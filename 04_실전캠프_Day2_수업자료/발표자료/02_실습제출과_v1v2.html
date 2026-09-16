@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>제출은 어디에 무엇을 — 실전 캠프 Day 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--ink:#14140F;--cream:#F2EFE6;--acid:#E8EC14;--stone:#B3B1A6;--rule-dark:#34342C;--paper:#FFFFFF;--paper-ink:#16160F;--paper-muted:#6E6C64;--rule-light:#E4E4DC;--row-hi:#FAFAE0;--olive:#7A7A00;--s:1;--body:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;word-break:keep-all;overflow-wrap:break-word;background:var(--ink);color:var(--cream);font-family:var(--body);overflow:hidden}
+.stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform:translate(-50%,-50%) scale(var(--s));transform-origin:center}
+.slide{position:absolute;inset:0;padding:88px 110px 80px;display:flex;flex-direction:column;overflow:hidden;background:var(--ink);color:var(--cream);opacity:0;visibility:hidden;transition:opacity .22s}
+.slide.on{opacity:1;visibility:visible}.slide.light{background:var(--paper);color:var(--paper-ink)}
+.eyebrow{font-family:var(--mono);font-size:24px;letter-spacing:.2em;color:var(--stone);margin:0 0 26px}.light .eyebrow{color:var(--paper-muted)}
+h1,h2,h3{font-weight:900;letter-spacing:-.025em;line-height:1.22;margin:0;text-wrap:balance}h2{font-size:80px}
+.y{color:var(--acid)}mark{color:var(--acid);background:none;padding:0}
+.light mark{color:inherit;background:linear-gradient(transparent 58%,var(--acid) 58%,var(--acid) 94%,transparent 94%);padding:0 .04em}
+.lead{font-size:36px;line-height:1.6;margin:34px 0 0;max-width:1500px}.light .lead{color:#3F3E38}.lead b{font-weight:700}.slide:not(.light) .lead b{color:var(--acid)}
+.foot{margin-top:auto;padding-top:28px}.note{font-size:23px;color:var(--stone);margin:0;line-height:1.5}.light .note{color:var(--paper-muted)}
+.cover{justify-content:center;align-items:center;text-align:center}.cover .eyebrow{letter-spacing:.3em;font-size:30px;font-family:var(--body)}
+.cover h1{font-size:104px;line-height:1.18}.cover .by{font-size:36px;color:var(--stone);margin-top:56px;line-height:1.5}
+.sec{justify-content:center}.sec .num{font-family:var(--mono);font-size:120px;color:var(--acid);line-height:1;margin-bottom:40px}.sec h2{font-size:92px}
+.cards{display:grid;gap:0;margin-top:50px;border:2px solid var(--rule-dark)}
+.cards>div{padding:38px 36px 40px;border-right:2px solid var(--rule-dark);min-height:240px}.cards>div:last-child{border-right:0}
+.cards .k{font-family:var(--mono);font-size:23px;color:var(--acid);margin:0 0 20px;letter-spacing:.06em}
+.cards .t{text-wrap:balance;font-size:36px;font-weight:700;line-height:1.4;margin:0}.cards .d{font-size:26px;line-height:1.55;color:var(--stone);margin:18px 0 0}
+.cards .on-acid{background:var(--acid);color:var(--ink)}.cards .on-acid .k,.cards .on-acid .d{color:var(--ink)}
+.light .cards,.light .cards>div{border-color:var(--rule-light)}.light .cards .k{color:var(--olive)}.light .cards .d{color:#4A4943}
+.scenes{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:54px}
+.scene{background:#1E1E17;border:2px solid var(--rule-dark);border-radius:6px;padding:40px 38px;display:flex;flex-direction:column;min-height:460px}
+.scene .when{font-family:var(--mono);font-size:22px;color:var(--acid);letter-spacing:.1em;margin:0 0 26px}
+.scene .q{text-wrap:balance;font-size:40px;font-weight:700;line-height:1.4;margin:0}.scene .q::before{content:"\201C";color:var(--acid)}.scene .q::after{content:"\201D";color:var(--acid)}
+.scene .d{font-size:26px;color:var(--stone);line-height:1.55;margin:auto 0 0;padding-top:30px}
+.table{width:100%;border-collapse:collapse;margin-top:44px;font-size:28px;table-layout:fixed}
+.table th{text-align:left;font-weight:500;font-size:22px;color:var(--paper-muted);padding:0 26px 18px;border-bottom:2px solid var(--rule-light)}
+.table td{padding:20px 24px;border-bottom:1px solid var(--rule-light);vertical-align:top;line-height:1.45;color:#3F3E38}
+.table td:first-child{font-weight:700;color:var(--paper-ink)}.table tr.hi td{background:var(--row-hi)}.table tr.hi td:first-child{box-shadow:inset 7px 0 0 var(--olive)}
+.table tr:last-child td{border-bottom:0}
+.slide:not(.light) .table th{color:var(--stone);border-color:var(--rule-dark)}.slide:not(.light) .table td{color:#E4E1D6;border-color:var(--rule-dark)}
+.slide:not(.light) .table td:first-child{color:var(--cream)}
+.split{display:grid;grid-template-columns:1fr 1fr;margin-top:56px;border:2px solid var(--rule-dark)}
+.split>div{padding:46px 50px}.split>div+div{border-left:2px solid var(--rule-dark)}
+.split .head{display:flex;align-items:baseline;gap:20px;margin:0 0 28px;flex-wrap:wrap}.split .head strong{font-size:42px;font-weight:900}.split .head span{font-family:var(--mono);font-size:23px;color:var(--stone)}
+.split ul{list-style:none;margin:0;padding:0;display:grid;gap:20px}.split li{font-size:30px;line-height:1.45;padding-left:40px;position:relative}
+.split li::before{content:"";position:absolute;left:0;top:.62em;width:18px;height:3px;background:var(--stone)}.split li b{font-weight:700}
+.split .on-acid{background:var(--acid);color:var(--ink)}.split .on-acid .head span{color:var(--ink)}.split .on-acid li::before{background:var(--ink)}
+.split .never li::before{width:20px;height:20px;top:.38em;background:none;border:3px solid var(--acid);border-radius:50%}
+.split .never li::after{content:"";position:absolute;left:-2px;top:calc(.38em + 9px);width:24px;height:3px;background:var(--acid);transform:rotate(-45deg)}
+.light .split,.light .split>div+div{border-color:var(--rule-light)}.light .split .head span{color:var(--paper-muted)}.light .split li::before{background:var(--paper-muted)}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);margin-top:54px;border-top:3px solid currentColor}.steps.three{grid-template-columns:repeat(3,1fr)}
+.steps>div{padding:38px 44px 0 0}.steps>div+div{padding-left:44px;border-left:1px solid var(--rule-dark)}.light .steps>div+div{border-color:var(--rule-light)}
+.steps .k{font-family:var(--mono);font-size:23px;color:var(--stone);margin:0 0 18px;letter-spacing:.1em}.light .steps .k{color:var(--paper-muted)}
+.steps .t{text-wrap:balance;font-size:38px;font-weight:900;line-height:1.3;margin:0 0 20px}.steps .d{font-size:27px;line-height:1.6;color:var(--stone);margin:0}.light .steps .d{color:#4A4943}
+.steps .hi .t{color:var(--acid)}.light .steps .hi .t{color:inherit;display:inline;background:linear-gradient(transparent 58%,var(--acid) 58%,var(--acid) 94%,transparent 94%)}
+.flowbox{margin-top:56px;display:flex;align-items:center;justify-content:center;gap:0;flex-wrap:wrap}
+.flowbox .n{border:3px solid var(--rule-dark);border-radius:8px;padding:34px 40px;min-width:380px;text-align:center}
+.flowbox .n b{display:block;font-size:38px;font-weight:900}.flowbox .n span{display:block;font-size:24px;color:var(--stone);margin-top:10px;line-height:1.4}
+.flowbox .n.hi{border-color:var(--acid);background:var(--acid);color:var(--ink)}.flowbox .n.hi span{color:var(--ink)}
+.flowbox .a{font-family:var(--mono);font-size:26px;color:var(--acid);padding:0 26px;text-align:center;line-height:1.3}
+.light .flowbox .n{border-color:var(--rule-light);background:#FBFBF7}.light .flowbox .n span{color:var(--paper-muted)}.light .flowbox .a{color:var(--olive)}
+.prompt{margin-top:40px;background:#1E1E17;border-left:6px solid var(--acid);padding:30px 40px;font-size:30px;line-height:1.55;border-radius:4px}
+.prompt .w{font-family:var(--mono);font-size:21px;color:var(--stone);display:block;margin-bottom:10px;letter-spacing:.1em}
+.light .prompt{background:#FBFBF7;color:#3F3E38}
+.big{font-size:120px;font-weight:900;color:var(--acid);line-height:1.1;margin:40px 0 0;letter-spacing:-.03em}
+.ui{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;padding:14px 24px;font-family:var(--mono);font-size:13px;color:var(--stone);z-index:9}
+.ui button{background:none;border:1px solid var(--rule-dark);color:var(--cream);font-family:var(--mono);font-size:13px;padding:8px 14px;border-radius:4px;cursor:pointer}
+.bar{position:fixed;left:0;top:0;height:4px;background:var(--acid);width:0;z-index:9;transition:width .2s}
+.hint{position:fixed;top:14px;right:20px;font-family:var(--mono);font-size:12px;color:var(--stone);z-index:9}
+</style></head><body>
+<div class="bar" id="progress"></div><div class="hint">← → 키 또는 화면 클릭</div>
+<div class="stage" id="stage">
+<section class="slide cover on"><p class="eyebrow">실전 캠프 Day 2 · 실습 ②</p><h1>제출은 <span class="y">어디에, 무엇을</span></h1><p class="by">v1은 오늘, v2는 10월 17일</p></section>
+<section class="slide light"><p class="eyebrow">제출하는 곳</p><h2>02 폴더 안에 <mark>내 이름 폴더</mark>가 있어요</h2>
+<div class="prompt" style="font-family:var(--mono);font-size:28px;line-height:1.7">02_실전캠프_Day2_실습제출/<br>├── 1조_유승균_마선생얼큰국밥/<br>├── 1조_이범례_부찌대학/<br>│&nbsp;&nbsp;&nbsp;├── README.md&nbsp;&nbsp;&nbsp;← 내 체크리스트<br>│&nbsp;&nbsp;&nbsp;├── v1/&nbsp;&nbsp;PRD.md · 제출서.md · 결과물/<br>│&nbsp;&nbsp;&nbsp;└── v2/&nbsp;&nbsp;PRD.md · 제출서.md · 결과물/<br>├── 2조_양진서_빈숲카페/<br>└── … 12명</div>
+<div class="foot"><p class="note">폴더와 빈 양식은 운영진이 미리 만들어 뒀어요. 사장님은 채우기만 하면 됩니다. 내 폴더만 고쳐요.</p></div></section>
+<section class="slide "><p class="eyebrow">무엇을 제출하나</p><h2>세 가지 — <span class="y">코드는 아니에요</span></h2>
+<div class="cards" style="grid-template-columns:repeat(3,1fr)">
+<div><p class="k">① PRD.md</p><p class="t">기획안</p><p class="d">무엇을 왜 만드나. 사전 과제로 쓴 PRD가 있으면 양식에 옮겨요. v1 범위와 v2 범위가 나뉘어 있어요.</p></div>
+<div class="on-acid"><p class="k">② 제출서.md</p><p class="t">링크 두 개</p><p class="d">내 개인 GitHub 저장소 주소(공개) + Vercel 인터넷 주소. 아티팩트 링크도 있으면.</p></div>
+<div><p class="k">③ 결과물/</p><p class="t">스크린샷</p><p class="d">만든 화면 사진 1~3장. 폰으로 찍어도 돼요.</p></div>
+</div>
+<div class="foot"><p class="note">코드는 내 개인 저장소에 두고, 여기엔 링크만. 링크만 있으면 누구나 코드와 화면으로 갈 수 있어요.</p></div></section>
+<section class="slide light"><p class="eyebrow">v1과 v2</p><h2>오늘은 <mark>v1</mark>, 한 달 뒤 <mark>v2</mark></h2>
+<table class="table"><colgroup><col style="width:18%"><col style="width:41%"><col style="width:41%"></colgroup>
+<tr><th></th><th>v1</th><th>v2</th></tr>
+<tr><td>언제</td><td><b>오늘</b> 17:00</td><td><b>10/17</b> · 10/2 온라인 점검</td></tr>
+<tr class="hi"><td>범위</td><td>오늘 안에 되는 것만. 외부 연결 없이. 화면 + 저장까지</td><td>API, 배민 데이터, 날씨, 카톡 알림 같은 외부 데이터·고도화</td></tr>
+<tr><td>예</td><td>근무표 입력 → 주급 계산 → 저장</td><td>배민 매출 자동 불러오기, 날씨 API로 준비량 추천</td></tr>
+<tr><td>어디</td><td>내폴더/v1/</td><td>내폴더/v2/</td></tr>
+</table>
+<div class="foot"><p class="note">범위가 크면 AI에게 "오늘 3시간 안에 되는 것만 남기고 나머지는 v2로 미뤄 줘"라고 하세요.</p></div></section>
+<section class="slide "><p class="eyebrow">실습 ② 순서</p><h2>AI에게 <span class="y">다섯 마디</span></h2>
+<div class="prompt"><span class="w">1 · 받기</span>https://github.com/selfishclub/baemin-ops-os-camp 저장소를 내 컴퓨터에 처음 가져와 줘. 홈 폴더 아래에.</div>
+<div class="prompt"><span class="w">2 · 내 폴더</span>02_실전캠프_Day2_실습제출 안의 내 폴더 [1조_이범례_부찌대학]을 열어 줘.</div>
+<div class="prompt"><span class="w">3 · PRD</span>내가 붙여넣는 기획안을 v1/PRD.md 양식에 맞춰 옮겨 줘. 오늘 되는 것만 v1에, 나머지는 v2 칸에. (없으면: 내 힘든 일은 ○○야. 양식대로 써 줘)</div>
+<div class="prompt"><span class="w">4 · 올리기</span>내 폴더만 바뀌었는지 확인하고, 비밀 없는지 본 다음 "v1 PRD 작성"으로 커밋하고 push해 줘.</div>
+<div class="prompt"><span class="w">5 · 확인</span>GitHub 웹에서 내 폴더 → v1/PRD.md 보이면 완료.</div></section>
+<section class="slide light"><p class="eyebrow">시간이 남으면</p><h2>같은 조 사장님 PRD를 <mark>AI에게 읽혀요</mark></h2>
+<div class="prompt"><span class="w">프롬프트</span>02_실전캠프_Day2_실습제출 폴더에서 2조 사장님들 PRD를 읽고, 내 PRD에 빠진 것이나 참고할 점을 알려 줘.</div>
+<p class="lead">같은 주제를 각자 만들고 서로 보는 게 이 캠프의 방식이에요.<br>좋은 건 가져오고, 내 것은 남에게 보여 줘요. GitHub이 그걸 가능하게 해요.</p></section>
+<section class="slide cover"><p class="eyebrow">11:25 ~ 12:00</p><h1>실습 ② <span class="y">시작</span></h1><p class="by">막히면 손 드세요 · 오류 메시지는 그대로 AI에게<br><span style="font-size:28px">12시에 02 폴더 제출 현황표를 같이 봅니다</span></p></section>
+
+</div>
+<div class="ui"><button id="prev">← 이전</button><span id="count">01 / 07</span><button id="next">다음 →</button></div>
+<script>
+(function(){var s=Array.prototype.slice.call(document.querySelectorAll('.slide')),c=document.getElementById('count'),p=document.getElementById('progress'),i=0;
+function pad(n){return(n<10?'0':'')+n}function fit(){var k=Math.min(window.innerWidth/1920,window.innerHeight/1080);document.documentElement.style.setProperty('--s',k)}
+function show(n){i=Math.max(0,Math.min(s.length-1,n));s.forEach(function(e,k){e.classList.toggle('on',k===i)});c.textContent=pad(i+1)+' / '+pad(s.length);p.style.width=((i+1)/s.length*100)+'%';try{history.replaceState(null,'','#'+(i+1))}catch(e){}}
+document.getElementById('prev').addEventListener('click',function(e){e.stopPropagation();show(i-1)});document.getElementById('next').addEventListener('click',function(e){e.stopPropagation();show(i+1)});
+document.addEventListener('keydown',function(e){if(['ArrowRight','PageDown',' ','Enter'].indexOf(e.key)>=0){e.preventDefault();show(i+1)}else if(['ArrowLeft','PageUp','Backspace'].indexOf(e.key)>=0){e.preventDefault();show(i-1)}else if(e.key==='Home')show(0);else if(e.key==='End')show(s.length-1)});
+document.getElementById('stage').addEventListener('click',function(e){if(e.clientX<window.innerWidth/3)show(i-1);else show(i+1)});
+window.addEventListener('resize',fit);fit();var st=parseInt((location.hash||'').replace('#',''),10);show(isNaN(st)?0:st-1)})();
+</script>
+</body></html>
