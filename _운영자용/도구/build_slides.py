@@ -119,7 +119,7 @@ d1.append(S("light", """<p class="eyebrow">GitHub이 있는 이유</p><h2>이유
 d1.append(S("", """<p class="eyebrow">이번 캠프에서</p><h2>저장소는 <span class="y">두 개</span>를 써요</h2>
 <div class="split">
 <div><p class="head"><strong>공동 저장소</strong><span>교실 게시판</span></p><ul>
-<li>지금 화면에 보이는 <b>baemin-ops-os-camp</b></li><li>우리 가게 소개</li><li>기획안(PRD)</li><li>제출서 — 링크 두 개</li><li>스크린샷</li><li>초대받은 12명만 봐요 (비공개)</li></ul></div>
+<li>지금 화면에 보이는 <b>baemin-ops-os-camp</b></li><li>우리 가게 소개</li><li>기획안(PRD)</li><li>제출서 — 링크 두 개</li><li>스크린샷</li><li>보는 건 누구나, 올리는 건 초대받은 12명</li></ul></div>
 <div class="on-acid"><p class="head"><strong>내 개인 저장소</strong><span>내 작업실 · 오후에 만듦</span></p><ul>
 <li><b>실제 코드와 화면</b></li><li>Vercel이 여기를 읽어 인터넷 주소를 만들어요</li><li>누구나 볼 수 있게 <b>공개(Public)</b></li><li>캠프 끝나도 계속 내 것</li><li>그 주소를 공동 저장소 제출서에 적어요</li></ul></div>
 </div>
