@@ -1,0 +1,17 @@
+# 비밀 파일 — 절대 올리지 않습니다
+.env
+.env.*
+*.pem
+*.key
+.claude/settings.local.json
+.codex/settings.local.json
+data/
+sessions/
+
+# 도구·시스템 파일
+node_modules/
+.vercel/
+.next/
+.DS_Store
+Thumbs.db
+*.zip
