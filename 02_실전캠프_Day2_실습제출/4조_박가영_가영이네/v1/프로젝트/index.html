@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gayoungene Menu Finder</title>
+  <meta name="description" content="Find Gayoungene dishes that match the ingredients you avoid, your spice level and the type of food you want. Order at the in-store kiosk." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to menu</a>
+
+  <div class="proto-bar" role="note">
+    <strong data-t="prototypeBadge">PROTOTYPE</strong>
+    <span data-t="prototypeNote">Demo data only · Not a live restaurant menu</span>
+  </div>
+
+  <header class="site-header">
+    <a class="brand" href="#/">
+      <span class="brand-mark" aria-hidden="true">가</span>
+      <span class="brand-text">
+        <span class="brand-ko">가영이네</span>
+        <span class="brand-sub">수제분식맛집</span>
+      </span>
+    </a>
+    <div class="header-right">
+      <span class="site-title" data-t="siteTitle">Gayoungene Menu Finder</span>
+      <label class="lang-select">
+        <span class="sr-only">Language</span>
+        <select id="lang"></select>
+      </label>
+    </div>
+  </header>
+
+  <div id="draft-bar" class="draft-bar" hidden>
+    <span data-t="draftTranslations">Draft translations · Not reviewed for customer use</span>
+  </div>
+
+  <nav class="site-nav" aria-label="Sections">
+    <a href="#/" data-nav="menu" data-t="nav.menu">Menu</a>
+    <a href="#/recommendations" data-nav="recommendations" data-t="nav.recommendations">Recommendations</a>
+    <a href="#/how-to-order" data-nav="how" data-t="nav.howToOrder">How to order</a>
+    <a href="#/visit" data-nav="visit" data-t="nav.visit">Visit</a>
+  </nav>
+
+  <main id="main" tabindex="-1"></main>
+
+  <footer class="site-footer">
+    <p class="order-note" data-t="order.note">Order and pay at the in-store kiosk or table ordering device.</p>
+    <p class="allergy-note" data-t="allergy.note">Ingredient filters are not an allergy-safety guarantee. Ask staff about allergies and cross-contact.</p>
+    <p class="demo-note" data-t="footer.demo">Education demo · Photos, prices, recipes, translations and store information still require review.</p>
+  </footer>
+
+  <div id="live" class="sr-only" aria-live="polite"></div>
+
+  <script src="data/menus.js"></script>
+  <script src="data/recommendations.js"></script>
+  <script src="data/store.js"></script>
+  <script src="data/ui-text.js"></script>
+  <script src="js/filter.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
