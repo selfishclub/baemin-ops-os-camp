@@ -26,6 +26,9 @@ export default async function proxy(request: NextRequest) {
   const isPublic = pathname === "/login" || pathname.startsWith("/api/auth/");
 
   if (!user && !isPublic) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+    }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = pathname === "/" ? "" : `?next=${encodeURIComponent(pathname)}`;
