@@ -68,6 +68,15 @@ test("names ingredient tones and stacks layers bottom-up", async () => {
   assert.match(page, /잔 아래\(1층\)부터/);
 });
 
+test("ships training checklist and quiz", async () => {
+  const [page, quiz, schema] = await Promise.all([read("../app/recipes/training/training-page.tsx"), read("../app/recipes/quiz.ts"), read("../supabase/schema.sql")]);
+  assert.match(page, /만들어 봤음/);
+  assert.match(page, /확인함/);
+  assert.match(quiz, /export function buildQuiz/);
+  assert.match(schema, /training_checks/);
+  assert.match(schema, /quiz_results/);
+});
+
 test("keeps image and video authoring without bundled cafe media", async () => {
   const studio = await read("../app/recipes/admin/studio.tsx");
   assert.match(studio, /사진 올리기/);

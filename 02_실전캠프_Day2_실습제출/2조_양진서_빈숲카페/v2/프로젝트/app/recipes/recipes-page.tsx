@@ -508,6 +508,7 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
             <p className={styles.headerNote}>{viewer ? `${viewer.displayName}님 · ${viewer.role === "owner" ? "사장" : "직원"}` : "공식 제조 기준"}</p>
           )}
           {viewer && pendingNotices.length > 0 && <a className={styles.noticeBadge} href="#changes-title">바뀐 레시피 {pendingNotices.length}</a>}
+          {viewer && <a href="/recipes/training">{canEdit ? "교육 현황" : "교육 체크"}</a>}
           {canEdit && <a href="/recipes/changes">확인 현황</a>}
           {canEdit && <a href="/recipes/staff">직원 관리</a>}
           {(canEdit || demo) && <a href="/recipes/admin">관리자 편집</a>}

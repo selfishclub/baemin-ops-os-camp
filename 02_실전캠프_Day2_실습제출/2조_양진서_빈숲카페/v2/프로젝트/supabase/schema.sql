@@ -206,6 +206,79 @@ as $$
 $$;
 grant execute on function public.recent_change_count(integer) to anon, authenticated;
 
+-- 3-2) 신입 메뉴 체크리스트 · 레시피 퀴즈 (v2 여유 있으면 1순위) ----------------------
+create table if not exists public.training_checks (
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  recipe_id text not null,
+  practiced_at timestamptz,
+  confirmed_by uuid references public.profiles (id) on delete set null,
+  confirmed_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, recipe_id)
+);
+
+create table if not exists public.quiz_results (
+  id bigserial primary key,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  score integer not null,
+  total integer not null,
+  detail_json jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_quiz_results_user on public.quiz_results (user_id, created_at desc);
+
+grant select, insert, update, delete on public.training_checks, public.quiz_results to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+
+alter table public.training_checks enable row level security;
+alter table public.quiz_results enable row level security;
+
+-- 직원은 자기 줄만 만들고 고친다. "확인함"(confirmed_*)은 사장만 바꿀 수 있게 트리거로 막는다.
+create or replace function public.guard_training_confirm()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_owner() then
+    if tg_op = 'INSERT' then
+      new.confirmed_by := null;
+      new.confirmed_at := null;
+    else
+      new.confirmed_by := old.confirmed_by;
+      new.confirmed_at := old.confirmed_at;
+    end if;
+  end if;
+  new.updated_at := now();
+  return new;
+end;
+$$;
+drop trigger if exists training_checks_guard on public.training_checks;
+create trigger training_checks_guard
+  before insert or update on public.training_checks
+  for each row execute function public.guard_training_confirm();
+
+drop policy if exists "training_select_self_or_owner" on public.training_checks;
+create policy "training_select_self_or_owner" on public.training_checks
+  for select to authenticated using (user_id = auth.uid() or public.is_owner());
+
+drop policy if exists "training_insert_self_or_owner" on public.training_checks;
+create policy "training_insert_self_or_owner" on public.training_checks
+  for insert to authenticated with check ((user_id = auth.uid() and public.is_active_user()) or public.is_owner());
+
+drop policy if exists "training_update_self_or_owner" on public.training_checks;
+create policy "training_update_self_or_owner" on public.training_checks
+  for update to authenticated using ((user_id = auth.uid() and public.is_active_user()) or public.is_owner());
+
+drop policy if exists "quiz_select_self_or_owner" on public.quiz_results;
+create policy "quiz_select_self_or_owner" on public.quiz_results
+  for select to authenticated using (user_id = auth.uid() or public.is_owner());
+
+drop policy if exists "quiz_insert_self" on public.quiz_results;
+create policy "quiz_insert_self" on public.quiz_results
+  for insert to authenticated with check (user_id = auth.uid() and public.is_active_user());
+
 -- 4) 사진 파일함 (비공개) -------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('recipe-media', 'recipe-media', false)
