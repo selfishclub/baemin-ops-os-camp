@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#5b3a1e">
+  <title>떡기리 직원 온라인북</title>
+  <meta name="description" content="떡기리 신입직원 교육 온라인북 — 폰으로 찾아보고 오픈·마감을 체크하는 매뉴얼">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <a href="#/" class="home-link" aria-label="첫 화면">🍡 떡기리 온라인북</a>
+    <form class="search-form" id="search-form" role="search">
+      <input type="search" id="search-input" placeholder="검색 (예: 라벨, 냉동, 마감)" autocomplete="off" aria-label="검색어">
+      <button type="submit" aria-label="검색">🔍</button>
+    </form>
+  </header>
+
+  <main id="app" class="app"></main>
+
+  <footer class="foot">
+    <p>떡기리 신입직원 교육 온라인북 v1 · 내용이 바뀌면 사장님이 <code>content.md</code>를 고쳐 다시 올립니다.</p>
+    <p class="muted">체크 상태는 이 폰에만 남고, 체크리스트는 날짜가 바뀌면 새로 시작합니다.</p>
+  </footer>
+
+  <script src="content.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
