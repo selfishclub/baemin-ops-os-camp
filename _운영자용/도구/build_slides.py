@@ -272,10 +272,10 @@ d3.append(S("", """<p class="eyebrow">열쇠 이야기</p><h2>공개 저장소�
 d3.append(S("light", """<p class="eyebrow">제출 전</p><h2>네 개만 <mark>확인</mark> — 주소가 먼저</h2>
 <table class="table"><colgroup><col style="width:8%"><col style="width:46%"><col style="width:46%"></colgroup>
 <tr><th>#</th><th>확인</th><th>방법</th></tr>
-<tr class="hi"><td>1</td><td>코드가 내 폴더 v1/프로젝트 안에 있나</td><td>GitHub 웹에서 내 폴더 → v1 → 앱 열어 보기</td></tr>
-<tr><td>2</td><td>.env · 키 · node_modules가 안 올라갔나</td><td>앱 폴더 파일 목록에 없음</td></tr>
-<tr><td>3</td><td>제출서 + 결과물/첫화면.png</td><td>첫화면.png가 '구경하기' 표에 올라가요</td></tr>
-<tr class="hi"><td>4</td><td>push 했나</td><td>GitHub 웹에서 보이면 끝</td></tr>
+<tr class="hi"><td>1</td><td>Vercel 주소가 열리나</td><td>내 폰 + 옆 사람 폰</td></tr>
+<tr><td>2</td><td>만든 폴더가 내 폴더 v1/프로젝트 안에 있나</td><td>GitHub 웹에서 내 폴더 → v1 → 프로젝트</td></tr>
+<tr><td>3</td><td>.env · 키 · node_modules가 안 올라갔나</td><td>프로젝트 폴더 파일 목록에 없음</td></tr>
+<tr class="hi"><td>4</td><td>제출서(주소) + 결과물/첫화면.png + push</td><td>GitHub 웹에서 보이면 끝</td></tr>
 </table>
 <div class="foot"><p class="note">Vercel 주소는 AI에게 "이 프로젝트를 Vercel에 배포해 줘, npx vercel로" 한마디. 로그인만 사장님이. 고치면 "다시 배포해 줘".</p></div>"""))
 d3.append(S("light", """<p class="eyebrow">완성 후 · 10/17 이후</p><h2>다 만들면 <mark>개인 저장소</mark>로 가져가요</h2>
