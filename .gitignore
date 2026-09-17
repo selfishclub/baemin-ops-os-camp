@@ -15,3 +15,16 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.zip
+
+# 앱을 만들 때 생기는 것 — 올리지 않습니다
+.next/
+dist/
+build/
+out/
+.turbo/
+coverage/
+*.log
+__pycache__/
+.venv/
+venv/
+.cache/
