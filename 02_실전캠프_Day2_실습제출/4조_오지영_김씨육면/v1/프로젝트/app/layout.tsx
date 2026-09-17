@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "김씨육면 월말 정산",
+  title: "김씨육면 손익관리",
   description: "월말 정산·손익관리",
 };
 

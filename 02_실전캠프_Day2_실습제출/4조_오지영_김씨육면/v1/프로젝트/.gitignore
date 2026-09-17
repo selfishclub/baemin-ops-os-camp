@@ -8,3 +8,5 @@ next-env.d.ts
 
 # 실제 정산 데이터 — 공개 저장소에 올리지 않음 (fixtures/의 가짜 시연 파일은 올림)
 data/*.csv
+.vercel
+.env*
