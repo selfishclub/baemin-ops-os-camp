@@ -75,6 +75,8 @@ window.GAYOUNGENE_DATA["ui"] =
       "card.soldOut": "Sold out",
       "card.needsCheck": "Some ingredients not verified",
       "card.detailsUnverified": "Spice & ingredients not verified",
+      "detail.spiceUnknownNote": "Spice level has not been checked yet. Ask staff before ordering if you are sensitive to spicy food.",
+      "card.contains": "Contains",
       "detail.back": "Back to menu",
       "detail.ingredients": "Ingredients",
       "detail.status.contains": "Contains",

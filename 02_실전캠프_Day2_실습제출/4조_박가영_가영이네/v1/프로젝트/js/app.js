@@ -32,6 +32,23 @@ function recReason(rec) {
 function spiceLabel(level) {
   return t(`spiceLabel.${level === null || level === undefined ? "null" : level}`);
 }
+// 맵기 눈금: 불꽃 3칸. level 0~3 = 켜진 불꽃 수, null = 회색 3개 + ?
+const FLAME = `<svg viewBox="0 0 24 28" aria-hidden="true"><path class="f-out" d="M12 1c1 4 4 6 5.5 9.5C19 14 19 17 17.5 20A7.5 7.5 0 0 1 4.5 20C3 17 3.5 13.5 6 11c.3 2 1.3 3.2 2.5 3.8C8 10 9.5 5 12 1z"/><path class="f-in" d="M12 15c.8 2 2.6 3 2.6 5.4A2.9 2.9 0 0 1 9.4 20.4C9.4 18 11 17.5 12 15z"/></svg>`;
+function spiceMeterHTML(level, size) {
+  const unknown = level === null || level === undefined;
+  const flames = [1, 2, 3].map((i) => `<span class="flame ${!unknown && i <= level ? "on" : ""} ${unknown ? "unk" : ""}">${FLAME}</span>`).join("");
+  return `<span class="spice-meter ${size}" role="img" aria-label="${spiceLabel(level)}">${flames}${unknown ? `<span class="flame-q">?</span>` : ""}</span>`;
+}
+// 재료 아이콘 (이모지). 필터 버튼·카드·상세에서 같이 쓴다.
+const ING_ICON = { pork: "🐷", beef: "🐮", chicken: "🐔", seafood: "🐟", egg: "🥚", dairy: "🥛" };
+const SPICE_OPT_ICON = { any: "", 0: "❄️ ", 1: "🔥 ", 2: "🔥🔥 ", 3: "🔥🔥🔥 " };
+function ingIcon(key) { return `<span class="ing-icon" aria-hidden="true">${ING_ICON[key] ?? ""}</span>`; }
+// 카드용: 포함(contains) 확인된 재료 아이콘만 나열
+function containsIconsHTML(menu) {
+  const keys = DATA.ingredientKeys.filter((k) => menu.ingredients?.[k] === "contains");
+  if (!keys.length) return "";
+  return `<div class="contains-row" aria-label="${t("card.contains")}"><span class="contains-label">${t("card.contains")}</span>${keys.map((k) => `<span class="ing-chip" title="${t(`ingredient.${k}`)}">${ING_ICON[k]}</span>`).join("")}</div>`;
+}
 function categoryLabel(id) {
   return t(`foodType.${id}`);
 }
@@ -112,7 +129,9 @@ function cardHTML(menu, extra = "") {
         <span class="num">${menu.sample ? t("card.sample") + " · " : ""}${esc(menu.menuNumber)}</span>
         <span class="name">${esc(menuName(menu))}</span>
         <span class="name-ko" lang="ko">${esc(menu.nameKo)}</span>
-        <div class="badges"><span class="badge ${spiceUnknown && ingUnknown ? "check" : "spice"}">${spiceUnknown && ingUnknown ? t("card.detailsUnverified") : spiceLabel(menu.spiceLevel)}</span>${sold}${check}</div>
+        <div class="spice-row">${spiceMeterHTML(menu.spiceLevel, "sm")}<span class="spice-text">${spiceLabel(menu.spiceLevel)}</span></div>
+        ${containsIconsHTML(menu)}
+        <div class="badges">${sold}${check}${spiceUnknown && ingUnknown ? `<span class="badge check">${t("card.needsCheck")}</span>` : ""}</div>
         <span class="meta">${menu.priceKrw === null ? t("card.pricePending") : `${menu.priceKrw.toLocaleString()} KRW`}</span>
         ${extra}
       </div>
@@ -135,9 +154,9 @@ function renderHome() {
   const f = state.filters;
   const chips = DATA.ingredientKeys.map((k) => {
     const on = f.avoid.includes(k);
-    return `<button type="button" class="chip" role="checkbox" aria-checked="${on}" data-avoid="${k}"><span class="mark" aria-hidden="true">${on ? "✓" : "+"}</span>${t(`ingredient.${k}`)}</button>`;
+    return `<button type="button" class="chip" role="checkbox" aria-checked="${on}" data-avoid="${k}"><span class="mark" aria-hidden="true">${on ? "✓" : "+"}</span>${ingIcon(k)}${t(`ingredient.${k}`)}</button>`;
   }).join("");
-  const spiceOpts = ["any", 0, 1, 2, 3].map((v) => `<option value="${v}" ${String(f.maxSpice ?? "any") === String(v) ? "selected" : ""}>${t(`spice.${v}`)}</option>`).join("");
+  const spiceOpts = ["any", 0, 1, 2, 3].map((v) => `<option value="${v}" ${String(f.maxSpice ?? "any") === String(v) ? "selected" : ""}>${SPICE_OPT_ICON[v]}${t(`spice.${v}`)}</option>`).join("");
   const types = [{ id: "all" }, ...DATA.categories].map((c) => `<button type="button" class="chip" role="radio" aria-checked="${f.foodType === c.id}" data-type="${c.id}">${categoryLabel(c.id)}</button>`).join("");
 
   main.innerHTML = `
@@ -195,11 +214,11 @@ function renderDetail(id) {
   }
   const ing = DATA.ingredientKeys.map((k) => {
     const s = menu.ingredients?.[k] ?? "unknown";
-    return `<li><span>${t(`ingredient.${k}`)}</span><span class="status ${s}">${t(`detail.status.${s}`)}</span></li>`;
+    return `<li><span class="ing-name">${ingIcon(k)}${t(`ingredient.${k}`)}</span><span class="status ${s}">${t(`detail.status.${s}`)}</span></li>`;
   }).join("");
   const reasons = Filter.matchedReasons(menu, state.filters);
   const matched = Filter.hasAnyFilter(state.filters)
-    ? (reasons.length ? `<ul class="matched">${reasons.map((r) => `<li>${r.type === "avoid" ? `${t("detail.status.absent_verified")}: ${t(`ingredient.${r.key}`)}` : r.type === "spice" ? spiceLabel(r.level) : categoryLabel(r.id)}</li>`).join("")}</ul>` : "")
+    ? (reasons.length ? `<ul class="matched">${reasons.map((r) => `<li>${r.type === "avoid" ? `${ING_ICON[r.key]} ${t("detail.status.absent_verified")}: ${t(`ingredient.${r.key}`)}` : r.type === "spice" ? spiceLabel(r.level) : categoryLabel(r.id)}</li>`).join("")}</ul>` : "")
     : `<p class="small">${t("detail.noFilters")}</p>`;
   const sold = menu.availability === "sold_out" ? `<span class="badge sold">${t("card.soldOut")}</span>` : "";
 
@@ -218,7 +237,7 @@ function renderDetail(id) {
     <section class="panel"><h2>${t("detail.ingredients")}</h2><ul class="ing-list">${ing}</ul>
       ${menuField(menu, "ingredientNote") ? `<p class="small">${esc(menuField(menu, "ingredientNote"))}</p>` : ""}
       <p class="small">${t("detail.statusNote")}</p></section>
-    <section class="panel"><h2>${t("detail.spice")}</h2><span class="badge spice">${spiceLabel(menu.spiceLevel)}</span></section>
+    <section class="panel"><h2>${t("detail.spice")}</h2><div class="spice-row lg">${spiceMeterHTML(menu.spiceLevel, "lg")}<span class="spice-text lg">${spiceLabel(menu.spiceLevel)}</span></div>${menu.spiceLevel === null ? `<p class="small">${t("detail.spiceUnknownNote")}</p>` : ""}</section>
     <section class="panel"><h2>${t("detail.matched")}</h2>${matched}</section>
     <p class="notice warn">${t("allergy.note")} ${t("allergy.notVegan")}</p>
     <a class="btn" href="#/find/${esc(menu.menuNumber)}">${t("detail.findInStore")}</a>

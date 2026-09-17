@@ -221,3 +221,36 @@ h2 { font-size: 18px; margin: 0 0 8px; }
 .photo.has-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .photo.has-img .photo-fallback { display: none; }
 .photo.large.has-img { border-radius: var(--radius); overflow: hidden; }
+
+/* ── spice flame meter ── */
+.spice-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.spice-row.lg { gap: 12px; margin-top: 2px; }
+.spice-meter { display: inline-flex; align-items: center; gap: 2px; position: relative; }
+.spice-meter .flame { width: 20px; height: 24px; display: inline-block; }
+.spice-meter.lg .flame { width: 34px; height: 40px; }
+.spice-meter .flame svg { width: 100%; height: 100%; display: block; }
+.flame .f-out { fill: #e8e0d8; }
+.flame .f-in { fill: #fbf7f2; }
+.flame.on .f-out { fill: url(#flame-grad, #ff6a00); fill: #ff6a00; }
+.flame.on .f-in { fill: #ffd166; }
+.flame.on:nth-child(2) .f-out { fill: #ff4d1f; }
+.flame.on:nth-child(3) .f-out { fill: #e8231a; }
+.flame.on { filter: drop-shadow(0 1px 1px rgba(232, 35, 26, .25)); animation: flicker 1.6s ease-in-out infinite; transform-origin: 50% 90%; }
+.flame.on:nth-child(2) { animation-delay: .25s; }
+.flame.on:nth-child(3) { animation-delay: .5s; }
+.flame.unk { opacity: .7; }
+.flame-q { position: absolute; right: -6px; top: -4px; background: var(--muted); color: #fff; font-size: 11px; font-weight: 900; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; }
+.spice-meter.lg .flame-q { width: 22px; height: 22px; font-size: 14px; right: -8px; top: -6px; }
+.spice-text { font-size: 12px; font-weight: 700; color: var(--orange-dark); }
+.spice-text.lg { font-size: 16px; }
+@keyframes flicker { 0%, 100% { transform: scale(1) rotate(0); } 50% { transform: scale(1.06) rotate(-2deg); } }
+@media (prefers-reduced-motion: reduce) { .flame.on { animation: none; } }
+
+/* ── ingredient icons ── */
+.ing-icon { font-size: 18px; line-height: 1; margin-right: 4px; }
+.chip .ing-icon { margin-right: 2px; }
+.ing-name { display: inline-flex; align-items: center; gap: 2px; }
+.ing-list .ing-icon { font-size: 22px; margin-right: 6px; }
+.contains-row { display: flex; align-items: center; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+.contains-label { font-size: 11px; color: var(--muted); font-weight: 700; margin-right: 2px; }
+.ing-chip { font-size: 16px; line-height: 1; background: #fff3ea; border: 1px solid #f5d5c0; border-radius: 999px; padding: 3px 5px; }
