@@ -97,6 +97,15 @@ create table if not exists public.recipe_audit_log (
 );
 create index if not exists idx_recipe_audit_created_at on public.recipe_audit_log (created_at);
 
+-- 2-1) 로그인한 사용자 역할에 표 접근 권한 (이게 없으면 잠금 규칙 이전에 "permission denied"가 난다)
+grant usage on schema public to authenticated, anon;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+grant execute on all functions in schema public to authenticated, anon;
+alter default privileges in schema public grant select, insert, update, delete on tables to authenticated;
+alter default privileges in schema public grant usage, select on sequences to authenticated;
+alter default privileges in schema public grant execute on functions to authenticated, anon;
+
 -- 3) 잠금(RLS) ----------------------------------------------------------------
 alter table public.profiles enable row level security;
 alter table public.recipe_workspaces enable row level security;
