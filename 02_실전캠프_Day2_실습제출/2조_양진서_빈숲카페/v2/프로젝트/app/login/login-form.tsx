@@ -11,7 +11,11 @@ export default function LoginForm({ next, reason }: { next: string; reason: stri
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState(reason === "inactive" ? "사용이 중지된 계정입니다. 사장님께 문의해 주세요." : "");
+  const reasonMessage: Record<string, string> = {
+    inactive: "사용이 중지된 계정입니다. 사장님께 문의해 주세요.",
+    noprofile: "로그인은 됐지만 직원 정보를 읽지 못했습니다. 데이터 창고 권한 설정(supabase/schema.sql)을 확인한 뒤, 아래 로그아웃 후 다시 로그인해 주세요.",
+  };
+  const [message, setMessage] = useState(reasonMessage[reason] ?? "");
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -63,6 +67,11 @@ export default function LoginForm({ next, reason }: { next: string; reason: stri
         </label>
         {message && <p className={styles.message} role="alert">{message}</p>}
         <button type="submit" disabled={busy}>{busy ? "확인하는 중…" : "로그인"}</button>
+        {reason && (
+          <button type="button" className={styles.secondary} onClick={async () => { await fetch("/api/auth/logout", { method: "post" }); window.location.href = "/login"; }}>
+            로그아웃하고 처음부터
+          </button>
+        )}
         <p className={styles.note}>레시피는 가게 영업 비밀입니다. 화면을 밖으로 공유하지 마세요.</p>
       </form>
     </main>

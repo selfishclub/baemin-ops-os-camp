@@ -34,7 +34,8 @@ export default async function proxy(request: NextRequest) {
     url.search = pathname === "/" ? "" : `?next=${encodeURIComponent(pathname)}`;
     return NextResponse.redirect(url);
   }
-  if (user && pathname === "/login") {
+  // 로그인은 됐는데 프로필이 없거나 중지된 경우(reason=...)는 로그인 화면에 머물게 둔다 (무한 반복 방지)
+  if (user && pathname === "/login" && !request.nextUrl.searchParams.get("reason")) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";

@@ -24,11 +24,12 @@ export async function getViewerSession(): Promise<ViewerSession> {
   const { data: { user } } = await db.auth.getUser();
   if (!user) return { mode: "auth", viewer: null, db };
 
-  const { data: profile } = await db
+  const { data: profile, error } = await db
     .from("profiles")
     .select("id, login_id, display_name, role, active")
     .eq("id", user.id)
     .maybeSingle();
+  if (error) console.error("[auth] 프로필을 읽지 못했습니다:", error.message);
   if (!profile) return { mode: "auth", viewer: null, db };
 
   return {
@@ -48,7 +49,11 @@ export async function getViewerSession(): Promise<ViewerSession> {
 export async function requireActiveViewer(returnTo: string): Promise<ViewerSession> {
   const session = await getViewerSession();
   if (session.mode === "demo") return session;
-  if (!session.viewer) redirect(`/login?next=${encodeURIComponent(returnTo)}`);
+  if (!session.viewer) {
+    const { data: { user } } = await session.db.auth.getUser();
+    // 로그인은 됐는데 프로필을 못 읽는 경우 → 로그인 화면에 이유를 보여 주고 멈춘다 (되돌리기 반복 방지)
+    redirect(user ? "/login?reason=noprofile" : `/login?next=${encodeURIComponent(returnTo)}`);
+  }
   if (!session.viewer.active) redirect("/login?reason=inactive");
   return session;
 }

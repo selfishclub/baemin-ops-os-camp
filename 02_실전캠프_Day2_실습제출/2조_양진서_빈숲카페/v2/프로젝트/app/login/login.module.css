@@ -43,6 +43,7 @@
   cursor: pointer;
 }
 .card button:disabled { opacity: .6; cursor: default; }
+.card button.secondary { background: white; color: #173f31; border: 1px solid #173f31; }
 
 .message { margin: 0; padding: 10px 12px; border-radius: 10px; background: #fff0ec; color: #9a3b2c; font-size: 13px; font-weight: 700; }
 .note { margin: 6px 0 0; color: #7a8078; font-size: 12px; line-height: 1.6; }
