@@ -420,13 +420,12 @@ const App = (() => {
   /* 왼쪽 메뉴: 대카테고리(g) 아래 하위 메뉴(items). 대카테고리를 누르면 접었다 펼친다.
      g 가 null 이면 헤더 없이 바로 버튼(설정). */
   const MENU = [
-    { id: 'work', g: '업무', ic: '🗂️', items: [['rules', '공지사항 필독', '📌'], ['tanks', '수조 관리표', '🐟'], ['today', '할 일', '✅'], ['routines', '루틴', '🔁'], ['report', '기록', '📊']] },
-    { id: 'shift', g: '근무', ic: '📅', items: [['month', '월간 근무표', '📅']] },
-    { id: 'people', g: '직원', ic: '👥', items: [['staff', '직원 명단', '🧑‍🍳'], ['contracts', '근로계약서', '📄']] },
+    { id: 'work', g: '업무', ic: '🗂️', items: [['rules', '공지사항 필독', '📌'], ['tanks', '수조 관리표', '🐟'], ['today', '할 일', '✅'], ['report', '기록', '📊']] },
+    { id: 'people', g: '직원', ic: '👥', items: [['month', '월간 근무표', '📅'], ['staff', '직원 명단', '🧑‍🍳'], ['contracts', '근로계약서', '📄']] },
     { id: 'ops', g: '운영', ic: '🏪', items: [['costs', '원가 관리', '💰'], ['notices', '월간 공지', '📢'], ['issues', '이슈 노트', '📝']] },
     { id: 'kitchen', g: '주방', ic: '🍳', items: [['recipes', '레시피 관리', '📖']] },
     { id: 'acct', g: '회계', ic: '💵', items: [['salesIn', '매출 입력', '🧾'], ['salesStat', '매출 분석', '📈'], ['pnl', '월 손익', '📘'], ['labor', '인건비', '👷']] },
-    { id: 'sys', g: null, items: [['settings', '설정', '⚙️']] },
+    { id: 'sys', g: '설정', ic: '⚙️', items: [['settings', '설정', '⚙️'], ['routines', '루틴', '🔁']] },
   ];
   const groupOf = (k) => MENU.find((m) => m.items.some(([x]) => x === k));
 
@@ -822,6 +821,15 @@ const App = (() => {
 
     if (isPast) h += `<div class="notice past"><b>지난 날짜를 보고 있습니다.</b> 빠뜨린 항목을 지금 채워 넣을 수 있습니다.</div>`;
     if (isFuture) h += `<div class="notice past"><b>아직 오지 않은 날짜입니다.</b> 그날 어떤 업무가 잡혀 있는지만 볼 수 있습니다.</div>`;
+
+    /* 하루 전체 진행률 — 시간대 상관없이 오늘 총작업량 기준 (휴식 제외) */
+    const allReal = real(ids), allDone = doneN(ids), allLeft = allReal.length - allDone;
+    const allPct = allReal.length ? Math.round(allDone / allReal.length * 100) : 0;
+    h += `<div class="progCard dayTotal${allLeft === 0 && allReal.length ? ' done' : ''}">
+      <div class="pcTop"><div><b>오늘 전체 진행률</b><div class="hint">오픈 · 미들 · 마감 ${allReal.length}건 기준 · 완료 ${allDone}건</div></div>
+        <div class="pcNum">${allPct}<small>%</small></div></div>
+      <div class="bar"><i style="width:${allPct}%"></i></div>
+      <div class="pcFoot">${allLeft === 0 && allReal.length ? '오늘 업무를 전부 마쳤습니다 🎉' : `남은 업무 <b>${allLeft}건</b>`}${SLOTS.map((sl) => { const l = inSlot(sl.key); const left = real(l).length - doneN(l); return left ? ` · ${sl.name} ${left}` : ''; }).join('')}</div></div>`;
 
     /* 오픈 / 미들 / 마감 — 시간대 세그먼트 */
     h += `<div class="slotTabs">${SLOTS.map((sl) => {
@@ -1354,7 +1362,7 @@ const App = (() => {
           <span class="lbar"><i style="width:${v / mx * 100}%"></i></span><span class="lv">${fmtWon(v)}</span></div>`).join('')}</div>`;
     }
 
-    h += `<div class="hd sub2"><h3>매입 내역</h3></div>`;
+    h += `<div class="hd sub2"><h3>매입 내역</h3><span class="hint" style="margin:0">분류 · 품목 · <b>수량</b> · <b>거래처</b> · 금액 · 기록자 — 줄을 누르면 수정</span></div>`;
     if (!list.length) {
       h += `<div class="notice"><b>이번 달 매입 기록이 없습니다.</b>
         <div class="hint">입고될 때마다 <b>+ 매입 입력</b>으로 바로 적어두세요. 영수증이 쌓이고 나서 몰아 적으면 반드시 빠집니다.</div></div>`;
@@ -1369,7 +1377,9 @@ const App = (() => {
         }
         h += `<button class="prow" data-act="purchaseEdit" data-id="${x.id}">
           <span class="chip cat">${esc(x.cat)}</span>
-          <span class="pnm">${esc(x.name)}${x.qty ? ` <small>${esc(x.qty)}${esc(x.unit || '')}</small>` : ''}${x.vendor ? ` <small>· ${esc(x.vendor)}</small>` : ''}</span>
+          <span class="pnm">${esc(x.name)}</span>
+          <span class="pqty">${x.qty ? `${esc(x.qty)}<small>${esc(x.unit || '')}</small>` : '<small class="dim">수량 없음</small>'}</span>
+          <span class="pvendor">${x.vendor ? `🏷 ${esc(x.vendor)}` : '<small class="dim">거래처 없음</small>'}</span>
           <span class="pamt">${fmtWon(x.amount)}</span>
           <span class="pby">${esc(x.by || '')}</span>
         </button>`;
