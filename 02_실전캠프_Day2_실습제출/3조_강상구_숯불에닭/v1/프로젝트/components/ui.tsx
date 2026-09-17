@@ -40,27 +40,36 @@ export function ConfirmDialog({
   );
 }
 
-// 쉼표가 찍히는 금액 입력 칸
+// 쉼표가 찍히는 금액 입력 칸.
+// allowEmpty: 빈 칸(null = 아직 안 넣음)과 0(= 없음)을 구분해야 하는 칸에 쓴다.
 export function MoneyInput({
   value,
   onChange,
   label,
   disabled,
+  allowEmpty = false,
+  placeholder = "0",
 }: {
-  value: number;
-  onChange: (n: number) => void;
+  value: number | null;
+  onChange: (n: number | null) => void;
   label: string;
   disabled?: boolean;
+  allowEmpty?: boolean;
+  placeholder?: string;
 }) {
+  const text = value === null ? "" : allowEmpty ? num(value) : value ? num(value) : "";
   return (
     <input
       aria-label={label}
       inputMode="numeric"
       className="field num text-right"
       disabled={disabled}
-      value={value ? num(value) : ""}
-      placeholder="0"
-      onChange={(e) => onChange(parseNum(e.target.value))}
+      value={text}
+      placeholder={placeholder}
+      onChange={(e) => {
+        const digits = e.target.value.replace(/[^d]/g, "");
+        onChange(digits === "" ? (allowEmpty ? null : 0) : parseNum(digits));
+      }}
     />
   );
 }

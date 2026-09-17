@@ -93,6 +93,9 @@ export default function PnlPage() {
           <h2 className="text-base font-bold">{monthLabel(month)} 손익</h2>
           <span className="text-[11px] text-stone-500">금액 · 매출 대비 %{hasPrev && " · 지난달 대비"}</span>
         </div>
+        <p className="mb-1 rounded-lg bg-stone-50 px-2 py-1.5 text-[11px] text-stone-600">
+          기준 — <b>매출·배달앱 수수료</b>: 주문이 발생한 달 · <b>비용</b>: 통장에서 돈이 나간 날. 다른 달에 결제한 비용은 지출추가 탭에서 날짜를 맞춰 넣을 수 있어요.
+        </p>
         <ul className="divide-y divide-stone-100">
           {pnl.lines.map((line) => (
             <PnlRow key={line.label} line={line} diff={diff[line.label] ?? null} open={open === line.label} onToggle={() => setOpen(open === line.label ? null : line.label)} />

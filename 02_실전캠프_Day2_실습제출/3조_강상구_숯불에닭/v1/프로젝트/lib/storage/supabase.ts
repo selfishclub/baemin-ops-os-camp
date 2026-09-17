@@ -86,6 +86,7 @@ export class SupabaseStore implements Store {
         orders: Number(r.orders),
         deposit: Number(r.deposit),
         count: Number(r.order_count),
+        unsettled: r.unsettled === null || r.unsettled === undefined ? null : Number(r.unsettled),
       }),
     );
   }
@@ -100,6 +101,7 @@ export class SupabaseStore implements Store {
           orders: s.orders,
           deposit: s.deposit,
           order_count: s.count,
+          unsettled: s.unsettled ?? null,
         })),
       ),
     );

@@ -38,9 +38,10 @@ export interface ChannelSale {
   month: Month;
   channel: ChannelId;
   name: string;
-  orders: number; // 주문금액 (손님이 결제한 돈)
-  deposit: number; // 입금액 (수수료 빠지고 들어온 돈)
+  orders: number; // 주문금액 — 이 달에 주문된 금액 (주문일 기준)
+  deposit: number; // 정산금액 — 이 달 주문분에서 수수료를 빼고 받을(받은) 돈. 통장에 들어온 날과 상관없음
   count: number; // 건수
+  unsettled?: number | null; // 월말 미입금액 — 이 달 주문분 중 다음 달에 들어올 돈. null/없음 = 안 넣음
 }
 
 export interface EditLog {

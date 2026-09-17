@@ -110,17 +110,32 @@ describe("손익", () => {
   });
 });
 
-describe("수수료율·입금 대조", () => {
-  it("배민 9,000,000 → 7,650,000 이면 15.0%", () => {
-    const fees = channelFees(sampleChannelSales("2026-08"), [
-      tx({ in: 7_650_000, channel: "baemin", major: "수입" }),
-      tx({ in: 4_050_000, channel: "coupang", major: "수입" }),
-    ]);
-    const baemin = fees.find((f) => f.channel === "baemin")!;
-    expect(baemin.feeRate).toBe(15);
-    expect(baemin.gap).toBe(0);
-    expect(fees.find((f) => f.channel === "coupang")!.gap).toBe(50_000);
-    expect(fees.find((f) => f.channel === "hall")!.feeRate).toBeNull();
+describe("수수료율·입금 대조 (주문일 기준)", () => {
+  const sale = (p: Partial<import("./types").ChannelSale>) => ({
+    month: "2026-08", channel: "baemin" as const, name: "배민", orders: 9_000_000, deposit: 7_650_000, count: 300, ...p,
+  });
+  it("수수료율은 같은 주문분끼리: 9,000,000 → 7,650,000 이면 15.0%", () => {
+    const [f] = channelFees([sale({})], []);
+    expect(f.fee).toBe(1_350_000);
+    expect(f.feeRate).toBe(15);
+  });
+  it("들어와야 할 돈 = 지난달 미입금 + 이 달 정산금액 − 이 달 말 미입금", () => {
+    const bank = [tx({ in: 7_500_000, channel: "baemin", major: "수입" })];
+    const prev = [sale({ month: "2026-07", unsettled: 300_000 })];
+    const [f] = channelFees([sale({ unsettled: 450_000 })], bank, prev);
+    expect(f.expectedBank).toBe(300_000 + 7_650_000 - 450_000);
+    expect(f.gap).toBe(0);
+    expect(f.gapKind).toBe("확정");
+  });
+  it("월말 미입금액을 안 넣으면 차이에 정산 시차가 섞여 있다고 알린다", () => {
+    const [f] = channelFees([sale({ unsettled: null })], [tx({ in: 7_200_000, channel: "baemin", major: "수입" })]);
+    expect(f.gap).toBe(450_000);
+    expect(f.gapKind).toBe("시차 포함");
+  });
+  it("홀은 수수료율을 계산하지 않는다", () => {
+    const [f] = channelFees([sale({ channel: "hall", name: "홀" })], []);
+    expect(f.feeRate).toBeNull();
+    expect(f.fee).toBe(0);
   });
 });
 
@@ -129,6 +144,7 @@ describe("이상한 숫자", () => {
     expect(checkChannelSale({ name: "배민", orders: 100, deposit: 200, count: 1 })[0].level).toBe("warn");
     expect(checkChannelSale({ name: "배민", orders: 1000, deposit: 900, count: 1 }, 100)[0].level).toBe("warn");
     expect(checkChannelSale({ name: "배민", orders: -1, deposit: 0, count: 0 })[0].level).toBe("error");
+    expect(checkChannelSale({ name: "배민", orders: 1000, deposit: 900, count: 1, unsettled: 950 })[0].level).toBe("warn");
     expect(checkExpense(0, "2026-08-01")[0].level).toBe("error");
   });
 });
@@ -158,9 +174,13 @@ describe("시연 파일 한 바퀴", () => {
     expect(txs.length).toBeGreaterThanOrEqual(60);
     expect(unknown).toHaveLength(7);
     const fees = channelFees(sampleChannelSales("2026-08"), txs);
-    expect(fees.find((f) => f.channel === "baemin")!.gap).toBe(0);
-    expect(fees.find((f) => f.channel === "coupang")!.gap).toBe(50_000);
-    expect(fees.find((f) => f.channel === "hall")!.gap).toBe(0);
+    const of = (c: string) => fees.find((f) => f.channel === c)!;
+    expect(of("baemin").gap).toBe(0); // 월말 미입금 45만 원을 빼면 통장과 일치
+    expect(of("hall").gap).toBe(0);
+    expect(of("coupang").gap).toBe(50_000); // 진짜 차이
+    expect(of("coupang").gapKind).toBe("확정");
+    expect(of("yogiyo").gapKind).toBe("시차 포함"); // 월말 미입금액을 안 넣음
+    expect(of("yogiyo").gap).toBe(120_000);
     const pnl = computePnl(txs, sampleChannelSales("2026-08"));
     expect(pnl.lines.find((l) => l.label === "임대료")!.amount).toBe(2_230_000);
   });

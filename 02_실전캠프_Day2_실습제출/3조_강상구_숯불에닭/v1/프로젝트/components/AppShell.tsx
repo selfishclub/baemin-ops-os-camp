@@ -56,15 +56,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
           : "시연 모드 — 가짜 데이터만 넣으세요. 누구나 볼 수 있어요"}
       </div>
 
-      <header className="sticky top-0 z-10 flex items-center justify-between bg-stone-100/95 px-4 py-3 backdrop-blur">
-        <h1 className="text-base font-bold">🔥 한눈 손익 장부</h1>
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-stone-100/95 px-4 py-3 backdrop-blur">
+        <h1 className="min-w-0 truncate text-sm font-bold sm:text-base">🔥 한눈 손익 장부</h1>
         {month && (
-          <div className="flex items-center gap-1">
-            <button aria-label="이전 달" className="btn-ghost px-3 py-1.5" onClick={() => setMonth(prevMonth(month))}>
+          <div className="flex shrink-0 items-center gap-1">
+            <button aria-label="이전 달" className="btn-ghost px-2.5 py-1.5" onClick={() => setMonth(prevMonth(month))}>
               ◀
             </button>
-            <span className="num min-w-[6.5rem] text-center text-sm font-bold">{monthLabel(month)}</span>
-            <button aria-label="다음 달" className="btn-ghost px-3 py-1.5" onClick={() => setMonth(nextMonth(month))}>
+            <span className="num min-w-[5.5rem] whitespace-nowrap text-center text-sm font-bold">{monthLabel(month)}</span>
+            <button aria-label="다음 달" className="btn-ghost px-2.5 py-1.5" onClick={() => setMonth(nextMonth(month))}>
               ▶
             </button>
           </div>

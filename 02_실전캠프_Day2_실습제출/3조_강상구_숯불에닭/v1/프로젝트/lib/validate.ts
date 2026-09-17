@@ -8,17 +8,23 @@ export interface Issue {
 
 export const TEN_TIMES = 10;
 
-export function checkChannelSale(s: Pick<ChannelSale, "name" | "orders" | "deposit" | "count">, prevOrders?: number): Issue[] {
+export function checkChannelSale(
+  s: Pick<ChannelSale, "name" | "orders" | "deposit" | "count" | "unsettled">,
+  prevOrders?: number,
+): Issue[] {
   const issues: Issue[] = [];
-  if (s.orders < 0 || s.deposit < 0 || s.count < 0) {
+  if (s.orders < 0 || s.deposit < 0 || s.count < 0 || (s.unsettled ?? 0) < 0) {
     issues.push({ level: "error", message: `${s.name}: 금액과 건수는 0보다 작을 수 없어요.` });
     return issues;
   }
   if (s.deposit > s.orders) {
-    issues.push({ level: "warn", message: `${s.name}: 입금액이 주문금액보다 커요. 두 칸이 바뀌지 않았나요?` });
+    issues.push({ level: "warn", message: `${s.name}: 정산금액이 주문금액보다 커요. 두 칸이 바뀌지 않았나요?` });
   }
   if (s.orders > 0 && s.deposit === 0 && s.name !== "홀(포스)") {
-    issues.push({ level: "warn", message: `${s.name}: 입금액이 0원이에요. 맞나요?` });
+    issues.push({ level: "warn", message: `${s.name}: 정산금액이 0원이에요. 맞나요?` });
+  }
+  if ((s.unsettled ?? 0) > s.deposit && s.deposit > 0) {
+    issues.push({ level: "warn", message: `${s.name}: 월말 미입금액이 이 달 정산금액보다 커요. 맞나요?` });
   }
   if (prevOrders && prevOrders > 0 && s.orders >= prevOrders * TEN_TIMES) {
     issues.push({ level: "warn", message: `${s.name}: 주문금액이 지난달의 ${TEN_TIMES}배가 넘어요. 0이 하나 더 붙지 않았나요?` });

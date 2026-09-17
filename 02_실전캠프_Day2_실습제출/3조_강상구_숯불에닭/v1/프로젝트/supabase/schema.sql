@@ -31,11 +31,13 @@ create table if not exists channel_sales (
   month text not null,
   channel text not null,
   name text not null,
-  orders bigint not null default 0,
-  deposit bigint not null default 0,
+  orders bigint not null default 0,          -- 주문금액 (주문일 기준)
+  deposit bigint not null default 0,         -- 정산금액 (이 달 주문분, 수수료 뺀 금액)
   order_count integer not null default 0,
+  unsettled bigint,                          -- 월말 미입금액 (안 넣었으면 null)
   primary key (month, channel)
 );
+alter table channel_sales add column if not exists unsettled bigint;
 
 create table if not exists month_closings (
   month text primary key,

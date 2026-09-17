@@ -52,14 +52,15 @@ export function seedRules(): Rule[] {
   }));
 }
 
-// 시연용 채널 실매출 (가짜). 가짜 은행 엑셀의 입금 합계와 맞춰 두었고,
-// 쿠팡이츠만 일부러 5만 원 다르게 해서 "입금 대조 차이"가 보이게 했다.
+// 시연용 채널 실매출 (가짜, 주문일 기준). 월말 미입금액을 빼면 가짜 은행 엑셀의 입금 합계와 맞는다.
+// 쿠팡이츠만 일부러 5만 원 다르게 해서 "진짜 차이"가 보이게 했고,
+// 요기요는 월말 미입금액을 비워서 "시차 포함"으로 보이게 했다.
 export function sampleChannelSales(month: string): ChannelSale[] {
   return [
-    { month, channel: "hall", name: "홀(포스)", orders: 14_000_000, deposit: 12_880_000, count: 520 },
-    { month, channel: "baemin", name: "배달의민족", orders: 9_000_000, deposit: 7_650_000, count: 300 },
-    { month, channel: "coupang", name: "쿠팡이츠", orders: 5_000_000, deposit: 4_100_000, count: 170 },
-    { month, channel: "yogiyo", name: "요기요", orders: 2_000_000, deposit: 1_720_000, count: 70 },
-    { month, channel: "etc", name: "땡겨요·기타", orders: 1_000_000, deposit: 930_000, count: 35 },
+    { month, channel: "hall", name: "홀(포스)", orders: 14_000_000, deposit: 12_880_000, count: 520, unsettled: 380_000 },
+    { month, channel: "baemin", name: "배달의민족", orders: 9_000_000, deposit: 7_650_000, count: 300, unsettled: 450_000 },
+    { month, channel: "coupang", name: "쿠팡이츠", orders: 5_000_000, deposit: 4_100_000, count: 170, unsettled: 300_000 },
+    { month, channel: "yogiyo", name: "요기요", orders: 2_000_000, deposit: 1_720_000, count: 70, unsettled: null },
+    { month, channel: "etc", name: "땡겨요·기타", orders: 1_000_000, deposit: 930_000, count: 35, unsettled: 0 },
   ];
 }

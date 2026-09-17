@@ -72,7 +72,7 @@ export default function ExpensesPage() {
     <>
       <section className="card space-y-3">
         <h2 className="text-base font-bold">통장에 안 보이는 지출 추가</h2>
-        <p className="text-sm text-stone-600">현금이나 다른 카드로 산 재료비처럼, 가게 통장 내역에 안 찍히는 돈을 적어 주세요.</p>
+        <p className="text-sm text-stone-600">현금이나 다른 카드로 산 재료비처럼, 가게 통장 내역에 안 찍히는 돈을 적어 주세요. 날짜는 <b>그 비용이 속한 달</b>로 넣으면 돼요.</p>
         {isClosed(ledger.closing) && <Notice tone="warn">마감한 달이에요. 추가하면 수정 기록이 남아요.</Notice>}
 
         <div className="grid grid-cols-2 gap-2">
@@ -92,7 +92,7 @@ export default function ExpensesPage() {
           }}
         />
         <input aria-label="사용내역" className="field" placeholder="사용내역 (예: 시장 채소)" value={payee} onChange={(e) => setPayee(e.target.value)} />
-        <MoneyInput label="금액" value={amount} onChange={setAmount} />
+        <MoneyInput label="금액" value={amount} onChange={(n) => setAmount(n ?? 0)} />
 
         {issues.filter((i) => i.level === "error").map((i) => (
           <Notice key={i.message} tone="error">
