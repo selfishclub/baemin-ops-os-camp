@@ -1,0 +1,37 @@
+{
+  "name": "review-content-studio",
+  "version": "3.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3400",
+    "build": "next build",
+    "start": "next start -p 3400",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "verify": "node scripts/verify.mjs",
+    "crawl:baemin": "node scripts/crawl-baemin.mjs",
+    "crawl:coupang": "node scripts/crawl-coupang.mjs",
+    "crawl:naver": "node scripts/crawl-naver.mjs",
+    "migrate:cloud": "node scripts/migrate-to-cloud.mjs",
+    "env:push": "node scripts/push-env-to-vercel.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@libsql/client": "^0.18.0",
+    "next": "^15.5.0",
+    "openai": "^5.20.0",
+    "playwright-core": "^1.55.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
