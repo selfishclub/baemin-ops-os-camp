@@ -1,0 +1,350 @@
+/* 저장소 — IndexedDB 우선, 불가하면 localStorage로 자동 대체.
+   매장(안산점/안양점)마다 상태 문서를 따로 보관한다: state:<매장id>
+   'meta' 문서가 매장 목록과 현재 선택을 기억한다. */
+
+const Store = (() => {
+  const DB_NAME = 'haemonic';
+  const STORE = 'kv';
+  const LSP = 'haemonic:';
+
+  let db = null;
+  let mode = 'idb';
+  let writable = false;
+  let meta = null;
+  let curKey = null;
+
+  /* 클라우드 동기화 — claude.ai 아티팩트 안에서 열렸을 때만 켜진다.
+     PC·휴대폰이 같은 문서를 보게 되고, 한쪽에서 체크하면 다른 쪽도 곧 따라온다.
+     매장 상태는 본문(kv/state:매장) + 월별 날짜 조각(kv/state:매장/days/YYYY-MM)으로
+     쪼개 올린다 — 문서 하나 256KB 제한 때문에 날짜 기록을 통째로 넣을 수 없다.
+     'meta'(지금 보는 매장)는 기기마다 다른 게 맞으므로 올리지 않는다. */
+  let cloud = null;            // db 네임스페이스
+  let cloudErr = null;         // 마지막 클라우드 오류 코드
+  let remoteCb = null;         // 다른 기기에서 바뀌었을 때 앱에 알린다
+  const lastUp = {};           // key -> 우리가 마지막으로 올린 savedAt (내 쓰기 되돌아오는 것 무시용)
+  const monthSig = {};         // key -> { 'YYYY-MM': 올린 JSON } 바뀐 달만 다시 올린다
+  let unsubs = [];
+  const CLOUD_KEYS = (k) => k !== 'meta' && k !== 'state';
+
+  function openDB() {
+    return new Promise((resolve) => {
+      let req;
+      try { req = indexedDB.open(DB_NAME, 1); } catch (e) { return resolve(null); }
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE);
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+      setTimeout(() => resolve(req.readyState === 'done' ? req.result : null), 2500);
+    });
+  }
+
+  function idbGet(k) {
+    return new Promise((resolve) => {
+      try {
+        const r = db.transaction(STORE, 'readonly').objectStore(STORE).get(k);
+        r.onsuccess = () => resolve(r.result || null);
+        r.onerror = () => resolve(null);
+      } catch (e) { resolve(null); }
+    });
+  }
+
+  function idbSet(k, v) {
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put(v, k);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+        tx.onabort = () => resolve(false);
+      } catch (e) { resolve(false); }
+    });
+  }
+
+  function lsGet(k) {
+    try { const raw = localStorage.getItem(LSP + k); return raw ? JSON.parse(raw) : null; }
+    catch (e) { return null; }
+  }
+
+  /* 양쪽을 다 읽어 최신본을 고른다 — 저장 방식이 오간 날에도 기록이 사라져 보이지 않게 */
+  async function localGet(k) {
+    const a = db ? await idbGet(k) : null;
+    const b = lsGet(k);
+    if (a && b) return (a.savedAt || 0) >= (b.savedAt || 0) ? a : b;
+    return a || b;
+  }
+
+  async function localPut(k, v) {
+    let done = false;
+    if (mode === 'idb') done = await idbSet(k, v);
+    if (!done) {
+      try { localStorage.setItem(LSP + k, JSON.stringify(v)); done = true; }
+      catch (e) { console.error('저장 실패', k, e); }
+    }
+    if (!done && writable) { writable = false; document.dispatchEvent(new Event('storage-broken')); }
+    return done;
+  }
+
+  /* ── 클라우드 읽기/쓰기 ── */
+  function cloudFail(e) {
+    cloudErr = (e && e.code) || 'unavailable';
+    console.error('클라우드 저장 실패', e);
+    document.dispatchEvent(new Event('cloud-status'));
+  }
+
+  /* 첨부 파일·서명 이미지처럼 큰 데이터(blobs)는 본문과 따로 조각(≤180KB)으로 올린다.
+     본문(contracts)에는 {id, chunks} 참조만 남는다 — 문서 하나 256KB 제한 때문.
+     이미 받아둔 것(known)은 다시 내려받지 않는다. */
+  const BLOB_CHUNK = 180 * 1024;
+  const blobSig = {};              // key -> { blobId: chunks } 클라우드에 올라가 있다고 아는 것
+  function blobRefs(doc) {
+    const out = [];
+    if (doc.settings && doc.settings.seal && doc.settings.seal.id) out.push({ id: doc.settings.seal.id, chunks: doc.settings.seal.chunks || 1 });
+    (doc.contracts || []).forEach((c) => {
+      (c.files || []).forEach((f) => { if (f && f.id) out.push({ id: f.id, chunks: f.chunks || 1 }); });
+      Object.values(c.sig || {}).forEach((sg) => { if (sg && sg.img && sg.img.id) out.push({ id: sg.img.id, chunks: sg.img.chunks || 1 }); });
+    });
+    return out;
+  }
+
+  async function cloudGet(k, known) {
+    try {
+      const snap = await cloud.doc('kv/' + k).get();
+      if (!snap.exists) return null;
+      const doc = JSON.parse(JSON.stringify(snap.data()));
+      if (k.startsWith('state:')) {
+        doc.days = {};
+        const q = await cloud.collection('kv/' + k + '/days').get();
+        q.docs.forEach((d) => { const b = d.data(); Object.assign(doc.days, (b && b.inst) || {}); });
+        doc.blobs = {};
+        const bs = blobSig[k] = blobSig[k] || {};
+        for (const ref of blobRefs(doc)) {
+          if (known && known[ref.id]) { doc.blobs[ref.id] = known[ref.id]; bs[ref.id] = ref.chunks; continue; }
+          const parts = [];
+          for (let i = 0; i < ref.chunks; i++) {
+            const cs = await cloud.doc('kv/' + k + '/blobs/' + ref.id + '_' + i).get();
+            if (!cs.exists) { parts.length = 0; break; }
+            parts.push((cs.data() || {}).data || '');
+          }
+          if (parts.length) { doc.blobs[ref.id] = parts.join(''); bs[ref.id] = ref.chunks; }
+        }
+      }
+      return doc;
+    } catch (e) { cloudFail(e); return null; }
+  }
+
+  async function cloudPut(k, v) {
+    try {
+      const core = { ...v };
+      if (k.startsWith('state:')) {
+        delete core.days;
+        delete core.blobs;
+        const bs = blobSig[k] = blobSig[k] || {};
+        const want = {};
+        for (const ref of blobRefs(v)) {
+          const data = (v.blobs || {})[ref.id]; if (!data) continue;
+          want[ref.id] = ref.chunks;
+          if (bs[ref.id]) continue;
+          for (let i = 0; i < ref.chunks; i++) {
+            await cloud.doc('kv/' + k + '/blobs/' + ref.id + '_' + i).set({ savedAt: v.savedAt, id: ref.id, i, n: ref.chunks, data: data.slice(i * BLOB_CHUNK, (i + 1) * BLOB_CHUNK) });
+          }
+          bs[ref.id] = ref.chunks;
+        }
+        // 지운 첨부는 클라우드에서도 치운다 — 실패해도 본문 저장은 계속
+        for (const [id, n] of Object.entries(bs)) {
+          if (want[id]) continue;
+          for (let i = 0; i < n; i++) {
+            try { const r = cloud.doc('kv/' + k + '/blobs/' + id + '_' + i); if (typeof r.delete === 'function') await r.delete(); } catch (_) { /* 무시 */ }
+          }
+          delete bs[id];
+        }
+        const byMonth = {};
+        Object.entries(v.days || {}).forEach(([d, rec]) => { (byMonth[d.slice(0, 7)] = byMonth[d.slice(0, 7)] || {})[d] = rec; });
+        const sig = monthSig[k] = monthSig[k] || {};
+        for (const [ym, inst] of Object.entries(byMonth)) {
+          const j = JSON.stringify(inst);
+          if (sig[ym] === j) continue;
+          await cloud.doc('kv/' + k + '/days/' + ym).set({ savedAt: v.savedAt, inst });
+          sig[ym] = j;
+        }
+      }
+      lastUp[k] = v.savedAt;
+      await cloud.doc('kv/' + k).set(core);
+      if (cloudErr) { cloudErr = null; document.dispatchEvent(new Event('cloud-status')); }
+      return true;
+    } catch (e) { cloudFail(e); return false; }
+  }
+
+  async function getDoc(k) {
+    const local = await localGet(k);
+    if (!cloud || !CLOUD_KEYS(k)) return local;
+    const remote = await cloudGet(k, local && local.blobs);
+    if (remote && (!local || (remote.savedAt || 0) >= (local.savedAt || 0))) {
+      await localPut(k, remote);          // 로컬은 캐시 — 오프라인에 대비해 최신본을 남겨둔다
+      lastUp[k] = remote.savedAt;
+      return remote;
+    }
+    if (local) await cloudPut(k, local); // 로컬이 더 새것(오프라인에서 썼거나 첫 연결)이면 올린다
+    return local;
+  }
+
+  async function putDoc(k, v) {
+    const ok = await localPut(k, v);
+    if (cloud && CLOUD_KEYS(k)) await cloudPut(k, v);
+    return ok;
+  }
+
+  /* 다른 기기의 변경을 듣는다 — 내 쓰기가 되돌아오는 것(savedAt 같거나 이전)은 무시 */
+  function watch(k) {
+    unsubs.forEach((u) => u()); unsubs = [];
+    if (!cloud || !CLOUD_KEYS(k)) return;
+    let timer = null;
+    const poke = (savedAt) => {
+      if (!(savedAt > (lastUp[k] || 0))) return;
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        if (pending) return;                 // 내 쪽에 아직 안 올라간 변경이 있으면 그게 곧 이긴다
+        const doc = await cloudGet(k, ((await localGet(k)) || {}).blobs);
+        if (!doc || !(doc.savedAt > (lastUp[k] || 0))) return;
+        lastUp[k] = doc.savedAt;
+        await localPut(k, doc);
+        if (remoteCb) remoteCb(k, doc);
+      }, 400);
+    };
+    const onErr = (e) => cloudFail(e);
+    unsubs.push(cloud.doc('kv/' + k).onSnapshot((snap) => {
+      if (!snap.exists || snap.metadata.hasPendingWrites) return;
+      poke(snap.data().savedAt || 0);
+    }, onErr));
+    unsubs.push(cloud.collection('kv/' + k + '/days').onSnapshot((qs) => {
+      if (qs.metadata.hasPendingWrites) return;
+      qs.docChanges().forEach((c) => { const b = c.doc.data(); if (b) poke(b.savedAt || 0); });
+    }, onErr));
+  }
+
+  /* 아티팩트 안에서만 응답한다. 파일로 열었거나 PC 서버로 열었으면 조용히 로컬만 쓴다. */
+  async function connectCloud() {
+    if (!(window.claude && typeof window.claude.use === 'function')) return null;
+    try { return await window.claude.use('db'); } catch (e) { return null; }
+  }
+
+  /* 저장소가 "있는지"가 아니라 "실제로 써지는지"를 확인한다 */
+  async function probeIDB() {
+    if (!db) return false;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put(1, '__probe');
+        tx.oncomplete = () => {
+          try { db.transaction(STORE, 'readwrite').objectStore(STORE).delete('__probe'); } catch (e) {}
+          resolve(true);
+        };
+        tx.onerror = () => resolve(false);
+        tx.onabort = () => resolve(false);
+      } catch (e) { resolve(false); }
+    });
+  }
+
+  function probeLS() {
+    try {
+      localStorage.setItem('__probe', '1');
+      const v = localStorage.getItem('__probe') === '1';
+      localStorage.removeItem('__probe');
+      return v;
+    } catch (e) { return false; }
+  }
+
+  async function init() {
+    db = await openDB();
+    if (await probeIDB()) { mode = 'idb'; writable = true; }
+    else if (probeLS()) { mode = 'ls'; writable = true; }
+    else { mode = 'none'; writable = false; }
+
+    cloud = await connectCloud();
+
+    meta = await getDoc('meta');
+    if (!meta) {
+      meta = {
+        savedAt: Date.now(),
+        current: 'ansan',
+        stores: [{ id: 'ansan', name: '안산점' }, { id: 'anyang', name: '안양점' }],
+      };
+      // 매장 구분 이전에 쓰던 단일 저장분은 안산점으로 승계한다
+      const legacy = await getDoc('state');
+      if (legacy) await putDoc('state:ansan', legacy);
+      await putDoc('meta', JSON.parse(JSON.stringify(meta)));
+    }
+    curKey = 'state:' + meta.current;
+    return mode;
+  }
+
+  async function load() { const d = await getDoc(curKey); watch(curKey); return d; }
+
+  let timer = null, pending = null;
+
+  /* 변경 즉시 저장. 저장 버튼은 두지 않는다 — 누르는 걸 잊으면 그대로 소실되기 때문. */
+  function save(state) {
+    state.savedAt = Date.now();
+    pending = state;
+    clearTimeout(timer);
+    timer = setTimeout(flush, 250);
+  }
+
+  async function flush() {
+    if (!pending) return;
+    const v = pending; pending = null;
+    await putDoc(curKey, v);
+  }
+
+  async function setMeta(m) {
+    meta = m; meta.savedAt = Date.now();
+    await putDoc('meta', JSON.parse(JSON.stringify(meta)));
+  }
+
+  /* 매장 전환 — 현재 매장을 저장한 뒤 다른 매장 상태를 불러온다 */
+  async function switchTo(id) {
+    await flush();
+    meta.current = id;
+    await setMeta(meta);
+    curKey = 'state:' + id;
+    const d = await getDoc(curKey);
+    watch(curKey);
+    return d;
+  }
+
+  /* 백업: 모든 매장 + meta 를 한 파일로 */
+  async function dumpAll() {
+    await flush();
+    const out = { v: 2, exportedAt: Date.now(), meta: JSON.parse(JSON.stringify(meta)), states: {} };
+    for (const st of meta.stores) {
+      const doc = await getDoc('state:' + st.id);
+      if (doc) out.states[st.id] = doc;
+    }
+    return out;
+  }
+
+  async function restoreAll(obj) {
+    if (obj.meta) await setMeta(obj.meta);
+    for (const [id, doc] of Object.entries(obj.states || {})) await putDoc('state:' + id, doc);
+  }
+
+  /* 다른 매장의 상태 문서를 직접 읽고 쓴다 — 설정에서 두 매장 직원을 한 화면에서 관리하기 위해 */
+  async function loadStore(id) { return getDoc('state:' + id); }
+  async function saveStore(id, doc) { doc.savedAt = Date.now(); return putDoc('state:' + id, doc); }
+
+  return {
+    init, load, save, flush, setMeta, switchTo, dumpAll, restoreAll, loadStore, saveStore,
+    get mode() { return mode; },
+    get ok() { return writable; },
+    get label() {
+      const l = { idb: 'IndexedDB', ls: '브라우저 저장소 (localStorage)', none: '저장 안 됨' }[mode];
+      return cloud ? `클라우드 동기화 (claude.ai) + ${l} 캐시` : l;
+    },
+    get meta() { return meta; },
+    get cloud() { return !!cloud; },
+    get cloudErr() { return cloudErr; },
+    onRemote(cb) { remoteCb = cb; },
+    BLOB_CHUNK,
+  };
+})();
