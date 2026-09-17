@@ -83,7 +83,22 @@
   display: flex;
   justify-self: end;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
+}
+.headerActions form { display: contents; }
+.headerActions form button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid rgba(43, 54, 44, .3);
+  border-radius: 999px;
+  background: transparent;
+  color: #4d5a50;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .headerActions a {

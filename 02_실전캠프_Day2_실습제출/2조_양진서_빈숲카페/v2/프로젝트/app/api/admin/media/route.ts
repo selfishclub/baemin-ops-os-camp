@@ -1,8 +1,6 @@
-import {
-  getRecipeDb,
-  getRecipeMediaBucket,
-  requireRecipeAdmin,
-} from "../../../../db/recipe-store";
+import { requireOwnerApi } from "../../../auth";
+import { logImageUpload } from "../../../../db/recipe-store";
+import { mediaBucket } from "../../../../lib/supabase/env";
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +26,8 @@ function hasExpectedSignature(bytes: Uint8Array, contentType: string) {
 }
 
 export async function POST(request: Request) {
-  const db = getRecipeDb();
-  const bucket = getRecipeMediaBucket();
-  if (!db || !bucket) return Response.json({ error: "이미지 저장소가 아직 연결되지 않았습니다." }, { status: 503 });
-  const actor = await requireRecipeAdmin(request, db);
-  if (!actor) return Response.json({ error: "관리자 권한이 없습니다." }, { status: 403 });
+  const ctx = await requireOwnerApi();
+  if ("error" in ctx) return ctx.error;
 
   const form = await request.formData();
   const file = form.get("file");
@@ -46,14 +41,9 @@ export async function POST(request: Request) {
 
   const objectId = crypto.randomUUID();
   const key = `recipes/${safeRecipeId(recipeId)}/${objectId}.${extension}`;
-  await bucket.put(key, bytes, { httpMetadata: { contentType: file.type } });
+  const { error } = await ctx.db.storage.from(mediaBucket).upload(key, bytes, { contentType: file.type, upsert: false });
+  if (error) return Response.json({ error: `사진을 저장하지 못했습니다: ${error.message}` }, { status: 503 });
   const alt = file.name.replace(/\.[^.]+$/, "").trim() || "음료 사진";
-  await db.prepare(`INSERT INTO recipe_audit_log
-    (action, actor_id, actor_email, details_json, created_at) VALUES ('image_uploaded', ?, ?, ?, ?)`).bind(
-      actor.id,
-      actor.email,
-      JSON.stringify({ recipeId, key, size: file.size, contentType: file.type }),
-      new Date().toISOString(),
-    ).run();
+  await logImageUpload(ctx.db, ctx.actor, { recipeId, key, size: file.size, contentType: file.type });
   return Response.json({ image: { id: objectId, url: `/api/media?key=${encodeURIComponent(key)}`, alt, caption: "" } }, { status: 201 });
 }

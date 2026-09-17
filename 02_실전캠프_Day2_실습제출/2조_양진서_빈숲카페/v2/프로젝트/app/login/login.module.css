@@ -1,0 +1,48 @@
+.page {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 24px 16px;
+  background: #f4f1ea;
+}
+
+.card {
+  display: grid;
+  gap: 14px;
+  width: min(420px, 100%);
+  padding: 28px 24px;
+  border: 1px solid #d9d2c3;
+  border-radius: 18px;
+  background: #fffdf8;
+  box-shadow: 0 18px 40px rgba(28, 54, 42, 0.1);
+}
+
+.card h1 { margin: 0; font-size: 26px; color: #173f31; }
+.eyebrow { margin: 0; color: #2f6b47; font-size: 10px; font-weight: 900; letter-spacing: .14em; }
+.lead { margin: 0 0 6px; color: #4d5a50; font-size: 14px; line-height: 1.6; }
+
+.card label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: #29332c; }
+.card input {
+  padding: 12px 14px;
+  border: 1px solid #c9c2b2;
+  border-radius: 10px;
+  background: white;
+  font-size: 16px;
+}
+.card input:focus { outline: 2px solid #2f6b47; outline-offset: 1px; }
+
+.card button {
+  margin-top: 4px;
+  padding: 13px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #173f31;
+  color: white;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.card button:disabled { opacity: .6; cursor: default; }
+
+.message { margin: 0; padding: 10px 12px; border-radius: 10px; background: #fff0ec; color: #9a3b2c; font-size: 13px; font-weight: 700; }
+.note { margin: 6px 0 0; color: #7a8078; font-size: 12px; line-height: 1.6; }

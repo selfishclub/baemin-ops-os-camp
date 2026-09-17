@@ -1,10 +1,7 @@
-# 빈숲 공개용 레시피OS
+# 빈숲 레시피OS · v2
 
-기존 `beansoop-os`를 참고해 별도 아티팩트로 만든 모바일 우선 카페 레시피·교육 관리 웹앱입니다.
-
-- 직원 화면: 메뉴 검색, 카테고리, 즐겨찾기, 최근 본 메뉴, 정량, 제조 순서, 주의사항, 사진·영상
-- 관리자 화면: 메뉴와 공통 기준 편집, 사진 업로드, 초안 저장, 공식 게시, 버전 복구
-- 데이터: 로컬에서는 안전한 기본 레시피로 동작하고, 배포 환경에서는 D1/R2에 연결됩니다.
+카페 직원 교육용 레시피북. 직원은 로그인해서 메뉴별 정량·제조 순서·주의사항을 보고, 사장은 레시피를 편집·게시합니다.
+레시피는 가게 영업 비밀이라 **로그인한 재직 직원만** 볼 수 있고, 저장소·시연 데이터에는 가짜 레시피만 들어 있습니다.
 
 ## 실행
 
@@ -13,101 +10,36 @@ npm install
 npm run dev
 ```
 
----
+브라우저에서 http://localhost:3000
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+- `.env.local` 이 **없으면 시연 모드**: 로그인 없이 가짜 레시피 10개를 보여 주고, 편집은 막힙니다. 다른 사장님이 구경할 때는 이 상태면 충분합니다.
+- `.env.local` 에 Supabase 열쇠를 넣으면 **실제 모드**: 로그인 화면이 켜지고, 사장 계정으로 레시피를 편집·게시할 수 있습니다.
 
-## Prerequisites
+## 데이터 창고(Supabase) 연결 — 사장님만 한 번
 
-- Node.js `>=22.13.0`
+1. Supabase 프로젝트를 만들고 **SQL Editor** 에 `supabase/schema.sql` 을 통째로 붙여넣어 실행 (표·잠금·사진 파일함이 만들어집니다)
+2. `.env.local.example` 을 복사해 `.env.local` 로 만들고, 대시보드 **Project Settings → API** 의 Project URL 과 anon 키를 붙여넣기 (`service_role` 은 절대 금지)
+3. **Authentication → Users → Add user** 로 사장 계정을 먼저 만들기 (Email: `아이디@beansoop.local`, Auto Confirm 켜기). **첫 계정이 자동으로 사장(owner)** 이 됩니다
+4. 같은 방법으로 직원 계정을 만들면 직원(staff)으로 들어갑니다. 앱의 **직원 계정 관리**(`/recipes/staff`)에서 퇴사 처리·역할 변경
 
-## Quick Start
+## 화면
 
-```bash
-npm install
-npm run dev
-npm run build
-```
+| 주소 | 누가 | 무엇 |
+|---|---|---|
+| `/login` | 모두 | 아이디·비밀번호 로그인 |
+| `/` | 재직 직원 | 레시피 목록·검색·상세, 영상 프롬프트 생성 |
+| `/recipes/admin` | 사장 | 레시피 편집·사진 올리기·초안 저장·공식 게시·버전 복구 |
+| `/recipes/staff` | 사장 | 직원 계정 재직/중지, 역할 |
 
-This starter does not use `wrangler.jsonc`.
+## 구조
 
-## Included Shape
+- `app/recipes/recipes-page.tsx` 직원 화면 (클라이언트) · `app/recipes/admin/studio.tsx` 관리자 화면
+- `app/auth.ts` 로그인·역할 확인 · `proxy.ts` 로그인 안 한 요청을 `/login` 으로
+- `db/recipe-store.ts` 저장 층 (Supabase Postgres) · `supabase/schema.sql` 표와 잠금
+- `lib/supabase/` 열쇠 읽기와 클라이언트
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+## v1과 달라진 것
 
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
-```
-
-## Optional Dispatch-Owned ChatGPT Sign-In
-
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
-
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Useful Commands
-
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+- ChatGPT 계정 연동 → Supabase 아이디·비밀번호 로그인, 사장/직원 권한
+- Cloudflare D1/R2 → Supabase Postgres/Storage. Vercel 에 그대로 올릴 수 있는 일반 Next.js
+- 단면도: 재료 이름으로 색 자동(16색)·직접 색·얼음 조각, 잔 아래(1층)부터 쌓는 순서

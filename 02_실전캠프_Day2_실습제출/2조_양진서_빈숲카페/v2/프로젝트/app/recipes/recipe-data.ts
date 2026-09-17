@@ -37,7 +37,7 @@ export const layerPalette: LayerPaletteEntry[] = [
   { id: "water", label: "물·탄산", background: "#e6f3f9", text: "#29332c", keywords: ["탄산", "스파클링", "소다", "토닉", "사이다", "물"] },
   { id: "tea", label: "홍차·차", background: "#c9925f", text: "#ffffff", keywords: ["홍차", "얼그레이", "밀크티", "보리차", "우롱", "아쌈", "루이보스"] },
   { id: "milk", label: "우유", background: "#f1e9d8", text: "#29332c", keywords: ["우유", "밀크", "오트", "두유", "라떼"] },
-  { id: "cream", label: "크림·휘핑", background: "#f6f0e4", text: "#29332c", keywords: ["크림", "휘핑", "폼", "거품", "치즈"] },
+  { id: "cream", label: "크림·휘핑", background: "#fbf8f1", text: "#29332c", keywords: ["크림", "휘핑", "폼", "거품", "치즈"] },
   { id: "chocolate", label: "초코", background: "#5b3a2a", text: "#ffffff", keywords: ["초코", "초콜릿", "코코아", "카카오", "모카"] },
   { id: "coffee", label: "커피·에스프레소", background: "#9d7154", text: "#ffffff", keywords: ["에스프레소", "커피", "샷", "콜드브루", "원두", "아메리카노"] },
   { id: "caramel", label: "카라멜·흑당", background: "#c98a3c", text: "#3a2508", keywords: ["카라멜", "캐러멜", "흑당", "돌체", "토피"] },

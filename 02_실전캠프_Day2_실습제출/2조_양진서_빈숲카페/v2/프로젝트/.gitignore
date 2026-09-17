@@ -40,3 +40,6 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# 예시 파일은 올린다 (값이 비어 있음)
+!.env.local.example
