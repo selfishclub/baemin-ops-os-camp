@@ -2020,12 +2020,14 @@ const App = (() => {
       $('#edProgT').textContent = `필수 확인 ${n} / ${ACKS.length}`; $('#edProgP').textContent = p + '%'; $('#edProgB').style.width = p + '%';
     };
 
-    box.querySelectorAll('[data-f]').forEach((el) => el.addEventListener('input', () => {
+    const saved = () => { save(); const d = new Date(); status(`자동 저장됨 ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`); };
+    /* input 과 change 를 둘 다 받는다 — 아이패드·아이폰 사파리는 날짜·시간 칸에서 input 을 보내지 않는다 */
+    box.querySelectorAll('[data-f]').forEach((el) => ['input', 'change'].forEach((ev) => el.addEventListener(ev, () => {
       let v = el.value; if (el.type === 'number') v = Number(v) || 0;
       setPath(el.dataset.f, typeof v === 'string' ? v.trim() : v);
       if (['from', 'to', 'breakFrom', 'breakTo', 'pay'].includes(el.dataset.f)) { hours(); wage(); }
-      save();
-    }));
+      saved();
+    })));
     $('#edProb').addEventListener('change', (e) => { f.probMonths = Number(e.target.value) || 0; save(); });
     $('#edWorkType').addEventListener('change', (e) => { f.workType = e.target.value; save(); });
     $('#edPayType').addEventListener('change', (e) => { f.payType = e.target.value; wage(); save(); });
@@ -3866,6 +3868,8 @@ const App = (() => {
     }, 30000);
 
     window.addEventListener('beforeunload', () => Store.flush());
+    window.addEventListener('pagehide', () => Store.flush());
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') Store.flush(); });
     // 다른 기기(휴대폰·매장 PC)에서 바뀐 게 도착하면 지금 보는 매장 것일 때만 갈아끼운다
     Store.onRemote((k, doc) => {
       if (k !== 'state:' + (Store.meta && Store.meta.current)) return;
