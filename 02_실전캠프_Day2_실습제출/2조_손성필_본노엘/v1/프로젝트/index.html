@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>신입 직원 매뉴얼북</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#a8632f">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="매뉴얼북">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    --paper:#faf7f2;
+    --surface:#ffffff;
+    --surface-sunken:#f1ece3;
+    --ink:#2b2420;
+    --ink-soft:#6b6259;
+    --ink-faint:#9a9086;
+    --line:#e5ddd0;
+    --line-strong:#d3c7b4;
+    --accent:#a8632f;
+    --accent-soft:#f3e3d1;
+    --accent-ink:#ffffff;
+    --danger:#b5432c;
+    --danger-soft:#f6dfd8;
+    --ok:#2f7a4f;
+    --ok-soft:#dcefe1;
+    --shadow: 0 1px 2px rgba(43,36,32,0.06), 0 6px 18px -10px rgba(43,36,32,0.22);
+    --radius-s: 6px;
+    --radius-m: 12px;
+    --radius-l: 18px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#1c1713;
+      --surface:#252019;
+      --surface-sunken:#2c261e;
+      --ink:#f1ece3;
+      --ink-soft:#b7ada0;
+      --ink-faint:#847a6e;
+      --line:#3a3226;
+      --line-strong:#4a4030;
+      --accent:#e0a066;
+      --accent-soft:#3a2c1c;
+      --accent-ink:#241a0e;
+      --danger:#e59078;
+      --danger-soft:#3a241d;
+      --ok:#7bc79a;
+      --ok-soft:#1e2f24;
+      color-scheme: dark;
+    }
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Noto Sans KR', -apple-system, sans-serif;
+    line-height:1.6;
+  }
+  .wrap{ max-width:820px; margin:0 auto; padding:20px 16px 90px; }
+  a{ color:inherit; }
+  button{ font-family:inherit; }
+
+  /* header */
+  .head{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 0 18px; }
+  .head h1{ font-size:19px; margin:0; }
+  .head .sub{ font-size:12px; color:var(--ink-faint); margin-top:2px; }
+  .head-link{ font-size:13px; color:var(--ink-soft); text-decoration:none; border:1px solid var(--line); padding:7px 12px; border-radius:999px; background:var(--surface); cursor:pointer; white-space:nowrap; }
+  .head-link:hover{ border-color:var(--line-strong); }
+
+  /* search */
+  .search-box{ position:relative; margin-bottom:16px; }
+  .search-box input{
+    width:100%; padding:13px 16px 13px 40px; border-radius:var(--radius-l);
+    border:1px solid var(--line-strong); background:var(--surface); color:var(--ink);
+    font-size:15px; outline:none;
+  }
+  .search-box input:focus{ border-color:var(--accent); }
+  .search-box .icon{ position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--ink-faint); font-size:15px; }
+
+  /* category chips */
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+  .chip{
+    padding:8px 14px; border-radius:999px; border:1px solid var(--line);
+    background:var(--surface); color:var(--ink-soft); font-size:13px; cursor:pointer; white-space:nowrap;
+  }
+  .chip.active{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+
+  /* manual card list */
+  .manual-list{ display:flex; flex-direction:column; gap:10px; }
+  .manual-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m);
+    padding:14px 16px; cursor:pointer; box-shadow:var(--shadow);
+  }
+  .manual-card:hover{ border-color:var(--line-strong); }
+  .manual-card .cat{ font-size:11px; color:var(--accent); font-weight:600; margin-bottom:4px; }
+  .manual-card .title{ font-size:16px; font-weight:600; margin-bottom:6px; }
+  .manual-card .tags{ display:flex; flex-wrap:wrap; gap:6px; }
+  .tag{ font-size:11px; color:var(--ink-faint); background:var(--surface-sunken); padding:3px 9px; border-radius:999px; }
+  .empty{ text-align:center; color:var(--ink-faint); padding:60px 20px; font-size:14px; }
+
+  /* detail view */
+  .back-btn{ display:inline-flex; align-items:center; gap:4px; background:none; border:none; color:var(--ink-soft); font-size:14px; padding:8px 0; margin-bottom:8px; cursor:pointer; }
+  .detail-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-l); padding:20px; box-shadow:var(--shadow); }
+  .detail-card .cat{ font-size:12px; color:var(--accent); font-weight:600; margin-bottom:6px; }
+  .detail-card h2{ margin:0 0 14px; font-size:21px; }
+  .photo-strip{ display:flex; gap:10px; overflow-x:auto; margin-bottom:16px; padding-bottom:4px; }
+  .photo-strip img{ height:180px; width:auto; border-radius:var(--radius-m); flex-shrink:0; border:1px solid var(--line); object-fit:cover; }
+  .video-wrap{ position:relative; padding-top:56.25%; border-radius:var(--radius-m); overflow:hidden; margin-bottom:18px; background:#000; }
+  .video-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+  .steps{ list-style:none; margin:0 0 18px; padding:0; display:flex; flex-direction:column; gap:12px; }
+  .steps li{ display:flex; gap:12px; }
+  .step-num{ flex-shrink:0; width:26px; height:26px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .step-text{ padding-top:3px; font-size:14.5px; white-space:pre-wrap; }
+  .detail-card .tags{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px; }
+
+  .confirm-box{ border-top:1px dashed var(--line-strong); padding-top:18px; margin-top:4px; }
+  .confirm-box p{ font-size:13px; color:var(--ink-soft); margin:0 0 10px; }
+  .confirm-row{ display:flex; gap:8px; }
+  .confirm-row input{ flex:1; padding:11px 14px; border-radius:var(--radius-s); border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); font-size:14px; outline:none; }
+  .confirm-row input:focus{ border-color:var(--accent); }
+  .btn{ padding:11px 18px; border-radius:var(--radius-s); border:none; background:var(--accent); color:var(--accent-ink); font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .btn:hover{ filter:brightness(1.05); }
+  .btn.secondary{ background:var(--surface-sunken); color:var(--ink); }
+  .btn.danger{ background:var(--danger); color:#fff; }
+  .btn:disabled{ opacity:.5; cursor:not-allowed; }
+  .confirm-done{ background:var(--ok-soft); color:var(--ok); padding:11px 14px; border-radius:var(--radius-s); font-size:13.5px; font-weight:600; }
+
+  /* admin login */
+  .center-card{ max-width:340px; margin:60px auto; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-l); padding:28px; box-shadow:var(--shadow); text-align:center; }
+  .center-card h2{ font-size:17px; margin:0 0 6px; }
+  .center-card p{ font-size:13px; color:var(--ink-faint); margin:0 0 18px; }
+  .center-card input{ width:100%; padding:12px 14px; border-radius:var(--radius-s); border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); font-size:16px; text-align:center; letter-spacing:4px; outline:none; margin-bottom:10px; }
+  .error-text{ color:var(--danger); font-size:12.5px; margin-bottom:10px; min-height:16px; }
+
+  /* admin layout */
+  .admin-tabs{ display:flex; gap:6px; overflow-x:auto; margin-bottom:18px; border-bottom:1px solid var(--line); }
+  .admin-tab{ padding:10px 14px; font-size:13.5px; color:var(--ink-soft); background:none; border:none; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; }
+  .admin-tab.active{ color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+  .section-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; gap:10px; }
+  .section-head h3{ font-size:15px; margin:0; }
+
+  .list-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:12px 14px; margin-bottom:8px; }
+  .list-row .info{ min-width:0; }
+  .list-row .info .t{ font-size:14px; font-weight:600; }
+  .list-row .info .s{ font-size:12px; color:var(--ink-faint); margin-top:2px; }
+  .row-actions{ display:flex; gap:6px; flex-shrink:0; }
+  .icon-btn{ padding:7px 11px; border-radius:var(--radius-s); border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); font-size:12.5px; cursor:pointer; }
+  .icon-btn:hover{ border-color:var(--line-strong); }
+  .icon-btn.danger{ color:var(--danger); border-color:var(--danger-soft); }
+
+  /* form */
+  .form-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-l); padding:20px; box-shadow:var(--shadow); margin-bottom:18px; }
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:var(--ink-soft); }
+  .field .hint{ font-size:12px; color:var(--ink-faint); margin-top:5px; }
+  .field input[type=text], .field input[type=url], .field select, .field textarea{
+    width:100%; padding:11px 13px; border-radius:var(--radius-s); border:1px solid var(--line-strong);
+    background:var(--surface); color:var(--ink); font-size:14px; outline:none; font-family:inherit;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{ border-color:var(--accent); }
+  .field textarea{ resize:vertical; min-height:60px; }
+
+  .step-edit-row{ display:flex; gap:8px; align-items:flex-start; margin-bottom:8px; }
+  .step-edit-row .step-num{ margin-top:8px; }
+  .step-edit-row textarea{ flex:1; }
+  .step-edit-row .step-btns{ display:flex; flex-direction:column; gap:4px; }
+  .mini-btn{ padding:4px 7px; font-size:11px; border-radius:4px; border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); cursor:pointer; }
+
+  .photo-grid{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; }
+  .photo-item{ position:relative; width:96px; height:96px; }
+  .photo-item img{ width:100%; height:100%; object-fit:cover; border-radius:var(--radius-s); border:1px solid var(--line); }
+  .photo-item .rm{ position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; background:var(--danger); color:#fff; border:2px solid var(--surface); font-size:12px; line-height:1; cursor:pointer; }
+  .upload-btn{ display:inline-block; padding:10px 16px; border-radius:var(--radius-s); border:1px dashed var(--line-strong); background:var(--surface-sunken); color:var(--ink-soft); font-size:13px; cursor:pointer; }
+
+  .form-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+
+  .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--paper); padding:11px 18px; border-radius:999px; font-size:13.5px; box-shadow:var(--shadow); z-index:50; opacity:0; pointer-events:none; transition:opacity .2s; }
+  .toast.show{ opacity:1; }
+
+  .loading{ text-align:center; padding:60px 0; color:var(--ink-faint); font-size:13px; }
+
+  .confirm-status-table{ width:100%; border-collapse:collapse; font-size:13px; }
+  .confirm-status-table th, .confirm-status-table td{ text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
+  .confirm-status-table th{ color:var(--ink-faint); font-weight:600; font-size:12px; }
+  .badge{ font-size:11px; padding:2px 8px; border-radius:999px; font-weight:600; }
+  .badge.ok{ background:var(--ok-soft); color:var(--ok); }
+  .badge.no{ background:var(--danger-soft); color:var(--danger); }
+  .badge.req{ background:var(--accent-soft); color:var(--accent); }
+  .badge.late{ background:var(--danger-soft); color:var(--danger); }
+  .manual-card .title .badge, .list-row .t .badge, .detail-card h2 .badge{ vertical-align:middle; margin-left:6px; }
+
+  /* 확인 UI (매장 → 이름 고르기) */
+  .confirm-row select{ flex:1; min-width:0; padding:11px 12px; border-radius:var(--radius-s); border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); font-size:14px; outline:none; font-family:inherit; }
+  .confirm-row select:focus{ border-color:var(--accent); }
+  .confirm-note{ font-size:12px; color:var(--ink-faint); margin-top:8px; }
+  .confirmed-list{ margin-top:16px; }
+  .confirmed-list h4{ font-size:12.5px; color:var(--ink-faint); margin:0 0 8px; font-weight:600; }
+  .confirmed-group{ font-size:13px; margin-bottom:6px; }
+  .confirmed-group b{ color:var(--ink-soft); font-weight:600; margin-right:6px; }
+  .confirmed-group span{ display:inline-block; background:var(--ok-soft); color:var(--ok); padding:2px 9px; border-radius:999px; font-size:12px; margin:0 4px 4px 0; }
+
+  /* 신입 진행률 */
+  .progress-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:14px 16px; margin-bottom:10px; box-shadow:var(--shadow); }
+  .progress-card .top{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+  .progress-card .name{ font-size:15px; font-weight:600; }
+  .progress-card .meta{ font-size:12px; color:var(--ink-faint); margin-top:2px; }
+  .progress-card .count{ font-size:13px; font-weight:600; color:var(--ink-soft); white-space:nowrap; }
+  .progress-card .count.done{ color:var(--ok); }
+  .progress-bar{ height:8px; border-radius:999px; background:var(--surface-sunken); overflow:hidden; margin-bottom:8px; }
+  .progress-bar i{ display:block; height:100%; background:var(--accent); border-radius:999px; }
+  .progress-bar i.done{ background:var(--ok); }
+  .progress-card .remain{ font-size:12.5px; color:var(--ink-soft); }
+  .progress-card .remain span{ display:inline-block; background:var(--surface-sunken); padding:2px 8px; border-radius:999px; margin:0 4px 4px 0; }
+  .progress-summary{ font-size:13px; color:var(--ink-soft); margin-bottom:12px; }
+
+  @media (max-width:480px){
+    .head h1{ font-size:17px; }
+    .photo-strip img{ height:140px; }
+  }
+</style>
+</head>
+<body>
+<div id="app" class="wrap"><div class="loading">불러오는 중…</div></div>
+<div id="toast" class="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(function(){
+  'use strict';
+
+  // ===== 설정 =====
+  // 기존 매니저 로그북과 같은 Supabase 계정을 재사용합니다 (테이블만 새로 추가).
+  var SUPABASE_URL = 'https://caetlljnyxsusswqhtci.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_Oiqo2urdo-9s-HIso3rkmQ_7pP-I0nV';
+  var PHOTO_BUCKET = 'manual-photos';
+
+  // 관리자 화면 비밀번호(4자리 숫자 등 원하는 값으로 바꾸세요)
+  var ADMIN_PIN = '1225';
+
+  var sb = null;
+  if (window.supabase && typeof window.supabase.createClient === 'function'){
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+
+  var app = document.getElementById('app');
+  var toastEl = document.getElementById('toast');
+
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    setTimeout(function(){ toastEl.classList.remove('show'); }, 2200);
+  }
+
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function fmtDate(iso){
+    if (!iso) return '';
+    var d = new Date(iso);
+    var pad = function(n){ return String(n).padStart(2,'0'); };
+    return d.getFullYear() + '.' + pad(d.getMonth()+1) + '.' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  // 등록일로부터 며칠째인지, 달력 날짜 기준 (등록 당일 = 1일째, 다음 날 = 2일째)
+  function daysSince(iso){
+    if (!iso) return 0;
+    var d = new Date(iso), now = new Date();
+    var start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    return Math.max(1, Math.round((today - start) / 86400000) + 1);
+  }
+
+  function extractYoutubeId(url){
+    if (!url) return '';
+    var m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{6,})/);
+    return m ? m[1] : '';
+  }
+
+  function uid(){
+    return (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+  }
+
+  // ===== 전역 상태 =====
+  var state = {
+    loaded: false,
+    categories: [],
+    branches: [],
+    manuals: [],
+    staff: [],
+    confirmations: [],   // 현재 열어본 매뉴얼의 확인 기록만 필요할 때 불러옴
+    view: 'home',         // home | detail | admin-login | admin
+    activeCategory: null,
+    onlyRequired: false,  // 홈에서 "신입 필수"만 보기
+    query: '',
+    detailManualId: null,
+    isAdmin: false,
+    adminTab: 'manuals',  // manuals | categories | branches | staff | progress | status
+    editingManual: null,  // 편집 중인 매뉴얼 draft 객체 (신규 작성 포함)
+    statusManualId: null,
+    progressBranchId: null // 진행률 탭에서 고른 매장 (null = 전체)
+  };
+
+  // 매장 공용폰이라 마지막에 고른 매장을 기억해 두면 다음 사람은 이름만 고르면 됨
+  // (localStorage가 막힌 환경에서도 이 세션 안에서는 메모리로 기억)
+  var confirmBranchId = '';
+  try { confirmBranchId = localStorage.getItem('mb_branch') || ''; } catch(e){}
+  function getSavedBranch(){ return confirmBranchId; }
+  function saveBranch(id){
+    confirmBranchId = id || '';
+    try { localStorage.setItem('mb_branch', confirmBranchId); } catch(e){}
+  }
+
+  try {
+    if (sessionStorage.getItem('mb_admin') === '1') state.isAdmin = true;
+  } catch(e){}
+
+  // ===== 데이터 로딩 =====
+  function loadAll(){
+    if (!sb){
+      app.innerHTML = '<div class="empty">Supabase 연결에 실패했습니다. 네트워크 상태를 확인해주세요.</div>';
+      return;
+    }
+    Promise.all([
+      sb.from('manual_categories').select('*').order('sort_order', {ascending:true}),
+      sb.from('manuals').select('*').order('created_at', {ascending:false}),
+      sb.from('manual_staff').select('*').order('name', {ascending:true}),
+      sb.from('manual_branches').select('*').order('sort_order', {ascending:true})
+    ]).then(function(results){
+      var catRes = results[0], manRes = results[1], staffRes = results[2], branchRes = results[3];
+      if (catRes.error) throw catRes.error;
+      if (manRes.error) throw manRes.error;
+      if (staffRes.error) throw staffRes.error;
+      if (branchRes.error) throw branchRes.error;
+      state.categories = catRes.data || [];
+      state.manuals = manRes.data || [];
+      state.staff = staffRes.data || [];
+      state.branches = branchRes.data || [];
+      state.loaded = true;
+      render();
+    }).catch(function(err){
+      console.error(err);
+      app.innerHTML = '<div class="empty">데이터를 불러오지 못했습니다.<br>' + esc(err.message || err) + '</div>';
+    });
+  }
+
+  function categoryName(id){
+    var c = state.categories.filter(function(x){ return x.id === id; })[0];
+    return c ? c.name : '미분류';
+  }
+
+  function branchName(id){
+    var b = state.branches.filter(function(x){ return x.id === id; })[0];
+    return b ? b.name : '미지정';
+  }
+
+  // ===== 검색 / 필터 =====
+  // 띄어쓰기·대소문자를 무시하고 비교 ("컵 홀더" → "컵홀더")
+  function norm(s){
+    return String(s == null ? '' : s).toLowerCase().replace(/\s+/g, '');
+  }
+
+  function matchesQuery(m, q){
+    q = norm(q);
+    if (!q) return true;
+    var hay = norm([
+      m.title || '',
+      (m.tags || []).join(' '),
+      (m.steps || []).join(' '),
+      categoryName(m.category_id)
+    ].join(' '));
+    return hay.indexOf(q) !== -1;
+  }
+
+  function visibleManuals(){
+    return state.manuals.filter(function(m){
+      var okCat = !state.activeCategory || m.category_id === state.activeCategory;
+      var okReq = !state.onlyRequired || !!m.is_required;
+      var okQuery = matchesQuery(m, state.query);
+      return okCat && okReq && okQuery;
+    });
+  }
+
+  function requiredManuals(){
+    return state.manuals.filter(function(m){ return !!m.is_required; });
+  }
+
+  function requiredBadge(m){
+    return m.is_required ? '<span class="badge req">신입 필수</span>' : '';
+  }
+
+  function manualCardHtml(m){
+    return (
+      '<div class="manual-card" data-id="' + esc(m.id) + '">' +
+        '<div class="cat">' + esc(categoryName(m.category_id)) + '</div>' +
+        '<div class="title">' + esc(m.title) + requiredBadge(m) + '</div>' +
+        '<div class="tags">' + (m.tags||[]).map(function(t){ return '<span class="tag">#' + esc(t) + '</span>'; }).join('') + '</div>' +
+      '</div>'
+    );
+  }
+
+  function manualListHtml(list){
+    if (list.length) return list.map(manualCardHtml).join('');
+    if (state.onlyRequired && !requiredManuals().length) return '<div class="empty">아직 "신입 필수"로 지정된 매뉴얼이 없어요.<br>관리자 화면에서 매뉴얼을 수정해 지정할 수 있어요.</div>';
+    return '<div class="empty">검색 결과가 없어요.<br>다른 키워드로 찾아보세요.</div>';
+  }
+
+  function bindCardEvents(){
+    document.querySelectorAll('.manual-card').forEach(function(el){
+      el.addEventListener('click', function(){
+        state.detailManualId = el.getAttribute('data-id');
+        state.view = 'detail';
+        render();
+        window.scrollTo(0,0);
+      });
+    });
+  }
+
+  // ===== 렌더링 =====
+  function render(){
+    if (!state.loaded){ app.innerHTML = '<div class="loading">불러오는 중…</div>'; return; }
+    if (state.view === 'detail') return renderDetail();
+    if (state.view === 'admin-login') return renderAdminLogin();
+    if (state.view === 'admin') return renderAdmin();
+    return renderHome();
+  }
+
+  function renderHeader(subtitle, opts){
+    opts = opts || {};
+    var linkLabel = state.isAdmin ? '관리자 화면' : '관리자';
+    var backHtml = opts.back ? '<button class="back-btn" id="btnBack">&larr; 목록으로</button>' : '';
+    return (
+      backHtml +
+      '<div class="head">' +
+        '<div><h1>신입 직원 매뉴얼북</h1><div class="sub">' + esc(subtitle || '검색하면 바로 찾아요') + '</div></div>' +
+        '<button class="head-link" id="btnAdminLink">' + esc(linkLabel) + '</button>' +
+      '</div>'
+    );
+  }
+
+  function renderHome(){
+    var reqCount = requiredManuals().length;
+    var chips = [
+      '<button class="chip' + (!state.activeCategory && !state.onlyRequired ? ' active' : '') + '" data-cat="">전체</button>',
+      '<button class="chip' + (state.onlyRequired ? ' active' : '') + '" data-req="1">신입 필수' + (reqCount ? ' ' + reqCount : '') + '</button>'
+    ];
+    state.categories.forEach(function(c){
+      chips.push('<button class="chip' + (state.activeCategory === c.id ? ' active' : '') + '" data-cat="' + esc(c.id) + '">' + esc(c.name) + '</button>');
+    });
+
+    app.innerHTML =
+      renderHeader() +
+      '<div class="search-box"><span class="icon">&#128269;</span><input id="searchInput" type="text" placeholder="예: 컵홀더, 단팥빵, 근로계약서" value="' + esc(state.query) + '"></div>' +
+      '<div class="chips">' + chips.join('') + '</div>' +
+      '<div class="manual-list">' + manualListHtml(visibleManuals()) + '</div>';
+
+    bindHeaderEvents();
+
+    var si = document.getElementById('searchInput');
+    si.addEventListener('input', function(){ state.query = si.value; renderListOnly(); });
+    si.focus();
+    si.selectionStart = si.selectionEnd = si.value.length;
+
+    document.querySelectorAll('.chip').forEach(function(el){
+      el.addEventListener('click', function(){
+        if (el.hasAttribute('data-req')){
+          state.onlyRequired = !state.onlyRequired;
+          state.activeCategory = null;
+        } else {
+          state.activeCategory = el.getAttribute('data-cat') || null;
+          state.onlyRequired = false;
+        }
+        render();
+      });
+    });
+    bindCardEvents();
+  }
+
+  // 검색 입력 중에는 목록만 다시 그려서 포커스를 잃지 않게 함
+  function renderListOnly(){
+    var listEl = document.querySelector('.manual-list');
+    if (listEl){
+      listEl.innerHTML = manualListHtml(visibleManuals());
+      bindCardEvents();
+    }
+  }
+
+  function bindHeaderEvents(){
+    var back = document.getElementById('btnBack');
+    if (back) back.addEventListener('click', function(){
+      state.view = 'home';
+      render();
+    });
+    var adminLink = document.getElementById('btnAdminLink');
+    if (adminLink) adminLink.addEventListener('click', function(){
+      state.view = state.isAdmin ? 'admin' : 'admin-login';
+      render();
+      window.scrollTo(0,0);
+    });
+  }
+
+  function renderDetail(){
+    var m = state.manuals.filter(function(x){ return x.id === state.detailManualId; })[0];
+    if (!m){ state.view = 'home'; return render(); }
+    var ytId = extractYoutubeId(m.youtube_url);
+    var photos = m.photos || [];
+
+    var photosHtml = photos.length ? (
+      '<div class="photo-strip">' + photos.map(function(p){ return '<img src="' + esc(p.url) + '" alt="">'; }).join('') + '</div>'
+    ) : '';
+
+    var videoHtml = ytId ? (
+      '<div class="video-wrap"><iframe src="https://www.youtube.com/embed/' + esc(ytId) + '" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>'
+    ) : '';
+
+    var stepsHtml = (m.steps||[]).length ? (
+      '<ol class="steps">' + (m.steps||[]).map(function(s, i){
+        return '<li><span class="step-num">' + (i+1) + '</span><span class="step-text">' + esc(s) + '</span></li>';
+      }).join('') + '</ol>'
+    ) : '';
+
+    var tagsHtml = (m.tags||[]).length ? (
+      '<div class="tags">' + (m.tags||[]).map(function(t){ return '<span class="tag">#' + esc(t) + '</span>'; }).join('') + '</div>'
+    ) : '';
+
+    app.innerHTML =
+      renderHeader(null, {back:true}) +
+      '<div class="detail-card">' +
+        '<div class="cat">' + esc(categoryName(m.category_id)) + '</div>' +
+        '<h2>' + esc(m.title) + requiredBadge(m) + '</h2>' +
+        photosHtml +
+        videoHtml +
+        stepsHtml +
+        tagsHtml +
+        '<div class="confirm-box">' +
+          '<p>다 확인하셨으면 매장과 본인 이름을 고르고 버튼을 눌러주세요.</p>' +
+          '<div id="confirmArea"></div>' +
+          '<div class="confirmed-list" id="confirmedList"><h4>확인한 사람</h4><div class="loading" style="padding:10px 0;">불러오는 중…</div></div>' +
+        '</div>' +
+      '</div>';
+
+    bindHeaderEvents();
+
+    var confirmed = [];          // 이 매뉴얼의 확인 기록
+    var confirmedStaffIds = {};  // staff_id → confirmed_at
+
+    // 확인 기록 한 줄을 (이름, 매장)으로 풀어 줌. 옛 기록(staff_id 없음)은 이름 문자열로 표시
+    function describe(c){
+      var s = c.staff_id ? state.staff.filter(function(x){ return x.id === c.staff_id; })[0] : null;
+      return { name: s ? s.name : (c.staff_name || '(이름 없음)'), branch: s ? branchName(s.branch_id) : (c.staff_name ? '옛 기록' : '미지정') };
+    }
+
+    function renderConfirmedList(){
+      var el = document.getElementById('confirmedList');
+      if (!el) return;
+      if (!confirmed.length){ el.innerHTML = '<h4>확인한 사람</h4><div class="confirm-note">아직 아무도 확인하지 않았어요.</div>'; return; }
+      var groups = {};
+      var order = [];
+      confirmed.forEach(function(c){
+        var d = describe(c);
+        if (!groups[d.branch]){ groups[d.branch] = []; order.push(d.branch); }
+        groups[d.branch].push(d.name + ' · ' + fmtDate(c.confirmed_at).slice(5, 10));
+      });
+      order.sort(function(a, b){ return a.localeCompare(b); });
+      el.innerHTML = '<h4>확인한 사람 (' + confirmed.length + ')</h4>' + order.map(function(b){
+        return '<div class="confirmed-group"><b>' + esc(b) + '</b>' + groups[b].map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') + '</div>';
+      }).join('');
+    }
+
+    function renderConfirmArea(){
+      var area = document.getElementById('confirmArea');
+      if (!area) return;
+      var NONE = '__none__'; // 아직 매장이 지정되지 않은 직원용
+      var hasUnassigned = state.staff.some(function(s){ return !s.branch_id; });
+      var branchId = getSavedBranch();
+      if (!state.branches.some(function(b){ return b.id === branchId; }) && !(branchId === NONE && hasUnassigned)) branchId = '';
+      var branchOptions = '<option value="">매장 선택</option>' + state.branches.map(function(b){
+        return '<option value="' + esc(b.id) + '"' + (b.id === branchId ? ' selected' : '') + '>' + esc(b.name) + '</option>';
+      }).join('') + (hasUnassigned ? '<option value="' + NONE + '"' + (branchId === NONE ? ' selected' : '') + '>매장 미지정</option>' : '');
+      var staffInBranch = branchId ? state.staff.filter(function(s){ return branchId === NONE ? !s.branch_id : s.branch_id === branchId; }) : [];
+      var staffOptions = '<option value="">이름 선택</option>' + staffInBranch.map(function(s){
+        var done = confirmedStaffIds[s.id];
+        return '<option value="' + esc(s.id) + '">' + esc(s.name) + (done ? ' ✓ 확인함' : '') + '</option>';
+      }).join('');
+      var note = '';
+      if (!state.branches.length) note = '아직 매장이 등록되지 않았어요. 관리자 화면 → 매장 관리에서 먼저 등록해주세요.';
+      else if (branchId && !staffInBranch.length) note = '이 매장에 등록된 직원이 없어요. 매니저에게 등록을 요청하세요. (관리자 화면 → 직원 명단)';
+      else if (branchId) note = '명단에 내 이름이 없으면 매니저에게 등록을 요청하세요. (관리자 화면 → 직원 명단)';
+
+      area.innerHTML =
+        '<div class="confirm-row">' +
+          '<select id="confirmBranch">' + branchOptions + '</select>' +
+          '<select id="confirmStaff"' + (branchId ? '' : ' disabled') + '>' + staffOptions + '</select>' +
+          '<button class="btn" id="btnConfirm">확인했어요</button>' +
+        '</div>' +
+        (note ? '<div class="confirm-note">' + esc(note) + '</div>' : '');
+
+      document.getElementById('confirmBranch').addEventListener('change', function(){
+        saveBranch(this.value);
+        renderConfirmArea();
+      });
+
+      document.getElementById('btnConfirm').addEventListener('click', function(){
+        var staffId = document.getElementById('confirmStaff').value;
+        if (!branchId){ toast('매장을 먼저 골라주세요.'); return; }
+        if (!staffId){ toast('본인 이름을 골라주세요.'); return; }
+        var staff = state.staff.filter(function(s){ return s.id === staffId; })[0];
+        if (confirmedStaffIds[staffId]){
+          toast(staff.name + '님은 이미 확인했어요. (' + fmtDate(confirmedStaffIds[staffId]) + ')');
+          return;
+        }
+        var btn = document.getElementById('btnConfirm');
+        btn.disabled = true;
+        sb.from('manual_confirmations').insert({ manual_id: m.id, staff_id: staffId, staff_name: staff.name }).select().then(function(res){
+          if (res.error){
+            btn.disabled = false;
+            // 23505 = 이미 같은 사람의 기록이 있음 (DB unique 제약)
+            if (res.error.code === '23505'){ toast(staff.name + '님은 이미 확인했어요.'); loadConfirmed(); return; }
+            toast('저장 실패: ' + res.error.message);
+            return;
+          }
+          var row = res.data[0];
+          confirmed.unshift(row);
+          confirmedStaffIds[staffId] = row.confirmed_at;
+          area.innerHTML = '<div class="confirm-done">확인 완료! ' + esc(staff.name) + '님, ' + fmtDate(row.confirmed_at) + '</div>' +
+            '<div class="confirm-note"><button class="mini-btn" id="btnConfirmAnother">다른 사람도 확인하기</button></div>';
+          document.getElementById('btnConfirmAnother').addEventListener('click', renderConfirmArea);
+          renderConfirmedList();
+          toast('확인 기록이 저장되었어요.');
+        });
+      });
+    }
+
+    function loadConfirmed(){
+      sb.from('manual_confirmations').select('*').eq('manual_id', m.id).order('confirmed_at', {ascending:false}).then(function(res){
+        if (res.error){ toast('확인 기록을 불러오지 못했어요.'); confirmed = []; }
+        else confirmed = res.data || [];
+        confirmedStaffIds = {};
+        confirmed.forEach(function(c){ if (c.staff_id && !confirmedStaffIds[c.staff_id]) confirmedStaffIds[c.staff_id] = c.confirmed_at; });
+        renderConfirmedList();
+        renderConfirmArea();
+      });
+    }
+
+    renderConfirmArea();
+    loadConfirmed();
+  }
+
+  // ===== 관리자 로그인 =====
+  function renderAdminLogin(){
+    app.innerHTML =
+      '<div class="center-card">' +
+        '<h2>관리자 화면</h2>' +
+        '<p>비밀번호를 입력해주세요.</p>' +
+        '<input id="pinInput" type="password" inputmode="numeric" maxlength="12" placeholder="••••">' +
+        '<div class="error-text" id="pinError"></div>' +
+        '<button class="btn" id="btnPinSubmit" style="width:100%">입장하기</button>' +
+        '<div style="margin-top:14px;"><button class="head-link" id="btnPinCancel">직원 화면으로</button></div>' +
+      '</div>';
+
+    var pinInput = document.getElementById('pinInput');
+    pinInput.focus();
+
+    function submit(){
+      if (pinInput.value === ADMIN_PIN){
+        state.isAdmin = true;
+        try { sessionStorage.setItem('mb_admin', '1'); } catch(e){}
+        state.view = 'admin';
+        render();
+      } else {
+        document.getElementById('pinError').textContent = '비밀번호가 올바르지 않아요.';
+        pinInput.value = '';
+        pinInput.focus();
+      }
+    }
+    document.getElementById('btnPinSubmit').addEventListener('click', submit);
+    pinInput.addEventListener('keydown', function(e){ if (e.key === 'Enter') submit(); });
+    document.getElementById('btnPinCancel').addEventListener('click', function(){ state.view = 'home'; render(); });
+  }
+
+  // ===== 관리자 화면 =====
+  function renderAdmin(){
+    var tabs = [
+      ['manuals', '매뉴얼 관리'],
+      ['categories', '카테고리 관리'],
+      ['branches', '매장 관리'],
+      ['staff', '직원 명단'],
+      ['progress', '신입 진행률'],
+      ['status', '확인 현황']
+    ];
+    var tabsHtml = tabs.map(function(t){
+      return '<button class="admin-tab' + (state.adminTab === t[0] ? ' active' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>';
+    }).join('');
+
+    app.innerHTML =
+      '<div class="head"><div><h1>관리자 화면</h1><div class="sub">매뉴얼북 관리</div></div>' +
+        '<button class="head-link" id="btnLogout">직원 화면으로</button></div>' +
+      '<div class="admin-tabs">' + tabsHtml + '</div>' +
+      '<div id="adminBody"></div>';
+
+    document.getElementById('btnLogout').addEventListener('click', function(){
+      state.view = 'home';
+      render();
+    });
+    document.querySelectorAll('.admin-tab').forEach(function(el){
+      el.addEventListener('click', function(){
+        state.adminTab = el.getAttribute('data-tab');
+        state.editingManual = null;
+        render();
+      });
+    });
+
+    var body = document.getElementById('adminBody');
+    if (state.adminTab === 'manuals') renderAdminManuals(body);
+    else if (state.adminTab === 'categories') renderAdminCategories(body);
+    else if (state.adminTab === 'branches') renderAdminBranches(body);
+    else if (state.adminTab === 'staff') renderAdminStaff(body);
+    else if (state.adminTab === 'progress') renderAdminProgress(body);
+    else if (state.adminTab === 'status') renderAdminStatus(body);
+  }
+
+  // --- 매뉴얼 관리 ---
+  function renderAdminManuals(body){
+    if (state.editingManual){
+      return renderManualForm(body, state.editingManual);
+    }
+    var rows = state.manuals.map(function(m){
+      return (
+        '<div class="list-row">' +
+          '<div class="info"><div class="t">' + esc(m.title) + requiredBadge(m) + '</div><div class="s">' + esc(categoryName(m.category_id)) + ' · 사진 ' + (m.photos||[]).length + '장 · 단계 ' + (m.steps||[]).length + '개</div></div>' +
+          '<div class="row-actions">' +
+            '<button class="icon-btn" data-edit="' + esc(m.id) + '">수정</button>' +
+            '<button class="icon-btn danger" data-del="' + esc(m.id) + '">삭제</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('') || '<div class="empty">등록된 매뉴얼이 없어요.</div>';
+
+    body.innerHTML =
+      '<div class="section-head"><h3>매뉴얼 목록 (' + state.manuals.length + ')</h3><button class="btn" id="btnNewManual">+ 새 매뉴얼</button></div>' +
+      rows;
+
+    document.getElementById('btnNewManual').addEventListener('click', function(){
+      state.editingManual = { id:null, title:'', category_id: state.categories[0] ? state.categories[0].id : null, tags:[], youtube_url:'', photos:[], steps:[''], is_required:false };
+      render();
+    });
+    body.querySelectorAll('[data-edit]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var m = state.manuals.filter(function(x){ return x.id === el.getAttribute('data-edit'); })[0];
+        state.editingManual = JSON.parse(JSON.stringify(m));
+        if (!state.editingManual.steps || !state.editingManual.steps.length) state.editingManual.steps = [''];
+        render();
+      });
+    });
+    body.querySelectorAll('[data-del]').forEach(function(el){
+      el.addEventListener('click', function(){
+        if (!confirm('이 매뉴얼을 삭제할까요? 되돌릴 수 없어요.')) return;
+        var id = el.getAttribute('data-del');
+        sb.from('manuals').delete().eq('id', id).then(function(res){
+          if (res.error){ toast('삭제 실패: ' + res.error.message); return; }
+          state.manuals = state.manuals.filter(function(x){ return x.id !== id; });
+          toast('삭제했어요.');
+          render();
+        });
+      });
+    });
+  }
+
+  function renderManualForm(body, draft){
+    var catOptions = state.categories.map(function(c){
+      return '<option value="' + esc(c.id) + '"' + (draft.category_id === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>';
+    }).join('');
+
+    var stepsHtml = draft.steps.map(function(s, i){
+      return (
+        '<div class="step-edit-row" data-step-idx="' + i + '">' +
+          '<span class="step-num">' + (i+1) + '</span>' +
+          '<textarea rows="2" data-step-input="' + i + '" placeholder="' + (i+1) + '단계 설명">' + esc(s) + '</textarea>' +
+          '<div class="step-btns">' +
+            '<button class="mini-btn" data-step-up="' + i + '">위로</button>' +
+            '<button class="mini-btn" data-step-down="' + i + '">아래로</button>' +
+            '<button class="mini-btn" data-step-del="' + i + '">삭제</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    var photosHtml = (draft.photos||[]).map(function(p, i){
+      return '<div class="photo-item"><img src="' + esc(p.url) + '"><span class="rm" data-photo-del="' + i + '">&times;</span></div>';
+    }).join('');
+
+    body.innerHTML =
+      '<div class="form-card">' +
+        '<div class="field"><label>제목</label><input type="text" id="fTitle" value="' + esc(draft.title) + '" placeholder="예: 컵홀더 접는 방법"></div>' +
+        '<div class="field"><label>카테고리</label><select id="fCategory">' + catOptions + '</select></div>' +
+        '<div class="field"><label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="fRequired"' + (draft.is_required ? ' checked' : '') + '> 신입 필수 매뉴얼</label>' +
+          '<div class="hint">체크하면 홈의 "신입 필수" 목록에 들어가고, 신입 진행률에서 몇 명이 봤는지 셉니다.</div></div>' +
+        '<div class="field"><label>사진</label>' +
+          '<div class="photo-grid" id="photoGrid">' + photosHtml + '</div>' +
+          '<label class="upload-btn">사진 추가하기<input type="file" id="fPhotoInput" accept="image/*" multiple style="display:none"></label>' +
+          '<div class="hint" id="uploadHint"></div>' +
+        '</div>' +
+        '<div class="field"><label>유튜브 링크 (비공개 링크 가능)</label><input type="url" id="fYoutube" value="' + esc(draft.youtube_url||'') + '" placeholder="https://youtu.be/..."></div>' +
+        '<div class="field"><label>단계별 설명</label>' +
+          '<div id="stepsList">' + stepsHtml + '</div>' +
+          '<button class="mini-btn" id="btnAddStep">+ 단계 추가</button>' +
+        '</div>' +
+        '<div class="field"><label>태그 (쉼표로 구분)</label><input type="text" id="fTags" value="' + esc((draft.tags||[]).join(', ')) + '" placeholder="예: 포장, 컵홀더, 테이크아웃"></div>' +
+        '<div class="form-actions">' +
+          '<button class="btn secondary" id="btnCancelForm">취소</button>' +
+          '<button class="btn" id="btnSaveManual">저장하기</button>' +
+        '</div>' +
+      '</div>';
+
+    // 필드 변경 시 draft에 즉시 반영 (재렌더링 없이)
+    document.getElementById('fTitle').addEventListener('input', function(e){ draft.title = e.target.value; });
+    document.getElementById('fCategory').addEventListener('change', function(e){ draft.category_id = e.target.value; });
+    document.getElementById('fYoutube').addEventListener('input', function(e){ draft.youtube_url = e.target.value; });
+    document.getElementById('fRequired').addEventListener('change', function(e){ draft.is_required = e.target.checked; });
+    document.getElementById('fTags').addEventListener('input', function(e){ draft.tags = e.target.value.split(',').map(function(t){ return t.trim(); }).filter(Boolean); });
+
+    body.querySelectorAll('[data-step-input]').forEach(function(el){
+      el.addEventListener('input', function(){
+        draft.steps[+el.getAttribute('data-step-input')] = el.value;
+      });
+    });
+    body.querySelectorAll('[data-step-up]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var i = +el.getAttribute('data-step-up');
+        if (i > 0){ var tmp = draft.steps[i-1]; draft.steps[i-1] = draft.steps[i]; draft.steps[i] = tmp; render(); }
+      });
+    });
+    body.querySelectorAll('[data-step-down]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var i = +el.getAttribute('data-step-down');
+        if (i < draft.steps.length-1){ var tmp = draft.steps[i+1]; draft.steps[i+1] = draft.steps[i]; draft.steps[i] = tmp; render(); }
+      });
+    });
+    body.querySelectorAll('[data-step-del]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var i = +el.getAttribute('data-step-del');
+        draft.steps.splice(i, 1);
+        if (!draft.steps.length) draft.steps.push('');
+        render();
+      });
+    });
+    document.getElementById('btnAddStep').addEventListener('click', function(){
+      draft.steps.push('');
+      render();
+    });
+
+    body.querySelectorAll('[data-photo-del]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var i = +el.getAttribute('data-photo-del');
+        var removed = draft.photos.splice(i, 1)[0];
+        render();
+        if (removed && removed.path){
+          sb.storage.from(PHOTO_BUCKET).remove([removed.path]).catch(function(){});
+        }
+      });
+    });
+
+    document.getElementById('fPhotoInput').addEventListener('change', function(e){
+      var files = Array.prototype.slice.call(e.target.files || []);
+      if (!files.length) return;
+      var hint = document.getElementById('uploadHint');
+      hint.textContent = '업로드 중… (' + files.length + '장)';
+      var manualKey = draft.id || 'new-' + Date.now();
+      Promise.all(files.map(function(file){
+        var path = manualKey + '/' + uid() + '-' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+        return sb.storage.from(PHOTO_BUCKET).upload(path, file).then(function(res){
+          if (res.error) throw res.error;
+          var pub = sb.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+          draft.photos.push({ path: path, url: pub.data.publicUrl });
+        });
+      })).then(function(){
+        render();
+        toast('사진을 업로드했어요.');
+      }).catch(function(err){
+        toast('업로드 실패: ' + (err.message || err));
+        render();
+      });
+    });
+
+    document.getElementById('btnCancelForm').addEventListener('click', function(){
+      state.editingManual = null;
+      render();
+    });
+
+    document.getElementById('btnSaveManual').addEventListener('click', function(){
+      var title = (draft.title||'').trim();
+      if (!title){ toast('제목을 입력해주세요.'); return; }
+      var payload = {
+        title: title,
+        category_id: draft.category_id || null,
+        tags: draft.tags || [],
+        youtube_url: (draft.youtube_url||'').trim(),
+        is_required: !!draft.is_required,
+        photos: draft.photos || [],
+        steps: (draft.steps||[]).map(function(s){ return s.trim(); }).filter(Boolean),
+        updated_at: new Date().toISOString()
+      };
+      var btn = document.getElementById('btnSaveManual');
+      btn.disabled = true;
+      var req = draft.id
+        ? sb.from('manuals').update(payload).eq('id', draft.id).select()
+        : sb.from('manuals').insert(payload).select();
+      req.then(function(res){
+        if (res.error){ toast('저장 실패: ' + res.error.message); btn.disabled = false; return; }
+        var saved = res.data[0];
+        if (draft.id){
+          state.manuals = state.manuals.map(function(m){ return m.id === saved.id ? saved : m; });
+        } else {
+          state.manuals.unshift(saved);
+        }
+        state.editingManual = null;
+        toast('저장했어요.');
+        render();
+      });
+    });
+  }
+
+  // --- 카테고리 관리 ---
+  function renderAdminCategories(body){
+    var rows = state.categories.map(function(c, i){
+      return (
+        '<div class="list-row">' +
+          '<div class="info"><div class="t">' + esc(c.name) + '</div><div class="s">순서 ' + c.sort_order + '</div></div>' +
+          '<div class="row-actions">' +
+            '<button class="icon-btn" data-cat-rename="' + esc(c.id) + '">이름 변경</button>' +
+            '<button class="icon-btn danger" data-cat-del="' + esc(c.id) + '">삭제</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('') || '<div class="empty">카테고리가 없어요.</div>';
+
+    body.innerHTML =
+      '<div class="section-head"><h3>카테고리 (' + state.categories.length + ')</h3></div>' +
+      '<div class="form-card">' +
+        '<div class="field"><label>새 카테고리 이름</label>' +
+          '<div style="display:flex; gap:8px;"><input type="text" id="newCatName" placeholder="예: 포장 방법" style="flex:1;"><button class="btn" id="btnAddCat">추가</button></div>' +
+        '</div>' +
+      '</div>' +
+      rows;
+
+    document.getElementById('btnAddCat').addEventListener('click', function(){
+      var input = document.getElementById('newCatName');
+      var name = input.value.trim();
+      if (!name){ toast('카테고리 이름을 입력해주세요.'); return; }
+      var sortOrder = state.categories.length ? Math.max.apply(null, state.categories.map(function(c){ return c.sort_order; })) + 1 : 0;
+      sb.from('manual_categories').insert({ name: name, sort_order: sortOrder }).select().then(function(res){
+        if (res.error){ toast('추가 실패: ' + res.error.message); return; }
+        state.categories.push(res.data[0]);
+        toast('카테고리를 추가했어요.');
+        render();
+      });
+    });
+
+    body.querySelectorAll('[data-cat-rename]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-cat-rename');
+        var cat = state.categories.filter(function(c){ return c.id === id; })[0];
+        var name = prompt('새 이름을 입력하세요.', cat.name);
+        if (name == null) return;
+        name = name.trim();
+        if (!name) return;
+        sb.from('manual_categories').update({ name: name }).eq('id', id).then(function(res){
+          if (res.error){ toast('변경 실패: ' + res.error.message); return; }
+          cat.name = name;
+          toast('이름을 변경했어요.');
+          render();
+        });
+      });
+    });
+    body.querySelectorAll('[data-cat-del]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-cat-del');
+        var used = state.manuals.some(function(m){ return m.category_id === id; });
+        if (used && !confirm('이 카테고리를 쓰는 매뉴얼이 있어요. 삭제하면 해당 매뉴얼은 "미분류"가 됩니다. 계속할까요?')) return;
+        sb.from('manual_categories').delete().eq('id', id).then(function(res){
+          if (res.error){ toast('삭제 실패: ' + res.error.message); return; }
+          state.categories = state.categories.filter(function(c){ return c.id !== id; });
+          state.manuals.forEach(function(m){ if (m.category_id === id) m.category_id = null; });
+          toast('삭제했어요.');
+          render();
+        });
+      });
+    });
+  }
+
+  // --- 매장 관리 ---
+  function renderAdminBranches(body){
+    var rows = state.branches.map(function(b){
+      return (
+        '<div class="list-row">' +
+          '<div class="info"><div class="t">' + esc(b.name) + '</div><div class="s">순서 ' + b.sort_order + '</div></div>' +
+          '<div class="row-actions">' +
+            '<button class="icon-btn" data-branch-rename="' + esc(b.id) + '">이름 변경</button>' +
+            '<button class="icon-btn danger" data-branch-del="' + esc(b.id) + '">삭제</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('') || '<div class="empty">등록된 매장이 없어요.</div>';
+
+    body.innerHTML =
+      '<div class="section-head"><h3>매장 (' + state.branches.length + ')</h3></div>' +
+      '<div class="hint" style="margin-bottom:12px;">여기서 매장을 등록해두면 "직원 명단"에서 직원마다 소속 매장을 지정할 수 있어요.</div>' +
+      '<div class="form-card">' +
+        '<div class="field"><label>새 매장 이름</label>' +
+          '<div style="display:flex; gap:8px;"><input type="text" id="newBranchName" placeholder="예: 성수점" style="flex:1;"><button class="btn" id="btnAddBranch">추가</button></div>' +
+        '</div>' +
+      '</div>' +
+      rows;
+
+    document.getElementById('btnAddBranch').addEventListener('click', function(){
+      var input = document.getElementById('newBranchName');
+      var name = input.value.trim();
+      if (!name){ toast('매장 이름을 입력해주세요.'); return; }
+      var sortOrder = state.branches.length ? Math.max.apply(null, state.branches.map(function(b){ return b.sort_order; })) + 1 : 0;
+      sb.from('manual_branches').insert({ name: name, sort_order: sortOrder }).select().then(function(res){
+        if (res.error){ toast('추가 실패: ' + res.error.message); return; }
+        state.branches.push(res.data[0]);
+        toast('매장을 추가했어요.');
+        render();
+      });
+    });
+
+    body.querySelectorAll('[data-branch-rename]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-branch-rename');
+        var b = state.branches.filter(function(x){ return x.id === id; })[0];
+        var name = prompt('새 이름을 입력하세요.', b.name);
+        if (name == null) return;
+        name = name.trim();
+        if (!name) return;
+        sb.from('manual_branches').update({ name: name }).eq('id', id).then(function(res){
+          if (res.error){ toast('변경 실패: ' + res.error.message); return; }
+          b.name = name;
+          toast('이름을 변경했어요.');
+          render();
+        });
+      });
+    });
+    body.querySelectorAll('[data-branch-del]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-branch-del');
+        var used = state.staff.some(function(s){ return s.branch_id === id; });
+        if (used && !confirm('이 매장 소속 직원이 있어요. 삭제하면 해당 직원은 "미지정"이 됩니다. 계속할까요?')) return;
+        sb.from('manual_branches').delete().eq('id', id).then(function(res){
+          if (res.error){ toast('삭제 실패: ' + res.error.message); return; }
+          state.branches = state.branches.filter(function(b){ return b.id !== id; });
+          state.staff.forEach(function(s){ if (s.branch_id === id) s.branch_id = null; });
+          toast('삭제했어요.');
+          render();
+        });
+      });
+    });
+  }
+
+  // --- 직원 명단 ---
+  function renderAdminStaff(body){
+    var branchOptions = '<option value="">매장 선택 안 함</option>' + state.branches.map(function(b){
+      return '<option value="' + esc(b.id) + '">' + esc(b.name) + '</option>';
+    }).join('');
+
+    var grouped = {};
+    var groupOrder = [];
+    state.branches.forEach(function(b){ grouped[b.id] = []; groupOrder.push(b.id); });
+    grouped['__none__'] = [];
+    groupOrder.push('__none__');
+    state.staff.forEach(function(s){
+      var key = (s.branch_id && grouped[s.branch_id]) ? s.branch_id : '__none__';
+      grouped[key].push(s);
+    });
+
+    var rows = groupOrder.map(function(key){
+      var list = grouped[key];
+      if (!list.length) return '';
+      var heading = key === '__none__' ? '미지정' : branchName(key);
+      var itemsHtml = list.map(function(s){
+        var staffBranchOptions = '<option value="">매장 선택 안 함</option>' + state.branches.map(function(b){
+          return '<option value="' + esc(b.id) + '"' + (s.branch_id === b.id ? ' selected' : '') + '>' + esc(b.name) + '</option>';
+        }).join('');
+        return (
+          '<div class="list-row">' +
+            '<div class="info"><div class="t">' + esc(s.name) + '</div><div class="s">' + esc(fmtDate(s.created_at).slice(0, 10)) + ' 등록 · ' + daysSince(s.created_at) + '일째</div></div>' +
+            '<div class="row-actions">' +
+              '<select class="icon-btn" data-staff-branch="' + esc(s.id) + '">' + staffBranchOptions + '</select>' +
+              '<button class="icon-btn danger" data-staff-del="' + esc(s.id) + '">삭제</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+      return '<div class="section-head" style="margin-top:18px;"><h3 style="font-size:13px; color:var(--ink-faint);">' + esc(heading) + ' (' + list.length + ')</h3></div>' + itemsHtml;
+    }).join('') || '<div class="empty">등록된 직원이 없어요.</div>';
+
+    body.innerHTML =
+      '<div class="section-head"><h3>직원 명단 (' + state.staff.length + ')</h3></div>' +
+      '<div class="hint" style="margin-bottom:12px;">여기에 등록해두면 "확인 현황"에서 아직 안 본 직원을 매장별로 보여줘요.</div>' +
+      '<div class="form-card">' +
+        '<div class="field"><label>새 직원 이름</label>' +
+          '<input type="text" id="newStaffName" placeholder="이름" style="margin-bottom:10px;">' +
+        '</div>' +
+        '<div class="field"><label>소속 매장</label>' +
+          '<div style="display:flex; gap:8px;"><select id="newStaffBranch" style="flex:1;">' + branchOptions + '</select><button class="btn" id="btnAddStaff">추가</button></div>' +
+        '</div>' +
+      '</div>' +
+      rows;
+
+    document.getElementById('btnAddStaff').addEventListener('click', function(){
+      var input = document.getElementById('newStaffName');
+      var branchSel = document.getElementById('newStaffBranch');
+      var name = input.value.trim();
+      if (!name){ toast('이름을 입력해주세요.'); return; }
+      sb.from('manual_staff').insert({ name: name, branch_id: branchSel.value || null }).select().then(function(res){
+        if (res.error){ toast('추가 실패: ' + res.error.message); return; }
+        state.staff.push(res.data[0]);
+        state.staff.sort(function(a,b){ return a.name.localeCompare(b.name); });
+        toast('추가했어요.');
+        render();
+      });
+    });
+
+    body.querySelectorAll('[data-staff-branch]').forEach(function(el){
+      el.addEventListener('change', function(){
+        var id = el.getAttribute('data-staff-branch');
+        var branchId = el.value || null;
+        sb.from('manual_staff').update({ branch_id: branchId }).eq('id', id).then(function(res){
+          if (res.error){ toast('변경 실패: ' + res.error.message); return; }
+          var s = state.staff.filter(function(x){ return x.id === id; })[0];
+          if (s) s.branch_id = branchId;
+          toast('매장을 변경했어요.');
+          render();
+        });
+      });
+    });
+
+    body.querySelectorAll('[data-staff-del]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-staff-del');
+        if (!confirm('이 직원을 명단에서 삭제할까요?')) return;
+        sb.from('manual_staff').delete().eq('id', id).then(function(res){
+          if (res.error){ toast('삭제 실패: ' + res.error.message); return; }
+          state.staff = state.staff.filter(function(s){ return s.id !== id; });
+          toast('삭제했어요.');
+          render();
+        });
+      });
+    });
+  }
+
+  // --- 신입 진행률 (직원 1명 → 필수 매뉴얼 N개 중 M개) ---
+  function renderAdminProgress(body){
+    var required = requiredManuals();
+    var chips = ['<button class="chip' + (!state.progressBranchId ? ' active' : '') + '" data-branch="">전체</button>'];
+    state.branches.forEach(function(b){
+      chips.push('<button class="chip' + (state.progressBranchId === b.id ? ' active' : '') + '" data-branch="' + esc(b.id) + '">' + esc(b.name) + '</button>');
+    });
+
+    body.innerHTML =
+      '<div class="section-head"><h3>신입 진행률</h3><span class="badge req">필수 ' + required.length + '개</span></div>' +
+      '<div class="hint" style="margin-bottom:12px;">직원마다 "신입 필수" 매뉴얼을 몇 개 확인했는지 보여줘요. 등록 7일이 지났는데 남은 게 있으면 빨갛게 표시돼요.</div>' +
+      '<div class="chips">' + chips.join('') + '</div>' +
+      '<div id="progressResult"><div class="loading">불러오는 중…</div></div>';
+
+    body.querySelectorAll('[data-branch]').forEach(function(el){
+      el.addEventListener('click', function(){
+        state.progressBranchId = el.getAttribute('data-branch') || null;
+        render();
+      });
+    });
+
+    var result = document.getElementById('progressResult');
+    if (!required.length){
+      result.innerHTML = '<div class="empty">아직 "신입 필수"로 지정된 매뉴얼이 없어요.<br>매뉴얼 관리 → 수정에서 "신입 필수 매뉴얼"을 체크해주세요.</div>';
+      return;
+    }
+    var staffList = state.staff.filter(function(s){ return !state.progressBranchId || s.branch_id === state.progressBranchId; });
+    if (!staffList.length){
+      result.innerHTML = '<div class="empty">이 매장에 등록된 직원이 없어요.</div>';
+      return;
+    }
+
+    var requiredIds = required.map(function(m){ return m.id; });
+    sb.from('manual_confirmations').select('manual_id, staff_id, staff_name, confirmed_at').in('manual_id', requiredIds).then(function(res){
+      if (res.error){ result.innerHTML = '<div class="empty">불러오기 실패</div>'; return; }
+      var rows = res.data || [];
+      // staff_id → { manual_id: confirmed_at }. 옛 기록은 이름으로 매칭
+      var doneById = {}, doneByName = {};
+      rows.forEach(function(c){
+        var bucket = c.staff_id ? (doneById[c.staff_id] = doneById[c.staff_id] || {}) : (c.staff_name ? (doneByName[c.staff_name] = doneByName[c.staff_name] || {}) : null);
+        if (bucket && !bucket[c.manual_id]) bucket[c.manual_id] = c.confirmed_at;
+      });
+
+      var cards = staffList.map(function(s){
+        var done = Object.assign({}, doneByName[s.name] || {}, doneById[s.id] || {});
+        var remaining = required.filter(function(m){ return !done[m.id]; });
+        var doneCount = required.length - remaining.length;
+        var last = null;
+        Object.keys(done).forEach(function(k){ if (!last || done[k] > last) last = done[k]; });
+        var days = daysSince(s.created_at);
+        return { staff: s, remaining: remaining, doneCount: doneCount, last: last, days: days, late: remaining.length > 0 && days > 7 };
+      });
+      cards.sort(function(a, b){
+        if (a.late !== b.late) return a.late ? -1 : 1;
+        if (a.remaining.length !== b.remaining.length) return b.remaining.length - a.remaining.length;
+        return a.staff.name.localeCompare(b.staff.name);
+      });
+
+      var doneAll = cards.filter(function(c){ return !c.remaining.length; }).length;
+      var lateCount = cards.filter(function(c){ return c.late; }).length;
+      var summary = '직원 ' + cards.length + '명 중 완료 ' + doneAll + '명' + (lateCount ? ' · <span class="badge late">첫 주 지났는데 미완료 ' + lateCount + '명</span>' : '');
+
+      result.innerHTML = '<div class="progress-summary">' + summary + '</div>' + cards.map(function(c){
+        var pct = required.length ? Math.round(c.doneCount / required.length * 100) : 0;
+        var isDone = !c.remaining.length;
+        return (
+          '<div class="progress-card">' +
+            '<div class="top">' +
+              '<div><div class="name">' + esc(c.staff.name) + (c.late ? ' <span class="badge late">첫 주 지남</span>' : '') + '</div>' +
+                '<div class="meta">' + esc(branchName(c.staff.branch_id)) + ' · 등록 ' + c.days + '일째' + (c.last ? ' · 마지막 확인 ' + esc(fmtDate(c.last).slice(0, 10)) : '') + '</div></div>' +
+              '<div class="count' + (isDone ? ' done' : '') + '">' + c.doneCount + ' / ' + required.length + '</div>' +
+            '</div>' +
+            '<div class="progress-bar"><i class="' + (isDone ? 'done' : '') + '" style="width:' + pct + '%"></i></div>' +
+            (isDone
+              ? '<div class="remain" style="color:var(--ok);">필수 매뉴얼을 모두 확인했어요.</div>'
+              : '<div class="remain">남은 것: ' + c.remaining.map(function(m){ return '<span>' + esc(m.title) + '</span>'; }).join('') + '</div>') +
+          '</div>'
+        );
+      }).join('');
+    });
+  }
+
+  // --- 확인 현황 ---
+  function renderAdminStatus(body){
+    var options = state.manuals.map(function(m){
+      return '<option value="' + esc(m.id) + '"' + (state.statusManualId === m.id ? ' selected' : '') + '>' + esc(m.title) + '</option>';
+    }).join('');
+
+    body.innerHTML =
+      '<div class="section-head"><h3>매뉴얼별 확인 현황</h3></div>' +
+      '<div class="field"><select id="statusSelect"><option value="">매뉴얼을 선택하세요</option>' + options + '</select></div>' +
+      '<div id="statusResult"></div>';
+
+    var sel = document.getElementById('statusSelect');
+    sel.addEventListener('change', function(){
+      state.statusManualId = sel.value || null;
+      loadStatus();
+    });
+    if (state.statusManualId) loadStatus();
+
+    function loadStatus(){
+      var result = document.getElementById('statusResult');
+      if (!state.statusManualId){ result.innerHTML = ''; return; }
+      result.innerHTML = '<div class="loading">불러오는 중…</div>';
+      sb.from('manual_confirmations').select('*').eq('manual_id', state.statusManualId).order('confirmed_at', {ascending:false}).then(function(res){
+        if (res.error){ result.innerHTML = '<div class="empty">불러오기 실패</div>'; return; }
+        var confirmed = res.data || [];
+        // 직원 ID로 연결된 기록이 기본, 옛 기록(staff_id 없음)은 이름으로 맞춰 봄
+        var byStaffId = {}, byName = {};
+        confirmed.forEach(function(c){
+          if (c.staff_id){ if (!byStaffId[c.staff_id]) byStaffId[c.staff_id] = c.confirmed_at; }
+          else if (c.staff_name){ if (!byName[c.staff_name]) byName[c.staff_name] = c.confirmed_at; }
+        });
+        var staffNames = {};
+        state.staff.forEach(function(s){ staffNames[s.name] = true; });
+
+        var combined = state.staff.map(function(s){
+          var date = byStaffId[s.id] || byName[s.name] || null;
+          return { name: s.name, branch: branchName(s.branch_id), ok: !!date, date: date };
+        });
+        // 명단에 없는 이름으로 남은 옛 기록도 보여 줌
+        Object.keys(byName).forEach(function(name){
+          if (!staffNames[name]) combined.push({ name: name, branch: '옛 기록', ok: true, date: byName[name] });
+        });
+        combined.sort(function(a,b){
+          if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
+          return a.name.localeCompare(b.name);
+        });
+
+        var rowsHtml = combined.map(function(row){
+          return '<tr><td>' + esc(row.branch) + '</td><td>' + esc(row.name) + '</td><td>' +
+            (row.ok ? '<span class="badge ok">확인함</span>' : '<span class="badge no">안 봄</span>') +
+            '</td><td>' + (row.date ? esc(fmtDate(row.date)) : '-') + '</td></tr>';
+        }).join('');
+
+        result.innerHTML = combined.length ? (
+          '<table class="confirm-status-table"><thead><tr><th>매장</th><th>이름</th><th>상태</th><th>확인 일시</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>'
+        ) : '<div class="empty">직원 명단을 먼저 등록해주세요.</div>';
+      });
+    }
+  }
+
+  loadAll();
+
+  if ('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    });
+  }
+})();
+</script>
+</body>
+</html>
