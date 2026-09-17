@@ -3222,6 +3222,34 @@ const App = (() => {
   }
   const crabHold = (sp) => { const h = S.settings.crabHold || {}; return Number(h[sp]) || 28; };   // 사장님 답: 활 갑각류 3~4주 보관 가능 → 기본 28일
   const crabBuys = (sp) => (S.purchases || []).filter((x) => x.cat === sp && (x.unit || 'kg') === 'kg' && Number(x.qty) > 0 && Number(x.amount) > 0 && x.date).map((x) => ({ date: x.date, kg: Number(x.qty), amt: Number(x.amount), name: x.name || '' }));
+  /* 매장 간 시세 참조 — 매입 기록이 없는 매장(안양점)은 다른 매장(안산점) 매입 단가를 시세 참고로 빌린다.
+     marketCache: 매장 id → 그 매장 매입 [{date, kg, amt, name, cat}]. 현재 매장은 캐시하지 않고 항상 S.purchases 를 직접 쓴다. */
+  let marketCache = {};
+  const purchaseRows = (list) => (Array.isArray(list) ? list : []).filter((x) => x && x.cat && (x.unit || 'kg') === 'kg' && Number(x.qty) > 0 && Number(x.amount) > 0 && x.date).map((x) => ({ date: x.date, kg: Number(x.qty), amt: Number(x.amount), name: x.name || '', cat: x.cat })).sort((a, b) => a.date.localeCompare(b.date));
+  async function loadMarketCache() {
+    try {
+      const mt = Store.meta; if (!mt || !Array.isArray(mt.stores)) return;
+      const cur = mt.current, next = {};
+      for (const st of mt.stores) {
+        if (st.id === cur) continue;
+        try { const doc = await Store.loadStore(st.id); next[st.id] = purchaseRows(doc && doc.purchases); } catch (e) { next[st.id] = []; }
+      }
+      if (Store.meta && Store.meta.current !== cur) return;   // 읽는 동안 매장이 바뀌었으면 버린다 (바뀐 쪽에서 다시 부른다)
+      marketCache = next;
+      if (view === 'buyInsight') render();
+    } catch (e) { /* 시세 참조는 없어도 앱은 돌아야 한다 */ }
+  }
+  /* 단가 흐름에 쓸 매입 — 이 매장 기록이 있으면 그것, 없으면 캐시의 다른 매장 매입을 빌린다 */
+  function priceBuys(sp) {
+    const own = crabBuys(sp); if (own.length) return { buys: own, source: storeName(), borrowed: false, from: '' };
+    const mt = Store.meta;
+    for (const st of (mt && Array.isArray(mt.stores) ? mt.stores : [])) {
+      if (st.id === mt.current) continue;
+      const rows = (marketCache[st.id] || []).filter((x) => x.cat === sp);
+      if (rows.length) return { buys: rows, source: `${st.name} (참조)`, borrowed: true, from: st.name };
+    }
+    return { buys: [], source: '', borrowed: false, from: '' };
+  }
   const wavg = (list) => { const kg = list.reduce((a, x) => a + x.kg, 0); return kg ? Math.round(list.reduce((a, x) => a + x.amt, 0) / kg) : null; };
   const inRange = (list, a, b) => list.filter((x) => x.date >= a && x.date <= b);
   const pctDiff = (a, b) => (a && b ? Math.round((a - b) / b * 100) : null);
@@ -3264,17 +3292,69 @@ const App = (() => {
     const earlier = pat.ws.filter((w) => w < -maxBack && pat.avg[w] < pat.avg[pick] * 0.95).sort((a, b) => pat.avg[a] - pat.avg[b])[0];
     return { pat, hold, ok: true, pick, from, to, late, price: pat.avg[pick], atEvent, saveRate: pctDiff(pat.avg[pick], atEvent), earlier: earlier != null ? { w: earlier, price: pat.avg[earlier], rate: pctDiff(pat.avg[earlier], pat.avg[pick]) } : null };
   }
-  /* 일정 주간에 얼마나 팔렸나 — 매출 입력의 품종 kg (없으면 그 주 매입 kg) */
+  /* ── 필요량은 판매 기록으로 ──
+     매출 입력의 품종 kg(crab/king/lob) 이 있는 날은 그대로, kg 을 안 적은 날(빈칸)은 그날 총매출 × 만원당 kg 으로 추정한다.
+     0kg 은 기록으로 센다 — 빈칸(null/undefined/'')만 추정한다. */
+  const SP_KEY = { '대게': 'crab', '킹크랩': 'king', '랍스터': 'lob' };
+  const hasNum = (v) => v != null && v !== '' && !isNaN(v);
+  /* 일정 주간 — 설·추석은 연휴가 뒤로도 이어져 [E−4, E+2], 그 외는 일정 당일로 끝나는 7일 [E−6, E] */
+  const demandWin = (ev) => (ev.name === '설' || ev.name === '추석') ? [shift(ev.date, -4), shift(ev.date, 2)] : [shift(ev.date, -6), ev.date];
+  /* 이 매장에서 품종 kg 과 총매출을 둘 다 적은 날(최근 400일)의 "그날 kg ÷ 그날 매출" 중간값 (원당 kg).
+     합계 비율이 아니라 중간값을 쓰는 이유 — kg 칸에 가격 같은 엉뚱한 숫자가 하루라도 들어가면 합계가 통째로 틀어진다.
+     하루 300kg 넘는 기록은 입력 실수로 보고 뺀다. */
+  const DAY_KG_MAX = 300;
+  function kgPerWon(sp) {
+    const key = SP_KEY[sp]; if (!key) return 0;
+    const from = shift(dateKey(), -400), ratios = [];
+    salesDates().forEach((k) => { if (k < from) return; const r = S.sales[k]; if (!r || !hasNum(r[key])) return; const kg = Number(r[key]), t = salesTotal(r); if (t > 0 && kg >= 0 && kg <= DAY_KG_MAX) ratios.push(kg / t); });
+    if (!ratios.length) return 0;
+    ratios.sort((a, b) => a - b);
+    return ratios[Math.floor(ratios.length / 2)];
+  }
+  /* 평소 하루 매출 — 최근 365일 매출을 적은 날 평균 */
+  function usualDaySales() {
+    const from = shift(dateKey(), -365); let sum = 0, n = 0;
+    salesDates().forEach((k) => { if (k < from) return; const t = salesTotal(S.sales[k]); if (t > 0) { sum += t; n++; } });
+    return n ? sum / n : 0;
+  }
+  /* 지난 같은 일정 중 판매 기록이 있는 것(최근 2회)으로 필요량 → { kg, recorded, estimated, sales, days, how, uplift, n, year, win } 또는 null */
+  function demandKg(sp, ev) {
+    const key = SP_KEY[sp]; if (!key) return null;
+    const today = dateKey(), rate = kgPerWon(sp), usual = usualDaySales();
+    const occ = buyEvents().filter((e) => e.name === ev.name && e.date < ev.date && e.date <= today).reverse();
+    const hits = [];
+    occ.forEach((e) => {
+      if (hits.length >= 2) return;
+      const [a, b] = demandWin(e); let rec = 0, est = 0, sales = 0, days = 0, recDays = 0, missing = 0, noRate = 0;
+      for (let k = a; k <= b; k = shift(k, 1)) {
+        const r = salesOf(k); if (!r) continue;
+        const t = salesTotal(r);
+        if (hasNum(r[key]) && Number(r[key]) <= DAY_KG_MAX) { rec += Number(r[key]); recDays++; if (t > 0) { sales += t; days++; } }
+        else if (t > 0) { days++; sales += t; if (rate > 0) { est += t * rate; missing++; } else noRate++; }
+      }
+      if (!recDays && !missing) return;   // kg 기록도 없고 추정도 못 하면 건너뛴다 (→ 매입 kg 으로 대체). 0kg 기록은 기록으로 센다
+      hits.push({ year: e.date.slice(0, 4), a, b, rec, est, sales, days, recDays, missing, noRate });
+    });
+    if (!hits.length) return null;
+    const n = hits.length, avg = (f) => hits.reduce((s, x) => s + f(x), 0) / n;
+    const recorded = Math.round(avg((x) => x.rec) * 10) / 10, estimated = Math.round(avg((x) => x.est) * 10) / 10;
+    const dayAvg = avg((x) => (x.days ? x.sales / x.days : 0));
+    const uplift = usual > 0 ? Math.round((dayAvg / usual - 1) * 100) : null;
+    const how = hits.map((x) => `${x.year}년 ${ev.name} 주간(${x.a.slice(5)}~${x.b.slice(5)}) 판매 ${sp} ${Math.round(x.rec)}kg 기록${x.missing ? ` + 매출로 추정 ${Math.round(x.est)}kg (kg 빠진 ${x.missing}일)` : ''}${x.noRate ? ` (kg 빠진 ${x.noRate}일은 추정 못 함)` : ''}`).join(' · ') + (n > 1 ? ` → ${n}회 평균` : '');
+    return { kg: Math.round((recorded + estimated) * 10) / 10, recorded, estimated, sales: Math.round(avg((x) => x.sales)), days: Math.round(avg((x) => x.days)), how, uplift, n, year: hits[0].year, win: [hits[0].a, hits[0].b] };
+  }
+  /* 대체 — 판매 기록이 없을 때 지난 같은 일정 전 1주 매입 kg (여러 해면 평균) */
+  function eventNeedKgBuys(sp, ev) {
+    const buys = crabBuys(sp), occ = buyEvents().filter((e) => e.name === ev.name && e.date < ev.date && e.date <= dateKey());
+    const got = occ.map((e) => inRange(buys, shift(e.date, -7), e.date).reduce((s, x) => s + x.kg, 0)).filter((k) => k > 0);
+    if (!got.length) return null;
+    return { kg: Math.round(got.reduce((a, x) => a + x, 0) / got.length * 10) / 10, how: `판매 기록 없음 → ${ev.name} 전 1주 매입 kg 기준${got.length > 1 ? ` (${got.length}회 평균)` : ''}`, est: false, basis: 'buys', demand: null };
+  }
+  /* 일정 주간에 얼마나 팔렸나 — 판매 기록(demandKg) 우선, 없으면 매입 kg 으로 대체 */
   function eventNeedKg(sp, ev) {
-    const key = { '대게': 'crab', '킹크랩': 'king', '랍스터': 'lob' }[sp];
-    const past = buyEvents().filter((e) => e.name === ev.name && e.date <= dateKey()).slice(-1)[0];
-    if (!past) return null;
-    const a = shift(past.date, -3), b = shift(past.date, 3);
-    let kg = 0, n = 0;
-    salesDates().forEach((k) => { if (k >= a && k <= b && S.sales[k][key] != null) { kg += Number(S.sales[k][key]) || 0; n++; } });
-    if (n) return { kg: Math.round(kg * 10) / 10, how: `${past.date.slice(0, 4)}년 ${ev.name} 앞뒤 3일 판매 kg` };
-    const bought = inRange(crabBuys(sp), shift(past.date, -7), past.date).reduce((s, x) => s + x.kg, 0);
-    return bought ? { kg: Math.round(bought * 10) / 10, how: `${past.date.slice(0, 4)}년 ${ev.name} 전 1주 매입 kg` } : null;
+    const d = demandKg(sp, ev);
+    if (d) return { kg: d.kg, how: d.how, est: d.estimated > 0, basis: 'sales', demand: d };
+    return eventNeedKgBuys(sp, ev);
   }
 
   /* ── 매입 인사이트: 그래프(SVG) · 수조 용량 매입 계획 ── */
@@ -3323,106 +3403,223 @@ const App = (() => {
     for (let m = 0; m < 12; m++) { g += `<text x="${L + gw * m + gw / 2}" y="${H - 10}" class="tx mid">${m + 1}월</text>`; years.forEach((y, i) => { const kg = v[y][m]; if (!kg) return; const h = kg / mx * ih; g += `<rect x="${(L + gw * m + 4 + i * bw).toFixed(1)}" y="${(T + ih - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" style="fill:${YEAR_STYLE[i % 4]}"><title>${y}년 ${m + 1}월 · ${fmtKg(kg)}</title></rect>`; }); }
     return g + `</svg>`;
   }
-  /* 일정 매입 계획 — 품종별 필요량과 수조 남은 자리로 권장 kg */
+  /* 지난 같은 일정 중 앞 21일~뒤 7일에 판매 기록이 하나라도 있는 가장 최근 것 */
+  function demandRef(ev) {
+    const today = dateKey(), keys = salesDates();
+    const occ = buyEvents().filter((e) => e.name === ev.name && e.date < ev.date && e.date <= today).reverse();
+    return occ.find((e) => { const a = shift(e.date, -21), b = shift(e.date, 7); return keys.some((k) => k >= a && k <= b); }) || null;
+  }
+  /* 판매 수요 그래프 — 지난 같은 일정 앞 21일~뒤 7일의 일별 총매출 막대(왼쪽 축) + 품종 판매 kg 점(오른쪽 축). 기록이 없으면 빈 문자열 */
+  function demandChart(sp, ev) {
+    const key = SP_KEY[sp]; if (!key) return '';
+    const past = demandRef(ev); if (!past) return '';
+    const a = shift(past.date, -21), b = shift(past.date, 7), days = [];
+    for (let k = a; k <= b; k = shift(k, 1)) { const r = salesOf(k), t = r ? salesTotal(r) : 0; days.push({ k, t: t > 0 ? t : 0, kg: r && hasNum(r[key]) ? Number(r[key]) : null, has: !!r }); }
+    if (!days.some((d) => d.has)) return '';
+    const W = 760, H = 200, L = 58, R = 48, T = 20, B = 30, iw = W - L - R, ih = H - T - B;
+    const tmax = Math.ceil(Math.max(...days.map((d) => d.t), 1) / 500000) * 500000 || 500000;
+    const kmax = Math.ceil(Math.max(...days.map((d) => d.kg || 0), 1) / 10) * 10 || 10;
+    const gw = iw / days.length, bw = Math.max(4, gw - 4);
+    const Y = (v) => T + ih - v / tmax * ih, YK = (v) => T + ih - v / kmax * ih, X = (i) => L + gw * i + (gw - bw) / 2;
+    const [wa, wb] = demandWin(past), wi = Math.max(0, diffDays(a, wa)), wj = Math.min(days.length - 1, diffDays(a, wb));
+    let g = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="지난 ${esc(ev.name)} 앞뒤 일별 매출과 ${esc(sp)} 판매 kg">`;
+    g += `<rect x="${(L + gw * wi).toFixed(1)}" y="${T}" width="${(gw * (wj - wi + 1)).toFixed(1)}" height="${ih}" class="dWin"><title>${esc(ev.name)} 주간 ${wa} ~ ${wb} — 필요량을 세는 기간</title></rect>`;
+    for (let i = 0; i <= 2; i++) { const v = tmax / 2 * i, yy = Y(v).toFixed(1); g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" class="grid"/><text x="${L - 6}" y="${(Y(v) + 4).toFixed(1)}" class="ty">${Math.round(v / 10000)}만</text><text x="${W - R + 6}" y="${(Y(v) + 4).toFixed(1)}" class="tx">${Math.round(kmax / 2 * i)}kg</text>`; }
+    days.forEach((d, i) => {
+      const x = X(i), wd = WD[new Date(d.k + 'T00:00:00').getDay()];
+      if (d.t > 0) { const hh = d.t / tmax * ih; g += `<rect x="${x.toFixed(1)}" y="${(T + ih - hh).toFixed(1)}" width="${bw.toFixed(1)}" height="${hh.toFixed(1)}" class="dBar"><title>${d.k} (${wd}) 매출 ${fmtWon(d.t)}${d.kg != null ? ` · ${esc(sp)} ${fmtKg(d.kg)}` : ' · kg 기록 없음 → 추정'}</title></rect>`; }
+      if (d.kg != null) g += `<circle cx="${(x + bw / 2).toFixed(1)}" cy="${YK(d.kg).toFixed(1)}" r="3" class="dDot"><title>${d.k} (${wd}) ${esc(sp)} ${fmtKg(d.kg)}</title></circle>`;
+      if (i % 7 === 0 || i === days.length - 1) g += `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 10}" class="tx mid">${d.k.slice(5)}</text>`;
+    });
+    const ex = (X(diffDays(a, past.date)) + bw / 2).toFixed(1);
+    g += `<line x1="${ex}" x2="${ex}" y1="${T}" y2="${T + ih}" class="ev" style="stroke:var(--crit)"/><text x="${Number(ex) + 4}" y="${T - 7}" class="te" style="fill:var(--crit)">${esc(ev.name)} ${past.date.slice(5)}</text>`;
+    return g + `</svg>`;
+  }
+  /* 일정 매입 계획 — 품종별 필요량(판매 기록)과 수조 남은 자리로 권장 kg. 단가는 이 매장 매입, 없으면 다른 매장 매입을 시세 참고로 */
   function eventPlan(ev) {
-    const cap = tankMaxKg(), rows = [];
+    const cap = tankMaxKg(), rows = []; let borrowed = '';
     CRAB_SPECIES.forEach((sp) => {
-      const buys = crabBuys(sp); if (!buys.length) return;
-      const ad = eventAdvice(sp, ev, buys);
-      // 필요량: 지난 같은 일정마다 [E−7, E+3] 매입 kg 을 평균 (판매 kg 이 있으면 그것)
-      const occ = buyEvents().filter((e) => e.name === ev.name && e.date <= dateKey());
-      const needs = occ.map((e) => { const s2 = eventNeedKg(sp, { name: ev.name, date: e.date }); return s2 ? s2.kg : inRange(buys, shift(e.date, -7), shift(e.date, 3)).reduce((a, x) => a + x.kg, 0); }).filter((k) => k > 0);
-      const need = needs.length ? Math.round(needs.reduce((a, x) => a + x, 0) / needs.length) : 0;
-      rows.push({ sp, ad, need, stock: tankStockKg(sp) });
+      const pb = priceBuys(sp), need = eventNeedKg(sp, ev);
+      if (!pb.buys.length && !need) return;
+      if (pb.borrowed) borrowed = pb.from;
+      const ad = eventAdvice(sp, ev, pb.buys);
+      rows.push({ sp, ad, need: need ? Math.max(0, Math.round(need.kg * 10) / 10) : 0, needHow: need ? need.how : '', needEst: !!(need && need.est), needBasis: need ? need.basis : '', stock: tankStockKg(sp) });
     });
     const stock = rows.reduce((a, r) => a + r.stock, 0), free = Math.max(0, cap - stock);
     const wantTotal = rows.reduce((a, r) => a + Math.max(0, r.need - r.stock), 0);
     rows.forEach((r) => { const want = Math.max(0, r.need - r.stock); r.buy = wantTotal ? Math.round(Math.min(want, free * want / wantTotal)) : 0; r.save = r.ad.ok && r.ad.saveRate != null && r.ad.saveRate < 0 ? Math.round(r.buy * (r.ad.atEvent - r.ad.price)) : 0; });
-    return { cap, stock, free, rows, buyTotal: rows.reduce((a, r) => a + r.buy, 0), saveTotal: rows.reduce((a, r) => a + r.save, 0), short: wantTotal > free };
+    // 반올림 때문에 합계가 남는 자리를 넘으면 제일 큰 행에서 깎는다
+    let over = rows.reduce((a, r) => a + r.buy, 0) - free;
+    if (over > 0) { const big = rows.slice().sort((x, y) => y.buy - x.buy)[0]; if (big) { big.buy = Math.max(0, big.buy - Math.ceil(over)); big.save = big.ad.ok && big.ad.saveRate != null && big.ad.saveRate < 0 ? Math.round(big.buy * (big.ad.atEvent - big.ad.price)) : 0; } }
+    return { cap, stock, free, rows, buyTotal: rows.reduce((a, r) => a + r.buy, 0), saveTotal: rows.reduce((a, r) => a + r.save, 0), short: wantTotal > free, borrowed };
   }
   function planTable(ev) {
     const P = eventPlan(ev); if (!P.rows.length) return '';
+    const needCell = (r) => { if (!r.need) return '–'; const basis = r.needBasis === 'buys' ? '매입 kg 기준' : r.needEst ? '판매 기준 · 일부 추정' : '판매 기준'; return `<span title="${esc(r.needHow)}">${r.needEst ? '≈ ' : ''}${fmtKg(r.need)}</span><small class="mut" title="${esc(r.needHow)}">${basis}</small>`; };
+    const sumNeed = P.rows.reduce((a, r) => a + r.need, 0), sumEst = P.rows.some((r) => r.needEst);
     return `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>품종</th><th>권장 매입 시기</th><th class="r">그때 단가</th><th class="r">일정 주간 단가</th><th class="r">필요량</th><th class="r">수조 재고</th><th class="r"><b>권장 매입</b></th><th class="r">절감</th></tr></thead><tbody>
       ${P.rows.map((r) => `<tr><td><b>${r.sp}</b></td><td>${r.ad.ok ? (r.ad.late ? '지금 바로 <small class="mut">(권장 구간 지남)</small>' : `${r.ad.from.slice(5)} ~ ${r.ad.to.slice(5)} <small class="mut">(${-r.ad.pick === 0 ? '일정 주간' : -r.ad.pick + '주 전'})</small>`) : '<span class="mut">패턴 없음</span>'}</td>
-        <td class="r">${r.ad.ok ? fmtWon(r.ad.price) : '–'}</td><td class="r">${r.ad.ok ? fmtWon(r.ad.atEvent) : '–'}</td><td class="r">${r.need ? fmtKg(r.need) : '–'}</td><td class="r">${fmtKg(r.stock)}</td><td class="r"><b>${fmtKg(r.buy)}</b></td><td class="r">${r.save ? fmtWon(r.save) : '–'}</td></tr>`).join('')}
-      <tr class="sum"><td colspan="4">수조 ${fmtKg(P.cap)} · 재고 ${fmtKg(P.stock)} · 남는 자리 ${fmtKg(P.free)}</td><td class="r">${fmtKg(P.rows.reduce((a, r) => a + r.need, 0))}</td><td class="r">${fmtKg(P.stock)}</td><td class="r"><b>${fmtKg(P.buyTotal)}</b></td><td class="r"><b>${P.saveTotal ? fmtWon(P.saveTotal) : '–'}</b></td></tr></tbody></table></div>
+        <td class="r">${r.ad.ok ? fmtWon(r.ad.price) : '–'}</td><td class="r">${r.ad.ok ? fmtWon(r.ad.atEvent) : '–'}</td><td class="r">${needCell(r)}</td><td class="r">${fmtKg(r.stock)}</td><td class="r"><b>${fmtKg(r.buy)}</b></td><td class="r">${r.save ? fmtWon(r.save) : '–'}</td></tr>`).join('')}
+      <tr class="sum"><td colspan="4">수조 ${fmtKg(P.cap)} · 재고 ${fmtKg(P.stock)} · 남는 자리 ${fmtKg(P.free)}</td><td class="r">${sumEst ? '≈ ' : ''}${fmtKg(sumNeed)}</td><td class="r">${fmtKg(P.stock)}</td><td class="r"><b>${fmtKg(P.buyTotal)}</b></td><td class="r"><b>${P.saveTotal ? fmtWon(P.saveTotal) : '–'}</b></td></tr></tbody></table></div>
       ${P.short ? `<p class="hint warnTxt">필요량이 수조 남는 자리보다 많아 비율대로 줄였습니다. 일정에 가까워지며 팔린 만큼 추가 매입하세요.</p>` : ''}`;
   }
 
+  /* ── 판단: 지금이 매입 시기인가 ─────────────────────────── */
+  const mdKo = (k) => `${Number(k.slice(5, 7))}월 ${Number(k.slice(8, 10))}일`;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  function timingVerdict(sp, ev) {
+    const today = dateKey(), hold = crabHold(sp), { buys, source, borrowed } = priceBuys(sp);
+    const ad = buys.length ? eventAdvice(sp, ev, buys) : { ok: false };
+    const dday = diffDays(today, ev.date);
+    let state, headline;
+    if (!ad.ok) { state = 'no-data'; headline = '단가 기록이 없어 판단할 수 없습니다'; }
+    else if (ad.late) { state = 'late'; headline = '권장 구간이 지났습니다 — 더 오르기 전에 지금 사세요'; }
+    else if (dday > hold + 21) { state = 'far'; headline = `아직 멀었습니다 — ${mdKo(ad.from)}쯤부터 보세요`; }
+    else if (today >= ad.from && today <= ad.to) { state = 'now'; headline = '지금이 매입 구간입니다'; }
+    else if (today < ad.from) { state = 'wait'; headline = `아직 기다리세요 — ${mdKo(ad.from)}부터 (${diffDays(today, ad.from)}일 뒤)`; }
+    else { state = 'now'; headline = '지금 사세요 — 일정이 코앞입니다'; }
+    const last30 = buys.length ? wavg(inRange(buys, shift(today, -30), today)) : null, avg12 = buys.length ? wavg(inRange(buys, shift(today, -365), today)) : null;
+    const vs12 = pctDiff(last30, avg12);
+    const priceNote = last30 == null ? '최근 30일 매입이 없어 지금 단가를 모릅니다'
+      : vs12 != null && vs12 <= -10 ? `지금 단가 ${fmtWon(last30)}/kg — 12개월 평균보다 ${-vs12}% 쌉니다 (저가 구간)`
+      : vs12 != null && vs12 >= 10 ? `지금 단가 ${fmtWon(last30)}/kg — 12개월 평균보다 ${vs12}% 비쌉니다`
+      : `지금 단가 ${fmtWon(last30)}/kg — 평소 수준입니다`;
+    const patternNote = !ad.ok ? '이 일정 앞 매입 기록이 없습니다'
+      : ad.pick === 0 ? `과거 ${ad.pat.n}회 ${ev.name}: 일정 주간 ${fmtWon(ad.price)}/kg (그 전 주 기록 없음)`
+      : `과거 ${ad.pat.n}회 ${ev.name} 앞: ${-ad.pick}주 전 ${fmtWon(ad.price)}/kg → 일정 주간 ${fmtWon(ad.atEvent)}/kg (${signOf(ad.saveRate)})`;
+    const need = eventNeedKg(sp, ev);
+    const P = eventPlan(ev), row = P.rows.find((r) => r.sp === sp);
+    const needNote = need ? `필요량 ${need.est ? '≈' : '약'} ${fmtKg(need.kg)} (${need.how})` : '필요량을 잡을 판매·매입 기록이 없습니다';
+    return { state, headline, priceNote, patternNote, needNote, need, buyKg: row ? row.buy : 0, save: row ? row.save : 0, stock: tankStockKg(sp), ad, from: ad.ok ? ad.from : null, to: ad.ok ? ad.to : null, source, borrowed, dday, hold, free: P.free };
+  }
+  function timelineHtml(v, ev) {
+    const today = dateKey(), span = Math.max(1, v.dday);
+    let band = '';
+    if (v.state === 'late') band = `<i class="band past" style="left:0;width:6%"></i><span class="lbl" style="left:0">권장 구간 지남</span>`;
+    else if (v.from) {
+      const left = clamp(diffDays(today, v.from) / span * 100, 0, 100), width = clamp((diffDays(v.from, v.to) + 1) / span * 100, 2, 100 - left);
+      band = `<i class="band" style="left:${left.toFixed(1)}%;width:${width.toFixed(1)}%"></i><span class="lbl" style="left:${left.toFixed(1)}%">${v.from.slice(5)}~${v.to.slice(5)}</span>`;
+    }
+    return `<div class="tl">${band}<b class="now">오늘</b><b class="ev">${esc(ev.name)} D-${v.dday}</b></div>`;
+  }
+  const STATE_CHIP = { now: ['ok', '지금 매입'], late: ['crit', '지금 바로'], wait: ['warn', '기다리기'], far: ['missed', '아직 멀음'], 'no-data': ['missed', '기록 없음'] };
+  function verdictCard(sp, ev) {
+    const v = timingVerdict(sp, ev), [cc, ct] = STATE_CHIP[v.state];
+    const buy = v.buyKg > 0 ? `권장 매입 <b>${fmtKg(v.buyKg)}</b>${v.save > 0 ? ` · 예상 절감 ${fmtWon(v.save)}` : ''}${v.stock > 0 ? ` · 수조 재고 ${fmtKg(v.stock)} 반영` : ''}`
+      : v.need ? (v.free <= 0 ? '수조가 가득 차 있어 추가 매입 없음' : `추가 매입 없음 (재고 ${fmtKg(v.stock)} ≥ 필요량)`) : '필요량 미정 — 판매 kg이 쌓이면 자동으로 잡힙니다';
+    return `<div class="vcard ${v.state}"><div class="vhead">${esc(sp)} <span class="chip ${cc}">${ct}</span><small class="mut">보관 ${v.hold}일 기준</small></div>
+      <div class="vline">${esc(v.headline)}</div>
+      ${v.state === 'no-data' ? '' : timelineHtml(v, ev)}
+      <ol class="why"><li>${esc(v.patternNote)}</li><li>${esc(v.priceNote)}</li><li>${esc(v.needNote)}</li></ol>
+      <div class="buyLine">${buy}</div>
+      ${v.borrowed ? `<small class="mut">단가: ${esc(v.source)} 매입 기준</small>` : ''}</div>`;
+  }
+
+  /* 샘플 자료 — 외부 주소(Vercel)에서 자료 없이 열었을 때 화면을 보여주기 위해. 실제 자료 대신 가짜 숫자 */
+  async function loadSampleData() {
+    const get = async (p) => { const r = await fetch(p, { cache: 'no-store' }); if (!r.ok) throw new Error(p); return parseCSV(await r.text()); };
+    try {
+      const pu = await get('샘플/매입_샘플.csv'), sa = await get('샘플/매출_샘플.csv');
+      const ix = (head) => { const m = {}; head.forEach((c, i) => { m[c.replace(/\s+/g, '')] = i; }); return m; };
+      const pi = ix(pu.head), si = ix(sa.head);
+      S.purchases = (S.purchases || []).filter((x) => x.src !== 'sample');
+      pu.rows.forEach((r) => { const d = r[pi['날짜']], kg = Number(r[pi['kg']]), amt = Number(r[pi['금액']]); if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !(amt > 0)) return;
+        const cat = PURCHASE_CATS.includes(r[pi['품종']]) ? r[pi['품종']] : guessCat(r[pi['품목']] || '');
+        S.purchases.push({ id: newId('p'), date: d, cat, name: r[pi['품목']] || cat, qty: kg > 0 ? kg : null, unit: 'kg', amount: amt, vendor: r[pi['거래처']] || '샘플', memo: '', by: '샘플', createdAt: Date.now(), src: 'sample' }); });
+      if (!S.sales) S.sales = {};
+      Object.keys(S.sales).forEach((k) => { if (S.sales[k].src === 'sample') delete S.sales[k]; });
+      const num = (v) => (v === '' || v == null ? null : Number(v));
+      sa.rows.forEach((r) => { const d = r[si['날짜']]; if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d > dateKey() || S.sales[d]) return; const total = num(r[si['총매출']]); if (!total) return;
+        S.sales[d] = { orders: num(r[si['총주문']]), store: num(r[si['매장매출']]), deliv: num(r[si['배달매출']]), take: num(r[si['포장매출']]), total, crab: num(r[si['대게kg']]), king: num(r[si['킹크랩kg']]), lob: num(r[si['랍스타kg']]), liquor: num(r[si['주류매출']]), by: '샘플', at: stamp(), src: 'sample' }; });
+      save(); render(); banner('샘플 자료를 넣었습니다', '전부 가짜 숫자입니다. 화면 아래 "샘플 자료 지우기"로 되돌릴 수 있습니다.');
+    } catch (e) { alert('샘플 자료를 불러오지 못했습니다. 인터넷 주소(https://…)로 열었을 때만 됩니다.'); }
+  }
+  const hasSample = () => (S.purchases || []).some((x) => x.src === 'sample') || Object.values(S.sales || {}).some((x) => x && x.src === 'sample');
+  function clearSampleData() {
+    S.purchases = (S.purchases || []).filter((x) => x.src !== 'sample');
+    Object.keys(S.sales || {}).forEach((k) => { if (S.sales[k].src === 'sample') delete S.sales[k]; });
+    save(); render();
+  }
+
   function vBuyInsight() {
-    const have = CRAB_SPECIES.filter((sp) => crabBuys(sp).length);
+    const own = CRAB_SPECIES.filter((sp) => crabBuys(sp).length);
+    const have = CRAB_SPECIES.filter((sp) => priceBuys(sp).buys.length);
     const sp = have.includes(S.ui.biSp) ? S.ui.biSp : (have[0] || '대게');
-    const buys = crabBuys(sp), today = dateKey();
-    let h = `<div class="hd"><div><h2>갑각류 매입 인사이트</h2><div class="sub">원가 관리의 매입 기록으로 kg당 단가 흐름을 읽고, 설·추석·가정의달·연말 앞에서 언제 사는 게 쌌는지 과거 패턴으로 다음 매입 시점을 권합니다.</div></div>
+    const { buys, source, borrowed, from } = priceBuys(sp), today = dateKey();
+    let h = `<div class="hd"><div><h2>갑각류 매입 인사이트</h2><div class="sub">과거 매입 단가와 판매 기록으로 <b>지금이 매입 시기인지</b>를 봅니다.</div></div>
       <div class="mnav"><span class="hint" style="margin:0">보관 가능</span><input type="number" class="tkIn" data-act="crabHold" data-sp="${sp}" value="${crabHold(sp)}" min="1" max="60"><span class="hint" style="margin:0">일</span>
         <span class="hint" style="margin:0 0 0 10px">수조 최대</span><input type="number" class="tkIn" data-act="tankMaxKg" value="${tankMaxKg()}" min="10" step="10"><span class="hint" style="margin:0">kg</span></div></div>`;
-    h += `<div class="filters">${CRAB_SPECIES.map((s2) => `<button class="fl${s2 === sp ? ' on' : ''}" data-act="biSp" data-sp="${s2}">${s2}${have.includes(s2) ? '' : ' <small>(기록 없음)</small>'}</button>`).join('')}</div>`;
-    if (!buys.length) return h + `<div class="notice"><b>${sp} 매입 기록이 없습니다.</b><div class="hint">원가 관리에서 매입을 kg 단위로 적거나, 거래처 원장을 CSV로 가져오면 여기에 단가 흐름이 나옵니다. <button class="btn sm" data-act="view" data-v="costs">원가 관리 열기</button></div></div>`;
-
-    /* 지금 단가 신호 */
-    const last30 = wavg(inRange(buys, shift(today, -30), today)), avg12 = wavg(inRange(buys, shift(today, -365), today));
-    const ly = wavg(inRange(buys, shift(today, -380), shift(today, -350)));
-    const vs12 = pctDiff(last30, avg12), vsLy = pctDiff(last30, ly);
-    const sig = last30 == null ? { c: 'missed', t: '최근 30일 매입 없음' } : vs12 <= -10 ? { c: 'today', t: '저가 구간' } : vs12 >= 10 ? { c: 'crit', t: '고가 구간' } : { c: 'missed', t: '보통' };
-    const sortedP = buys.map((x) => x.amt / x.kg).sort((a, b) => a - b), median = sortedP[Math.floor(sortedP.length / 2)] || 1;
-    h += `<div class="cards m4">
-      <div class="card"><div class="cl">최근 30일 평균 단가</div><div class="cv sm2">${last30 != null ? fmtWon(last30) + '/kg' : '–'}</div><div class="cs"><span class="chip ${sig.c}">${sig.t}</span></div></div>
-      <div class="card${vs12 != null && vs12 >= 10 ? ' warn' : ''}"><div class="cl">12개월 평균 대비</div><div class="cv sm2">${vs12 != null ? signOf(vs12) : '–'}</div><div class="cs">12개월 평균 ${avg12 != null ? fmtWon(avg12) : '–'}</div></div>
-      <div class="card${vsLy != null && vsLy >= 10 ? ' warn' : ''}"><div class="cl">작년 같은 시기 대비</div><div class="cv sm2">${vsLy != null ? signOf(vsLy) : '–'}</div><div class="cs">작년 이맘때 ${ly != null ? fmtWon(ly) : '기록 없음'}</div></div>
-      <div class="card"><div class="cl">기록</div><div class="cv sm2">${buys.length}건 · ${fmtKg(buys.reduce((a, x) => a + x.kg, 0))}</div><div class="cs">${buys[0].date} ~ ${buys[buys.length - 1].date}</div></div></div>`;
-
-    /* 연간 단가 그래프 · 월별 kg */
-    h += `<div class="hd sub2"><h3>연간 kg당 단가 — 해마다 겹쳐 보기</h3><span class="hint" style="margin:0">주 단위 평균 · 점에 마우스를 올리면 단가 · 세로 점선은 그해 추석·설</span></div><div class="chartBox">${priceLineChart(sp, buys)}</div>
-      <div class="hd sub2"><h3>월별 매입 kg</h3></div><div class="chartBox">${kgBarChart(sp, buys)}</div>`;
-
-    /* 다음 일정 매입 계획 — 수조 용량 기준 (품종 전체) */
+    if (!have.length) {
+      return h + `<div class="notice"><b>매입 기록이 없어 아직 판단할 수 없습니다.</b>
+        <div class="hint">원가 관리에서 거래처 원장을 CSV로 가져오거나 매입을 kg 단위로 적으면 여기에 "지금 사야 하나"가 나옵니다. 자료 없이 화면만 보려면 샘플(가짜 숫자)을 넣어 보세요.</div>
+        <div class="rowbtns"><button class="btn" data-act="view" data-v="costs">원가 관리 열기</button><button class="btn primary" data-act="sampleLoad">샘플 자료로 보기</button></div></div>`;
+    }
+    /* 다음 일정 고르기 */
     const nexts = buyEvents().filter((e) => e.date >= today).slice(0, 3);
-    if (nexts.length) h += `<div class="hd sub2"><h3>${esc(nexts[0].name)} (${nexts[0].date}, D-${diffDays(today, nexts[0].date)}) 매입 계획 — 수조 ${fmtKg(tankMaxKg())} 기준</h3><span class="hint" style="margin:0">가장 쌌던 주에 얼마나 사둘지. 재고는 수조 관리표 입고 kg</span></div>` + planTable(nexts[0]);
-    if (nexts[1]) h += `<details class="notice" style="margin-top:10px"><summary><b>${esc(nexts[1].name)} (${nexts[1].date}) 계획도 보기</b></summary>${planTable(nexts[1])}</details>`;
-    h += `<div class="hd sub2"><h3>다음 수요 일정 — 언제 사둘까</h3><span class="hint" style="margin:0">보관 ${crabHold(sp)}일 안에서 과거 패턴상 가장 쌌던 주</span></div><div class="biCards">`;
-    nexts.forEach((ev) => {
-      const ad = eventAdvice(sp, ev, buys), need = eventNeedKg(sp, ev), dday = diffDays(today, ev.date);
-      const rec = ad.ok ? `<div class="biRec"><b>${ad.late ? '권장 구간이 지났어요 — 더 오르기 전에 지금' : `권장 매입 ${ad.from.slice(5)} ~ ${ad.to.slice(5)}`}</b> <small>(${ad.late ? `원래는 ${-ad.pick === 0 ? '일정 주간' : -ad.pick + '주 전'}` : -ad.pick === 0 ? '일정 주간' : `${-ad.pick}주 전`})</small>
-          <div class="hint">과거 ${ad.pat.n}회 평균 — 그 주 ${fmtWon(ad.price)}/kg, 일정 주간 ${fmtWon(ad.atEvent)}/kg${ad.saveRate != null ? ` (${signOf(ad.saveRate)})` : ''}${ad.pat.base ? ` · 8~5주 전 기준가 ${fmtWon(ad.pat.base)}` : ''}</div>
-          ${ad.earlier ? `<div class="hint">보관을 ${-ad.earlier.w * 7}일까지 늘릴 수 있다면 <b>${-ad.earlier.w}주 전</b>이 ${fmtWon(ad.earlier.price)}/kg (${signOf(ad.earlier.rate)})로 더 쌌습니다.</div>` : ''}
-          ${need ? `<div class="hint">필요량 약 <b>${need.kg}kg</b> (${need.how})${ad.saveRate != null && ad.saveRate < 0 ? ` → 미리 사면 약 <b>${fmtWon(Math.round(need.kg * (ad.atEvent - ad.price)))}</b> 절감` : ''}</div>` : '<div class="hint">필요량은 매출 입력의 품종 kg이 쌓이면 자동으로 잡힙니다.</div>'}</div>`
-        : `<div class="biRec"><span class="hint">이 일정 앞 매입 기록이 아직 없어 패턴을 못 냅니다.</span></div>`;
-      h += `<div class="card biCard"><div class="biTop"><b>${esc(ev.name)}</b> <span class="mut">${ev.date}</span> <span class="chip ${dday <= 14 ? 'crit' : dday <= 45 ? 'today' : 'missed'}">D-${dday}</span></div>${rec}</div>`;
-    });
-    h += `</div>`;
+    const ev = nexts.find((e) => e.date === S.ui.biEv) || nexts[0];
+    if (!ev) return h + `<div class="notice">앞으로의 수요 일정이 없습니다. 아래에서 일정을 추가하세요.</div>`;
+    h += `<div class="filters">${nexts.map((e) => `<button class="fl${e === ev ? ' on' : ''}" data-act="biEv" data-d="${e.date}">${esc(e.name)} <small>${e.date.slice(5)} · D-${diffDays(today, e.date)}</small></button>`).join('')}</div>`;
+    if (borrowed) h += `<div class="notice">이 매장에는 매입 기록이 없어 <b>${esc(from)}</b> 매입 단가를 시세 참고로 씁니다. 필요량은 이 매장 판매 기록으로 계산합니다.</div>`;
+    if (hasSample()) h += `<div class="notice warn"><b>샘플(가짜) 자료를 보는 중입니다.</b> <button class="btn sm" data-act="sampleClear">샘플 자료 지우기</button></div>`;
 
-    /* 일정별 과거 패턴 표 */
-    const evNames = [...new Set(buyEvents().map((e) => e.name))];
-    h += `<div class="hd sub2"><h3>일정 앞 8주 단가 패턴 (과거 평균, kg당)</h3><span class="hint" style="margin:0">8~5주 전 평균을 기준(0%)으로 몇 % 움직였나</span></div>
-      <div class="tkLogWrap"><table class="tkLog biPat"><thead><tr><th>일정</th><th>해</th>${[-8, -7, -6, -5, -4, -3, -2, -1, 0].map((w) => `<th class="r">${w === 0 ? '당주' : -w + '주 전'}</th>`).join('')}<th>가장 쌈</th><th>정점</th></tr></thead><tbody>
-      ${evNames.map((n) => { const p = eventPattern(sp, n, buys); if (!p.n) return `<tr><td>${esc(n)}</td><td class="mut">기록 없음</td><td colspan="11"></td></tr>`;
-        return `<tr><td><b>${esc(n)}</b></td><td class="mut">${p.n}회</td>${[-8, -7, -6, -5, -4, -3, -2, -1, 0].map((w) => { const v = p.avg[w]; const r = v != null && p.base ? Math.round((v - p.base) / p.base * 100) : null; return `<td class="r ${r == null ? '' : r <= -5 ? 'cheap' : r >= 10 ? 'dear' : ''}">${v != null ? `${fmtNum(v)}<small>${r != null ? ' ' + signOf(r) : ''}</small>` : '–'}</td>`; }).join('')}
-        <td>${p.minW != null ? (p.minW === 0 ? '당주' : -p.minW + '주 전') : '–'}</td><td>${p.peakW != null ? (p.peakW === 0 ? '당주' : -p.peakW + '주 전') : '–'}</td></tr>`; }).join('')}
-      </tbody></table></div>`;
+    /* 판단 카드 — 자료가 있는 품종마다 */
+    const show = CRAB_SPECIES.filter((s2) => priceBuys(s2).buys.length || eventNeedKg(s2, ev));
+    h += `<div class="verdicts">${show.map((s2) => verdictCard(s2, ev)).join('')}</div>`;
+    const P = eventPlan(ev);
+    const line = show.map((s2) => { const v = timingVerdict(s2, ev); const when = v.state === 'now' ? `지금 매입 구간(~${v.to.slice(5)})` : v.state === 'late' ? '권장 구간 지남 → 지금 바로' : v.state === 'wait' ? `${mdKo(v.from)}부터` : v.state === 'far' ? '아직 멀음' : '기록 없음'; return `<b>${esc(s2)}</b>: ${when}${v.buyKg > 0 ? ` ${fmtKg(v.buyKg)}` : ''}`; }).join(' · ');
+    h += `<div class="notice">${line} · 수조 남는 자리 ${fmtKg(P.free)}${P.buyTotal ? ` · 권장 합계 <b>${fmtKg(P.buyTotal)}</b>` : ''}${P.saveTotal ? ` · 예상 절감 ${fmtWon(P.saveTotal)}` : ''}</div>`;
 
-    /* 월별 단가 — 해별 나란히 */
-    const years = [...new Set(buys.map((x) => x.date.slice(0, 4)))].sort();
-    const cell = (y, m) => { const mm = `${y}-${pad(m)}`, l = buys.filter((x) => x.date.slice(0, 7) === mm); const p = wavg(l); if (p == null) return '<td class="mut">–</td>'; const r = p / median; return `<td class="r ${r <= 0.85 ? 'cheap' : r >= 1.15 ? 'dear' : ''}">${fmtNum(p)}<small>${fmtKg(l.reduce((a, x) => a + x.kg, 0))}</small></td>`; };
-    h += `<div class="hd sub2"><h3>월별 평균 단가 (kg당) · 매입 kg</h3><span class="hint" style="margin:0">중간값 ${fmtWon(median)} 기준 — 초록 15% 이상 쌈 · 빨강 15% 이상 비쌈</span></div>
-      <div class="tkLogWrap"><table class="tkLog biMon"><thead><tr><th>월</th>${years.map((y) => `<th class="r">${y}</th>`).join('')}</tr></thead><tbody>
-      ${Array.from({ length: 12 }, (_, i) => i + 1).map((m) => `<tr><td><b>${m}월</b></td>${years.map((y) => cell(y, m)).join('')}</tr>`).join('')}</tbody></table></div>`;
+    /* 매입 계획표 */
+    h += `<div class="hd sub2"><h3>${esc(ev.name)} (${ev.date}, D-${diffDays(today, ev.date)}) 매입 계획 — 수조 ${fmtKg(tankMaxKg())} 기준</h3><span class="hint" style="margin:0">가장 쌌던 주에 얼마나 사둘지 · 필요량은 지난 같은 일정 주간 판매 kg · 재고는 수조 관리표 입고 kg</span></div>` + planTable(ev);
 
-    /* 주간 단가 흐름 막대 (최근 24개월) */
-    const weeks = []; for (let k = mondayOf(shift(today, -730)); k <= today; k = shift(k, 7)) weeks.push(k);
-    const wp = weeks.map((k) => ({ k, p: wavg(inRange(buys, k, shift(k, 6))) })), wmx = Math.max(...wp.map((x) => x.p || 0), 1);
-    h += `<div class="hd sub2"><h3>주간 단가 흐름 (최근 2년)</h3></div><div class="spark sales bi">${wp.map((x) => `<span class="sb${x.p == null ? ' none' : ''}" title="${x.k} 주 · ${x.p != null ? fmtWon(x.p) + '/kg' : '매입 없음'}"><i style="height:${x.p != null ? Math.max(2, x.p / wmx * 100) : 0}%"></i></span>`).join('')}</div>
-      <p class="hint">막대에 마우스를 올리면 주와 단가가 보입니다. 최고 ${fmtWon(wmx)}/kg.</p>`;
+    /* ── 근거 자세히 보기 (접힘) ── */
+    const chips = `<div class="filters" style="margin:6px 0 10px">${CRAB_SPECIES.map((s2) => `<button class="fl${s2 === sp ? ' on' : ''}" data-act="biSp" data-sp="${s2}">${s2}${own.includes(s2) ? '' : have.includes(s2) ? ' <small>(참조)</small>' : ' <small>(기록 없음)</small>'}</button>`).join('')}</div>`;
+    const ref = demandRef(ev), dc = ref ? demandChart(sp, ev) : '', dm = demandKg(sp, ev);
+    h += `<details class="notice bi-more"><summary><b>근거 1 · 지난 ${esc(ev.name)} 판매 흐름${ref ? ` — ${ref.date.slice(0, 4)}년` : ''}</b></summary>${chips}
+      ${dc ? `<p class="hint">막대는 그날 총매출 · 점은 ${esc(sp)} 판매 kg (적은 날만) · 색칠한 곳이 필요량을 세는 주간</p><div class="chartBox">${dc}</div>` : `<p class="hint">지난 ${esc(ev.name)} 앞뒤 판매 기록이 없습니다.</p>`}
+      ${dm ? `<p class="hint">${esc(ev.name)} 주간 매출은 평소보다 <b>${dm.uplift != null ? signOf(dm.uplift) : '–'}</b> · ${esc(sp)} 필요량 ≈ <b>${fmtKg(dm.kg)}</b> (기록 ${fmtKg(dm.recorded)} + 추정 ${fmtKg(dm.estimated)})${dm.n > 1 ? ` · ${dm.n}회 평균` : ''}</p>` : ''}</details>`;
 
-    /* 품목별 */
-    const byName = {}; buys.forEach((x) => { const o = byName[x.name] = byName[x.name] || { kg: 0, amt: 0, last: null, lastP: null }; o.kg += x.kg; o.amt += x.amt; if (!o.last || x.date > o.last) { o.last = x.date; o.lastP = Math.round(x.amt / x.kg); } });
-    h += `<div class="hd sub2"><h3>품목별</h3></div><div class="tkLogWrap"><table class="tkLog"><thead><tr><th>품목</th><th class="r">총 kg</th><th class="r">평균 단가</th><th class="r">최근 단가</th><th>최근 매입일</th></tr></thead><tbody>
-      ${Object.entries(byName).sort((a, b) => b[1].kg - a[1].kg).map(([n, o]) => `<tr><td><b>${esc(n)}</b></td><td class="r">${fmtKg(o.kg)}</td><td class="r">${fmtWon(Math.round(o.amt / o.kg))}</td><td class="r">${fmtWon(o.lastP)}</td><td class="mut">${o.last}</td></tr>`).join('')}</tbody></table></div>`;
+    if (buys.length) {
+      const last30 = wavg(inRange(buys, shift(today, -30), today)), avg12 = wavg(inRange(buys, shift(today, -365), today));
+      const ly = wavg(inRange(buys, shift(today, -380), shift(today, -350)));
+      const vs12 = pctDiff(last30, avg12), vsLy = pctDiff(last30, ly);
+      const sig = last30 == null ? { c: 'missed', t: '최근 30일 매입 없음' } : vs12 <= -10 ? { c: 'today', t: '저가 구간' } : vs12 >= 10 ? { c: 'crit', t: '고가 구간' } : { c: 'missed', t: '보통' };
+      const sortedP = buys.map((x) => x.amt / x.kg).sort((a, b) => a - b), median = sortedP[Math.floor(sortedP.length / 2)] || 1;
+      h += `<details class="notice bi-more"><summary><b>근거 2 · ${esc(sp)} 단가 흐름 — 연간 그래프 · 월별 kg · 지금 단가</b></summary>${chips}
+        <div class="cards m4">
+        <div class="card"><div class="cl">최근 30일 평균 단가</div><div class="cv sm2">${last30 != null ? fmtWon(last30) + '/kg' : '–'}</div><div class="cs"><span class="chip ${sig.c}">${sig.t}</span></div></div>
+        <div class="card${vs12 != null && vs12 >= 10 ? ' warn' : ''}"><div class="cl">12개월 평균 대비</div><div class="cv sm2">${vs12 != null ? signOf(vs12) : '–'}</div><div class="cs">12개월 평균 ${avg12 != null ? fmtWon(avg12) : '–'}</div></div>
+        <div class="card${vsLy != null && vsLy >= 10 ? ' warn' : ''}"><div class="cl">작년 같은 시기 대비</div><div class="cv sm2">${vsLy != null ? signOf(vsLy) : '–'}</div><div class="cs">작년 이맘때 ${ly != null ? fmtWon(ly) : '기록 없음'}</div></div>
+        <div class="card"><div class="cl">기록${borrowed ? ' <small class="mut">(참조)</small>' : ''}</div><div class="cv sm2">${buys.length}건 · ${fmtKg(buys.reduce((a, x) => a + x.kg, 0))}</div><div class="cs">${buys[0].date} ~ ${buys[buys.length - 1].date}${borrowed ? ` · ${esc(source)}` : ''}</div></div></div>
+        <p class="hint">주 단위 평균 · 점에 마우스를 올리면 단가 · 세로 점선은 그해 추석·설</p><div class="chartBox">${priceLineChart(sp, buys)}</div>
+        <p class="hint">월별 매입 kg</p><div class="chartBox">${kgBarChart(sp, buys)}</div></details>`;
 
-    /* 일정 관리 */
-    h += `<div class="hd sub2"><h3>수요 일정</h3><span class="hint" style="margin:0">설·추석·가정의달·연말은 기본. 지역 축제·단체 예약 같은 우리 가게 일정을 더할 수 있습니다.</span></div>
+      const evNames = [...new Set(buyEvents().map((e) => e.name))];
+      h += `<details class="notice bi-more"><summary><b>근거 3 · 일정 앞 8주 단가 패턴 (과거 평균, kg당)</b></summary>${chips}<p class="hint">8~5주 전 평균을 기준(0%)으로 몇 % 움직였나</p>
+        <div class="tkLogWrap"><table class="tkLog biPat"><thead><tr><th>일정</th><th>해</th>${[-8, -7, -6, -5, -4, -3, -2, -1, 0].map((w) => `<th class="r">${w === 0 ? '당주' : -w + '주 전'}</th>`).join('')}<th>가장 쌈</th><th>정점</th></tr></thead><tbody>
+        ${evNames.map((n) => { const p = eventPattern(sp, n, buys); if (!p.n) return `<tr><td>${esc(n)}</td><td class="mut">기록 없음</td><td colspan="11"></td></tr>`;
+          return `<tr><td><b>${esc(n)}</b></td><td class="mut">${p.n}회</td>${[-8, -7, -6, -5, -4, -3, -2, -1, 0].map((w) => { const v = p.avg[w]; const r = v != null && p.base ? Math.round((v - p.base) / p.base * 100) : null; return `<td class="r ${r == null ? '' : r <= -5 ? 'cheap' : r >= 10 ? 'dear' : ''}">${v != null ? `${fmtNum(v)}<small>${r != null ? ' ' + signOf(r) : ''}</small>` : '–'}</td>`; }).join('')}
+          <td>${p.minW != null ? (p.minW === 0 ? '당주' : -p.minW + '주 전') : '–'}</td><td>${p.peakW != null ? (p.peakW === 0 ? '당주' : -p.peakW + '주 전') : '–'}</td></tr>`; }).join('')}
+        </tbody></table></div></details>`;
+
+      const years = [...new Set(buys.map((x) => x.date.slice(0, 4)))].sort();
+      const cell = (y, m) => { const mm = `${y}-${pad(m)}`, l = buys.filter((x) => x.date.slice(0, 7) === mm); const p = wavg(l); if (p == null) return '<td class="mut">–</td>'; const r = p / median; return `<td class="r ${r <= 0.85 ? 'cheap' : r >= 1.15 ? 'dear' : ''}">${fmtNum(p)}<small>${fmtKg(l.reduce((a, x) => a + x.kg, 0))}</small></td>`; };
+      const weeks = []; for (let k = mondayOf(shift(today, -730)); k <= today; k = shift(k, 7)) weeks.push(k);
+      const wp = weeks.map((k) => ({ k, p: wavg(inRange(buys, k, shift(k, 6))) })), wmx = Math.max(...wp.map((x) => x.p || 0), 1);
+      const byName = {}; buys.forEach((x) => { const o = byName[x.name] = byName[x.name] || { kg: 0, amt: 0, last: null, lastP: null }; o.kg += x.kg; o.amt += x.amt; if (!o.last || x.date > o.last) { o.last = x.date; o.lastP = Math.round(x.amt / x.kg); } });
+      h += `<details class="notice bi-more"><summary><b>근거 4 · 월별 단가 표 · 주간 막대 · 품목별</b></summary>${chips}
+        <p class="hint">월별 평균 단가(kg당) · 매입 kg — 중간값 ${fmtWon(median)} 기준, 초록 15% 이상 쌈 · 빨강 15% 이상 비쌈</p>
+        <div class="tkLogWrap"><table class="tkLog biMon"><thead><tr><th>월</th>${years.map((y) => `<th class="r">${y}</th>`).join('')}</tr></thead><tbody>
+        ${Array.from({ length: 12 }, (_, i) => i + 1).map((m) => `<tr><td><b>${m}월</b></td>${years.map((y) => cell(y, m)).join('')}</tr>`).join('')}</tbody></table></div>
+        <p class="hint">주간 단가 흐름 (최근 2년) — 최고 ${fmtWon(wmx)}/kg</p><div class="spark sales bi">${wp.map((x) => `<span class="sb${x.p == null ? ' none' : ''}" title="${x.k} 주 · ${x.p != null ? fmtWon(x.p) + '/kg' : '매입 없음'}"><i style="height:${x.p != null ? Math.max(2, x.p / wmx * 100) : 0}%"></i></span>`).join('')}</div>
+        <p class="hint">품목별</p><div class="tkLogWrap"><table class="tkLog"><thead><tr><th>품목</th><th class="r">총 kg</th><th class="r">평균 단가</th><th class="r">최근 단가</th><th>최근 매입일</th></tr></thead><tbody>
+        ${Object.entries(byName).sort((a, b) => b[1].kg - a[1].kg).map(([n, o]) => `<tr><td><b>${esc(n)}</b></td><td class="r">${fmtKg(o.kg)}</td><td class="r">${fmtWon(Math.round(o.amt / o.kg))}</td><td class="r">${fmtWon(o.lastP)}</td><td class="mut">${o.last}</td></tr>`).join('')}</tbody></table></div></details>`;
+    }
+    if (nexts[1]) h += `<details class="notice bi-more"><summary><b>${esc(nexts[1].name)} (${nexts[1].date}) 계획도 보기</b></summary>${planTable(nexts[1])}</details>`;
+    h += `<details class="notice bi-more"><summary><b>수요 일정 관리</b></summary><p class="hint">설·추석·가정의달·연말은 기본. 지역 축제·단체 예약 같은 우리 가게 일정을 더할 수 있습니다.</p>
       <div class="loads">${buyEvents().filter((e) => e.date >= shift(today, -400)).map((e) => `<div class="lrow"><span class="ln">${esc(e.name)}</span><span class="lv" style="margin-left:auto">${e.date}${e.date >= today ? ` <small>D-${diffDays(today, e.date)}</small>` : ' <small>지남</small>'}${e.custom ? ` <button class="btn sm ghost danger" data-act="buyEvDel" data-d="${e.date}" data-n="${esc(e.name)}">삭제</button>` : ''}</span></div>`).join('')}</div>
-      <div class="rowbtns"><button class="btn" data-act="buyEvAdd">+ 일정 추가</button></div>
-      <p class="hint">계산 방식 — 단가는 매입 금액 ÷ kg 의 가중 평균. 일정 패턴은 각 일정 앞 8주를 주 단위로 묶어 여러 해를 평균. 권장 매입은 보관 가능 일수 안의 주 중 가장 싼 주(3% 안이면 더 늦은 주). 필요량은 지난 같은 일정 앞뒤 3일의 판매 kg. 예측이 아니라 과거 평균이니 시세와 수조 상태를 보고 결정하세요.</p>`;
+      <div class="rowbtns"><button class="btn" data-act="buyEvAdd">+ 일정 추가</button>${hasSample() ? '' : '<button class="btn ghost" data-act="sampleLoad">샘플 자료로 보기</button>'}</div></details>`;
+    h += `<p class="hint">판단은 예측이 아니라 과거 2년 평균 패턴입니다. 시세와 수조 상태를 보고 결정하세요. 계산 방식 — 단가는 매입 금액 ÷ kg 의 가중 평균. 일정 패턴은 각 일정 앞 8주를 주 단위로 묶어 여러 해를 평균. 권장 매입 시기는 보관 가능 일수 안의 주 중 가장 싼 주(3% 안이면 더 늦은 주). 필요량은 지난 같은 일정 주간(설·추석은 당일 앞 4일~뒤 2일, 그 외는 앞 6일~당일)의 판매 kg — kg을 안 적은 날은 그날 매출 × 만원당 평균 kg(이 매장에서 kg과 매출을 둘 다 적은 날 기준)으로 추정하고, 판매 기록이 아예 없으면 그 일정 전 1주 매입 kg으로 대신합니다. 권장 kg은 수조 최대 kg에서 수조 관리표 재고를 뺀 자리 안에서 필요량을 나눈 값. 매입 기록이 없는 매장은 다른 매장 매입 단가를 시세 참고로 씁니다.</p>`;
     return h;
   }
   function buyEvForm() {
@@ -3679,6 +3876,9 @@ const App = (() => {
         case 'purchaseCsv': purchaseCsvImport(); break;
         case 'biSp': S.ui.biSp = b.dataset.sp; save(); render(); break;
         case 'buyEvAdd': buyEvForm(); break;
+        case 'biEv': S.ui.biEv = b.dataset.d; save(); render(); break;
+        case 'sampleLoad': loadSampleData(); break;
+        case 'sampleClear': if (!confirm('샘플 자료를 지울까요? 직접 넣은 기록은 그대로 남습니다.')) return; clearSampleData(); break;
         case 'buyEvDel': S.settings.buyEvents = (S.settings.buyEvents || []).filter((e) => !(e.date === b.dataset.d && e.name === b.dataset.n)); save(); render(); break;
         case 'purchaseEdit': purchaseForm((S.purchases || []).find((x) => x.id === id)); break;
         case 'purchaseDel': {
@@ -4308,6 +4508,7 @@ const App = (() => {
     hydrate();
     view = 'today';
     render();
+    try { loadMarketCache(); } catch (e) {}   // 다른 매장 매입 단가(시세 참조)를 새 매장 기준으로 다시 읽는다
   }
 
   async function start() {
@@ -4315,6 +4516,7 @@ const App = (() => {
     S = (await Store.load()) || freshState();
     hydrate();
     loadSharedIssues();
+    try { loadMarketCache(); } catch (e) {}   // 매입 기록 없는 매장이 다른 매장 단가를 시세 참고로 쓰기 위해
     // 주소 뒤에 ?view=tanks 처럼 붙이면 그 화면으로 바로 연다 — 아이패드 홈 화면 바로가기용
     try {
       const want = new URLSearchParams(location.search).get('view');

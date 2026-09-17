@@ -1064,3 +1064,28 @@ table.tkLog td small{display:block;font-size:11px;color:var(--muted);font-weight
 .chart .te{font-size:10.5px;font-weight:700}
 .chart .tl{fill:var(--ink-2);font-size:11.5px}
 .chart circle{cursor:crosshair}
+/* 매입 인사이트 — 판매 수요 그래프(일별 매출 막대 + 품종 kg 점) */
+.chart .dBar{fill:var(--accent);opacity:.7}
+.chart .dWin{fill:var(--accent-soft);opacity:.55}
+.chart .dDot{fill:var(--hall);stroke:var(--surface);stroke-width:1;cursor:crosshair}
+
+/* 매입 인사이트 — 판단 카드 */
+.verdicts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:12px 0}
+.vcard{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:16px 18px}
+.vcard.now{border-color:var(--ok)}.vcard.late{border-color:var(--crit)}.vcard.wait{border-color:var(--hall)}
+.vhead{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:800}
+.vhead small{font-weight:400;font-size:12px;margin-left:auto}
+.vline{font-size:16px;font-weight:700;margin:6px 0 22px}
+.tl{position:relative;height:30px;margin:8px 0 28px;background:var(--rule);border-radius:4px}
+.tl .band{position:absolute;top:0;height:100%;background:var(--accent);border-radius:4px;opacity:.9}
+.tl .band.past{background:var(--crit)}
+.tl b{position:absolute;top:100%;margin-top:4px;font-size:11.5px;color:var(--ink-2);white-space:nowrap}
+.tl b.now{left:0}.tl b.ev{right:0}
+.tl .lbl{position:absolute;bottom:100%;margin-bottom:3px;font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap}
+.tl .band.past + .lbl{color:var(--crit)}
+.why{margin:0;padding-left:18px;font-size:13.5px;line-height:1.6;color:var(--ink-2)}
+.buyLine{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--accent-soft);color:var(--ink);font-size:15px}
+.buyLine b{font-size:20px;color:var(--accent)}
+.vcard.late .buyLine{background:var(--crit-soft)}.vcard.late .buyLine b{color:var(--crit)}
+.bi-more{margin-top:10px}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}.chip.warn{background:var(--hall-bg);color:var(--hall)}
