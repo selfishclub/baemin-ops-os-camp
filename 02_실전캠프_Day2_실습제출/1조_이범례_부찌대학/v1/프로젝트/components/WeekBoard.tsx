@@ -20,7 +20,7 @@ const STATUS: Record<DayCalc["status"], { label: string; cls: string }> = {
 };
 
 export default function WeekBoard({ store }: { store: Store }) {
-  const { employees, records, loaded } = useData();
+  const { employees, records, loaded, settings } = useData();
   const [monday, setMonday] = useState(() => mondayOf(todayISO()));
   const [editing, setEditing] = useState<{ emp: Employee; date: string } | null>(null);
 
@@ -52,6 +52,7 @@ export default function WeekBoard({ store }: { store: Store }) {
               <span className="text-lg font-bold">{emp.alias}</span>
               <span className="text-sm text-muted">{emp.role} · {PAY_LABEL[emp.payCycle]} · 시급 {emp.wage.toLocaleString()}원</span>
               {w.pending > 0 && <span className="chip bg-warn-soft text-warn">확인 필요 {w.pending}일</span>}
+              {emp.wage < settings.minWage && <span className="chip bg-accent-soft text-accent">최저시급 미만</span>}
             </div>
 
             <div className="overflow-x-auto rounded-md border border-line">
