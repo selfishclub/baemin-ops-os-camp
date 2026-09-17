@@ -421,8 +421,8 @@ const App = (() => {
      g 가 null 이면 헤더 없이 바로 버튼(설정). */
   const MENU = [
     { id: 'work', g: '업무', ic: '🗂️', items: [['rules', '공지사항 필독', '📌'], ['tanks', '수조 관리표', '🐟'], ['today', '할 일', '✅'], ['report', '기록', '📊']] },
-    { id: 'people', g: '직원', ic: '👥', items: [['month', '월간 근무표', '📅'], ['staff', '직원 명단', '🧑‍🍳'], ['contracts', '근로계약서', '📄']] },
-    { id: 'ops', g: '운영', ic: '🏪', items: [['costs', '원가 관리', '💰'], ['notices', '월간 공지', '📢'], ['issues', '이슈 노트', '📝']] },
+    { id: 'people', g: '직원', ic: '👥', items: [['month', '월간 근무표', '📅'], ['staff', '직원 명단', '🧑‍🍳'], ['contracts', '근로계약서', '📄'], ['payslip', '급여명세서', '💳'], ['health', '보건증 관리', '🩺'], ['hygiene', '위생교육 일정관리', '🧼']] },
+    { id: 'ops', g: '운영', ic: '🏪', items: [['costs', '원가 관리', '💰'], ['notices', '월간 공지', '📢'], ['issues', '트러블시트', '📝']] },
     { id: 'kitchen', g: '주방', ic: '🍳', items: [['recipes', '레시피 관리', '📖']] },
     { id: 'acct', g: '회계', ic: '💵', items: [['salesIn', '매출 입력', '🧾'], ['salesStat', '매출 분석', '📈'], ['pnl', '월 손익', '📘'], ['labor', '인건비', '👷']] },
     { id: 'sys', g: '설정', ic: '⚙️', items: [['settings', '설정', '⚙️'], ['routines', '루틴', '🔁']] },
@@ -493,7 +493,7 @@ const App = (() => {
     const sb = $('#storebar'); if (sb) sb.innerHTML = `<div class="sstore top">${storeBtns}</div>`;
 
     const y = window.scrollY;
-    $('#main').innerHTML = ({ rules: vRules, tanks: vTanks, today: vToday, staff: vStaff, contracts: vContracts, month: vMonth, costs: vCosts, notices: vNotices, issues: vIssues, recipes: vRecipes, routines: vRoutines, report: vReport, salesIn: vSalesIn, salesStat: vSalesStat, pnl: vPnl, labor: vLabor, settings: vSettings })[view]();
+    $('#main').innerHTML = ({ rules: vRules, tanks: vTanks, today: vToday, staff: vStaff, contracts: vContracts, month: vMonth, costs: vCosts, notices: vNotices, issues: vIssues, recipes: vRecipes, routines: vRoutines, report: vReport, salesIn: vSalesIn, salesStat: vSalesStat, pnl: vPnl, labor: vLabor, payslip: vPayslip, health: vHealth, hygiene: vHygiene, settings: vSettings })[view]();
     /* 지금 어느 매장 데이터를 보고 있는지 화면마다 박아둔다.
        직원·기록이 매장별로 따로인데 표시가 없으면 공유되는 것처럼 오해한다. */
     const h2 = $('#main .hd h2');
@@ -787,6 +787,8 @@ const App = (() => {
     if (isToday && ta.length) {
       h += `<button class="notice pin" data-act="view" data-v="tanks">🐟 <b>수조 ${ta.length}건 오늘 처리</b> — ${ta.map(esc).join(' · ')}</button>`;
     }
+    const sa = staffAlerts();
+    if (isToday && sa.length) h += sa.slice(0, 3).map((a) => `<button class="notice pin" data-act="view" data-v="${a.v}">🩺 <b>${esc(a.text)}</b> — 눌러서 확인</button>`).join('');
 
     /* 백업 안내 배너는 서버(v2) 단계 전까지 두지 않는다 — 설정 › 백업에서 여전히 내보낼 수 있다 */
 
@@ -1181,7 +1183,7 @@ const App = (() => {
       </article>`; }).join('') : '<div class="tkEmptyLog">이 구간에 배치된 근무자가 없습니다.</div>'}</div>
       <div class="mlabel">근무자 추가</div>
       <div class="addWorker">
-        <label>직원<select id="seStaff">${cand.map((x) => `<option value="${x.id}">${esc(x.name)} (${(x.roles || []).join('·')})${isOffDay(x, date) ? ' — 고정 휴무일' : ''}</option>`).join('')}<option value="__new">직접 입력 (명단에 없는 사람)</option></select></label>
+        <label>직원<select id="seStaff">${cand.map((x) => `<option value="${x.id}">${esc(x.name)} (${(x.roles || []).join('·')})${isOffDay(x, date) ? ' — 고정 휴무일' : ''}${healthOf(x).level === 'expired' ? ' — ⚠️ 보건증 만료' : ''}</option>`).join('')}<option value="__new">직접 입력 (명단에 없는 사람)</option></select></label>
         <label id="seNameWrap" hidden>이름<input id="seName" placeholder="근무자 이름" autocomplete="off"></label>
         <div class="frow">
           <label>근무 형태<select id="seType">${Object.entries(EMP_TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
@@ -1473,35 +1475,40 @@ const App = (() => {
   let issueFilter = 'open', issueCat = 'all';
 
   function vIssues() {
-    let list = (S.issues || []).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    let list = issuesAll().slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    if (issueStore !== 'all') list = list.filter((x) => (x.store || '') === issueStore);
     const openN = list.filter((x) => x.status !== 'done').length;
     if (issueFilter === 'open') list = list.filter((x) => x.status !== 'done');
     if (issueFilter === 'done') list = list.filter((x) => x.status === 'done');
     if (issueCat !== 'all') list = list.filter((x) => x.cat === issueCat);
 
     let h = `<div class="hd">
-      <div><h2>이슈 노트</h2><div class="sub">크고 작은 일을 그날 바로 적고, 어떻게 개선했는지까지 남기세요. 같은 실수가 줄어듭니다.</div></div>
-      <button class="btn primary" data-act="issueAdd" style="margin-left:auto">+ 이슈 등록</button>
+      <div><h2>트러블시트</h2><div class="sub">두 매장이 같이 보는 기록입니다. 크고 작은 일을 그날 바로 적고, 어떻게 해결했는지까지 남기세요. 같은 실수가 줄어듭니다.</div></div>
+      <button class="btn primary" data-act="issueAdd" style="margin-left:auto">+ 트러블 등록</button>
     </div>`;
 
     h += `<div class="rcbar">
       <div class="filters">
-        ${[['open', `진행 중 ${openN}`], ['done', '개선 완료'], ['all', '전체']].map(([k, n]) =>
+        ${[['all', '두 매장 전부'], ...(Store.meta ? Store.meta.stores.map((st) => [st.name, st.name]) : [])].map(([k, n]) =>
+          `<button class="fl${issueStore === k ? ' on' : ''}" data-act="issueStoreF" data-s="${esc(k)}">${esc(n)}</button>`).join('')}
+      </div>
+      <div class="filters">
+        ${[['open', `진행 중 ${openN}`], ['done', '해결 완료'], ['all', '전체']].map(([k, n]) =>
           `<button class="fl${issueFilter === k ? ' on' : ''}" data-act="issueFilter" data-f="${k}">${n}</button>`).join('')}
       </div>
       <div class="filters">
-        ${['all', ...ISSUE_CATS, ...[...new Set((S.issues || []).map((i2) => i2.cat).filter((c) => c && !ISSUE_CATS.includes(c)))]].map((c) => `<button class="fl${issueCat === c ? ' on' : ''}" data-act="issueCatF" data-c="${esc(c)}">${c === 'all' ? '분류 전체' : esc(c)}</button>`).join('')}
+        ${['all', ...ISSUE_CATS, ...[...new Set(issuesAll().map((i2) => i2.cat).filter((c) => c && !ISSUE_CATS.includes(c)))]].map((c) => `<button class="fl${issueCat === c ? ' on' : ''}" data-act="issueCatF" data-c="${esc(c)}">${c === 'all' ? '분류 전체' : esc(c)}</button>`).join('')}
       </div>
     </div>`;
 
     if (!list.length) {
-      h += `<div class="notice"><b>${issueFilter === 'open' ? '진행 중인 이슈가 없습니다.' : '이슈가 없습니다.'}</b>
+      h += `<div class="notice"><b>${issueFilter === 'open' ? '진행 중인 트러블이 없습니다.' : '기록이 없습니다.'}</b>
         <div class="hint">예: "룸2 에어컨 소음 — 손님 컴플레인", "찜 시간 안내가 사람마다 다름". 잘잘못을 따지는 곳이 아니라 <b>다음에 어떻게 할지</b>를 남기는 곳입니다.</div></div>`;
     } else {
       h += list.map((x) => `<button class="icard" data-act="issueOpen" data-id="${x.id}">
         <div class="rcTop">
-          <span class="ipill${x.status === 'done' ? ' done' : ''}">${x.status === 'done' ? '개선 완료' : '진행 중'}</span>
-          <span class="chip cat">${esc(x.cat)}</span>
+          <span class="ipill${x.status === 'done' ? ' done' : ''}">${x.status === 'done' ? '해결 완료' : '진행 중'}</span>
+          <span class="chip store">${esc(x.store || '')}</span><span class="chip cat">${esc(x.cat)}</span>
           <span class="rcMeta" style="margin-left:auto">${esc(x.by || '')} · ${new Date(x.createdAt).toLocaleDateString('ko-KR')}</span>
         </div>
         <div class="rcName">${esc(x.title)}</div>
@@ -1515,8 +1522,8 @@ const App = (() => {
   function issueForm(x) {
     const isNew = !x; x = x || { cat: ISSUE_CATS[0] };
     const curBy = x.by || (S.ui.whoDate === dateKey() ? S.ui.who : '') || '';
-    modal(isNew ? '이슈 등록' : '이슈 수정', `
-      <div class="mlabel">이슈 종류</div>
+    modal(isNew ? '트러블 등록' : '트러블 수정', `
+      <div class="mlabel">종류</div>
       <div class="roles wrap" id="isCats">${ISSUE_CATS.map((c) => `<button type="button" class="rl${c === x.cat ? ' on' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}</div>
       <input id="isCOther" placeholder="다른 종류 직접 입력" value="${x.cat && !ISSUE_CATS.includes(x.cat) ? esc(x.cat) : ''}" style="margin-top:6px">
       <label>제목<input id="isT" value="${esc(x.title || '')}" placeholder="예: 룸2 에어컨 소음 — 손님 컴플레인"></label>
@@ -1529,21 +1536,21 @@ const App = (() => {
       if (!title) { alert('제목을 입력하세요.'); return false; }
       const catSel = document.querySelector('#isCats .rl.on');
       const cat = $('#isCOther').value.trim() || (catSel ? catSel.dataset.cat : '');
-      if (!cat) { alert('이슈 종류를 골라 주세요.'); return false; }
+      if (!cat) { alert('종류를 골라 주세요.'); return false; }
       const by = $('#isBy').value.trim();
       if (!by) { alert('작성자를 적어 주세요.'); return false; }
       const rec = {
         id: x.id || 'i' + Date.now(), cat, title, body: $('#isB').value.trim(),
         status: x.status || 'open', replies: x.replies || [],
-        by, createdAt: x.createdAt || Date.now(),
+        by, createdAt: x.createdAt || Date.now(), store: x.store || storeName(), updatedAt: Date.now(),
       };
-      if (x.id) S.issues = S.issues.map((i2) => (i2.id === x.id ? rec : i2));
-      else S.issues.push(rec);
-      save(); render();
+      if (x.id) SH.issues = issuesAll().map((i2) => (i2.id === x.id ? rec : i2));
+      else issuesAll().push(rec);
+      saveShared(); render();
       const tg = $('#isTg');
       if (tg && tg.checked) {
-        sendTelegram(`\u{1F4DD} [${storeName()} 이슈] ${rec.cat} — ${rec.title}${rec.body ? '\n' + rec.body : ''}${rec.by ? '\n- ' + rec.by : ''}`)
-          .then((r) => banner(r.ok ? '이슈를 텔레그램으로 공유했습니다' : '텔레그램 전송 실패', r.ok ? rec.title : r.err));
+        sendTelegram(`\u{1F4DD} [${rec.store} 트러블] ${rec.cat} — ${rec.title}${rec.body ? '\n' + rec.body : ''}${rec.by ? '\n- ' + rec.by : ''}`)
+          .then((r) => banner(r.ok ? '텔레그램으로 공유했습니다' : '텔레그램 전송 실패', r.ok ? rec.title : r.err));
       }
     }, '저장');
     $('#isCats').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return;
@@ -1553,20 +1560,20 @@ const App = (() => {
   }
 
   function issueShow(id) {
-    const x = (S.issues || []).find((i2) => i2.id === id); if (!x) return;
+    const x = issuesAll().find((i2) => i2.id === id); if (!x) return;
     modal(x.title, `
-      <div class="rcTop"><span class="ipill${x.status === 'done' ? ' done' : ''}">${x.status === 'done' ? '개선 완료' : '진행 중'}</span>
-        <span class="chip cat">${esc(x.cat)}</span>
+      <div class="rcTop"><span class="ipill${x.status === 'done' ? ' done' : ''}">${x.status === 'done' ? '해결 완료' : '진행 중'}</span>
+        <span class="chip store">${esc(x.store || '')}</span><span class="chip cat">${esc(x.cat)}</span>
         <span class="opt">${esc(x.by || '')} · ${new Date(x.createdAt).toLocaleDateString('ko-KR')}</span></div>
       ${x.body ? `<div class="rcBody">${esc(x.body)}</div>` : ''}
       ${(x.replies || []).map((r) => `<div class="irep${r.fix ? ' fix' : ''}">${r.fix ? '✅ ' : ''}${esc(r.text)}
         <div class="rcMeta">${esc(r.by || '')} · ${new Date(r.at).toLocaleDateString('ko-KR')}</div></div>`).join('')}
-      <label>덧글 · 개선 내용<textarea id="isR" rows="2" placeholder="해본 것, 알게 된 것을 남기세요"></textarea></label>
+      <label>덧글 · 해결 내용<textarea id="isR" rows="2" placeholder="해본 것, 알게 된 것을 남기세요"></textarea></label>
       <div class="rowbtns">
         <button class="btn" data-act="issueReply" data-id="${x.id}">덧글 남기기</button>
         ${x.status === 'done'
           ? `<button class="btn ghost" data-act="issueReopen" data-id="${x.id}">다시 열기</button>`
-          : `<button class="btn primary" data-act="issueDone" data-id="${x.id}">개선 완료로</button>`}
+          : `<button class="btn primary" data-act="issueDone" data-id="${x.id}">해결 완료로</button>`}
       </div>
       <div class="rowbtns">
         <button class="btn sm" data-act="issueEdit" data-id="${x.id}">수정</button>
@@ -3015,7 +3022,184 @@ const App = (() => {
       <div class="setrow"><span>4대보험 사업주 부담 비율<div class="hint">기본급+주휴수당에 이 비율을 곱해 어림합니다. 세무사 확인 후 조정하세요.</div></span>
         <input type="number" class="num" data-act="insRate" value="${Number(S.settings.insRate) || 0}" min="0" max="30" step="0.1"><span class="hint" style="margin:0">%</span></div>
       <div class="setrow"><span>주휴수당 자동 계산<div class="hint">한 주 15시간 이상 일한 시급 직원에게 자동으로 더합니다.</div></span>
-        <button class="btn sm${S.settings.weeklyPay !== false ? ' on' : ''}" data-act="weeklyPay">${S.settings.weeklyPay !== false ? '켜짐' : '꺼짐'}</button></div>`;
+        <button class="btn sm${S.settings.weeklyPay !== false ? ' on' : ''}" data-act="weeklyPay">${S.settings.weeklyPay !== false ? '켜짐' : '꺼짐'}</button></div>
+      <div class="setrow"><span>급여명세서 — 근로자 부담 4대보험 요율 (%)<div class="hint">국민연금 · 건강보험 · 장기요양(건강보험의 %) · 고용보험. 기본값은 2026년 기준 예시이며 고시가 바뀌면 여기서 고칩니다.</div></span>
+        <span class="v">${[['np', '국민연금'], ['hi', '건강'], ['ltc', '장기요양'], ['ei', '고용']].map(([k, n]) => `<label class="dedIn">${n}<input type="number" class="tkIn" data-act="dedRate" data-k="${k}" value="${dedRates()[k]}" min="0" max="30" step="0.001"></label>`).join('')}</span></div>
+      <div class="setrow"><span>임금 지급일 (명세서용)<div class="hint">근로계약서에 지급일이 있으면 그 값을 먼저 씁니다.</div></span><input class="num wide" data-act="payDayText" value="${esc(S.settings.payDayText || '매월 10일')}"></div>`;
+  }
+
+  /* ── 트러블시트 (두 매장 공용) ───────────────────────────
+     SH.issues[] 는 매장 문서가 아니라 공용 문서 'shared:issues' 에 산다. 이슈마다 store(매장 이름).
+     예전 매장별 이슈 노트(S.issues)는 처음 열 때 한 번만 옮겨 온다. */
+  let SH = { issues: [] }, issueStore = 'all';
+  const issuesAll = () => (SH.issues = SH.issues || []);
+  function saveShared() { Store.saveShared('issues', SH); }
+  async function loadSharedIssues() {
+    const doc = await Store.loadShared('issues');
+    SH = doc && Array.isArray(doc.issues) ? doc : { issues: [] };
+    const mt = Store.meta; let moved = 0;
+    for (const st of (mt ? mt.stores : [])) {
+      const doc2 = st.id === mt.current ? S : await Store.loadStore(st.id);
+      if (!doc2 || !Array.isArray(doc2.issues) || doc2.issuesMoved) continue;
+      doc2.issues.forEach((x) => { if (!SH.issues.some((y) => y.id === x.id)) { SH.issues.push({ ...x, store: x.store || st.name }); moved++; } });
+      doc2.issuesMoved = true;
+      if (st.id === mt.current) save(); else await Store.saveStore(st.id, doc2);
+    }
+    if (moved) saveShared();
+    Store.watchShared('issues');
+    if (view === 'issues') render();
+  }
+
+  /* ── 보건증 · 위생교육 ────────────────────────────────────
+     staff.health{issued, memo} · S.settings.healthMonths(기본 12)
+     S.hygiene{ owner{done, every, org, memo}, staff{ staffId: {done, memo} } } */
+  const healthMonths = () => Number(S.settings.healthMonths) || 12;
+  function addMonths(k, n) { const d = new Date(k + 'T00:00:00'); d.setMonth(d.getMonth() + n); return dateKey(d); }
+  function dueStatus(done, months) {
+    if (!done) return { level: 'none', label: '미등록', left: null, due: null };
+    const due = addMonths(done, months), left = diffDays(dateKey(), due);
+    const level = left < 0 ? 'expired' : left <= 7 ? 'urgent' : left <= 30 ? 'soon' : 'ok';
+    const label = level === 'expired' ? `만료 ${-left}일 지남` : level === 'ok' ? `${left}일 남음` : `${left}일 남음 · 곧 만료`;
+    return { level, label, left, due };
+  }
+  const healthOf = (st) => dueStatus(st && st.health && st.health.issued, healthMonths());
+  function hygieneOf() {
+    if (!S.hygiene) S.hygiene = {};
+    if (!S.hygiene.owner) S.hygiene.owner = { done: '', every: 12, org: '', memo: '' };
+    if (!S.hygiene.staff) S.hygiene.staff = {};
+    return S.hygiene;
+  }
+  const ownerHygiene = () => { const o = hygieneOf().owner; return dueStatus(o.done, Number(o.every) || 12); };
+  const dueBad = (st) => st.level === 'expired' || st.level === 'urgent' || st.level === 'soon';
+  /* 할 일 화면 맨 위 알림 */
+  function staffAlerts() {
+    const out = [];
+    S.staff.filter((s) => s.active).forEach((s) => { const h = healthOf(s); if (dueBad(h)) out.push({ v: 'health', text: `${s.name} 보건증 ${h.label}` }); });
+    const o = ownerHygiene(); if (dueBad(o)) out.push({ v: 'hygiene', text: `영업자 위생교육 ${o.label}` });
+    const hs = hygieneOf().staff;
+    S.staff.filter((s) => s.active && hs[s.id] && hs[s.id].done).forEach((s) => { const st = dueStatus(hs[s.id].done, 12); if (dueBad(st)) out.push({ v: 'hygiene', text: `${s.name} 위생교육 ${st.label}` }); });
+    return out;
+  }
+  const lvlChip = (st) => `<span class="chip ${st.level === 'ok' ? 'today' : st.level === 'none' ? 'missed' : 'crit'}">${st.label}</span>`;
+
+  function vHealth() {
+    const act = S.staff.filter((s) => s.active);
+    const bad = act.filter((s) => dueBad(healthOf(s))), none = act.filter((s) => healthOf(s).level === 'none');
+    let h = `<div class="hd"><div><h2>보건증 관리</h2><div class="sub">식품을 다루는 직원은 건강진단(보건증)을 받아야 합니다. 발급일만 적어 두면 만료 30일·7일 전에 할 일 화면에 알림이 뜹니다.</div></div>
+      <div class="mnav"><span class="hint" style="margin:0">유효기간</span><input type="number" class="tkIn" data-act="healthMonths" value="${healthMonths()}" min="1" max="36"><span class="hint" style="margin:0">개월</span></div></div>`;
+    h += `<div class="cards m4">
+      <div class="card"><div class="cl">재직 직원</div><div class="cv">${act.length}<small>명</small></div></div>
+      <div class="card${bad.length ? ' warn' : ''}"><div class="cl">만료 · 임박</div><div class="cv">${bad.length}<small>명</small></div><div class="cs">30일 이내</div></div>
+      <div class="card${none.length ? ' warn' : ''}"><div class="cl">미등록</div><div class="cv">${none.length}<small>명</small></div></div>
+      <div class="card"><div class="cl">정상</div><div class="cv">${act.length - bad.length - none.length}<small>명</small></div></div></div>`;
+    h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>직원</th><th>역할</th><th>발급일</th><th>만료일</th><th>상태</th><th>메모</th></tr></thead><tbody>
+      ${act.map((s) => { const st = healthOf(s), hh = s.health || {}; return `<tr><td><b>${esc(s.name)}</b></td><td class="mut">${(s.roles || []).join('·')}</td>
+        <td><input type="date" class="tkIn wide" data-act="healthDate" data-id="${s.id}" value="${esc(hh.issued || '')}" max="${dateKey()}"></td>
+        <td class="mut">${st.due || '—'}</td><td>${lvlChip(st)}</td>
+        <td><input class="tkIn wide2" data-act="healthMemo" data-id="${s.id}" value="${esc(hh.memo || '')}" placeholder="보건소 · 검진기관 등"></td></tr>`; }).join('')}
+      ${act.length ? '' : '<tr><td colspan="6">재직 직원이 없습니다. 직원 명단에서 먼저 추가하세요.</td></tr>'}</tbody></table></div>
+      <p class="hint">기준 — 식품위생법 제40조: 식품 조리·판매 종사자는 건강진단을 받아야 하며 유효기간은 통상 1년으로 봅니다(관할 보건소 기준 확인). 만료된 직원을 근무표에 배치하면 배치 창에 경고가 보입니다.</p>`;
+    return h;
+  }
+  function vHygiene() {
+    const hy = hygieneOf(), o = hy.owner, os = ownerHygiene(), act = S.staff.filter((s) => s.active);
+    let h = `<div class="hd"><div><h2>위생교육 일정관리</h2><div class="sub">영업자는 매년 식품위생교육(3시간)을 받아야 합니다. 이수일을 적어 두면 다음 기한 30일·7일 전에 알림이 뜹니다.</div></div></div>`;
+    h += `<div class="hd sub2"><h3>영업자 위생교육 — ${esc(storeName())}</h3></div>
+      <div class="setrow"><span>최근 이수일</span><input type="date" class="num wide" data-act="hyOwner" data-f="done" value="${esc(o.done || '')}" max="${dateKey()}"></div>
+      <div class="setrow"><span>주기 (개월)</span><input type="number" class="num" data-act="hyOwner" data-f="every" value="${Number(o.every) || 12}" min="1" max="36"></div>
+      <div class="setrow"><span>교육기관 · 메모<div class="hint">예: 한국외식업중앙회 온라인 교육</div></span><input class="num wide2" data-act="hyOwner" data-f="org" value="${esc(o.org || '')}"></div>
+      <div class="setrow"><span>다음 기한</span><span class="v">${os.due || '—'} ${lvlChip(os)}</span></div>`;
+    h += `<div class="hd sub2"><h3>직원 위생교육 <small>(선택)</small></h3></div>
+      <p class="hint">신규 직원 위생교육이나 매장 자체 교육을 한 날을 적어 두면 1년 뒤 알림이 뜹니다.</p>
+      <div class="tkLogWrap"><table class="tkLog"><thead><tr><th>직원</th><th>이수일</th><th>다음 기한</th><th>상태</th><th>메모</th></tr></thead><tbody>
+      ${act.map((s) => { const r = hy.staff[s.id] || {}, st = dueStatus(r.done, 12); return `<tr><td><b>${esc(s.name)}</b></td>
+        <td><input type="date" class="tkIn wide" data-act="hyStaff" data-id="${s.id}" data-f="done" value="${esc(r.done || '')}" max="${dateKey()}"></td>
+        <td class="mut">${st.due || '—'}</td><td>${r.done ? lvlChip(st) : '<span class="chip missed">없음</span>'}</td>
+        <td><input class="tkIn wide2" data-act="hyStaff" data-id="${s.id}" data-f="memo" value="${esc(r.memo || '')}"></td></tr>`; }).join('')}
+      ${act.length ? '' : '<tr><td colspan="5">재직 직원이 없습니다.</td></tr>'}</tbody></table></div>
+      <p class="hint">기준 — 식품위생법 제41조: 식품접객업 영업자는 매년 식품위생교육을 받아야 합니다(기존 영업자 3시간, 온라인 가능). 이수증은 영업신고 서류와 함께 보관하세요.</p>`;
+    return h;
+  }
+
+  /* ── 급여명세서 ───────────────────────────────────────────
+     확정한 인건비(S.payroll[m])로 만든다. S.payroll[m].slips{ name: { tax, sent[{at,how}] } }
+     이메일 자동 발송은 서버가 있어야 해서 다음 버전. 지금은 메일 앱을 열어 주고 발송 기록을 남긴다. */
+  const DED_DEFAULT = { np: 4.75, hi: 3.595, ltc: 13.14, ei: 0.9 };   // 근로자 부담 % — 2026년 기준 예시값. 설정에서 고친다
+  function dedRates() { if (!S.settings.ded) S.settings.ded = { ...DED_DEFAULT }; return S.settings.ded; }
+  function slipOf(m, r) {
+    const p = payrollOf(m), d = dedRates(), st = S.staff.find((s) => s.name === r.name) || {};
+    const gross = r.base + r.weekly;
+    const np = Math.round(gross * d.np / 100), hi = Math.round(gross * d.hi / 100), ltc = Math.round(hi * d.ltc / 100), ei = Math.round(gross * d.ei / 100);
+    const sl = (p && p.slips && p.slips[r.name]) || {};
+    const tax = Number(sl.tax) || 0, ltax = Math.round(tax / 10);
+    const ded = np + hi + ltc + ei + tax + ltax;
+    return { gross, np, hi, ltc, ei, tax, ltax, ded, net: gross - ded, email: st.email || '', sent: sl.sent || [] };
+  }
+  function slipMeta(r) {
+    const c = (S.contracts || []).filter((x) => x.staffName === r.name || (r.staffId && x.staffId === r.staffId)).sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''))[0];
+    const birth = c && c.f && c.f.worker && c.f.worker.rrn ? c.f.worker.rrn.slice(0, 6) : '';
+    return { biz: bizOf(), payDay: (c && c.f && payDayText(c.f)) || S.settings.payDayText || '매월 10일', birth };
+  }
+  function slipPaper(m, r) {
+    const s = slipOf(m, r), mt = slipMeta(r), d = dedRates(), [y, mo] = m.split('-').map(Number);
+    const row = (n, v, note) => `<tr><td>${esc(n)}</td><td class="r">${fmtWon(v)}</td><td class="mut">${note || ''}</td></tr>`;
+    return `<div class="paper slip"><h1>임금명세서</h1>
+      <table class="slipHead"><tr><th>사업장</th><td>${esc(mt.biz.name)} (대표 ${esc(mt.biz.rep)})</td><th>근로자</th><td>${esc(r.name)}${mt.birth ? ` · 생년월일 ${mt.birth.slice(0, 2)}.${mt.birth.slice(2, 4)}.${mt.birth.slice(4, 6)}` : ''}</td></tr>
+      <tr><th>임금 귀속 기간</th><td>${y}년 ${mo}월 1일 ~ 말일</td><th>임금 지급일</th><td>${esc(mt.payDay)}</td></tr>
+      <tr><th>근무</th><td>${r.days}일 · ${r.hours}시간</td><th>급여 기준</th><td>${r.payType === 'month' ? '월급 ' + fmtWon(r.rate) : '시급 ' + fmtWon(r.rate)}</td></tr></table>
+      <h4>지급 항목</h4><table class="slipT"><thead><tr><th>항목</th><th class="r">금액</th><th>계산 방법</th></tr></thead><tbody>
+        ${row('기본급', r.base, r.payType === 'month' ? '월급' : `${r.hours}시간 × ${fmtWon(r.rate)}`)}
+        ${r.weekly ? row('주휴수당', r.weekly, '주 15시간 이상 근무한 주 × (주 시간 ÷ 40) × 8 × 시급') : ''}
+        <tr class="sum"><td>지급 총액</td><td class="r">${fmtWon(s.gross)}</td><td></td></tr></tbody></table>
+      <h4>공제 항목</h4><table class="slipT"><thead><tr><th>항목</th><th class="r">금액</th><th>계산 방법</th></tr></thead><tbody>
+        ${row('국민연금', s.np, `지급 총액 × ${d.np}%`)}${row('건강보험', s.hi, `지급 총액 × ${d.hi}%`)}${row('장기요양보험', s.ltc, `건강보험 × ${d.ltc}%`)}${row('고용보험', s.ei, `지급 총액 × ${d.ei}%`)}
+        ${row('소득세', s.tax, '간이세액표')}${row('지방소득세', s.ltax, '소득세 × 10%')}
+        <tr class="sum"><td>공제 총액</td><td class="r">${fmtWon(s.ded)}</td><td></td></tr></tbody></table>
+      <div class="slipNet">실지급액 <b>${fmtWon(s.net)}</b></div>
+      <p class="pNote">근로기준법 제48조 제2항에 따라 교부하는 임금명세서입니다. 4대보험 요율은 사업장 설정값이며 실제 고지액과 차이가 있을 수 있습니다.${mt.biz.phone ? ' 문의 ' + esc(mt.biz.phone) : ''}</p>
+      <div class="pHash">발행 ${stamp()} · ${esc(storeName())}</div></div>`;
+  }
+  function slipText(m, r) {
+    const s = slipOf(m, r), mt = slipMeta(r), d = dedRates(), [y, mo] = m.split('-').map(Number);
+    return [`[${mt.biz.name}] ${y}년 ${mo}월 임금명세서 — ${r.name}`, '',
+      `임금 귀속 기간: ${y}년 ${mo}월 1일 ~ 말일`, `임금 지급일: ${mt.payDay}`,
+      `근무: ${r.days}일 · ${r.hours}시간 (${r.payType === 'month' ? '월급 ' + fmtWon(r.rate) : '시급 ' + fmtWon(r.rate)})`, '',
+      '[지급 항목]', `기본급 ${fmtWon(r.base)}${r.payType === 'month' ? '' : ` (${r.hours}시간 × ${fmtWon(r.rate)})`}`,
+      ...(r.weekly ? [`주휴수당 ${fmtWon(r.weekly)}`] : []), `지급 총액 ${fmtWon(s.gross)}`, '',
+      '[공제 항목]', `국민연금 ${fmtWon(s.np)} (${d.np}%)`, `건강보험 ${fmtWon(s.hi)} (${d.hi}%)`, `장기요양보험 ${fmtWon(s.ltc)}`, `고용보험 ${fmtWon(s.ei)} (${d.ei}%)`,
+      `소득세 ${fmtWon(s.tax)} · 지방소득세 ${fmtWon(s.ltax)}`, `공제 총액 ${fmtWon(s.ded)}`, '',
+      `실지급액 ${fmtWon(s.net)}`, '', `근로기준법 제48조 제2항에 따라 교부합니다.${mt.biz.phone ? ' 문의 ' + mt.biz.phone : ''}`].join('\n');
+  }
+  function vPayslip() {
+    const m = S.ui.lmonth || curMonth(), p = payrollOf(m);
+    let h = `<div class="hd"><div><h2>급여명세서</h2><div class="sub">확정한 인건비로 직원별 명세서를 만듭니다. "이메일로 보내기"를 누르면 메일 앱이 열리고, 보낸 기록이 남습니다.</div></div>
+      <div class="mnav"><button class="dnav" data-act="lmonthNav" data-d="-1" aria-label="이전 달">‹</button><span class="mtitle">${monthLabel(m)}</span><button class="dnav" data-act="lmonthNav" data-d="1" aria-label="다음 달">›</button>
+      ${p ? `<button class="btn" data-act="slipPrintAll">전체 인쇄</button>` : ''}</div></div>`;
+    h += `<div class="notice"><b>자동 발송은 다음 버전(서버)에서 붙습니다.</b> 지금은 직원 주소 · 제목 · 명세서 본문이 채워진 메일 창이 열리고, 사장님이 보내기만 누르면 됩니다.</div>`;
+    if (!p) return h + `<div class="notice warn"><b>${monthLabel(m)} 급여가 아직 확정되지 않았습니다.</b><div class="hint">인건비 화면에서 "이달 급여 확정"을 누르면 명세서를 만들 수 있습니다. <button class="btn sm" data-act="view" data-v="labor">인건비 열기</button></div></div>`;
+    const rows = p.rows.filter((r) => r.payType);
+    h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>직원</th><th class="r">지급 총액</th><th class="r">공제</th><th class="r">실지급</th><th class="r">소득세</th><th>이메일</th><th>발송</th><th></th></tr></thead><tbody>
+      ${rows.map((r) => { const s = slipOf(m, r), last = s.sent[s.sent.length - 1]; return `<tr><td><b>${esc(r.name)}</b></td><td class="r">${fmtWon(s.gross)}</td><td class="r">${fmtWon(s.ded)}</td><td class="r"><b>${fmtWon(s.net)}</b></td>
+        <td class="r"><input type="number" class="tkIn" data-act="slipTax" data-n="${esc(r.name)}" value="${s.tax || ''}" min="0" step="10" placeholder="0"></td>
+        <td>${s.email ? esc(s.email) : '<span class="chip missed">이메일 없음</span>'}</td>
+        <td>${last ? `<span class="chip today">✓ ${esc(last.at.slice(5))}</span> <small class="mut">${esc(last.how)}</small>` : '<span class="chip missed">미발송</span>'}</td>
+        <td class="nowrap"><button class="btn sm" data-act="slipView" data-n="${esc(r.name)}">보기 · 인쇄</button> ${s.email ? `<button class="btn sm primary" data-act="slipMail" data-n="${esc(r.name)}">이메일로 보내기</button>` : ''} <button class="btn sm ghost" data-act="slipSent" data-n="${esc(r.name)}">발송 완료 표시</button></td></tr>`; }).join('')}
+      ${rows.length ? '' : '<tr><td colspan="8">급여 기준(시급/월급)이 있는 직원이 없습니다.</td></tr>'}</tbody></table></div>
+      <p class="hint">소득세는 간이세액표 금액을 직접 넣습니다(모르면 0 · 세무사 확인). 4대보험 근로자 부담 요율은 설정 › 급여 기준에서 고칩니다. 이메일이 없는 직원은 직원 명단에 이메일을 넣으세요.</p>`;
+    return h;
+  }
+  function slipRow(m, name) { const p = payrollOf(m); return p ? p.rows.find((r) => r.name === name) : null; }
+  function slipMark(m, name, how) {
+    const p = payrollOf(m); if (!p) return;
+    p.slips = p.slips || {}; p.slips[name] = p.slips[name] || {}; p.slips[name].sent = p.slips[name].sent || [];
+    p.slips[name].sent.push({ at: stamp(), how }); save(); render();
+  }
+  function printHtml(html) {
+    let box = $('#printBox'); if (!box) { box = document.createElement('div'); box.id = 'printBox'; document.body.appendChild(box); }
+    box.innerHTML = html; document.body.classList.add('printMode');
+    const done = () => { document.body.classList.remove('printMode'); window.removeEventListener('afterprint', done); box.innerHTML = ''; };
+    window.addEventListener('afterprint', done);
+    setTimeout(() => { try { window.print(); } catch (e) { alert('이 화면에서는 인쇄가 막혀 있습니다.'); } setTimeout(done, 1500); }, 50);
   }
 
   /* ── 모달 ────────────────────────────────────────────────── */
@@ -3251,6 +3435,16 @@ const App = (() => {
         }
         case 'weeklyPay': S.settings.weeklyPay = S.settings.weeklyPay === false; save(); render(); break;
         case 'laborConfirm': laborConfirm(); break;
+        case 'slipView': { const m2 = S.ui.lmonth || curMonth(), r = slipRow(m2, b.dataset.n); if (!r) return;
+          modal(`${monthLabel(m2)} 임금명세서 — ${r.name}`, `<div class="slipWrap">${slipPaper(m2, r)}</div><div class="rowbtns"><button class="btn" data-act="slipPrint" data-n="${esc(r.name)}">인쇄 · PDF 저장</button></div>`, null, '닫기'); break; }
+        case 'slipPrint': { const m2 = S.ui.lmonth || curMonth(), r = slipRow(m2, b.dataset.n); if (!r) return; closeModal(); printHtml(slipPaper(m2, r)); slipMark(m2, r.name, '인쇄 · PDF'); break; }
+        case 'slipPrintAll': { const m2 = S.ui.lmonth || curMonth(), p = payrollOf(m2); if (!p) return; printHtml(p.rows.filter((r) => r.payType).map((r) => slipPaper(m2, r)).join('<div class="pageBreak"></div>')); break; }
+        case 'slipMail': { const m2 = S.ui.lmonth || curMonth(), r = slipRow(m2, b.dataset.n); if (!r) return;
+          const s2 = slipOf(m2, r), [y2, mo2] = m2.split('-').map(Number);
+          const subject = `[${bizOf().name}] ${y2}년 ${mo2}월 임금명세서 — ${r.name}`;
+          location.href = `mailto:${encodeURIComponent(s2.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(slipText(m2, r))}`;
+          slipMark(m2, r.name, '메일 앱 열림'); break; }
+        case 'slipSent': { slipMark(S.ui.lmonth || curMonth(), b.dataset.n, '발송 완료'); break; }
         case 'laborUnconfirm': {
           const m2 = S.ui.lmonth || curMonth();
           if (!confirm(`${monthLabel(m2)} 급여 확정을 풀까요? 다시 예상 값으로 돌아갑니다.`)) return;
@@ -3274,39 +3468,40 @@ const App = (() => {
         }
         case 'issueAdd': issueForm(null); break;
         case 'issueOpen': issueShow(id); break;
-        case 'issueEdit': closeModal(); issueForm((S.issues || []).find((x) => x.id === id)); break;
+        case 'issueEdit': closeModal(); issueForm(issuesAll().find((x) => x.id === id)); break;
         case 'issueFilter': issueFilter = b.dataset.f; render(); break;
+        case 'issueStoreF': issueStore = b.dataset.s; render(); break;
         case 'issueCatF': issueCat = b.dataset.c; render(); break;
         case 'issueDel': {
-          if (!confirm('이 이슈를 삭제할까요? 덧글도 함께 사라집니다.')) return;
-          S.issues = S.issues.filter((x) => x.id !== id); save(); closeModal(); render(); break;
+          if (!confirm('이 기록을 삭제할까요? 덧글도 함께 사라집니다. 두 매장 모두에서 사라집니다.')) return;
+          SH.issues = issuesAll().filter((x) => x.id !== id); saveShared(); closeModal(); render(); break;
         }
         case 'issueReply': {
           const t = $('#isR').value.trim();
           if (!t) { alert('내용을 입력하세요.'); return; }
-          const x = S.issues.find((i2) => i2.id === id);
+          const x = issuesAll().find((i2) => i2.id === id); if (!x) return;
           x.replies = x.replies || [];
-          x.replies.push({ text: t, by: (S.ui.whoDate === dateKey() ? S.ui.who : '') || '', at: Date.now() });
-          save(); closeModal(); render(); issueShow(id); break;
+          x.replies.push({ text: t, by: (S.ui.whoDate === dateKey() ? S.ui.who : '') || '', store: storeName(), at: Date.now() });
+          x.updatedAt = Date.now(); saveShared(); closeModal(); render(); issueShow(id); break;
         }
         case 'issueDone': {
           const t = $('#isR').value.trim();
-          const x = S.issues.find((i2) => i2.id === id);
+          const x = issuesAll().find((i2) => i2.id === id); if (!x) return;
           x.replies = x.replies || [];
           // 어떻게 개선했는지가 남아야 다음 사람에게 코칭이 된다
           if (t) x.replies.push({ text: t, by: (S.ui.whoDate === dateKey() ? S.ui.who : '') || '', at: Date.now(), fix: true });
-          else if (!x.replies.some((r) => r.fix)) { alert('어떻게 개선했는지 덧글 칸에 한 줄 적고 완료해 주세요.\n그게 남아야 다음 사람이 배웁니다.'); return; }
-          x.status = 'done'; save(); closeModal(); render(); issueShow(id); break;
+          else if (!x.replies.some((r) => r.fix)) { alert('어떻게 해결했는지 덧글 칸에 한 줄 적고 완료해 주세요.\n그게 남아야 다음 사람이 배웁니다.'); return; }
+          x.status = 'done'; x.updatedAt = Date.now(); saveShared(); closeModal(); render(); issueShow(id); break;
         }
         case 'issueReopen': {
-          const x = S.issues.find((i2) => i2.id === id);
-          x.status = 'open'; save(); closeModal(); render(); issueShow(id); break;
+          const x = issuesAll().find((i2) => i2.id === id); if (!x) return;
+          x.status = 'open'; x.updatedAt = Date.now(); saveShared(); closeModal(); render(); issueShow(id); break;
         }
         case 'issueSend': {
-          const x = (S.issues || []).find((i2) => i2.id === id); if (!x) return;
+          const x = issuesAll().find((i2) => i2.id === id); if (!x) return;
           b.disabled = true;
           const fix = (x.replies || []).filter((r) => r.fix).map((r) => '\n✅ ' + r.text).join('');
-          sendTelegram(`\u{1F4DD} [${storeName()} 이슈] ${x.cat} — ${x.title}${x.body ? '\n' + x.body : ''}${fix}`).then((r) => {
+          sendTelegram(`\u{1F4DD} [${x.store || storeName()} 트러블] ${x.cat} — ${x.title}${x.body ? '\n' + x.body : ''}${fix}`).then((r) => {
             b.disabled = false;
             alert(r.ok ? '보냈습니다.' : '실패: ' + r.err);
           });
@@ -3626,6 +3821,17 @@ const App = (() => {
         if (b.dataset.act !== 'staffEmail') render();
       }
       if (b.dataset.act === 'insRate') { S.settings.insRate = Math.max(0, Number(b.value) || 0); save(); render(); }
+      if (b.dataset.act === 'dedRate') { dedRates()[b.dataset.k] = Math.max(0, Number(b.value) || 0); save(); }
+      if (b.dataset.act === 'payDayText') { S.settings.payDayText = b.value.trim() || '매월 10일'; save(); }
+      if (b.dataset.act === 'slipTax') { const p = payrollOf(S.ui.lmonth || curMonth()); if (p) { p.slips = p.slips || {}; p.slips[b.dataset.n] = p.slips[b.dataset.n] || {}; p.slips[b.dataset.n].tax = Math.max(0, Number(b.value) || 0); save(); render(); } }
+      if (b.dataset.act === 'healthMonths') { S.settings.healthMonths = Math.max(1, Number(b.value) || 12); save(); render(); }
+      if (b.dataset.act === 'healthDate' || b.dataset.act === 'healthMemo') {
+        const st = S.staff.find((x) => x.id === b.dataset.id); if (!st) return;
+        st.health = st.health || {}; if (b.dataset.act === 'healthDate') st.health.issued = b.value; else st.health.memo = b.value.trim();
+        save(); if (b.dataset.act === 'healthDate') render();
+      }
+      if (b.dataset.act === 'hyOwner') { const o = hygieneOf().owner; o[b.dataset.f] = b.dataset.f === 'every' ? Math.max(1, Number(b.value) || 12) : b.value.trim(); save(); if (b.dataset.f !== 'org') render(); }
+      if (b.dataset.act === 'hyStaff') { const hs = hygieneOf().staff; hs[b.dataset.id] = hs[b.dataset.id] || {}; hs[b.dataset.id][b.dataset.f] = b.value.trim(); save(); if (b.dataset.f === 'done') render(); }
       if (b.dataset.act === 'sfrom' || b.dataset.act === 'sto') {
         const v = b.value; if (v && v <= dateKey()) S.ui[b.dataset.act] = v;
         if (S.ui.sfrom && S.ui.sto && S.ui.sfrom > S.ui.sto) S.ui.sto = S.ui.sfrom;
@@ -3834,6 +4040,7 @@ const App = (() => {
     await Store.init();
     S = (await Store.load()) || freshState();
     hydrate();
+    loadSharedIssues();
     // 주소 뒤에 ?view=tanks 처럼 붙이면 그 화면으로 바로 연다 — 아이패드 홈 화면 바로가기용
     try {
       const want = new URLSearchParams(location.search).get('view');
@@ -3864,6 +4071,7 @@ const App = (() => {
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') Store.flush(); });
     // 다른 기기(휴대폰·매장 PC)에서 바뀐 게 도착하면 지금 보는 매장 것일 때만 갈아끼운다
     Store.onRemote((k, doc) => {
+      if (k === 'shared:issues') { if (doc && Array.isArray(doc.issues)) { SH = doc; if (view === 'issues' && $('#modal').hidden) render(); } return; }
       if (k !== 'state:' + (Store.meta && Store.meta.current)) return;
       if (!$('#modal').hidden) return;      // 입력 중인 창을 날리지 않는다
       if (view === 'contracts' && cMode === 'edit') return;   // 계약서 작성 중 — 서명이 지워진다

@@ -333,8 +333,32 @@ const Store = (() => {
   async function loadStore(id) { return getDoc('state:' + id); }
   async function saveStore(id, doc) { doc.savedAt = Date.now(); return putDoc('state:' + id, doc); }
 
+  /* 매장 공용 문서 (트러블시트 등) — 'shared:<이름>' 키. 클라우드에서도 같이 동기화된다 */
+  let unsubs2 = [];
+  async function loadShared(name) { return getDoc('shared:' + name); }
+  async function saveShared(name, doc) { doc.savedAt = Date.now(); return putDoc('shared:' + name, doc); }
+  function watchShared(name) {
+    const k = 'shared:' + name;
+    unsubs2.forEach((u) => u()); unsubs2 = [];
+    if (!cloud) return;
+    let timer = null;
+    unsubs2.push(cloud.doc('kv/' + k).onSnapshot((snap) => {
+      if (!snap.exists || snap.metadata.hasPendingWrites) return;
+      const savedAt = snap.data().savedAt || 0;
+      if (!(savedAt > (lastUp[k] || 0))) return;
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const doc = await cloudGet(k, null);
+        if (!doc || !(doc.savedAt > (lastUp[k] || 0))) return;
+        lastUp[k] = doc.savedAt;
+        await localPut(k, doc);
+        if (remoteCb) remoteCb(k, doc);
+      }, 400);
+    }, (e) => cloudFail(e)));
+  }
+
   return {
-    init, load, save, flush, setMeta, switchTo, dumpAll, restoreAll, loadStore, saveStore,
+    init, load, save, flush, setMeta, switchTo, dumpAll, restoreAll, loadStore, saveStore, loadShared, saveShared, watchShared,
     get mode() { return mode; },
     get ok() { return writable; },
     get label() {
