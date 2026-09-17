@@ -25,7 +25,7 @@ for d in ORDER:
         sub=f"{folder}/{v}"; sm=f"{sub}/제출서.md"
         text=open(sm).read() if os.path.exists(sm) else ""
         tool=field(text,"도구 이름"); desc=field(text,"한 줄 설명")
-        proj=f"{sub}/프로젝트"; has_proj=os.path.isdir(proj) and any(os.scandir(proj))
+        proj=next((f"{sub}/{n}" for n in ("프로젝트","앱") if os.path.isdir(f"{sub}/{n}") and any(os.scandir(f"{sub}/{n}"))), None); has_proj=proj is not None
         img=first_image(sub)
         parts=[]
         if img: parts.append(f'<a href="{urllib.parse.quote(os.path.relpath(img,ROOT))}"><img src="{urllib.parse.quote(os.path.relpath(img,ROOT))}" width="180"></a>')
