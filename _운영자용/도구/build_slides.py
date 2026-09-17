@@ -161,11 +161,11 @@ d1.append(S("light", """<p class="eyebrow">오늘 실습 ①</p><h2>우리 가�
 d1.append(S("light", """<p class="eyebrow">오늘 실습 ②</p><h2>AI에게 시켜서 <mark>내 폴더에 PRD 넣고 올리기</mark></h2>
 <div class="steps">
 <div><p class="k">1 · Clone</p><p class="t">저장소 받기</p><p class="d">"이 저장소를 내 컴퓨터에 처음 가져와 줘"</p></div>
-<div><p class="k">2 · 내 폴더</p><p class="t">02 폴더 안 내 이름</p><p class="d">"내 폴더 1조_이범례_부찌대학 열어 줘". v1/PRD.md가 이미 있어요.</p></div>
-<div class="hi"><p class="k">3 · PRD</p><p class="t">기획안 채우기</p><p class="d">사전 과제 PRD를 양식에 옮겨 달라고. 없으면 그 자리에서 AI와 씀.</p></div>
+<div><p class="k">2 · 내 폴더</p><p class="t">02 폴더 안 내 이름</p><p class="d">"내 폴더 1조_이범례_부찌대학 열어 줘". PRD_전체.md와 v1·v2 양식이 이미 있어요.</p></div>
+<div class="hi"><p class="k">3 · PRD</p><p class="t">전체 → v1·v2</p><p class="d">AI와 인터뷰하며 PRD_전체를 먼저 채우고, 오늘 만들 것은 v1, 나머지는 v2 초안으로 나눠요.</p></div>
 <div><p class="k">4 · Push</p><p class="t">올리기</p><p class="d">"내 폴더만 바뀌었는지 보고, 비밀 없는지 확인하고 커밋·push해 줘"</p></div>
 </div>
-<div class="foot"><p class="note">GitHub 웹에서 내 폴더를 열어 v1/PRD.md가 보이면 완료. 옆 사장님 것도 보여요. 그게 "같이 본다"예요.</p></div>"""))
+<div class="foot"><p class="note">GitHub 웹에서 내 폴더를 열어 PRD_전체.md와 v1/PRD.md가 채워져 있으면 완료. 옆 사장님 것도 보여요. 그게 "같이 본다"예요.</p></div>"""))
 d1.append(S("", """<p class="eyebrow">규칙</p><h2>지킬 것 <span class="y">세 가지</span>뿐이에요</h2>
 <div class="split">
 <div><p class="head"><strong>이렇게 해요</strong></p><ul>
@@ -186,10 +186,10 @@ d1.append(S("light", """<p class="eyebrow">제출 구조</p><h2>내 폴더 안�
 <tr><th></th><th>v1</th><th>v2</th></tr>
 <tr><td>언제</td><td><b>오늘 9/17</b> 안</td><td><b>10/17(금)</b>까지 · 10/2 온라인 중간 점검</td></tr>
 <tr><td>범위</td><td>오늘 안에 되는 것만. 외부 연결 없이</td><td>API · 배민 데이터 · 날씨 등 외부 데이터, 고도화</td></tr>
-<tr class="hi"><td>제출물</td><td>PRD.md + 제출서.md(두 링크) + 스크린샷</td><td>같은 구성</td></tr>
+<tr class="hi"><td>제출물</td><td>PRD_전체 + v1 PRD + 제출서.md(두 링크) + 스크린샷</td><td>v2 PRD(사용메모로 고친 것) + 제출서 + 스크린샷</td></tr>
 <tr><td>코드는</td><td>내 개인 저장소(공개)에</td><td>같은 저장소, 같은 Vercel 주소</td></tr>
 </table>
-<div class="foot"><p class="note">v1에서 미룬 걸 PRD "다음 버전에서 더할 것"에 적어 두면 그게 v2의 시작점이에요.</p></div>"""))
+<div class="foot"><p class="note">전체 PRD에서 [v2]를 붙인 게 v2의 시작점이에요. v1을 써 보고 사용메모에 적으면, 10/2 점검 때 v2를 고쳐요.</p></div>"""))
 d1.append(S("sec", """<p class="eyebrow">정리하면</p>
 <h2>사장님이 바뀌는 건 딱 하나,<br><span class="y">"끝낼 때 push"</span></h2>
 <p class="lead">안 잃어버리고, 집에서 이어 만들고, 되돌릴 수 있고, 서로 봐요.<br>명령어는 AI가 치고, 사장님은 <b>말로 시키고 GitHub에서 확인</b>만 하면 됩니다.</p>"""))
@@ -200,13 +200,14 @@ d1.append(S("cover", """<p class="eyebrow">지금 바로</p><h1>실습 ①<br><s
 d2 = []
 d2.append(S("cover", """<p class="eyebrow">실전 캠프 Day 2 · 실습 ②</p><h1>제출은 <span class="y">어디에, 무엇을</span></h1><p class="by">v1은 오늘, v2는 10월 17일</p>""", on=True))
 d2.append(S("light", """<p class="eyebrow">제출하는 곳</p><h2>02 폴더 안에 <mark>내 이름 폴더</mark>가 있어요</h2>
-<div class="prompt" style="font-family:var(--mono);font-size:28px;line-height:1.7">02_실전캠프_Day2_실습제출/<br>├── 1조_유승균_마선생얼큰국밥/<br>├── 1조_이범례_부찌대학/<br>│&nbsp;&nbsp;&nbsp;├── README.md&nbsp;&nbsp;&nbsp;← 내 체크리스트<br>│&nbsp;&nbsp;&nbsp;├── v1/&nbsp;&nbsp;PRD.md · 제출서.md · 결과물/<br>│&nbsp;&nbsp;&nbsp;└── v2/&nbsp;&nbsp;PRD.md · 제출서.md · 결과물/<br>├── 2조_양진서_빈숲카페/<br>└── … 12명</div>
+<div class="prompt" style="font-family:var(--mono);font-size:28px;line-height:1.7">02_실전캠프_Day2_실습제출/<br>├── 1조_유승균_마선생얼큰국밥/<br>├── 1조_이범례_부찌대학/<br>│&nbsp;&nbsp;&nbsp;├── README.md&nbsp;&nbsp;&nbsp;← 내 체크리스트<br>│&nbsp;&nbsp;&nbsp;├── PRD_전체.md&nbsp;← 전체 기획안 (먼저)<br>│&nbsp;&nbsp;&nbsp;├── 중간점검_1002.md<br>│&nbsp;&nbsp;&nbsp;├── v1/&nbsp;&nbsp;PRD.md · 제출서.md · 사용메모.md · 결과물/<br>│&nbsp;&nbsp;&nbsp;└── v2/&nbsp;&nbsp;PRD.md · 제출서.md · 결과물/<br>├── 2조_양진서_빈숲카페/<br>└── … 12명</div>
 <div class="foot"><p class="note">폴더와 빈 양식은 운영진이 미리 만들어 뒀어요. 사장님은 채우기만 하면 됩니다. 내 폴더만 고쳐요.</p></div>"""))
-d2.append(S("", """<p class="eyebrow">무엇을 제출하나</p><h2>세 가지 — <span class="y">코드는 아니에요</span></h2>
-<div class="cards" style="grid-template-columns:repeat(3,1fr)">
-<div><p class="k">① PRD.md</p><p class="t">기획안</p><p class="d">무엇을 왜 만드나. 사전 과제로 쓴 PRD가 있으면 양식에 옮겨요. v1 범위와 v2 범위가 나뉘어 있어요.</p></div>
-<div class="on-acid"><p class="k">② 제출서.md</p><p class="t">링크 두 개</p><p class="d">내 개인 GitHub 저장소 주소(공개) + Vercel 인터넷 주소. 아티팩트 링크도 있으면.</p></div>
-<div><p class="k">③ 결과물/</p><p class="t">스크린샷</p><p class="d">만든 화면 사진 1~3장. 폰으로 찍어도 돼요.</p></div>
+d2.append(S("", """<p class="eyebrow">무엇을 제출하나</p><h2>네 가지 — <span class="y">코드는 아니에요</span></h2>
+<div class="cards" style="grid-template-columns:repeat(4,1fr)">
+<div><p class="k">① PRD_전체.md</p><p class="t">전체 기획안</p><p class="d">다 만들었을 때의 모습. 기능마다 [v1]·[v2]·[나중] 꼬리표.</p></div>
+<div><p class="k">② v1/PRD.md</p><p class="t">오늘 만들 것</p><p class="d">전체에서 [v1]만. v2/PRD.md는 초안으로 같이 나눠 둬요.</p></div>
+<div class="on-acid"><p class="k">③ 제출서.md</p><p class="t">링크 두 개</p><p class="d">내 개인 GitHub 저장소 주소(공개) + Vercel 인터넷 주소. 아티팩트 링크도 있으면.</p></div>
+<div><p class="k">④ 결과물/</p><p class="t">스크린샷</p><p class="d">만든 화면 사진 1~3장. 폰으로 찍어도 돼요.</p></div>
 </div>
 <div class="foot"><p class="note">코드는 내 개인 저장소에 두고, 여기엔 링크만. 링크만 있으면 누구나 코드와 화면으로 갈 수 있어요.</p></div>"""))
 d2.append(S("light", """<p class="eyebrow">v1과 v2</p><h2>오늘은 <mark>v1</mark>, 한 달 뒤 <mark>v2</mark></h2>
@@ -217,13 +218,13 @@ d2.append(S("light", """<p class="eyebrow">v1과 v2</p><h2>오늘은 <mark>v1</m
 <tr><td>예</td><td>근무표 입력 → 주급 계산 → 저장</td><td>배민 매출 자동 불러오기, 날씨 API로 준비량 추천</td></tr>
 <tr><td>어디</td><td>내폴더/v1/</td><td>내폴더/v2/</td></tr>
 </table>
-<div class="foot"><p class="note">범위가 크면 AI에게 "오늘 3시간 안에 되는 것만 남기고 나머지는 v2로 미뤄 줘"라고 하세요.</p></div>"""))
+<div class="foot"><p class="note">범위가 크면 AI에게 "PRD_전체에서 오늘 되는 것만 [v1]으로 남기고 나머지는 [v2]로 옮겨 줘"라고 하세요.</p></div>"""))
 d2.append(S("", """<p class="eyebrow">실습 ② 순서</p><h2>AI에게 <span class="y">다섯 마디</span></h2>
 <div class="prompt"><span class="w">1 · 받기</span>https://github.com/selfishclub/baemin-ops-os-camp 저장소를 내 컴퓨터에 처음 가져와 줘. 홈 폴더 아래에.</div>
 <div class="prompt"><span class="w">2 · 내 폴더</span>02_실전캠프_Day2_실습제출 안의 내 폴더 [1조_이범례_부찌대학]을 열어 줘.</div>
-<div class="prompt"><span class="w">3 · PRD</span>내가 붙여넣는 기획안을 v1/PRD.md 양식에 맞춰 옮겨 줘. 오늘 되는 것만 v1에, 나머지는 v2 칸에. (없으면: 내 힘든 일은 ○○야. 양식대로 써 줘)</div>
-<div class="prompt"><span class="w">4 · 올리기</span>내 폴더만 바뀌었는지 확인하고, 비밀 없는지 본 다음 "v1 PRD 작성"으로 커밋하고 push해 줘.</div>
-<div class="prompt"><span class="w">5 · 확인</span>GitHub 웹에서 내 폴더 → v1/PRD.md 보이면 완료.</div>"""))
+<div class="prompt"><span class="w">3 · PRD</span>PRD_전체.md를 나와 인터뷰하면서 채우고, [v1]은 v1/PRD.md에, [v2]는 v2/PRD.md 초안으로 나눠 줘. (사전 과제 PRD가 있으면 먼저 붙여넣기) (없으면: 내 힘든 일은 ○○야. 양식대로 써 줘)</div>
+<div class="prompt"><span class="w">4 · 올리기</span>내 폴더만 바뀌었는지 확인하고, 비밀 없는지 본 다음 "전체 PRD·v1 PRD 작성"으로 커밋하고 push해 줘.</div>
+<div class="prompt"><span class="w">5 · 확인</span>GitHub 웹에서 내 폴더 → PRD_전체.md와 v1/PRD.md가 채워져 있으면 완료.</div>"""))
 d2.append(S("light", """<p class="eyebrow">시간이 남으면</p><h2>같은 조 사장님 PRD를 <mark>AI에게 읽혀요</mark></h2>
 <div class="prompt"><span class="w">프롬프트</span>02_실전캠프_Day2_실습제출 폴더에서 2조 사장님들 PRD를 읽고, 내 PRD에 빠진 것이나 참고할 점을 알려 줘.</div>
 <p class="lead">같은 주제를 각자 만들고 서로 보는 게 이 캠프의 방식이에요.<br>좋은 건 가져오고, 내 것은 남에게 보여 줘요. GitHub이 그걸 가능하게 해요.</p>"""))
