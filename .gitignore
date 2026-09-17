@@ -28,3 +28,9 @@ __pycache__/
 .venv/
 venv/
 .cache/
+
+# 영상은 GitHub 한도를 넘기기 쉽습니다 — 링크로만 적습니다
+*.mp4
+*.mov
+*.avi
+*.mkv

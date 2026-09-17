@@ -119,7 +119,7 @@ d1.append(S("light", """<p class="eyebrow">GitHub이 있는 이유</p><h2>이유
 d1.append(S("", """<p class="eyebrow">이번 캠프에서</p><h2>저장소는 <span class="y">두 개</span>를 써요</h2>
 <div class="split">
 <div class="on-acid"><p class="head"><strong>공동 저장소</strong><span>교실 겸 공동 작업실 · 오늘은 전부 여기</span></p><ul>
-<li>지금 화면에 보이는 <b>baemin-ops-os-camp</b></li><li>우리 가게 소개 · 기획안(PRD)</li><li><b>만든 앱(코드)</b> — 내 폴더 v1/앱 안에</li><li>제출서 · 스크린샷</li><li>다른 사장님 앱을 열어 보고 <b>끌어다 써요</b></li><li>보는 건 누구나, 올리는 건 초대받은 12명</li></ul></div>
+<li>지금 화면에 보이는 <b>baemin-ops-os-camp</b></li><li>우리 가게 소개 · 기획안(PRD)</li><li><b>만든 앱(코드)</b> — 내 폴더 v1/프로젝트 안에</li><li>제출서 · 스크린샷</li><li>다른 사장님 앱을 열어 보고 <b>끌어다 써요</b></li><li>보는 건 누구나, 올리는 건 초대받은 12명</li></ul></div>
 <div><p class="head"><strong>내 개인 저장소</strong><span>내 창고 · 완성 후(10/17 이후)에 만듦</span></p><ul>
 <li>완성한 앱을 <b>옮겨 두는 곳</b></li><li>Vercel이 여기를 읽어 인터넷 주소를 만들어요</li><li>누구나 볼 수 있게 <b>공개(Public)</b></li><li>캠프 끝나도 계속 내 것</li><li>오늘은 안 만들어요</li></ul></div>
 </div>
@@ -127,7 +127,7 @@ d1.append(S("", """<p class="eyebrow">이번 캠프에서</p><h2>저장소는 <s
 d1.append(S("light", """<p class="eyebrow">그림 한 장</p><h2>오늘은 <mark>공동 저장소 내 폴더</mark>까지, 완성 후에 인터넷 주소</h2>
 <div class="flowbox">
 <div class="n"><b>내 컴퓨터</b><span>AI와 함께 만든다</span></div><div class="a">push<br>올리기 →</div>
-<div class="n hi"><b>공동 저장소 · 내 폴더 · v1/앱</b><span>12명이 한곳에 · 서로 pull해서 본다</span></div>
+<div class="n hi"><b>공동 저장소 · 내 폴더 · v1/프로젝트</b><span>12명이 한곳에 · 서로 pull해서 본다</span></div>
 </div>
 <div class="flowbox" style="margin-top:34px"><div class="a">↓ 다 완성되면 (10/17 이후)</div></div>
 <div class="flowbox" style="margin-top:10px">
@@ -188,8 +188,8 @@ d1.append(S("light", """<p class="eyebrow">제출 구조</p><h2>내 폴더 안�
 <tr><th></th><th>v1</th><th>v2</th></tr>
 <tr><td>언제</td><td><b>오늘 9/17</b> 안</td><td><b>10/17(금)</b>까지 · 10/2 온라인 중간 점검</td></tr>
 <tr><td>범위</td><td>오늘 안에 되는 것만. 외부 연결 없이</td><td>API · 배민 데이터 · 날씨 등 외부 데이터, 고도화</td></tr>
-<tr class="hi"><td>제출물</td><td>PRD_전체 + v1 PRD + v2 PRD 초안 + <b>v1/앱(코드)</b> + 제출서 + 스크린샷</td><td>v2 PRD(사용메모로 고친 것) + <b>v2/앱</b> + 제출서 + 스크린샷</td></tr>
-<tr><td>코드는</td><td>공동 저장소 내 폴더 <b>v1/앱/</b></td><td>내 폴더 v2/앱/ · 완성 후 개인 저장소로 옮김</td></tr>
+<tr class="hi"><td>제출물</td><td>PRD_전체 + v1 PRD + v2 PRD 초안 + <b>v1/프로젝트(코드)</b> + 제출서 + 스크린샷</td><td>v2 PRD(사용메모로 고친 것) + <b>v2/프로젝트</b> + 제출서 + 스크린샷</td></tr>
+<tr><td>코드는</td><td>공동 저장소 내 폴더 <b>v1/프로젝트/</b></td><td>내 폴더 v2/프로젝트/ · 완성 후 개인 저장소로 옮김</td></tr>
 </table>
 <div class="foot"><p class="note">전체 PRD에서 [v2]를 붙인 게 v2의 시작점이에요. v1을 써 보고 사용메모에 적으면, 10/2 점검 때 v2를 고쳐요.</p></div>"""))
 d1.append(S("sec", """<p class="eyebrow">정리하면</p>
@@ -202,24 +202,24 @@ d1.append(S("cover", """<p class="eyebrow">지금 바로</p><h1>실습 ①<br><s
 d2 = []
 d2.append(S("cover", """<p class="eyebrow">실전 캠프 Day 2 · 실습 ②</p><h1>제출은 <span class="y">어디에, 무엇을</span></h1><p class="by">v1은 오늘, v2는 10월 17일</p>""", on=True))
 d2.append(S("light", """<p class="eyebrow">제출하는 곳</p><h2>02 폴더 안에 <mark>내 이름 폴더</mark>가 있어요</h2>
-<div class="prompt" style="font-family:var(--mono);font-size:28px;line-height:1.7">02_실전캠프_Day2_실습제출/<br>├── 1조_유승균_마선생얼큰국밥/<br>├── 1조_이범례_부찌대학/<br>│&nbsp;&nbsp;&nbsp;├── README.md&nbsp;&nbsp;&nbsp;← 내 체크리스트<br>│&nbsp;&nbsp;&nbsp;├── PRD_전체.md&nbsp;← 전체 기획안 (먼저)<br>│&nbsp;&nbsp;&nbsp;├── 중간점검_1002.md<br>│&nbsp;&nbsp;&nbsp;├── v1/&nbsp;&nbsp;PRD.md · 제출서.md · 사용메모.md · 결과물/ · <b>앱/</b> ← 코드<br>│&nbsp;&nbsp;&nbsp;└── v2/&nbsp;&nbsp;PRD.md · 제출서.md · 결과물/ · <b>앱/</b><br>├── 2조_양진서_빈숲카페/<br>└── … 12명</div>
+<div class="prompt" style="font-family:var(--mono);font-size:28px;line-height:1.7">02_실전캠프_Day2_실습제출/<br>├── 1조_유승균_마선생얼큰국밥/<br>├── 1조_이범례_부찌대학/<br>│&nbsp;&nbsp;&nbsp;├── README.md&nbsp;&nbsp;&nbsp;← 내 체크리스트<br>│&nbsp;&nbsp;&nbsp;├── PRD_전체.md&nbsp;← 전체 기획안 (먼저)<br>│&nbsp;&nbsp;&nbsp;├── 중간점검_1002.md<br>│&nbsp;&nbsp;&nbsp;├── v1/&nbsp;&nbsp;PRD.md · 제출서.md · 사용메모.md · 결과물/ · <b>프로젝트/</b> ← 만든 것 전부<br>│&nbsp;&nbsp;&nbsp;└── v2/&nbsp;&nbsp;PRD.md · 제출서.md · 결과물/ · <b>프로젝트/</b><br>├── 2조_양진서_빈숲카페/<br>└── … 12명</div>
 <div class="foot"><p class="note">폴더와 빈 양식은 운영진이 미리 만들어 뒀어요. 사장님은 채우기만 하면 됩니다. 내 폴더만 고쳐요.</p></div>"""))
 d2.append(S("", """<p class="eyebrow">무엇을 제출하나</p><h2>다섯 가지 — <span class="y">코드도 여기에</span></h2>
 <div class="cards" style="grid-template-columns:repeat(5,1fr)">
 <div><p class="k">① PRD_전체.md</p><p class="t">전체 기획안</p><p class="d">다 만들었을 때의 모습. 기능마다 [v1]·[v2]·[나중].</p></div>
 <div><p class="k">② v1/PRD.md</p><p class="t">오늘 만들 것</p><p class="d">전체에서 [v1]만. v2/PRD.md는 초안으로.</p></div>
-<div class="on-acid"><p class="k">③ v1/앱/</p><p class="t">만든 코드</p><p class="d">내 폴더 안 v1/앱에 만들고 그대로 push. git init은 안 해요.</p></div>
+<div class="on-acid"><p class="k">③ v1/프로젝트/</p><p class="t">만든 폴더 통째로</p><p class="d">코드 · 프롬프트 기록 · 이미지 · 문서 전부. 내 폴더 안에 만들고 그대로 push. git init은 안 해요.</p></div>
 <div><p class="k">④ 제출서.md</p><p class="t">실행 방법</p><p class="d">도구 이름, 실행 방법 세 줄, 스크린샷 파일명.</p></div>
-<div><p class="k">⑤ 결과물/</p><p class="t">스크린샷</p><p class="d">화면 사진 1~3장. 폰으로 찍어도 돼요.</p></div>
+<div><p class="k">⑤ 결과물/</p><p class="t">첫화면.png</p><p class="d">첫 화면 사진은 '구경하기' 표에 올라가요. 폰으로 찍어도 돼요.</p></div>
 </div>
-<div class="foot"><p class="note">코드가 한곳에 모이니까 다른 사장님 앱을 열어 보고 끌어다 쓸 수 있어요. 완성되면(10/17 이후) 각자 개인 저장소로 옮겨요.</p></div>"""))
+<div class="foot"><p class="note">12명이 만든 게 한곳에 통째로 모이니까 02 폴더 맨 위 '구경하기' 표에서 전부 구경하고 끌어다 쓸 수 있어요. 완성되면(10/17 이후) 각자 개인 저장소로 옮겨요.</p></div>"""))
 d2.append(S("light", """<p class="eyebrow">v1과 v2</p><h2>오늘은 <mark>v1</mark>, 한 달 뒤 <mark>v2</mark></h2>
 <table class="table"><colgroup><col style="width:18%"><col style="width:41%"><col style="width:41%"></colgroup>
 <tr><th></th><th>v1</th><th>v2</th></tr>
 <tr><td>언제</td><td><b>오늘</b> 안</td><td><b>10/17</b> · 10/2 온라인 점검</td></tr>
 <tr class="hi"><td>범위</td><td>오늘 안에 되는 것만. 외부 연결 없이. 화면 + 저장까지</td><td>API, 배민 데이터, 날씨, 카톡 알림 같은 외부 데이터·고도화</td></tr>
 <tr><td>예</td><td>근무표 입력 → 주급 계산 → 저장</td><td>배민 매출 자동 불러오기, 날씨 API로 준비량 추천</td></tr>
-<tr><td>어디</td><td>내폴더/v1/ · 코드는 v1/앱/</td><td>내폴더/v2/ · 코드는 v2/앱/ (v1/앱 복사해 이어 만듦)</td></tr>
+<tr><td>어디</td><td>내폴더/v1/ · 코드는 v1/프로젝트/</td><td>내폴더/v2/ · 코드는 v2/프로젝트/ (v1/프로젝트 복사해 이어 만듦)</td></tr>
 </table>
 <div class="foot"><p class="note">범위가 크면 AI에게 "PRD_전체에서 오늘 되는 것만 [v1]으로 남기고 나머지는 [v2]로 옮겨 줘"라고 하세요.</p></div>"""))
 d2.append(S("", """<p class="eyebrow">실습 ② 순서</p><h2>AI에게 <span class="y">다섯 마디</span></h2>
@@ -235,31 +235,31 @@ d2.append(S("cover", """<p class="eyebrow">실습 ②</p><h1>실습 ② <span cl
 
 # ---------------- 발표 03 ----------------
 d3 = []
-d3.append(S("cover", """<p class="eyebrow">실전 캠프 Day 2 · v1 만들기</p><h1>내 폴더에 만들고,<br><span class="y">같이</span> 봐요</h1><p class="by">전체 PRD → v1 구현 → 내 폴더 v1/앱에 push<br><span style="font-size:28px">인터넷 주소는 완성 후에</span></p>""", on=True))
+d3.append(S("cover", """<p class="eyebrow">실전 캠프 Day 2 · v1 만들기</p><h1>내 폴더에 만들고,<br><span class="y">같이</span> 봐요</h1><p class="by">전체 PRD → v1 구현 → 내 폴더 v1/프로젝트에 push<br><span style="font-size:28px">인터넷 주소는 완성 후에</span></p>""", on=True))
 d3.append(S("light", """<p class="eyebrow">오늘 목표</p><h2>여기까지가 <mark>오늘</mark>이에요</h2>
 <div class="steps">
 <div><p class="k">1</p><p class="t">전체 PRD</p><p class="d">baemin-ops-prd 스킬로 인터뷰. 다 만들었을 때의 모습.</p></div>
 <div><p class="k">2</p><p class="t">v1 · v2로 나누기</p><p class="d">오늘 되는 건 v1/PRD.md, 나머지는 v2/PRD.md 초안.</p></div>
-<div class="hi"><p class="k">3</p><p class="t">v1 만들기</p><p class="d">내 폴더 v1/앱 안에. 외부 연결 없이, 가짜 데이터로.</p></div>
+<div class="hi"><p class="k">3</p><p class="t">v1 만들기</p><p class="d">내 폴더 v1/프로젝트 안에. 외부 연결 없이, 가짜 데이터로.</p></div>
 <div><p class="k">4</p><p class="t">push · 제출서</p><p class="d">한 기능 될 때마다 push. 제출서에 실행 방법과 스크린샷.</p></div>
 </div>
 <div class="foot"><p class="note">개인 저장소·Vercel 인터넷 주소는 오늘 안 해요. 10/17 다 만든 뒤에.</p></div>"""))
-d3.append(S("", """<p class="eyebrow">제일 중요한 것</p><h2>앱은 <span class="y">내 폴더 v1/앱</span> 안에 만들어요</h2>
-<div class="prompt"><span class="w">AI에게 · 시작할 때</span>v1/PRD.md를 읽고 v1 범위만 만들어 줘. <b>02_실전캠프_Day2_실습제출/[내폴더]/v1/앱 폴더 안에</b> 만들어. 이 폴더는 이미 GitHub 저장소 안이니 <b>git init은 하지 마.</b></div>
+d3.append(S("", """<p class="eyebrow">제일 중요한 것</p><h2>만든 건 <span class="y">내 폴더 v1/프로젝트</span>에 통째로</h2>
+<div class="prompt"><span class="w">AI에게 · 시작할 때</span>v1/PRD.md를 읽고 v1 범위만 만들어 줘. <b>02_실전캠프_Day2_실습제출/[내폴더]/v1/프로젝트 폴더 안에</b> 만들어. 이 폴더는 이미 GitHub 저장소 안이니 <b>git init은 하지 마.</b></div>
 <div class="split" style="margin-top:36px">
 <div><p class="head"><strong>이렇게 돼요</strong></p><ul>
-<li>내 폴더 안에 <b>앱/</b>이 생기고 그 안에 코드</li><li>node_modules · .env는 <b>자동으로 빠져요</b> (.gitignore)</li><li>사장님마다 package.json이 있어도 폴더가 달라서 안 부딪혀요</li></ul></div>
+<li>내 폴더 안에 <b>프로젝트/</b>가 생기고 그 안에 코드 · 프롬프트 기록 · 이미지 · 문서 전부</li><li>node_modules · .env는 <b>자동으로 빠져요</b> (.gitignore)</li><li>사장님마다 package.json이 있어도 폴더가 달라서 안 부딪혀요</li></ul></div>
 <div class="never"><p class="head"><strong>이러면 꼬여요</strong></p><ul>
-<li>내 폴더 안에서 <b>git init</b> — 저장소 안의 저장소</li><li>저장소 맨 위(루트)에 파일 만들기</li><li>남의 폴더에 파일 만들기</li></ul></div>
+<li>내 폴더 안에서 <b>git init</b> — 저장소 안의 저장소</li><li>다른 데서 만든 폴더를 <b>.git째로</b> 복사해 넣기</li><li>저장소 맨 위(루트)나 남의 폴더에 파일 만들기</li><li>영상 파일 올리기 — 링크로</li></ul></div>
 </div>
-<div class="foot"><p class="note">꼬였으면 AI에게 "방금 만든 .git 폴더 지워 줘" 또는 "내 폴더 밖에 만든 파일을 v1/앱으로 옮겨 줘". 운영진도 불러요.</p></div>"""))
+<div class="foot"><p class="note">꼬였으면 AI에게 "방금 만든 .git 폴더 지워 줘" 또는 "내 폴더 밖에 만든 파일을 v1/프로젝트으로 옮겨 줘". 운영진도 불러요.</p></div>"""))
 d3.append(S("light", """<p class="eyebrow">같이 만들기</p><h2>자주 pull, 자주 push — <mark>서로 끌어다 써요</mark></h2>
 <div class="cards" style="grid-template-columns:repeat(3,1fr)">
 <div><p class="k">시작할 때</p><p class="t">pull</p><p class="d">"GitHub 최신 내용 pull해 줘." 다른 사장님이 올린 앱이 내 컴퓨터에 들어와요.</p></div>
 <div class="on-acid"><p class="k">한 기능 될 때마다</p><p class="t">push</p><p class="d">"지금까지 된 것 커밋하고 push해 줘." 30분에 한 번은 올려요. 컴퓨터가 꺼져도 안 잃어요.</p></div>
-<div><p class="k">남의 것 볼 때</p><p class="t">읽고 복사만</p><p class="d">"[2조_양진서_빈숲카페]/v1/앱을 읽고 메뉴 카드 화면을 내 앱에 맞게 가져와 줘. 그 폴더는 고치지 마."</p></div>
+<div><p class="k">남의 것 볼 때</p><p class="t">읽고 복사만</p><p class="d">"[2조_양진서_빈숲카페]/v1/프로젝트을 읽고 메뉴 카드 화면을 내 앱에 맞게 가져와 줘. 그 폴더는 고치지 마."</p></div>
 </div>
-<div class="foot"><p class="note">같은 조가 같은 주제를 만들어요. 옆 사장님이 먼저 만든 화면을 가져오면 30분이 줄어요. 그러라고 한곳에 모은 거예요.</p></div>"""))
+<div class="foot"><p class="note">같은 조가 같은 주제를 만들어요. 02 폴더 맨 위 '구경하기' 표에서 12명 것을 다 보고, 옆 사장님이 먼저 만든 화면을 가져오면 30분이 줄어요.</p></div>"""))
 d3.append(S("", """<p class="eyebrow">열쇠 이야기</p><h2>공개 저장소예요 — <span class="y">절대 안 되는 열쇠</span></h2>
 <div class="split">
 <div><p class="head"><strong>올라가도 돼요</strong></p><ul>
@@ -271,21 +271,21 @@ d3.append(S("", """<p class="eyebrow">열쇠 이야기</p><h2>공개 저장소�
 d3.append(S("light", """<p class="eyebrow">제출 전</p><h2>네 개만 <mark>확인</mark></h2>
 <table class="table"><colgroup><col style="width:8%"><col style="width:46%"><col style="width:46%"></colgroup>
 <tr><th>#</th><th>확인</th><th>방법</th></tr>
-<tr class="hi"><td>1</td><td>코드가 내 폴더 v1/앱 안에 있나</td><td>GitHub 웹에서 내 폴더 → v1 → 앱 열어 보기</td></tr>
+<tr class="hi"><td>1</td><td>코드가 내 폴더 v1/프로젝트 안에 있나</td><td>GitHub 웹에서 내 폴더 → v1 → 앱 열어 보기</td></tr>
 <tr><td>2</td><td>.env · 키 · node_modules가 안 올라갔나</td><td>앱 폴더 파일 목록에 없음</td></tr>
-<tr><td>3</td><td>제출서에 실행 방법과 스크린샷</td><td>v1/제출서.md · v1/결과물/</td></tr>
+<tr><td>3</td><td>제출서 + 결과물/첫화면.png</td><td>첫화면.png가 '구경하기' 표에 올라가요</td></tr>
 <tr class="hi"><td>4</td><td>push 했나</td><td>GitHub 웹에서 보이면 끝</td></tr>
 </table>
 <div class="foot"><p class="note">제출서 맨 아래에 이 네 칸이 있어요. AI에게 "제출서 채우고 네 개 확인하고 v1 제출로 커밋·push해 줘".</p></div>"""))
 d3.append(S("light", """<p class="eyebrow">완성 후 · 10/17 이후</p><h2>다 만들면 <mark>개인 저장소</mark>로 옮기고 인터넷 주소</h2>
 <div class="steps">
-<div><p class="k">0</p><p class="t">복사해서 옮기기</p><p class="d">내 폴더 v2/앱을 새 폴더로 복사. 공동 저장소 쪽은 기록으로 남겨요.</p></div>
+<div><p class="k">0</p><p class="t">복사해서 옮기기</p><p class="d">내 폴더 v2/프로젝트을 새 폴더로 복사. 공동 저장소 쪽은 기록으로 남겨요.</p></div>
 <div><p class="k">1</p><p class="t">내 GitHub 저장소</p><p class="d">복사본을 내 계정에 Public으로. 캠프 끝나도 내 것.</p></div>
 <div><p class="k">2</p><p class="t">Supabase</p><p class="d">저장이 필요한 앱만. 열쇠는 환경변수에.</p></div>
 <div class="hi"><p class="k">3</p><p class="t">Vercel</p><p class="d">저장소 하나 = 사이트 하나. 직원 폰에서 열리는 주소.</p></div>
 </div>
 <div class="foot"><p class="note">왜 나중에? 만드는 동안은 한곳이 편하고, Vercel은 저장소 하나에 사이트 하나라서요. 순서는 03 폴더 문서에 다 있어요.</p></div>"""))
-d3.append(S("cover", """<p class="eyebrow">미니 해커톤</p><h1>각자 <span class="y">v1</span> 만들기</h1><p class="by">내 폴더 v1/앱 안에 · git init 없이 · 30분마다 push<br><span style="font-size:28px">막히면 오류 메시지 그대로 AI에게, 그다음 운영진</span></p>"""))
+d3.append(S("cover", """<p class="eyebrow">미니 해커톤</p><h1>각자 <span class="y">v1</span> 만들기</h1><p class="by">내 폴더 v1/프로젝트 안에 · git init 없이 · 30분마다 push<br><span style="font-size:28px">막히면 오류 메시지 그대로 AI에게, 그다음 운영진</span></p>"""))
 
 DECKS = [
  ("01_GitHub_왜쓰고_어떻게쓰나", "GitHub, 왜 쓰고 어떻게 쓰나 — 실전 캠프 Day 2", d1),
