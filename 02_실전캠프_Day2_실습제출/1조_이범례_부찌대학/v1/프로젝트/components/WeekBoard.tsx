@@ -68,8 +68,9 @@ export default function WeekBoard({ store }: { store: Store }) {
                 </thead>
                 <tbody>
                   {w.days.map((d) => {
-                    const st = STATUS[d.status];
                     const r = d.record;
+                    const samePlan = r?.kind === "work" && d.plan && r.start === d.plan.start && r.end === d.plan.end && (r.breakMin ?? d.plan.breakMin) === d.plan.breakMin;
+                    const st = samePlan ? { label: "예정대로 확정", cls: "bg-ok-soft text-ok" } : STATUS[d.status];
                     const actual =
                       r?.kind === "absent" ? "—" :
                       r?.start && r?.end ? `${r.start}–${r.end}${r.breakMin !== undefined && r.breakMin !== d.plan?.breakMin ? ` · 휴게 ${r.breakMin}분` : ""}` :
