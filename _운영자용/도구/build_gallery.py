@@ -36,7 +36,7 @@ for d in ORDER:
         links=[]
         if url: links.append(f"**[열어 보기 ↗]({url})**")
         if repo: links.append(f"[코드 보기]({repo})")
-        if has_proj: links.append(link(proj,"참고 폴더"))
+        if has_proj: links.append(link(proj,"만든 폴더(힌트)"))
         if os.path.exists(f"{sub}/PRD.md"): links.append(link(f"{sub}/PRD.md","PRD"))
         if os.path.exists(sm): links.append(link(sm,"제출서"))
         if links: parts.append(" · ".join(links))

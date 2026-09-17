@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>v1 만들기, 개인 저장소와 Vercel — 실전 캠프 Day 2</title>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>v1 만들기, 내 폴더에 같이 — 실전 캠프 Day 2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -67,57 +67,57 @@ h1,h2,h3{font-weight:900;letter-spacing:-.025em;line-height:1.22;margin:0;text-w
 </style></head><body>
 <div class="bar" id="progress"></div><div class="hint">← → 키 또는 화면 클릭</div>
 <div class="stage" id="stage">
-<section class="slide cover on"><p class="eyebrow">실전 캠프 Day 2 · v1 만들기</p><h1>내 저장소에 만들고,<br><span class="y">링크</span>로 모아요</h1><p class="by">별도 폴더 → 내 개인 저장소(공개) → Vercel 주소 → 공동 저장소엔 두 링크<br><span style="font-size:28px">폴더는 나란히, 저장소는 따로</span></p></section>
+<section class="slide cover on"><p class="eyebrow">실전 캠프 Day 2 · v1 만들기</p><h1>내 폴더에 만들고,<br><span class="y">같이</span> 봐요</h1><p class="by">전체 PRD → v1 구현 → 내 폴더에 push → Vercel 주소<br><span style="font-size:28px">폴더는 서로 힌트용, 써 보는 건 주소로</span></p></section>
 <section class="slide light"><p class="eyebrow">오늘 목표</p><h2>여기까지가 <mark>오늘</mark>이에요</h2>
 <div class="steps">
 <div><p class="k">1</p><p class="t">전체 PRD</p><p class="d">baemin-ops-prd 스킬로 인터뷰. 다 만들었을 때의 모습.</p></div>
 <div><p class="k">2</p><p class="t">v1 · v2로 나누기</p><p class="d">오늘 되는 건 v1/PRD.md, 나머지는 v2/PRD.md 초안.</p></div>
-<div class="hi"><p class="k">3</p><p class="t">v1 만들기</p><p class="d">공동 저장소 옆 별도 폴더에서. 외부 연결 없이, 가짜 데이터로.</p></div>
-<div><p class="k">4</p><p class="t">개인 저장소 · Vercel · 제출서</p><p class="d">내 GitHub에 Public으로 → Vercel 주소 → 공동 저장소 제출서에 두 링크.</p></div>
+<div class="hi"><p class="k">3</p><p class="t">v1 만들기</p><p class="d">내 폴더 v1/프로젝트 안에. 외부 연결 없이, 가짜 데이터로.</p></div>
+<div><p class="k">4</p><p class="t">push · 제출서</p><p class="d">한 기능 될 때마다 push. 제출서에 실행 방법과 첫화면.png. Vercel 주소는 있으면.</p></div>
 </div>
-<div class="foot"><p class="note">v1이 일찍 끝나면 같은 저장소에서 v2까지 시작해도 돼요. push하면 Vercel에 자동으로 올라가요.</p></div></section>
-<section class="slide "><p class="eyebrow">제일 중요한 것</p><h2>폴더는 <span class="y">나란히</span>, 저장소는 <span class="y">따로</span></h2>
-<div class="prompt" style="font-family:var(--mono);font-size:28px;line-height:1.7">홈 폴더/<br>├── baemin-ops-os-camp/&nbsp;&nbsp;&nbsp;&nbsp;← 공동 저장소 (이미 받은 것) · PRD · 제출서 · 스크린샷만<br>└── projects/<br>&nbsp;&nbsp;&nbsp;&nbsp;└── staff-schedule/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← 내 프로젝트 = 내 개인 저장소 · 코드는 전부 여기</div>
+<div class="foot"><p class="note">v1이 일찍 끝나면 v1/프로젝트를 v2/프로젝트로 복사해서 오늘 v2까지 해도 돼요. 개인 저장소·Vercel 연결은 10/2에 다 같이.</p></div></section>
+<section class="slide "><p class="eyebrow">제일 중요한 것</p><h2>10/2까지 만든 건 <span class="y">내 폴더 v1/프로젝트</span>에 통째로</h2>
+<div class="prompt"><span class="w">AI에게 · 시작할 때</span>v1/PRD.md를 읽고 v1 범위만 만들어 줘. <b>02_실전캠프_Day2_실습제출/[내폴더]/v1/프로젝트 폴더 안에</b> 만들어. 이 폴더는 이미 GitHub 저장소 안이니 <b>git init은 하지 마.</b></div>
 <div class="split" style="margin-top:36px">
-<div><p class="head"><strong>이렇게 해요</strong></p><ul>
-<li>코드 작업은 <b>프로젝트 폴더</b>를 열고 AI에게</li><li>제출서는 <b>공동 저장소 폴더</b>를 열고 AI에게</li><li>이미 공동 저장소 안에서 만들던 분은 <b>복사해서 옆으로</b> (03 폴더 0단계)</li></ul></div>
+<div><p class="head"><strong>이렇게 돼요</strong></p><ul>
+<li>내 폴더 안에 <b>프로젝트/</b>가 생기고 그 안에 코드 · 프롬프트 기록 · 이미지 · 문서 전부</li><li>node_modules · .env는 <b>자동으로 빠져요</b> (.gitignore)</li><li>사장님마다 package.json이 있어도 폴더가 달라서 안 부딪혀요</li></ul></div>
 <div class="never"><p class="head"><strong>이러면 꼬여요</strong></p><ul>
-<li>공동 저장소 폴더 <b>안에</b> 프로젝트 만들기</li><li>한 폴더 안에 저장소 두 개 겹치기 (git init 두 번)</li><li>공동 저장소에 코드 통째로 올리기</li></ul></div>
+<li>내 폴더 안에서 <b>git init</b> — 저장소 안의 저장소</li><li>다른 데서 만든 폴더를 <b>.git째로</b> 복사해 넣기</li><li>저장소 맨 위(루트)나 남의 폴더에 파일 만들기</li><li>영상 파일 올리기 — 링크로</li></ul></div>
 </div>
-<div class="foot"><p class="note">저장소 안의 저장소는 GitHub에 빈 껍데기로만 보이고, AI가 어디에 push할지 헷갈려요. 옆에 두면 아무 문제 없어요.</p></div></section>
-<section class="slide light"><p class="eyebrow">세 단계 · 15분</p><h2>한 번 해 두면 <mark>push만 하면</mark> 자동이에요</h2>
-<div class="steps three">
-<div class="hi"><p class="k">1 · 5분</p><p class="t">내 GitHub 저장소</p><p class="d">"이 프로젝트를 내 GitHub에 새 저장소로, <b>Public</b>으로 올려 줘. .gitignore에 .env* 있는지 확인하고." AI가 주소를 알려 줘요.</p></div>
-<div><p class="k">2 · 10분 · 저장이 필요할 때만</p><p class="t">Supabase 창고</p><p class="d"><b>사장님</b>: GitHub 계정으로 가입·로그인 → <b>Claude in Chrome</b>: 새 프로젝트(Seoul)·테이블·잠금(RLS) → <b>사장님</b>: URL과 anon 키를 .env.local에 붙여넣기.</p></div>
-<div class="hi"><p class="k">3 · 10분</p><p class="t">Vercel 주소</p><p class="d">GitHub 계정으로 가입 → Import 내 저장소 → 환경변수(Supabase 값) → Deploy → 주소. 내 폰에서 열리면 성공.</p></div>
+<div class="foot"><p class="note">꼬였으면 AI에게 "방금 만든 .git 폴더 지워 줘" 또는 "내 폴더 밖에 만든 파일을 v1/프로젝트으로 옮겨 줘". 운영진도 불러요.</p></div></section>
+<section class="slide light"><p class="eyebrow">같이 만들기</p><h2>자주 pull, 자주 push — <mark>서로 끌어다 써요</mark></h2>
+<div class="cards" style="grid-template-columns:repeat(3,1fr)">
+<div><p class="k">시작할 때</p><p class="t">pull</p><p class="d">"GitHub 최신 내용 pull해 줘." 다른 사장님이 올린 앱이 내 컴퓨터에 들어와요.</p></div>
+<div class="on-acid"><p class="k">한 기능 될 때마다</p><p class="t">push</p><p class="d">"지금까지 된 것 커밋하고 push해 줘." 30분에 한 번은 올려요. 컴퓨터가 꺼져도 안 잃어요.</p></div>
+<div><p class="k">남의 것 볼 때</p><p class="t">읽고 복사만</p><p class="d">"[2조_양진서_빈숲카페]/v1/프로젝트을 읽고 메뉴 카드 화면을 내 앱에 맞게 가져와 줘. 그 폴더는 고치지 마."</p></div>
 </div>
-<div class="foot"><p class="note">셋 다 GitHub 계정 하나로 로그인돼요. 무료로 시작. 그 뒤로는 push만 하면 같은 주소에 새 버전 — v2도, 10/17 최종도.</p></div></section>
-<section class="slide "><p class="eyebrow">열쇠 이야기</p><h2>내 저장소는 공개예요 — <span class="y">절대 안 되는 열쇠</span></h2>
+<div class="foot"><p class="note">같은 조가 같은 주제를 만들어요. 폴더는 "어떻게 만들었나" 힌트, 써 보는 건 그분 Vercel 주소로. 옆 사장님이 먼저 만든 화면을 가져오면 30분이 줄어요.</p></div></section>
+<section class="slide "><p class="eyebrow">열쇠 이야기</p><h2>공개 저장소예요 — <span class="y">절대 안 되는 열쇠</span></h2>
 <div class="split">
 <div><p class="head"><strong>올라가도 돼요</strong></p><ul>
-<li>코드 전부 — 다른 사장님이 보고 힌트를 얻어요</li><li>시연용 <b>가짜 데이터</b></li><li>Supabase <b>URL</b>과 <b>anon</b> 키 — 단, 환경변수(.env.local)에만. 자동으로 빠져요</li></ul></div>
+<li>코드 전부</li><li>시연용 <b>가짜 데이터</b></li><li>Supabase <b>Project URL</b>과 <b>anon</b> 키 — 단, 환경변수(.env.local)에만. 어차피 자동으로 빠져요</li></ul></div>
 <div class="never"><p class="head"><strong>절대 안 돼요</strong><span>공개 저장소라 전 세계가 봐요</span></p><ul>
 <li>Supabase <b>service_role</b> 키 · DB 비밀번호</li><li><b>.env</b> 파일 자체 · 로그인 세션 파일</li><li>실제 직원 · 손님 이름, 연락처, 실제 매출 파일</li></ul></div>
 </div>
 <div class="foot"><p class="note">push 전에 AI에게 "키 들어간 파일 없는지 확인해 줘". 실수로 올렸으면 파일 삭제가 아니라 키 재발급이에요. 운영진에게 바로 알려요.</p></div></section>
-<section class="slide light"><p class="eyebrow">서로 힌트</p><h2>구경하기 표 하나로 <mark>써 보고, 코드도 봐요</mark></h2>
-<div class="cards" style="grid-template-columns:repeat(3,1fr)">
-<div><p class="k">열어 보기</p><p class="t">Vercel 주소</p><p class="d">설치도 실행도 없이 폰으로 바로. 10/2 점검 때 서로 써 보는 것도 이 주소로.</p></div>
-<div class="on-acid"><p class="k">코드 보기</p><p class="t">개인 저장소</p><p class="d">"저런 것도 되는구나." AI에게 그 저장소를 읽혀서 내 것에 맞게 가져와요.</p></div>
-<div><p class="k">프롬프트</p><p class="t">읽혀서 가져오기</p><p class="d">"[저장소 주소]를 읽고 메뉴 카드 화면이 어떻게 만들어졌는지 설명해 줘. 내 것에 맞게 가져와 줘."</p></div>
-</div>
-<div class="foot"><p class="note">같은 조가 같은 주제를 만들어요. 옆 사장님이 먼저 만든 화면을 가져오면 30분이 줄어요. 그래서 개인 저장소를 공개로 두는 거예요.</p></div></section>
-<section class="slide light"><p class="eyebrow">제출 전</p><h2>다섯 개만 <mark>확인</mark></h2>
+<section class="slide light"><p class="eyebrow">제출 전</p><h2>네 개만 <mark>확인</mark> — 주소가 먼저</h2>
 <table class="table"><colgroup><col style="width:8%"><col style="width:46%"><col style="width:46%"></colgroup>
 <tr><th>#</th><th>확인</th><th>방법</th></tr>
-<tr class="hi"><td>1</td><td>개인 저장소가 Public인가</td><td>저장소 이름 옆 Public</td></tr>
-<tr><td>2</td><td>개인 저장소에 .env · 키가 없나</td><td>파일 목록에 없음</td></tr>
-<tr class="hi"><td>3</td><td>Vercel 주소가 열리나</td><td>내 폰 + 옆 사람 폰</td></tr>
-<tr><td>4</td><td>제출서에 두 링크 + 결과물/첫화면.png</td><td>공동 저장소 내 폴더 v1/</td></tr>
-<tr class="hi"><td>5</td><td>공동 저장소에 push 했나</td><td>GitHub 웹에서 제출서 보이면 끝</td></tr>
+<tr class="hi"><td>1</td><td>Vercel 주소가 열리나</td><td>내 폰 + 옆 사람 폰</td></tr>
+<tr><td>2</td><td>만든 폴더가 내 폴더 v1/프로젝트 안에 있나</td><td>GitHub 웹에서 내 폴더 → v1 → 프로젝트</td></tr>
+<tr><td>3</td><td>.env · 키 · node_modules가 안 올라갔나</td><td>프로젝트 폴더 파일 목록에 없음</td></tr>
+<tr class="hi"><td>4</td><td>제출서(주소) + 결과물/첫화면.png + push</td><td>GitHub 웹에서 보이면 끝</td></tr>
 </table>
-<div class="foot"><p class="note">제출서 맨 아래에 이 다섯 칸이 있어요. 공동 저장소 폴더를 열고 AI에게 "제출서 채우고 다섯 개 확인하고 v1 제출로 커밋·push해 줘".</p></div></section>
-<section class="slide cover"><p class="eyebrow">미니 해커톤</p><h1>각자 <span class="y">v1</span> 만들기</h1><p class="by">별도 폴더에서 · 외부 연결 없이 · 가짜 데이터로<br><span style="font-size:28px">되면 개인 저장소 → Vercel → 제출서 · 막히면 오류 메시지 그대로 AI에게</span></p></section>
+<div class="foot"><p class="note">제출서 맨 아래 확인 칸으로 셀프 체크. 오늘 임시 Vercel 주소가 필요하면 AI에게 "이 프로젝트를 Vercel에 배포해 줘, npx vercel로" 한마디.</p></div></section>
+<section class="slide light"><p class="eyebrow">10/2 중간 점검 때</p><h2>다 같이 <mark>개인 저장소</mark>로 흩어져요</h2>
+<div class="steps">
+<div><p class="k">0</p><p class="t">복사해서 옮기기</p><p class="d">내 폴더 v2/프로젝트를 공동 저장소 옆 새 폴더로 복사. 공동 저장소 쪽은 기록으로 남겨요.</p></div>
+<div><p class="k">1</p><p class="t">내 GitHub 저장소</p><p class="d">복사본을 내 계정에 Public으로. 캠프 끝나도 내 것.</p></div>
+<div><p class="k">2</p><p class="t">Supabase</p><p class="d">저장이 필요한 앱만. 열쇠는 환경변수에.</p></div>
+<div class="hi"><p class="k">3</p><p class="t">GitHub ↔ Vercel 연결</p><p class="d">이제 push만 하면 자동으로 새 버전. 주소는 그대로.</p></div>
+</div>
+<div class="foot"><p class="note">왜 10/2에? 만드는 동안은 한곳에서 서로 힌트를 얻는 게 더 중요해서요. 그날 서로 Vercel 주소로 써 보고 피드백해요. 순서는 03 폴더 문서에 다 있어요.</p></div></section>
+<section class="slide cover"><p class="eyebrow">미니 해커톤</p><h1>각자 <span class="y">v1</span> 만들기</h1><p class="by">내 폴더 v1/프로젝트 안에 · git init 없이 · 30분마다 push<br><span style="font-size:28px">v1이 끝나면 오늘 v2까지 해도 돼요 · 막히면 오류 메시지 그대로 AI에게</span></p></section>
 
 </div>
 <div class="ui"><button id="prev">← 이전</button><span id="count">01 / 08</span><button id="next">다음 →</button></div>
