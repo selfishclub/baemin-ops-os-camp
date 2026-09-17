@@ -17,7 +17,7 @@
 |---|---|---|---|
 | [01_GitHub_왜쓰고_어떻게쓰나.html](발표자료/01_GitHub_왜쓰고_어떻게쓰나.html) | [열기](https://claude.ai/artifact/6nLH9UXirZYdwgRef3YbxW) | GitHub이 왜 있고 어떻게 쓰나 (16장) | 첫 번째 |
 | [02_실습제출과_v1v2.html](발표자료/02_실습제출과_v1v2.html) | [열기](https://claude.ai/artifact/Wg8kVrFHGvJubNugGEvPfK) | 제출 구조, v1/v2 기준 (7장) | 실습 ② 전 |
-| [03_v1만들기_내폴더에_같이.html](발표자료/03_v1만들기_내폴더에_같이.html) | [열기](https://claude.ai/artifact/EjJ9g7RjJbVCW4pW5fWtGL) | v1 만들기 — 내 폴더에 만들고 서로 끌어다 쓰기, 완성 후 인터넷 주소 (8장) | v1 만들기 전 |
+| [03_v1만들기_개인저장소와_Vercel.html](발표자료/03_v1만들기_개인저장소와_Vercel.html) | [열기](https://claude.ai/artifact/EjJ9g7RjJbVCW4pW5fWtGL) | v1 만들기 — 별도 폴더 → 개인 저장소(공개) → Vercel → 요약 제출 (8장) | v1 만들기 전 |
 | [발표메모.md](발표자료/발표메모.md) | — | 강사용 말할 내용 | 강사 |
 
 슬라이드는 HTML 파일이라 **브라우저에서 열면** 됩니다. 화살표 키나 화면 클릭으로 넘깁니다.

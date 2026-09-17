@@ -118,24 +118,21 @@ d1.append(S("light", """<p class="eyebrow">GitHub이 있는 이유</p><h2>이유
 <div class="foot"><p class="note">오늘 캠프에서 제일 중요한 건 04예요. 12명이 같은 주제를 각자 만들고 서로 보면서 좋은 걸 가져옵니다.</p></div>"""))
 d1.append(S("", """<p class="eyebrow">이번 캠프에서</p><h2>저장소는 <span class="y">두 개</span>를 써요</h2>
 <div class="split">
-<div class="on-acid"><p class="head"><strong>공동 저장소</strong><span>교실 겸 공동 작업실 · 오늘은 전부 여기</span></p><ul>
-<li>지금 화면에 보이는 <b>baemin-ops-os-camp</b></li><li>우리 가게 소개 · 기획안(PRD)</li><li><b>만든 앱(코드)</b> — 내 폴더 v1/프로젝트 안에</li><li>제출서 · 스크린샷</li><li>다른 사장님 폴더를 열어 보고 <b>힌트</b>를 얻어요</li><li>보는 건 누구나, 올리는 건 초대받은 12명</li></ul></div>
-<div><p class="head"><strong>내 개인 저장소</strong><span>내 창고 · 완성 후(10/17 이후)에 만듦</span></p><ul>
-<li>완성한 프로젝트를 <b>옮겨 두는 곳</b></li><li>그때부터 GitHub과 Vercel을 연결해 push만 하면 자동 배포</li><li>누구나 볼 수 있게 <b>공개(Public)</b></li><li>캠프 끝나도 계속 내 것</li><li>오늘은 안 만들어요. <b>Vercel 주소는 오늘</b> 내 폴더에서 바로 만들어요</li></ul></div>
+<div><p class="head"><strong>공동 저장소</strong><span>교실 게시판</span></p><ul>
+<li>지금 화면에 보이는 <b>baemin-ops-os-camp</b></li><li>우리 가게 소개 · 기획안(PRD)</li><li>제출서 — <b>링크 두 개</b> (개인 저장소 · Vercel)</li><li>스크린샷</li><li>구경하기 표로 12명 것을 한눈에</li><li>보는 건 누구나, 올리는 건 초대받은 12명</li></ul></div>
+<div class="on-acid"><p class="head"><strong>내 개인 저장소</strong><span>내 작업실 · 오늘 v1 만든 뒤 만듦</span></p><ul>
+<li><b>실제 코드</b>는 전부 여기</li><li>Vercel이 여기를 읽어 인터넷 주소를 만들어요 — push하면 자동</li><li>누구나 볼 수 있게 <b>공개(Public)</b> — 서로 코드를 보고 힌트</li><li>캠프 끝나도 계속 내 것</li><li>공동 저장소 폴더 <b>옆</b>에 별도 폴더로</li></ul></div>
 </div>
-<div class="foot"><p class="note">오늘은 만든 폴더를 공동 저장소 내 폴더에 통째로 올려요. 서로 힌트를 얻으려고요. 써 보는 건 각자 Vercel 주소로. 완성되면 개인 저장소로 옮겨요.</p></div>"""))
-d1.append(S("light", """<p class="eyebrow">그림 한 장</p><h2>오늘은 <mark>공동 저장소 내 폴더</mark> + <mark>Vercel 주소</mark>까지</h2>
+<div class="foot"><p class="note">코드는 개인 저장소에, 공동 저장소에는 링크와 요약만. 12명 코드가 한곳에 섞이면 서로 건드려 깨지기 때문이에요. 링크만 있으면 누구나 써 보고 코드도 봐요.</p></div>"""))
+d1.append(S("light", """<p class="eyebrow">그림 한 장</p><h2>내 컴퓨터에서 <mark>인터넷 주소</mark>까지, 그리고 <mark>링크</mark>로 모으기</h2>
 <div class="flowbox">
-<div class="n"><b>내 컴퓨터</b><span>AI와 함께 만든다</span></div><div class="a">push<br>올리기 →</div>
-<div class="n hi"><b>공동 저장소 · 내 폴더 · v1/프로젝트</b><span>12명이 한곳에 · 서로 폴더 열어 힌트</span></div>
-<div class="a">AI가<br>올림 →</div><div class="n"><b>Vercel</b><span>인터넷 주소<br>써 보는 건 여기로</span></div>
+<div class="n"><b>내 컴퓨터 · 별도 폴더</b><span>AI와 함께 만든다</span></div><div class="a">push<br>올리기 →</div>
+<div class="n hi"><b>내 GitHub 저장소</b><span>공개 · 내 것</span></div><div class="a">자동으로<br>읽음 →</div>
+<div class="n"><b>Vercel</b><span>인터넷 주소<br>누구나 폰으로</span></div>
 </div>
-<div class="flowbox" style="margin-top:34px"><div class="a">↓ 다 완성되면 (10/17 이후)</div></div>
-<div class="flowbox" style="margin-top:10px">
-<div class="n"><b>내 개인 저장소</b><span>복사해서 옮김 · 공개</span></div><div class="a">GitHub 연결<br>push하면 자동 →</div>
-<div class="n"><b>같은 Vercel 주소</b><span>이제 자동으로 새 버전</span></div>
-</div>
-<div class="foot"><p class="note">오늘 할 건 위 줄. Vercel 주소는 AI에게 "Vercel에 배포해 줘" 한마디로 내 폴더에서 바로 만들어요. 아래 줄은 10/17 이후.</p></div>"""))
+<div class="flowbox" style="margin-top:30px"><div class="a">↓ 두 주소를 적어서</div></div>
+<div class="flowbox" style="margin-top:10px"><div class="n" style="min-width:900px"><b>공동 저장소 · 내 폴더 · 제출서.md</b><span>개인 저장소 주소 + Vercel 주소 + 스크린샷 → 구경하기 표</span></div></div>
+<div class="foot"><p class="note">오전엔 왼쪽 칸(공동 저장소에 PRD 올리기)만. 오후에 v1을 만들고 개인 저장소·Vercel·제출서까지.</p></div>"""))
 d1.append(S("light", """<p class="eyebrow">기억할 말 네 개</p><h2>금고 비유로 <mark>네 단어</mark>만</h2>
 <table class="table"><colgroup><col style="width:22%"><col style="width:40%"><col style="width:38%"></colgroup>
 <tr><th>말</th><th>쉬운 뜻</th><th>언제</th></tr>
@@ -189,8 +186,8 @@ d1.append(S("light", """<p class="eyebrow">제출 구조</p><h2>내 폴더 안�
 <tr><th></th><th>v1</th><th>v2</th></tr>
 <tr><td>언제</td><td><b>오늘 9/17</b> 안</td><td><b>10/2(금) 1차 마감</b> + 중간 점검 → 서로 피드백 → <b>10/17 최종</b></td></tr>
 <tr><td>범위</td><td>오늘 안에 되는 것만. 외부 연결 없이</td><td>API · 배민 데이터 · 날씨 등 외부 데이터, 고도화</td></tr>
-<tr class="hi"><td>제출물</td><td>PRD_전체 + v1 PRD + v2 PRD 초안 + <b>v1/프로젝트</b> + <b>Vercel 주소</b> + 제출서 + 스크린샷</td><td>v2 PRD + <b>v2/프로젝트</b> + Vercel 주소 갱신 + 제출서 + 스크린샷</td></tr>
-<tr><td>코드는</td><td>공동 저장소 내 폴더 <b>v1/프로젝트/</b></td><td>내 폴더 v2/프로젝트/ · 완성 후 개인 저장소로 옮김</td></tr>
+<tr class="hi"><td>제출물</td><td>PRD_전체 + v1 PRD + v2 PRD 초안 + 제출서(<b>개인 저장소 · Vercel 링크</b>) + 스크린샷</td><td>v2 PRD + 제출서(두 링크) + 스크린샷</td></tr>
+<tr><td>코드는</td><td><b>내 개인 저장소(공개)</b></td><td>같은 저장소에 이어서 · 같은 Vercel 주소</td></tr>
 </table>
 <div class="foot"><p class="note">전체 PRD에서 [v2]를 붙인 게 v2의 시작점이에요. 10/2에 v2를 올리고 그날 점검 시간에 서로 써 보고 Issue로 피드백해요. 10/17까지 반영하고 다듬어 최종본을 내요.</p></div>"""))
 d1.append(S("sec", """<p class="eyebrow">정리하면</p>
@@ -203,24 +200,23 @@ d1.append(S("cover", """<p class="eyebrow">지금 바로</p><h1>실습 ①<br><s
 d2 = []
 d2.append(S("cover", """<p class="eyebrow">실전 캠프 Day 2 · 실습 ②</p><h1>제출은 <span class="y">어디에, 무엇을</span></h1><p class="by">v1은 오늘 · v2는 10월 2일 · 피드백 반영한 최종은 10월 17일</p>""", on=True))
 d2.append(S("light", """<p class="eyebrow">제출하는 곳</p><h2>02 폴더 안에 <mark>내 이름 폴더</mark>가 있어요</h2>
-<div class="prompt" style="font-family:var(--mono);font-size:28px;line-height:1.7">02_실전캠프_Day2_실습제출/<br>├── 1조_유승균_마선생얼큰국밥/<br>├── 1조_이범례_부찌대학/<br>│&nbsp;&nbsp;&nbsp;├── README.md&nbsp;&nbsp;&nbsp;← 내 체크리스트<br>│&nbsp;&nbsp;&nbsp;├── PRD_전체.md&nbsp;← 전체 기획안 (먼저)<br>│&nbsp;&nbsp;&nbsp;├── 중간점검_1002.md<br>│&nbsp;&nbsp;&nbsp;├── v1/&nbsp;&nbsp;PRD.md · 제출서.md · 사용메모.md · 결과물/ · <b>프로젝트/</b> ← 만든 것 전부<br>│&nbsp;&nbsp;&nbsp;└── v2/&nbsp;&nbsp;PRD.md · 제출서.md · 결과물/ · <b>프로젝트/</b><br>├── 2조_양진서_빈숲카페/<br>└── … 12명</div>
+<div class="prompt" style="font-family:var(--mono);font-size:28px;line-height:1.7">02_실전캠프_Day2_실습제출/<br>├── 1조_유승균_마선생얼큰국밥/<br>├── 1조_이범례_부찌대학/<br>│&nbsp;&nbsp;&nbsp;├── README.md&nbsp;&nbsp;&nbsp;← 내 체크리스트<br>│&nbsp;&nbsp;&nbsp;├── PRD_전체.md&nbsp;← 전체 기획안 (먼저)<br>│&nbsp;&nbsp;&nbsp;├── 중간점검_1002.md<br>│&nbsp;&nbsp;&nbsp;├── v1/&nbsp;&nbsp;PRD.md · <b>제출서.md(두 링크)</b> · 사용메모.md · 결과물/<br>│&nbsp;&nbsp;&nbsp;└── v2/&nbsp;&nbsp;PRD.md · 제출서.md · 결과물/<br>├── 2조_양진서_빈숲카페/<br>└── … 12명</div>
 <div class="foot"><p class="note">폴더와 빈 양식은 운영진이 미리 만들어 뒀어요. 사장님은 채우기만 하면 됩니다. 내 폴더만 고쳐요.</p></div>"""))
-d2.append(S("", """<p class="eyebrow">무엇을 제출하나</p><h2>다섯 가지 — <span class="y">코드도 여기에</span></h2>
-<div class="cards" style="grid-template-columns:repeat(5,1fr)">
-<div><p class="k">① PRD_전체.md</p><p class="t">전체 기획안</p><p class="d">다 만들었을 때의 모습. 기능마다 [v1]·[v2]·[나중].</p></div>
-<div><p class="k">② v1/PRD.md</p><p class="t">오늘 만들 것</p><p class="d">전체에서 [v1]만. v2/PRD.md는 초안으로.</p></div>
-<div class="on-acid"><p class="k">③ v1/프로젝트/</p><p class="t">만든 폴더 통째로</p><p class="d">코드 · 프롬프트 기록 · 이미지 · 문서 전부. 내 폴더 안에 만들고 그대로 push. git init은 안 해요.</p></div>
-<div><p class="k">④ 제출서.md</p><p class="t">Vercel 주소</p><p class="d">써 보는 건 이 주소로. 도구 이름, 한 줄 설명도.</p></div>
-<div><p class="k">⑤ 결과물/</p><p class="t">첫화면.png</p><p class="d">첫 화면 사진은 '구경하기' 표에 올라가요. 폰으로 찍어도 돼요.</p></div>
+d2.append(S("", """<p class="eyebrow">무엇을 제출하나</p><h2>네 가지 — <span class="y">코드는 링크로</span></h2>
+<div class="cards" style="grid-template-columns:repeat(4,1fr)">
+<div><p class="k">① PRD_전체.md</p><p class="t">전체 기획안</p><p class="d">다 만들었을 때의 모습. 기능마다 [v1]·[v2]·[나중] 꼬리표.</p></div>
+<div><p class="k">② v1/PRD.md</p><p class="t">오늘 만들 것</p><p class="d">전체에서 [v1]만. v2/PRD.md는 초안으로 같이 나눠 둬요.</p></div>
+<div class="on-acid"><p class="k">③ 제출서.md</p><p class="t">링크 두 개</p><p class="d">내 개인 GitHub 저장소 주소(공개) + Vercel 인터넷 주소. 도구 이름, 한 줄 설명도.</p></div>
+<div><p class="k">④ 결과물/</p><p class="t">첫화면.png</p><p class="d">첫 화면 사진은 '구경하기' 표에 올라가요. 폰으로 찍어도 돼요.</p></div>
 </div>
-<div class="foot"><p class="note">폴더는 "저런 것도 되는구나" 힌트용, 써 보는 건 Vercel 주소로. 02 폴더 맨 위 '구경하기' 표에 둘 다 올라가요. 완성되면(10/17 이후) 각자 개인 저장소로 가져가요.</p></div>"""))
+<div class="foot"><p class="note">코드는 내 개인 저장소(공개)에 두고, 여기엔 링크만. 구경하기 표에서 열어 보기(써 보기)·코드 보기(힌트)가 한 번에 돼요.</p></div>"""))
 d2.append(S("light", """<p class="eyebrow">v1과 v2</p><h2>오늘은 <mark>v1</mark>, 한 달 뒤 <mark>v2</mark></h2>
 <table class="table"><colgroup><col style="width:18%"><col style="width:41%"><col style="width:41%"></colgroup>
 <tr><th></th><th>v1</th><th>v2</th></tr>
 <tr><td>언제</td><td><b>오늘</b> 안</td><td><b>10/2 1차 마감</b> + 온라인 점검 → 서로 피드백 → <b>10/17 최종</b></td></tr>
 <tr class="hi"><td>범위</td><td>오늘 안에 되는 것만. 외부 연결 없이. 화면 + 저장까지</td><td>API, 배민 데이터, 날씨, 카톡 알림 같은 외부 데이터·고도화</td></tr>
 <tr><td>예</td><td>근무표 입력 → 주급 계산 → 저장</td><td>배민 매출 자동 불러오기, 날씨 API로 준비량 추천</td></tr>
-<tr><td>어디</td><td>내폴더/v1/ · 코드는 v1/프로젝트/</td><td>내폴더/v2/ · 코드는 v2/프로젝트/ (v1/프로젝트 복사해 이어 만듦)</td></tr>
+<tr><td>어디</td><td>코드는 내 개인 저장소 · 여기엔 내폴더/v1/</td><td>같은 개인 저장소에 이어서 · 여기엔 내폴더/v2/</td></tr>
 </table>
 <div class="foot"><p class="note">범위가 크면 AI에게 "PRD_전체에서 오늘 되는 것만 [v1]으로 남기고 나머지는 [v2]로 옮겨 줘"라고 하세요. 반대로 v1이 일찍 끝나면 오늘 v2까지 시작해서 올려도 돼요.</p></div>"""))
 d2.append(S("", """<p class="eyebrow">실습 ② 순서</p><h2>AI에게 <span class="y">다섯 마디</span></h2>
@@ -236,62 +232,62 @@ d2.append(S("cover", """<p class="eyebrow">실습 ②</p><h1>실습 ② <span cl
 
 # ---------------- 발표 03 ----------------
 d3 = []
-d3.append(S("cover", """<p class="eyebrow">실전 캠프 Day 2 · v1 만들기</p><h1>내 폴더에 만들고,<br><span class="y">같이</span> 봐요</h1><p class="by">전체 PRD → v1 구현 → 내 폴더에 push → Vercel 주소<br><span style="font-size:28px">폴더는 서로 힌트용, 써 보는 건 주소로</span></p>""", on=True))
+d3.append(S("cover", """<p class="eyebrow">실전 캠프 Day 2 · v1 만들기</p><h1>내 저장소에 만들고,<br><span class="y">링크</span>로 모아요</h1><p class="by">별도 폴더 → 내 개인 저장소(공개) → Vercel 주소 → 공동 저장소엔 두 링크<br><span style="font-size:28px">폴더는 나란히, 저장소는 따로</span></p>""", on=True))
 d3.append(S("light", """<p class="eyebrow">오늘 목표</p><h2>여기까지가 <mark>오늘</mark>이에요</h2>
 <div class="steps">
 <div><p class="k">1</p><p class="t">전체 PRD</p><p class="d">baemin-ops-prd 스킬로 인터뷰. 다 만들었을 때의 모습.</p></div>
 <div><p class="k">2</p><p class="t">v1 · v2로 나누기</p><p class="d">오늘 되는 건 v1/PRD.md, 나머지는 v2/PRD.md 초안.</p></div>
-<div class="hi"><p class="k">3</p><p class="t">v1 만들기</p><p class="d">내 폴더 v1/프로젝트 안에. 외부 연결 없이, 가짜 데이터로.</p></div>
-<div><p class="k">4</p><p class="t">Vercel 주소 · 제출서</p><p class="d">한 기능 될 때마다 push. AI에게 "Vercel에 배포해 줘" → 주소를 제출서에.</p></div>
+<div class="hi"><p class="k">3</p><p class="t">v1 만들기</p><p class="d">공동 저장소 옆 별도 폴더에서. 외부 연결 없이, 가짜 데이터로.</p></div>
+<div><p class="k">4</p><p class="t">개인 저장소 · Vercel · 제출서</p><p class="d">내 GitHub에 Public으로 → Vercel 주소 → 공동 저장소 제출서에 두 링크.</p></div>
 </div>
-<div class="foot"><p class="note">v1이 일찍 끝나면 v1/프로젝트를 v2/프로젝트로 복사해서 오늘 v2까지 해도 돼요. 개인 저장소만 완성 후에.</p></div>"""))
-d3.append(S("", """<p class="eyebrow">제일 중요한 것</p><h2>만든 건 <span class="y">내 폴더 v1/프로젝트</span>에 통째로</h2>
-<div class="prompt"><span class="w">AI에게 · 시작할 때</span>v1/PRD.md를 읽고 v1 범위만 만들어 줘. <b>02_실전캠프_Day2_실습제출/[내폴더]/v1/프로젝트 폴더 안에</b> 만들어. 이 폴더는 이미 GitHub 저장소 안이니 <b>git init은 하지 마.</b></div>
+<div class="foot"><p class="note">v1이 일찍 끝나면 같은 저장소에서 v2까지 시작해도 돼요. push하면 Vercel에 자동으로 올라가요.</p></div>"""))
+d3.append(S("", """<p class="eyebrow">제일 중요한 것</p><h2>폴더는 <span class="y">나란히</span>, 저장소는 <span class="y">따로</span></h2>
+<div class="prompt" style="font-family:var(--mono);font-size:28px;line-height:1.7">홈 폴더/<br>├── baemin-ops-os-camp/&nbsp;&nbsp;&nbsp;&nbsp;← 공동 저장소 (이미 받은 것) · PRD · 제출서 · 스크린샷만<br>└── projects/<br>&nbsp;&nbsp;&nbsp;&nbsp;└── staff-schedule/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;← 내 프로젝트 = 내 개인 저장소 · 코드는 전부 여기</div>
 <div class="split" style="margin-top:36px">
-<div><p class="head"><strong>이렇게 돼요</strong></p><ul>
-<li>내 폴더 안에 <b>프로젝트/</b>가 생기고 그 안에 코드 · 프롬프트 기록 · 이미지 · 문서 전부</li><li>node_modules · .env는 <b>자동으로 빠져요</b> (.gitignore)</li><li>사장님마다 package.json이 있어도 폴더가 달라서 안 부딪혀요</li></ul></div>
+<div><p class="head"><strong>이렇게 해요</strong></p><ul>
+<li>코드 작업은 <b>프로젝트 폴더</b>를 열고 AI에게</li><li>제출서는 <b>공동 저장소 폴더</b>를 열고 AI에게</li><li>이미 공동 저장소 안에서 만들던 분은 <b>복사해서 옆으로</b> (03 폴더 0단계)</li></ul></div>
 <div class="never"><p class="head"><strong>이러면 꼬여요</strong></p><ul>
-<li>내 폴더 안에서 <b>git init</b> — 저장소 안의 저장소</li><li>다른 데서 만든 폴더를 <b>.git째로</b> 복사해 넣기</li><li>저장소 맨 위(루트)나 남의 폴더에 파일 만들기</li><li>영상 파일 올리기 — 링크로</li></ul></div>
+<li>공동 저장소 폴더 <b>안에</b> 프로젝트 만들기</li><li>한 폴더 안에 저장소 두 개 겹치기 (git init 두 번)</li><li>공동 저장소에 코드 통째로 올리기</li></ul></div>
 </div>
-<div class="foot"><p class="note">꼬였으면 AI에게 "방금 만든 .git 폴더 지워 줘" 또는 "내 폴더 밖에 만든 파일을 v1/프로젝트으로 옮겨 줘". 운영진도 불러요.</p></div>"""))
-d3.append(S("light", """<p class="eyebrow">같이 만들기</p><h2>자주 pull, 자주 push — <mark>서로 끌어다 써요</mark></h2>
-<div class="cards" style="grid-template-columns:repeat(3,1fr)">
-<div><p class="k">시작할 때</p><p class="t">pull</p><p class="d">"GitHub 최신 내용 pull해 줘." 다른 사장님이 올린 앱이 내 컴퓨터에 들어와요.</p></div>
-<div class="on-acid"><p class="k">한 기능 될 때마다</p><p class="t">push</p><p class="d">"지금까지 된 것 커밋하고 push해 줘." 30분에 한 번은 올려요. 컴퓨터가 꺼져도 안 잃어요.</p></div>
-<div><p class="k">남의 것 볼 때</p><p class="t">읽고 복사만</p><p class="d">"[2조_양진서_빈숲카페]/v1/프로젝트을 읽고 메뉴 카드 화면을 내 앱에 맞게 가져와 줘. 그 폴더는 고치지 마."</p></div>
+<div class="foot"><p class="note">저장소 안의 저장소는 GitHub에 빈 껍데기로만 보이고, AI가 어디에 push할지 헷갈려요. 옆에 두면 아무 문제 없어요.</p></div>"""))
+d3.append(S("light", """<p class="eyebrow">세 단계 · 15분</p><h2>한 번 해 두면 <mark>push만 하면</mark> 자동이에요</h2>
+<div class="steps three">
+<div class="hi"><p class="k">1 · 5분</p><p class="t">내 GitHub 저장소</p><p class="d">"이 프로젝트를 내 GitHub에 새 저장소로, <b>Public</b>으로 올려 줘. .gitignore에 .env* 있는지 확인하고." AI가 주소를 알려 줘요.</p></div>
+<div><p class="k">2 · 10분 · 저장이 필요할 때만</p><p class="t">Supabase 창고</p><p class="d"><b>사장님</b>: GitHub 계정으로 가입·로그인 → <b>Claude in Chrome</b>: 새 프로젝트(Seoul)·테이블·잠금(RLS) → <b>사장님</b>: URL과 anon 키를 .env.local에 붙여넣기.</p></div>
+<div class="hi"><p class="k">3 · 10분</p><p class="t">Vercel 주소</p><p class="d">GitHub 계정으로 가입 → Import 내 저장소 → 환경변수(Supabase 값) → Deploy → 주소. 내 폰에서 열리면 성공.</p></div>
 </div>
-<div class="foot"><p class="note">같은 조가 같은 주제를 만들어요. 폴더는 "어떻게 만들었나" 힌트, 써 보는 건 그분 Vercel 주소로. 옆 사장님이 먼저 만든 화면을 가져오면 30분이 줄어요.</p></div>"""))
-d3.append(S("", """<p class="eyebrow">열쇠 이야기</p><h2>공개 저장소예요 — <span class="y">절대 안 되는 열쇠</span></h2>
+<div class="foot"><p class="note">셋 다 GitHub 계정 하나로 로그인돼요. 무료로 시작. 그 뒤로는 push만 하면 같은 주소에 새 버전 — v2도, 10/17 최종도.</p></div>"""))
+d3.append(S("", """<p class="eyebrow">열쇠 이야기</p><h2>내 저장소는 공개예요 — <span class="y">절대 안 되는 열쇠</span></h2>
 <div class="split">
 <div><p class="head"><strong>올라가도 돼요</strong></p><ul>
-<li>코드 전부</li><li>시연용 <b>가짜 데이터</b></li><li>Supabase <b>Project URL</b>과 <b>anon</b> 키 — 단, 환경변수(.env.local)에만. 어차피 자동으로 빠져요</li></ul></div>
+<li>코드 전부 — 다른 사장님이 보고 힌트를 얻어요</li><li>시연용 <b>가짜 데이터</b></li><li>Supabase <b>URL</b>과 <b>anon</b> 키 — 단, 환경변수(.env.local)에만. 자동으로 빠져요</li></ul></div>
 <div class="never"><p class="head"><strong>절대 안 돼요</strong><span>공개 저장소라 전 세계가 봐요</span></p><ul>
 <li>Supabase <b>service_role</b> 키 · DB 비밀번호</li><li><b>.env</b> 파일 자체 · 로그인 세션 파일</li><li>실제 직원 · 손님 이름, 연락처, 실제 매출 파일</li></ul></div>
 </div>
 <div class="foot"><p class="note">push 전에 AI에게 "키 들어간 파일 없는지 확인해 줘". 실수로 올렸으면 파일 삭제가 아니라 키 재발급이에요. 운영진에게 바로 알려요.</p></div>"""))
-d3.append(S("light", """<p class="eyebrow">제출 전</p><h2>네 개만 <mark>확인</mark> — 주소가 먼저</h2>
+d3.append(S("light", """<p class="eyebrow">서로 힌트</p><h2>구경하기 표 하나로 <mark>써 보고, 코드도 봐요</mark></h2>
+<div class="cards" style="grid-template-columns:repeat(3,1fr)">
+<div><p class="k">열어 보기</p><p class="t">Vercel 주소</p><p class="d">설치도 실행도 없이 폰으로 바로. 10/2 점검 때 서로 써 보는 것도 이 주소로.</p></div>
+<div class="on-acid"><p class="k">코드 보기</p><p class="t">개인 저장소</p><p class="d">"저런 것도 되는구나." AI에게 그 저장소를 읽혀서 내 것에 맞게 가져와요.</p></div>
+<div><p class="k">프롬프트</p><p class="t">읽혀서 가져오기</p><p class="d">"[저장소 주소]를 읽고 메뉴 카드 화면이 어떻게 만들어졌는지 설명해 줘. 내 것에 맞게 가져와 줘."</p></div>
+</div>
+<div class="foot"><p class="note">같은 조가 같은 주제를 만들어요. 옆 사장님이 먼저 만든 화면을 가져오면 30분이 줄어요. 그래서 개인 저장소를 공개로 두는 거예요.</p></div>"""))
+d3.append(S("light", """<p class="eyebrow">제출 전</p><h2>다섯 개만 <mark>확인</mark></h2>
 <table class="table"><colgroup><col style="width:8%"><col style="width:46%"><col style="width:46%"></colgroup>
 <tr><th>#</th><th>확인</th><th>방법</th></tr>
-<tr class="hi"><td>1</td><td>Vercel 주소가 열리나</td><td>내 폰 + 옆 사람 폰</td></tr>
-<tr><td>2</td><td>만든 폴더가 내 폴더 v1/프로젝트 안에 있나</td><td>GitHub 웹에서 내 폴더 → v1 → 프로젝트</td></tr>
-<tr><td>3</td><td>.env · 키 · node_modules가 안 올라갔나</td><td>프로젝트 폴더 파일 목록에 없음</td></tr>
-<tr class="hi"><td>4</td><td>제출서(주소) + 결과물/첫화면.png + push</td><td>GitHub 웹에서 보이면 끝</td></tr>
+<tr class="hi"><td>1</td><td>개인 저장소가 Public인가</td><td>저장소 이름 옆 Public</td></tr>
+<tr><td>2</td><td>개인 저장소에 .env · 키가 없나</td><td>파일 목록에 없음</td></tr>
+<tr class="hi"><td>3</td><td>Vercel 주소가 열리나</td><td>내 폰 + 옆 사람 폰</td></tr>
+<tr><td>4</td><td>제출서에 두 링크 + 결과물/첫화면.png</td><td>공동 저장소 내 폴더 v1/</td></tr>
+<tr class="hi"><td>5</td><td>공동 저장소에 push 했나</td><td>GitHub 웹에서 제출서 보이면 끝</td></tr>
 </table>
-<div class="foot"><p class="note">Vercel 주소는 AI에게 "이 프로젝트를 Vercel에 배포해 줘, npx vercel로" 한마디. 로그인만 사장님이. 고치면 "다시 배포해 줘".</p></div>"""))
-d3.append(S("light", """<p class="eyebrow">완성 후 · 10/17 이후</p><h2>다 만들면 <mark>개인 저장소</mark>로 가져가요</h2>
-<div class="steps">
-<div><p class="k">0</p><p class="t">복사해서 옮기기</p><p class="d">내 폴더 v2/프로젝트을 새 폴더로 복사. 공동 저장소 쪽은 기록으로 남겨요.</p></div>
-<div><p class="k">1</p><p class="t">내 GitHub 저장소</p><p class="d">복사본을 내 계정에 Public으로. 캠프 끝나도 내 것.</p></div>
-<div><p class="k">2</p><p class="t">Supabase</p><p class="d">저장이 필요한 앱만. 열쇠는 환경변수에.</p></div>
-<div class="hi"><p class="k">3</p><p class="t">GitHub ↔ Vercel 연결</p><p class="d">이제 push만 하면 자동으로 새 버전. 주소는 그대로.</p></div>
-</div>
-<div class="foot"><p class="note">왜 나중에? 만드는 동안은 한곳에서 서로 힌트를 얻는 게 더 중요해서요. 순서는 03 폴더 문서에 다 있어요.</p></div>"""))
-d3.append(S("cover", """<p class="eyebrow">미니 해커톤</p><h1>각자 <span class="y">v1</span> 만들기</h1><p class="by">내 폴더 v1/프로젝트 안에 · git init 없이 · 30분마다 push · 되면 Vercel 주소<br><span style="font-size:28px">v1이 끝나면 오늘 v2까지 해도 돼요 · 막히면 오류 메시지 그대로 AI에게</span></p>"""))
+<div class="foot"><p class="note">제출서 맨 아래에 이 다섯 칸이 있어요. 공동 저장소 폴더를 열고 AI에게 "제출서 채우고 다섯 개 확인하고 v1 제출로 커밋·push해 줘".</p></div>"""))
+d3.append(S("cover", """<p class="eyebrow">미니 해커톤</p><h1>각자 <span class="y">v1</span> 만들기</h1><p class="by">별도 폴더에서 · 외부 연결 없이 · 가짜 데이터로<br><span style="font-size:28px">되면 개인 저장소 → Vercel → 제출서 · 막히면 오류 메시지 그대로 AI에게</span></p>"""))
 
 DECKS = [
  ("01_GitHub_왜쓰고_어떻게쓰나", "GitHub, 왜 쓰고 어떻게 쓰나 — 실전 캠프 Day 2", d1),
  ("02_실습제출과_v1v2", "제출은 어디에 무엇을 — 실전 캠프 Day 2", d2),
- ("03_v1만들기_내폴더에_같이", "v1 만들기, 내 폴더에 같이 — 실전 캠프 Day 2", d3),
+ ("03_v1만들기_개인저장소와_Vercel", "v1 만들기, 개인 저장소와 Vercel — 실전 캠프 Day 2", d3),
 ]
 os.makedirs(OUT, exist_ok=True)
 for fn, title, slides in DECKS:
