@@ -17,7 +17,7 @@ Vercel에 올릴 때는 이 폴더를 그대로 올리면 됩니다. 빌드 설�
 ├── css/style.css       디자인
 ├── js/app.js           화면 그리기·이동
 ├── js/filter.js        조건 판정 (화면과 분리된 순수 함수)
-└── data/               ★ 사장님이 채우는 곳
+└── content/             ★ 사장님이 채우는 곳
     ├── menus.js          메뉴
     ├── recommendations.js 사장님 추천·나라별 추천
     ├── store.js          주문 순서·주소·영업시간

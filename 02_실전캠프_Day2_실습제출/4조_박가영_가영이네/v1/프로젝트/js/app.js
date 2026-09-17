@@ -42,7 +42,7 @@ function esc(s) {
 // ── 데이터 읽기
 function loadData() {
   const d = window.GAYOUNGENE_DATA;
-  if (!d || !d.menus || !d.recommendations || !d.store || !d.ui) throw new Error("data/*.js 파일이 빠졌거나 문법 오류가 있어요");
+  if (!d || !d.menus || !d.recommendations || !d.store || !d.ui) throw new Error("content/*.js 파일이 빠졌거나 문법 오류가 있어요");
   return { menus: d.menus.menus, categories: d.menus.categories, ingredientKeys: d.menus.ingredientKeys, recs: d.recommendations.recommendations, store: d.store, ui: d.ui };
 }
 
@@ -304,7 +304,7 @@ function renderVisit() {
   try {
     DATA = loadData();
   } catch (e) {
-    main.innerHTML = `<div class="empty"><p>데이터 파일을 읽지 못했어요. data 폴더의 .js 파일을 확인해 주세요.</p><p class="small">${esc(e.message)}</p></div>`;
+    main.innerHTML = `<div class="empty"><p>데이터 파일을 읽지 못했어요. content 폴더의 .js 파일을 확인해 주세요.</p><p class="small">${esc(e.message)}</p></div>`;
     return;
   }
   setupLang();
