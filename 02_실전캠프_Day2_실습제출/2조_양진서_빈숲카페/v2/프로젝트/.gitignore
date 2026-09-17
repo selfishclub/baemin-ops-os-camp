@@ -43,3 +43,7 @@ next-env.d.ts
 
 # 예시 파일은 올린다 (값이 비어 있음)
 !.env.local.example
+
+# 빌드·타입검사 임시 파일
+/.vite/
+tsconfig.tsbuildinfo
