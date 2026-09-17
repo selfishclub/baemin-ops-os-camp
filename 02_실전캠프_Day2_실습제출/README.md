@@ -5,7 +5,7 @@
 12명이 만든 것을 한눈에. **써 보려면 Vercel 주소**로 들어가고, **어떻게 만들었는지 힌트**를 얻으려면 폴더를 엽니다.
 
 <!-- GALLERY:START -->
-| 조 | 가게 · 이름 | v1 (9/17) | v2 (10/2 1차 · 10/17 최종) |
+| 조 | 가게 · 이름 | v1 (9/17) | v2 (10/2 1차 · 10/14 최종 발표) |
 |---|---|---|---|
 | 1조 | **마선생얼큰국밥**<br>유승균<br>[내 폴더](1%EC%A1%B0_%EC%9C%A0%EC%8A%B9%EA%B7%A0_%EB%A7%88%EC%84%A0%EC%83%9D%EC%96%BC%ED%81%B0%EA%B5%AD%EB%B0%A5) | <a href="1%EC%A1%B0_%EC%9C%A0%EC%8A%B9%EA%B7%A0_%EB%A7%88%EC%84%A0%EC%83%9D%EC%96%BC%ED%81%B0%EA%B5%AD%EB%B0%A5/v1/%EA%B2%B0%EA%B3%BC%EB%AC%BC/%EC%B2%AB%ED%99%94%EB%A9%B4.png"><img src="1%EC%A1%B0_%EC%9C%A0%EC%8A%B9%EA%B7%A0_%EB%A7%88%EC%84%A0%EC%83%9D%EC%96%BC%ED%81%B0%EA%B5%AD%EB%B0%A5/v1/%EA%B2%B0%EA%B3%BC%EB%AC%BC/%EC%B2%AB%ED%99%94%EB%A9%B4.png" width="180"></a><br>**리뷰 콘텐츠 스튜디오**<br>배민·쿠팡이츠·네이버 리뷰를 모아 맛·양·포장·배달·불만 등으로 자동 분류해 한눈에 보고, 리뷰 하나로 인스타 캐러셀·릴스 대본·새소식 문구를 AI가 만들어 주는 웹앱<br>**[열어 보기 ↗](https://review-content-studio.vercel.app/)** · [만든 폴더(힌트)](1%EC%A1%B0_%EC%9C%A0%EC%8A%B9%EA%B7%A0_%EB%A7%88%EC%84%A0%EC%83%9D%EC%96%BC%ED%81%B0%EA%B5%AD%EB%B0%A5/v1/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8) · [PRD](1%EC%A1%B0_%EC%9C%A0%EC%8A%B9%EA%B7%A0_%EB%A7%88%EC%84%A0%EC%83%9D%EC%96%BC%ED%81%B0%EA%B5%AD%EB%B0%A5/v1/PRD.md) · [제출서](1%EC%A1%B0_%EC%9C%A0%EC%8A%B9%EA%B7%A0_%EB%A7%88%EC%84%A0%EC%83%9D%EC%96%BC%ED%81%B0%EA%B5%AD%EB%B0%A5/v1/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) | [PRD](1%EC%A1%B0_%EC%9C%A0%EC%8A%B9%EA%B7%A0_%EB%A7%88%EC%84%A0%EC%83%9D%EC%96%BC%ED%81%B0%EA%B5%AD%EB%B0%A5/v2/PRD.md) · [제출서](1%EC%A1%B0_%EC%9C%A0%EC%8A%B9%EA%B7%A0_%EB%A7%88%EC%84%A0%EC%83%9D%EC%96%BC%ED%81%B0%EA%B5%AD%EB%B0%A5/v2/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) |
 | 1조 | **부찌대학**<br>이범례<br>[내 폴더](1%EC%A1%B0_%EC%9D%B4%EB%B2%94%EB%A1%80_%EB%B6%80%EC%B0%8C%EB%8C%80%ED%95%99) | <a href="1%EC%A1%B0_%EC%9D%B4%EB%B2%94%EB%A1%80_%EB%B6%80%EC%B0%8C%EB%8C%80%ED%95%99/v1/%EA%B2%B0%EA%B3%BC%EB%AC%BC/%EC%B2%AB%ED%99%94%EB%A9%B4.png"><img src="1%EC%A1%B0_%EC%9D%B4%EB%B2%94%EB%A1%80_%EB%B6%80%EC%B0%8C%EB%8C%80%ED%95%99/v1/%EA%B2%B0%EA%B3%BC%EB%AC%BC/%EC%B2%AB%ED%99%94%EB%A9%B4.png" width="180"></a><br>**근무·급여 원터치**<br>매장 마감 때 예정과 다른 출퇴근만 넣으면, 주휴수당까지 계산된 직원별·사업장(홀/배달)별 세전 급여가 한 화면에 나오는 도구. 계산은 도구가, 확인과 확정은 사장님이.<br>**[열어 보기 ↗](https://payroll-onetouch.vercel.app (홀 매장 `/hall` · 배달 매장 `/delivery` · 정산 `/`))** · [만든 폴더(힌트)](1%EC%A1%B0_%EC%9D%B4%EB%B2%94%EB%A1%80_%EB%B6%80%EC%B0%8C%EB%8C%80%ED%95%99/v1/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8) · [PRD](1%EC%A1%B0_%EC%9D%B4%EB%B2%94%EB%A1%80_%EB%B6%80%EC%B0%8C%EB%8C%80%ED%95%99/v1/PRD.md) · [제출서](1%EC%A1%B0_%EC%9D%B4%EB%B2%94%EB%A1%80_%EB%B6%80%EC%B0%8C%EB%8C%80%ED%95%99/v1/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) | [PRD](1%EC%A1%B0_%EC%9D%B4%EB%B2%94%EB%A1%80_%EB%B6%80%EC%B0%8C%EB%8C%80%ED%95%99/v2/PRD.md) · [제출서](1%EC%A1%B0_%EC%9D%B4%EB%B2%94%EB%A1%80_%EB%B6%80%EC%B0%8C%EB%8C%80%ED%95%99/v2/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) |
@@ -17,7 +17,7 @@
 | 3조 | **바삭마차**<br>이승신<br>[내 폴더](3%EC%A1%B0_%EC%9D%B4%EC%8A%B9%EC%8B%A0_%EB%B0%94%EC%82%AD%EB%A7%88%EC%B0%A8) | [PRD](3%EC%A1%B0_%EC%9D%B4%EC%8A%B9%EC%8B%A0_%EB%B0%94%EC%82%AD%EB%A7%88%EC%B0%A8/v1/PRD.md) · [제출서](3%EC%A1%B0_%EC%9D%B4%EC%8A%B9%EC%8B%A0_%EB%B0%94%EC%82%AD%EB%A7%88%EC%B0%A8/v1/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) | [PRD](3%EC%A1%B0_%EC%9D%B4%EC%8A%B9%EC%8B%A0_%EB%B0%94%EC%82%AD%EB%A7%88%EC%B0%A8/v2/PRD.md) · [제출서](3%EC%A1%B0_%EC%9D%B4%EC%8A%B9%EC%8B%A0_%EB%B0%94%EC%82%AD%EB%A7%88%EC%B0%A8/v2/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) |
 | 4조 | **카페스이**<br>손민지<br>[내 폴더](4%EC%A1%B0_%EC%86%90%EB%AF%BC%EC%A7%80_%EC%B9%B4%ED%8E%98%EC%8A%A4%EC%9D%B4) | <a href="4%EC%A1%B0_%EC%86%90%EB%AF%BC%EC%A7%80_%EC%B9%B4%ED%8E%98%EC%8A%A4%EC%9D%B4/v1/%EA%B2%B0%EA%B3%BC%EB%AC%BC/%EC%B2%AB%ED%99%94%EB%A9%B4.png"><img src="4%EC%A1%B0_%EC%86%90%EB%AF%BC%EC%A7%80_%EC%B9%B4%ED%8E%98%EC%8A%A4%EC%9D%B4/v1/%EA%B2%B0%EA%B3%BC%EB%AC%BC/%EC%B2%AB%ED%99%94%EB%A9%B4.png" width="180"></a><br>**브랜드에서 오픈까지**<br>카페를 준비하는 사람이 **브랜드를 정하는 3일(DAY 1·2·3)부터 실제 오픈까지**를 한 화면에서 챙기는 도구. 오른쪽 DAY 탭에 답을 적고, 왼쪽 창업 준비 체크리스트에서 남은 일과 들 돈을 봅니다<br>[만든 폴더(힌트)](4%EC%A1%B0_%EC%86%90%EB%AF%BC%EC%A7%80_%EC%B9%B4%ED%8E%98%EC%8A%A4%EC%9D%B4/v1/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8) · [PRD](4%EC%A1%B0_%EC%86%90%EB%AF%BC%EC%A7%80_%EC%B9%B4%ED%8E%98%EC%8A%A4%EC%9D%B4/v1/PRD.md) · [제출서](4%EC%A1%B0_%EC%86%90%EB%AF%BC%EC%A7%80_%EC%B9%B4%ED%8E%98%EC%8A%A4%EC%9D%B4/v1/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) | [PRD](4%EC%A1%B0_%EC%86%90%EB%AF%BC%EC%A7%80_%EC%B9%B4%ED%8E%98%EC%8A%A4%EC%9D%B4/v2/PRD.md) · [제출서](4%EC%A1%B0_%EC%86%90%EB%AF%BC%EC%A7%80_%EC%B9%B4%ED%8E%98%EC%8A%A4%EC%9D%B4/v2/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) |
 | 4조 | **김씨육면**<br>오지영<br>[내 폴더](4%EC%A1%B0_%EC%98%A4%EC%A7%80%EC%98%81_%EA%B9%80%EC%94%A8%EC%9C%A1%EB%A9%B4) | <a href="4%EC%A1%B0_%EC%98%A4%EC%A7%80%EC%98%81_%EA%B9%80%EC%94%A8%EC%9C%A1%EB%A9%B4/v1/%EA%B2%B0%EA%B3%BC%EB%AC%BC/%EC%B2%AB%ED%99%94%EB%A9%B4.png"><img src="4%EC%A1%B0_%EC%98%A4%EC%A7%80%EC%98%81_%EA%B9%80%EC%94%A8%EC%9C%A1%EB%A9%B4/v1/%EA%B2%B0%EA%B3%BC%EB%AC%BC/%EC%B2%AB%ED%99%94%EB%A9%B4.png" width="180"></a><br>**김씨육면 손익관리**<br>카드 내역서를 올리면 계정과목별로 분류해 그 달 손익이 바로 보이는 도구<br>**[열어 보기 ↗](https://kimssi-profit.vercel.app)** · [만든 폴더(힌트)](4%EC%A1%B0_%EC%98%A4%EC%A7%80%EC%98%81_%EA%B9%80%EC%94%A8%EC%9C%A1%EB%A9%B4/v1/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8) · [PRD](4%EC%A1%B0_%EC%98%A4%EC%A7%80%EC%98%81_%EA%B9%80%EC%94%A8%EC%9C%A1%EB%A9%B4/v1/PRD.md) · [제출서](4%EC%A1%B0_%EC%98%A4%EC%A7%80%EC%98%81_%EA%B9%80%EC%94%A8%EC%9C%A1%EB%A9%B4/v1/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) | [PRD](4%EC%A1%B0_%EC%98%A4%EC%A7%80%EC%98%81_%EA%B9%80%EC%94%A8%EC%9C%A1%EB%A9%B4/v2/PRD.md) · [제출서](4%EC%A1%B0_%EC%98%A4%EC%A7%80%EC%98%81_%EA%B9%80%EC%94%A8%EC%9C%A1%EB%A9%B4/v2/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) |
-| 4조 | **가영이네**<br>박가영<br>[내 폴더](4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4) | <a href="4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v1/%EA%B2%B0%EA%B3%BC%EB%AC%BC/%EC%B2%AB%ED%99%94%EB%A9%B4.png"><img src="4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v1/%EA%B2%B0%EA%B3%BC%EB%AC%BC/%EC%B2%AB%ED%99%94%EB%A9%B4.png" width="180"></a><br>**Gayoungene Menu Finder**<br>외국인 손님이 피하는 재료·맵기·음식 종류를 고르면 맞는 메뉴만 보여 주고, 메뉴 번호·한국어 이름으로 키오스크·테이블오더에서 찾게 돕는 사이트<br>[만든 폴더(힌트)](4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v1/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8) · [PRD](4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v1/PRD.md) · [제출서](4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v1/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) | [PRD](4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v2/PRD.md) · [제출서](4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v2/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) |
+| 4조 | **가영이네**<br>박가영<br>[내 폴더](4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4) | <a href="4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v1/%EA%B2%B0%EA%B3%BC%EB%AC%BC/%EC%B2%AB%ED%99%94%EB%A9%B4.png"><img src="4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v1/%EA%B2%B0%EA%B3%BC%EB%AC%BC/%EC%B2%AB%ED%99%94%EB%A9%B4.png" width="180"></a><br>**Gayoungene Menu Finder**<br>외국인 손님이 피하는 재료·맵기·음식 종류를 고르면 맞는 메뉴만 보여 주고, 메뉴 번호·한국어 이름으로 키오스크·테이블오더에서 찾게 돕는 사이트<br>**[열어 보기 ↗](https://gayoungene-menu-finder.vercel.app)** · [만든 폴더(힌트)](4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v1/%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8) · [PRD](4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v1/PRD.md) · [제출서](4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v1/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) | [PRD](4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v2/PRD.md) · [제출서](4%EC%A1%B0_%EB%B0%95%EA%B0%80%EC%98%81_%EA%B0%80%EC%98%81%EC%9D%B4%EB%84%A4/v2/%EC%A0%9C%EC%B6%9C%EC%84%9C.md) |
 <!-- GALLERY:END -->
 
 (제출서와 결과물 폴더에서 자동으로 만듭니다. 운영진: `python3 _운영자용/도구/build_gallery.py`)
@@ -37,7 +37,7 @@
                                                                             ▼
                                                    10/2 점검 시간: 개인 저장소로 흩어지기 → 서로 써 보고 피드백(Issue)
                                                                             │
-                                     10/17 최종 제출 ◀── 10/2~10/17 개인 저장소에서 피드백 반영 · 더 써 보기 · 디자인
+                                     10/14 최종 발표·제출 ◀── 10/2~10/14 개인 저장소에서 피드백 반영 · 더 써 보기 · 디자인
 ```
 
 ## 무엇을 제출하나 — 다섯 가지
@@ -76,7 +76,7 @@
 
 | | v1 | v2 |
 |---|---|---|
-| 언제 | **9/17 오늘** 안 | **10/2(금) 1차 마감** → 온라인 중간 점검 → 피드백 반영해 **10/17(금) 최종** |
+| 언제 | **9/17 오늘** 안 | **10/2(금) 1차 마감** → 온라인 중간 점검 → 피드백 반영해 **10/14 (수) 최종** |
 | 범위 | 오늘 안에 되는 것만. 외부 연결 없이 (데이터 저장용 Supabase는 가능) | API 연동, 배민 데이터, 날씨 등 외부 데이터·고도화 |
 | 어디 | `내폴더/v1/` (코드는 `v1/프로젝트/`) | 10/2까지 `내폴더/v2/` (코드는 `v2/프로젝트/`, v1/프로젝트를 복사해 이어 만듦) · **10/2부터 내 개인 저장소** |
 
@@ -91,7 +91,7 @@
 | v2 상태·막힌 것·피드백 받고 싶은 점 정리 | `내폴더/중간점검_1002.md` | 10/2 점검 전날까지 |
 | **개인 저장소로 흩어지기** — 내 폴더 앱을 옮겨 개인 저장소(Public) + Vercel 연결 → 제출서에 두 링크 | [03 폴더](../03_인터넷에서_접근가능하게_만들기/README.md) | **10/2 점검 시간** |
 | 서로 Vercel 주소로 써 보고 피드백 남기기 | GitHub **Issues** (같은 조 2개 이상) | **10/2 당일** |
-| 피드백 반영 · 내 가게에서 더 써 보기 · 디자인 다듬기 → 최종본 | 개인 저장소 push + `피드백_반영_1017.md` | 10/2 ~ **10/17** |
+| 피드백 반영 · 내 가게에서 더 써 보기 · 디자인 다듬기 → 최종본 | 개인 저장소 push + `피드백_반영_1014.md` | 10/2 ~ **10/14** |
 
 ## 실습 ② — AI에게 시켜서 올리기
 
@@ -122,12 +122,12 @@ Claude에게 순서대로 말합니다. `[ ]` 부분만 바꿉니다.
 - 같은 조 사장님 것 **2개 이상**, 시간이 남으면 다른 조도
 - 방법은 [피드백 주고받기](../04_실전캠프_Day2_수업자료/피드백_주고받기.md) — 웹에서 3분
 
-## 최종본 만들기 — 10/2 ~ 10/17
+## 최종본 만들기 — 10/2 ~ 10/14
 
-- 받은 Issue를 `내폴더/피드백_반영_1017.md`에 정리하고 반영합니다.
+- 받은 Issue를 `내폴더/피드백_반영_1014.md`에 정리하고 반영합니다.
 - 내 가게에서 더 써 봅니다. 직원·가족에게도 써 보게 하고 반응을 `사용메모.md`에 적습니다.
 - 디자인을 원하는 방향으로 다듬습니다.
-- 10/17까지 개인 저장소에 push하고(Vercel 자동 반영), 공동 저장소 `v2/제출서.md`를 갱신합니다.
+- 10/14까지 개인 저장소에 push하고(Vercel 자동 반영), 공동 저장소 `v2/제출서.md`를 갱신합니다.
 
 ## 처음부터 만들지 않아도 됩니다
 

@@ -133,7 +133,7 @@ d1.append(S("light", """<p class="eyebrow">그림 한 장</p><h2>10/2까지는 <
 <div class="flowbox" style="margin-top:34px"><div class="a">↓ 10/2 중간 점검 때 흩어지기</div></div>
 <div class="flowbox" style="margin-top:10px">
 <div class="n"><b>내 개인 저장소</b><span>복사해서 옮김 · 공개</span></div><div class="a">GitHub 연결<br>push하면 자동 →</div>
-<div class="n"><b>Vercel 주소</b><span>서로 써 보고 피드백<br>10/17 최종까지 같은 주소</span></div>
+<div class="n"><b>Vercel 주소</b><span>서로 써 보고 피드백<br>10/14 최종까지 같은 주소</span></div>
 </div>
 <div class="foot"><p class="note">오늘 할 건 위 줄. 아래 줄은 10/2 중간 점검 때 다 같이 03 폴더 문서 보고 합니다.</p></div>"""))
 d1.append(S("light", """<p class="eyebrow">기억할 말 네 개</p><h2>금고 비유로 <mark>네 단어</mark>만</h2>
@@ -187,12 +187,12 @@ d1.append(S("light", """<p class="eyebrow">사례 · 이범례 사장님 (부찌
 d1.append(S("light", """<p class="eyebrow">제출 구조</p><h2>내 폴더 안에 <mark>v1 / v2</mark></h2>
 <table class="table"><colgroup><col style="width:18%"><col style="width:41%"><col style="width:41%"></colgroup>
 <tr><th></th><th>v1</th><th>v2</th></tr>
-<tr><td>언제</td><td><b>오늘 9/17</b> 안</td><td><b>10/2(금) 1차 마감</b> + 중간 점검 → 서로 피드백 → <b>10/17 최종</b></td></tr>
+<tr><td>언제</td><td><b>오늘 9/17</b> 안</td><td><b>10/2(금) 1차 마감</b> + 중간 점검 → 서로 피드백 → <b>10/14 최종 발표</b></td></tr>
 <tr><td>범위</td><td>오늘 안에 되는 것만. 외부 연결 없이</td><td>API · 배민 데이터 · 날씨 등 외부 데이터, 고도화</td></tr>
 <tr class="hi"><td>제출물</td><td>PRD_전체 + v1 PRD + v2 PRD 초안 + <b>v1/프로젝트</b> + <b>Vercel 주소</b> + 제출서 + 스크린샷</td><td>v2 PRD + <b>v2/프로젝트</b> + Vercel 주소 갱신 + 제출서 + 스크린샷</td></tr>
 <tr><td>코드는</td><td>공동 저장소 내 폴더 <b>v1/프로젝트/</b></td><td>10/2까지 내 폴더 v2/프로젝트/ · 10/2부터 내 개인 저장소</td></tr>
 </table>
-<div class="foot"><p class="note">전체 PRD에서 [v2]를 붙인 게 v2의 시작점이에요. 10/2에 v2를 올리고 그날 점검 시간에 서로 써 보고 Issue로 피드백해요. 10/17까지 반영하고 다듬어 최종본을 내요.</p></div>"""))
+<div class="foot"><p class="note">전체 PRD에서 [v2]를 붙인 게 v2의 시작점이에요. 10/2에 v2를 올리고 그날 점검 시간에 서로 써 보고 Issue로 피드백해요. 10/14까지 반영하고 다듬어 최종본을 내요.</p></div>"""))
 d1.append(S("sec", """<p class="eyebrow">정리하면</p>
 <h2>사장님이 바뀌는 건 딱 하나,<br><span class="y">"끝낼 때 push"</span></h2>
 <p class="lead">안 잃어버리고, 집에서 이어 만들고, 되돌릴 수 있고, 서로 봐요.<br>명령어는 AI가 치고, 사장님은 <b>말로 시키고 GitHub에서 확인</b>만 하면 됩니다.</p>"""))
@@ -201,7 +201,7 @@ d1.append(S("cover", """<p class="eyebrow">지금 바로</p><h1>실습 ①<br><s
 
 # ---------------- 발표 02 ----------------
 d2 = []
-d2.append(S("cover", """<p class="eyebrow">실전 캠프 Day 2 · 실습 ②</p><h1>제출은 <span class="y">어디에, 무엇을</span></h1><p class="by">v1은 오늘 · v2는 10월 2일 · 피드백 반영한 최종은 10월 17일</p>""", on=True))
+d2.append(S("cover", """<p class="eyebrow">실전 캠프 Day 2 · 실습 ②</p><h1>제출은 <span class="y">어디에, 무엇을</span></h1><p class="by">v1은 오늘 · v2는 10월 2일 · 피드백 반영한 최종은 10월 14일</p>""", on=True))
 d2.append(S("light", """<p class="eyebrow">제출하는 곳</p><h2>02 폴더 안에 <mark>내 이름 폴더</mark>가 있어요</h2>
 <div class="prompt" style="font-family:var(--mono);font-size:28px;line-height:1.7">02_실전캠프_Day2_실습제출/<br>├── 1조_유승균_마선생얼큰국밥/<br>├── 1조_이범례_부찌대학/<br>│&nbsp;&nbsp;&nbsp;├── README.md&nbsp;&nbsp;&nbsp;← 내 체크리스트<br>│&nbsp;&nbsp;&nbsp;├── PRD_전체.md&nbsp;← 전체 기획안 (먼저)<br>│&nbsp;&nbsp;&nbsp;├── 중간점검_1002.md<br>│&nbsp;&nbsp;&nbsp;├── v1/&nbsp;&nbsp;PRD.md · 제출서.md · 사용메모.md · 결과물/ · <b>프로젝트/</b> ← 만든 것 전부<br>│&nbsp;&nbsp;&nbsp;└── v2/&nbsp;&nbsp;PRD.md · 제출서.md · 결과물/ · <b>프로젝트/</b><br>├── 2조_양진서_빈숲카페/<br>└── … 12명</div>
 <div class="foot"><p class="note">폴더와 빈 양식은 운영진이 미리 만들어 뒀어요. 사장님은 채우기만 하면 됩니다. 내 폴더만 고쳐요.</p></div>"""))
@@ -217,7 +217,7 @@ d2.append(S("", """<p class="eyebrow">무엇을 제출하나</p><h2>다섯 가�
 d2.append(S("light", """<p class="eyebrow">v1과 v2</p><h2>오늘은 <mark>v1</mark>, 한 달 뒤 <mark>v2</mark></h2>
 <table class="table"><colgroup><col style="width:18%"><col style="width:41%"><col style="width:41%"></colgroup>
 <tr><th></th><th>v1</th><th>v2</th></tr>
-<tr><td>언제</td><td><b>오늘</b> 안</td><td><b>10/2 1차 마감</b> + 온라인 점검 → 서로 피드백 → <b>10/17 최종</b></td></tr>
+<tr><td>언제</td><td><b>오늘</b> 안</td><td><b>10/2 1차 마감</b> + 온라인 점검 → 서로 피드백 → <b>10/14 최종 발표</b></td></tr>
 <tr class="hi"><td>범위</td><td>오늘 안에 되는 것만. 외부 연결 없이. 화면 + 저장까지</td><td>API, 배민 데이터, 날씨, 카톡 알림 같은 외부 데이터·고도화</td></tr>
 <tr><td>예</td><td>근무표 입력 → 주급 계산 → 저장</td><td>배민 매출 자동 불러오기, 날씨 API로 준비량 추천</td></tr>
 <tr><td>어디</td><td>내폴더/v1/ · 코드는 v1/프로젝트/</td><td>내폴더/v2/ · 코드는 v2/프로젝트/ (v1/프로젝트 복사해 이어 만듦)</td></tr>
