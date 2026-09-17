@@ -1000,3 +1000,20 @@ table.tkLog tr.sum td{font-weight:700;border-top:2px solid var(--rule);backgroun
 .pvendor{min-width:110px;font-size:13.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pqty .dim,.pvendor .dim{font-weight:400;color:var(--muted)}
 @media (max-width:760px){.prow{flex-wrap:wrap;row-gap:4px}.pvendor{min-width:0;flex:1 1 100%;order:9;padding-left:2px}}
+
+/* 할 일 — 진행률 정리 (전체 카드 + 시간대 탭 막대) */
+.progCard.dayTotal .pcSub{font-size:14px;color:var(--ink-2);margin-top:4px}
+.progCard.dayTotal .pcSub b{color:var(--ink)}
+.progCard.dayTotal .pcSub b.left{color:var(--crit)}
+.progCard.dayTotal.done .pcSub b.left{color:var(--ok)}
+.slotTab .stRow{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.slotTab .stCnt{margin-top:0}
+.slotTab .stBar{display:block;height:5px;margin-top:9px;background:var(--rule);border-radius:3px;overflow:hidden}
+.slotTab .stBar i{display:block;height:100%;background:var(--accent)}
+.slotTab.on .stBar{background:rgba(255,255,255,.35)}
+.slotTab.on .stBar i{background:#fff}
+.slotTab.full:not(.on){border-color:var(--ok)}
+/* 근로계약서 — 빠진 칸 표시 */
+.edField.miss input,.edField.miss textarea,.edField.miss select,.edField.miss .rrn input{border-color:var(--crit)!important;box-shadow:0 0 0 2px var(--crit-soft)}
+.edField.miss>label{color:var(--crit)}
+.edCard.miss{outline:2px solid var(--crit);outline-offset:2px}

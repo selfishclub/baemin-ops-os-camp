@@ -788,27 +788,14 @@ const App = (() => {
       h += `<button class="notice pin" data-act="view" data-v="tanks">🐟 <b>수조 ${ta.length}건 오늘 처리</b> — ${ta.map(esc).join(' · ')}</button>`;
     }
 
-    const lb = S.settings.lastBackup;
-    if (isToday && (!lb || diffDays(lb, key) >= 7)) {
-      h += `<div class="notice warn"><b>백업한 지 ${lb ? diffDays(lb, key) + '일 지났습니다' : '한 번도 안 했습니다'}.</b>
-        브라우저 데이터를 지우면 기록이 전부 사라집니다.
-        <button class="btn sm" data-act="export">지금 백업</button></div>`;
-    }
+    /* 백업 안내 배너는 서버(v2) 단계 전까지 두지 않는다 — 설정 › 백업에서 여전히 내보낼 수 있다 */
 
     const pins = (S.notices || []).filter((n) => n.month === key.slice(0, 7) && n.pin);
     if (pins.length && isToday) {
       h += pins.slice(0, 2).map((n) => `<button class="notice pin" data-act="view" data-v="notices">📌 <b>${esc(n.title)}</b>${n.body ? ` — ${esc(n.body.split('\n')[0].slice(0, 40))}` : ''}</button>`).join('');
     }
 
-    const un = unassignedRoles(key);
-    if (!isToday) { /* 지난 날짜에는 편성 안내를 띄우지 않는다 */ }
-    else if (!rosterOf(key)) {
-      h += `<div class="notice warn"><b>오늘 근무 편성이 안 됐습니다.</b> 누가 어떤 역할을 맡는지 정해야 담당 없는 업무가 생기지 않습니다.
-        <button class="btn sm" data-act="view" data-v="month">편성하기</button></div>`;
-    } else if (un.length) {
-      h += `<div class="notice warn"><b>담당자가 없는 역할: ${un.join(' · ')}</b> 이 역할의 업무는 오늘 통째로 빠질 수 있습니다.
-        <button class="btn sm" data-act="view" data-v="month">편성 수정</button></div>`;
-    }
+    /* 근무 편성 안내 배너도 두지 않는다 — 근무표 화면에서 부족 인원을 직접 본다 */
 
     /* 날짜 이동 */
     h += `<div class="datebar">
@@ -826,27 +813,18 @@ const App = (() => {
     const allReal = real(ids), allDone = doneN(ids), allLeft = allReal.length - allDone;
     const allPct = allReal.length ? Math.round(allDone / allReal.length * 100) : 0;
     h += `<div class="progCard dayTotal${allLeft === 0 && allReal.length ? ' done' : ''}">
-      <div class="pcTop"><div><b>오늘 전체 진행률</b><div class="hint">오픈 · 미들 · 마감 ${allReal.length}건 기준 · 완료 ${allDone}건</div></div>
+      <div class="pcTop"><div><b>오늘 진행률</b><div class="pcSub">완료 <b>${allDone}</b> / ${allReal.length}건 · 남은 업무 <b class="left">${allLeft}건</b>${allLeft === 0 && allReal.length ? ' — 전부 마쳤습니다 🎉' : ''}</div></div>
         <div class="pcNum">${allPct}<small>%</small></div></div>
-      <div class="bar"><i style="width:${allPct}%"></i></div>
-      <div class="pcFoot">${allLeft === 0 && allReal.length ? '오늘 업무를 전부 마쳤습니다 🎉' : `남은 업무 <b>${allLeft}건</b>`}${SLOTS.map((sl) => { const l = inSlot(sl.key); const left = real(l).length - doneN(l); return left ? ` · ${sl.name} ${left}` : ''; }).join('')}</div></div>`;
+      <div class="bar"><i style="width:${allPct}%"></i></div></div>`;
 
-    /* 오픈 / 미들 / 마감 — 시간대 세그먼트 */
+    /* 오픈 / 미들 / 마감 — 시간대 탭. 탭 안에 그 시간대의 완료 수와 막대가 있어 따로 진행률 카드를 두지 않는다 */
     h += `<div class="slotTabs">${SLOTS.map((sl) => {
-      const list = inSlot(sl.key);
-      return `<button class="slotTab${sl.key === slot.key ? ' on' : ''}" data-act="slotPick" data-s="${sl.key}">
-        <span class="stName">${sl.name}</span>
-        <span class="stCnt">${doneN(list)}/${real(list).length} 완료</span></button>`;
+      const list = inSlot(sl.key), dn = doneN(list), rn = real(list).length, pc = rn ? Math.round(dn / rn * 100) : 0;
+      return `<button class="slotTab${sl.key === slot.key ? ' on' : ''}${rn && dn === rn ? ' full' : ''}" data-act="slotPick" data-s="${sl.key}">
+        <span class="stRow"><span class="stName">${sl.name}</span><span class="stCnt">${dn}/${rn}${rn && dn === rn ? ' ✓' : ''}</span></span>
+        <span class="stBar"><i style="width:${pc}%"></i></span></button>`;
     }).join('')}</div>`;
-
-    /* 선택한 시간대 진행률 */
     const list0 = inSlot(slot.key);
-    const dn0 = doneN(list0), rn0 = real(list0).length;
-    const pct0 = rn0 ? Math.round((dn0 / rn0) * 100) : 0;
-    h += `<div class="progCard">
-      <div class="pcTop"><div><b>${slot.name} 진행률</b><div class="hint">각 항목 아래에 메모와 담당이 바로 보입니다.</div></div>
-        <div class="pcNum">${dn0}<small>/${rn0}</small></div></div>
-      <div class="bar"><i style="width:${pct0}%"></i></div></div>`;
 
     /* 역할 필터 */
     const crew = crewOf(key);
@@ -1941,7 +1919,7 @@ const App = (() => {
       ${fld('근로자 성명', `<input data-f="worker.name" value="${esc(f.worker.name || '')}" placeholder="성명" required>`)}
       ${fld('연락처', `<input data-f="worker.phone" value="${esc(f.worker.phone || '')}" inputmode="tel" placeholder="010-0000-0000" required>`)}
       ${fld('근로자 주소', `<input data-f="worker.addr" value="${esc(f.worker.addr || '')}" placeholder="주소" required>`, true)}
-      ${fld('주민등록번호', `<div class="rrn"><input id="edRrnF" inputmode="numeric" maxlength="6" placeholder="앞 6자리" value="${esc(edSens.front)}" autocomplete="off"><span class="rrnSep">-</span><input id="edRrnB" type="password" inputmode="numeric" maxlength="7" placeholder="뒤 7자리" value="${esc(edSens.back)}" autocomplete="off"></div>
+      ${fld('주민등록번호 <small>(선택)</small>', `<div class="rrn"><input id="edRrnF" inputmode="numeric" maxlength="6" placeholder="앞 6자리" value="${esc(edSens.front)}" autocomplete="off"><span class="rrnSep">-</span><input id="edRrnB" type="password" inputmode="numeric" maxlength="7" placeholder="뒤 7자리" value="${esc(edSens.back)}" autocomplete="off"></div>
         <button type="button" class="btn sm ghost" id="edRrnToggle" style="margin:6px 0 0">뒷자리 표시</button>
         <p class="edSens">세무·4대보험 신고 목적의 민감정보입니다. 저장본에는 뒷자리를 가려(●●●●●●) 남기고, 전체 번호는 서명 완료 때 만드는 인쇄본에만 들어갑니다.</p>`, true)}
       ${fld('신분증 사본 첨부', `<input type="file" id="edIdFile" accept="image/*,.pdf" capture="environment"><small>사진은 계약서 인쇄본에 함께 표시됩니다. PDF는 파일명만 남습니다.</small>
@@ -2064,21 +2042,35 @@ const App = (() => {
     const cv = $('#edCv'); initSigPad(cv, $('#edClear'), (drawn) => { $('#edSignHint').textContent = drawn ? '서명 입력됨' : '서명 전'; });
 
     $('#edComplete').addEventListener('click', () => {
+      /* 빠진 것을 전부 모아 한 번에 보여준다 — 하나씩 조용히 막으면 "안 된다"로만 보인다 */
+      box.querySelectorAll('.edField.miss').forEach((el) => el.classList.remove('miss'));
+      const miss = []; let firstEl = null;
+      const mark = (sel, label) => { miss.push(label); const el = sel ? box.querySelector(sel) : null; if (el) { (el.closest('.edField') || el.closest('.edCard') || el).classList.add('miss'); if (!firstEl) firstEl = el; } };
       const need = [['worker.name', '근로자 성명'], ['worker.phone', '연락처'], ['worker.addr', '근로자 주소'], ['start', '근로계약 시작일'], ['from', '근무 시작'], ['to', '근무 종료'], ['payDayText', '임금 지급일'], ['signer', '서명자 성명'], ['signDate', '서명일']];
-      for (const [k, l] of need) { const v = k.split('.').reduce((o, x) => (o || {})[x], f); if (!v) { status(`필수 항목을 작성해 주세요: ${l}`); const el = box.querySelector(`[data-f="${k}"]`); if (el) el.focus(); return; } }
-      if (!(Number(f.pay) > 0)) { status('기본 임금을 넣어 주세요.'); return; }
-      if (f.end && f.end < f.start) { status('종료일이 시작일보다 앞섭니다.'); return; }
-      if (!dutiesOf(f).length && !f.dutyOther) { status('업무 내용을 하나 이상 선택해 주세요.'); return; }
-      if (!(f.days || []).length) { status('근무 요일을 하나 이상 선택해 주세요.'); return; }
-      if (!/^\d{6}$/.test(edSens.front) || !/^\d{7}$/.test(edSens.back)) { status('주민등록번호 13자리를 정확히 입력해 주세요.'); $('#edRrnF').focus(); return; }
-      if (f.acks.some((x) => !x)) { status('모든 계약조건 확인란에 체크해 주세요.'); return; }
-      if (!cv._drawn) { status('근로자 서명을 입력해 주세요.'); return; }
-      if (!f.finalAgree) { status('전자서명 최종 동의가 필요합니다.'); return; }
-      if (f.signer.replace(/\s/g, '') !== f.worker.name.replace(/\s/g, '')) { status('서명자 성명이 근로자 성명과 다릅니다.'); return; }
+      for (const [k, l] of need) { const v = k.split('.').reduce((o, x) => (o || {})[x], f); if (!v) mark(`[data-f="${k}"]`, l); }
+      if (!(Number(f.pay) > 0)) mark('[data-f="pay"]', '기본 임금');
+      if (f.end && f.end < f.start) mark('[data-f="end"]', '종료일이 시작일보다 앞섭니다');
+      if (!dutiesOf(f).length && !f.dutyOther) mark('#edDuties', '업무 내용 (하나 이상 선택)');
+      if (!(f.days || []).length) mark('#edDays', '근무 요일 (하나 이상 선택)');
+      /* 주민등록번호는 선택 — 넣었다면 13자리가 맞아야 한다 */
+      const rrnTyped = edSens.front || edSens.back;
+      if (rrnTyped && (!/^\d{6}$/.test(edSens.front) || !/^\d{7}$/.test(edSens.back))) mark('#edRrnF', '주민등록번호 (앞 6자리 · 뒤 7자리, 비워도 됩니다)');
+      const ackLeft = f.acks.filter((x) => !x).length; if (ackLeft) mark('.ack', `계약조건 확인란 ${ackLeft}개 체크`);
+      if (!cv._drawn) mark('#edCv', '근로자 서명 (서명 칸에 손가락이나 마우스로)');
+      if (!f.finalAgree) mark('#edFinal', '전자서명 최종 동의 체크');
+      if (f.signer && f.worker.name && f.signer.replace(/\s/g, '') !== f.worker.name.replace(/\s/g, '')) mark('[data-f="signer"]', '서명자 성명이 근로자 성명과 다릅니다');
+      if (miss.length) {
+        const msg = `아직 ${miss.length}가지가 남았습니다.\n\n· ${miss.join('\n· ')}\n\n붉게 표시된 칸을 채운 뒤 다시 눌러 주세요.`;
+        status(`남은 항목 ${miss.length}개: ${miss.join(' · ')}`);
+        banner(`서명을 완료하려면 ${miss.length}가지가 더 필요합니다`, miss.join(' · '));
+        alert(msg);
+        if (firstEl) { firstEl.scrollIntoView({ block: 'center', behavior: 'smooth' }); if (firstEl.focus) setTimeout(() => firstEl.focus(), 300); }
+        return;
+      }
       if (f.payType === 'hour' && Number(f.pay) < minWage() && !confirm(`시급이 최저시급(${fmtNum(minWage())}원)보다 낮습니다. 최저임금법 위반이 될 수 있습니다. 그래도 진행할까요?`)) return;
 
-      f.worker.rrn = `${edSens.front}-${edSens.back[0]}******`;
-      edFull = `${edSens.front}-${edSens.back}`;
+      f.worker.rrn = rrnTyped ? `${edSens.front}-${edSens.back[0]}******` : '';
+      edFull = rrnTyped ? `${edSens.front}-${edSens.back}` : null;
       c.emp = { ...bizOf() }; c.staffName = f.worker.name;
       c.sig = c.sig || {};
       c.sig.worker = { img: putBlob('sg', sigPng(cv)), name: f.signer, at: stamp() };
