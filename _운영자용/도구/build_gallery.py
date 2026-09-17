@@ -38,7 +38,7 @@ for d in ORDER:
         if links: parts.append(" · ".join(links))
         cells.append("<br>".join(parts) if parts else "—")
     rows.append(f"| {g} | **{store}**<br>{name}<br>{link(folder,'내 폴더')} | {cells[0]} | {cells[1]} |")
-table="| 조 | 가게 · 이름 | v1 (9/17) | v2 (10/17) |\n|---|---|---|---|\n"+"\n".join(rows)
+table="| 조 | 가게 · 이름 | v1 (9/17) | v2 (10/2 1차 · 10/17 최종) |\n|---|---|---|---|\n"+"\n".join(rows)
 s=open(README).read()
 s=re.sub(r"<!-- GALLERY:START -->.*?<!-- GALLERY:END -->", "<!-- GALLERY:START -->\n"+table+"\n<!-- GALLERY:END -->", s, flags=re.S)
 open(README,"w").write(s); print("구경하기 표 갱신:",len(rows),"명")
