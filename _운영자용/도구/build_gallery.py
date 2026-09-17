@@ -5,9 +5,9 @@ ROOT="02_실전캠프_Day2_실습제출"; README=f"{ROOT}/README.md"
 ORDER=["1조_유승균_마선생얼큰국밥","1조_이범례_부찌대학","2조_양진서_빈숲카페","2조_손성필_본노엘","2조_김은정_떡기리",
        "3조_김민혁_해모닉","3조_강상구_숯불에닭","3조_이승신_바삭마차","4조_손민지_카페스이","4조_오지영_김씨육면","4조_박가영_가영이네"]
 def field(text,label):
-    m=re.search(r"^- \**"+re.escape(label.strip("*"))+r"\**[^:：\n]*[:：]\**[ \t]*(.*)$", text, re.M)
-    v=(m.group(1).strip() if m else "")
-    v=v.strip("*").strip()
+    vals=[x.strip().strip("*").strip() for x in re.findall(r"^- \**"+re.escape(label.strip("*"))+r"\**[^:：\n]*[:：]\**[ \t]*(.*)$", text, re.M)]
+    vals=[x for x in vals if x and not (x.startswith("(") and x.endswith(")"))]
+    v=vals[0] if vals else ""
     return "" if v.startswith("(") and v.endswith(")") else v
 def first_image(folder):
     imgs=[p for p in glob.glob(f"{folder}/결과물/*") if p.lower().endswith((".png",".jpg",".jpeg",".gif",".webp"))]
