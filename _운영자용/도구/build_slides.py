@@ -191,7 +191,7 @@ d1.append(S("light", """<p class="eyebrow">제출 구조</p><h2>내 폴더 안�
 <tr class="hi"><td>제출물</td><td>PRD_전체 + v1 PRD + v2 PRD 초안 + <b>v1/프로젝트(코드)</b> + 제출서 + 스크린샷</td><td>v2 PRD(사용메모로 고친 것) + <b>v2/프로젝트</b> + 제출서 + 스크린샷</td></tr>
 <tr><td>코드는</td><td>공동 저장소 내 폴더 <b>v1/프로젝트/</b></td><td>내 폴더 v2/프로젝트/ · 완성 후 개인 저장소로 옮김</td></tr>
 </table>
-<div class="foot"><p class="note">전체 PRD에서 [v2]를 붙인 게 v2의 시작점이에요. 10/2에 v2를 올리고, 2주 동안 서로 써 보고 Issue로 피드백한 뒤, 10/17에 고친 최종본을 내요.</p></div>"""))
+<div class="foot"><p class="note">전체 PRD에서 [v2]를 붙인 게 v2의 시작점이에요. 10/2에 v2를 올리고 그날 점검 시간에 서로 써 보고 Issue로 피드백해요. 10/17까지 반영하고 다듬어 최종본을 내요.</p></div>"""))
 d1.append(S("sec", """<p class="eyebrow">정리하면</p>
 <h2>사장님이 바뀌는 건 딱 하나,<br><span class="y">"끝낼 때 push"</span></h2>
 <p class="lead">안 잃어버리고, 집에서 이어 만들고, 되돌릴 수 있고, 서로 봐요.<br>명령어는 AI가 치고, 사장님은 <b>말로 시키고 GitHub에서 확인</b>만 하면 됩니다.</p>"""))
