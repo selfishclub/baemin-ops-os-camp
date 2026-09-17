@@ -98,7 +98,7 @@ def S(cls, html, on=False): return f'<section class="slide {cls}{" on" if on els
 d1 = []
 d1.append(S("cover", """<p class="eyebrow">배민 AI 장사사관학교 · 실전 캠프 Day 2 · 가게 운영 편</p>
 <h1>GitHub, <span class="y">왜</span> 쓰고<br><span class="y">어떻게</span> 쓰나</h1>
-<p class="by">오늘 만든 걸 안 잃어버리고, 집에서 이어 만들고, 서로 보는 법<br><span style="font-size:28px">2026. 9. 17 · 10:00</span></p>""", on=True))
+<p class="by">오늘 만든 걸 안 잃어버리고, 집에서 이어 만들고, 서로 보는 법<br><span style="font-size:28px">2026. 9. 17</span></p>""", on=True))
 d1.append(S("", """<p class="eyebrow">먼저 여쭤볼게요</p><h2>이런 경험, <mark>없으셨나요?</mark></h2>
 <div class="scenes">
 <div class="scene"><p class="when">지난주 · 캠프 Day 1 다음 날</p><p class="q">어제 AI로 만든 거… 어디 갔지?</p><p class="d">바탕화면, 다운로드 폴더, 카톡 나에게 보내기. 파일이 세 군데에 흩어져 있고 어느 게 최신인지 모릅니다.</p></div>
@@ -120,7 +120,7 @@ d1.append(S("", """<p class="eyebrow">이번 캠프에서</p><h2>저장소는 <s
 <div class="split">
 <div><p class="head"><strong>공동 저장소</strong><span>교실 게시판</span></p><ul>
 <li>지금 화면에 보이는 <b>baemin-ops-os-camp</b></li><li>우리 가게 소개</li><li>기획안(PRD)</li><li>제출서 — 링크 두 개</li><li>스크린샷</li><li>보는 건 누구나, 올리는 건 초대받은 12명</li></ul></div>
-<div class="on-acid"><p class="head"><strong>내 개인 저장소</strong><span>내 작업실 · 오후에 만듦</span></p><ul>
+<div class="on-acid"><p class="head"><strong>내 개인 저장소</strong><span>내 작업실 · v1 만들 때 만듦</span></p><ul>
 <li><b>실제 코드와 화면</b></li><li>Vercel이 여기를 읽어 인터넷 주소를 만들어요</li><li>누구나 볼 수 있게 <b>공개(Public)</b></li><li>캠프 끝나도 계속 내 것</li><li>그 주소를 공동 저장소 제출서에 적어요</li></ul></div>
 </div>
 <div class="foot"><p class="note">코드는 개인 저장소에, 공동 저장소에는 링크만. 12명 코드가 한곳에 섞이면 서로 건드려 깨지기 때문이에요.</p></div>"""))
@@ -132,7 +132,7 @@ d1.append(S("light", """<p class="eyebrow">그림 한 장</p><h2>내 컴퓨터�
 </div>
 <div class="flowbox" style="margin-top:30px"><div class="a">↓ 두 주소를 적어서</div></div>
 <div class="flowbox" style="margin-top:10px"><div class="n" style="min-width:900px"><b>공동 저장소 · 내 폴더 · 제출서.md</b><span>개인 저장소 주소 + Vercel 주소 + 스크린샷</span></div></div>
-<div class="foot"><p class="note">오전엔 왼쪽 두 칸(내 컴퓨터 ↔ GitHub)만 합니다. Vercel은 오후에.</p></div>"""))
+<div class="foot"><p class="note">지금은 왼쪽 두 칸(내 컴퓨터 ↔ GitHub)만 합니다. Vercel은 v1을 만든 뒤에.</p></div>"""))
 d1.append(S("light", """<p class="eyebrow">기억할 말 네 개</p><h2>금고 비유로 <mark>네 단어</mark>만</h2>
 <table class="table"><colgroup><col style="width:22%"><col style="width:40%"><col style="width:38%"></colgroup>
 <tr><th>말</th><th>쉬운 뜻</th><th>언제</th></tr>
@@ -158,7 +158,7 @@ d1.append(S("light", """<p class="eyebrow">오늘 실습 ①</p><h2>우리 가�
 <div><p class="k">STEP 4</p><p class="t">초록 버튼 두 번</p><p class="d">Commit changes… → 설명에 "우리 가게 소개 추가" → Commit changes. 끝.</p></div>
 </div>
 <div class="foot"><p class="note">웹에서 저장했으니 이미 GitHub에 올라간 거예요. 방금 하신 게 Commit + Push입니다.</p></div>"""))
-d1.append(S("light", """<p class="eyebrow">오늘 실습 ② · 11:15</p><h2>AI에게 시켜서 <mark>내 폴더에 PRD 넣고 올리기</mark></h2>
+d1.append(S("light", """<p class="eyebrow">오늘 실습 ②</p><h2>AI에게 시켜서 <mark>내 폴더에 PRD 넣고 올리기</mark></h2>
 <div class="steps">
 <div><p class="k">1 · Clone</p><p class="t">저장소 받기</p><p class="d">"이 저장소를 내 컴퓨터에 처음 가져와 줘"</p></div>
 <div><p class="k">2 · 내 폴더</p><p class="t">02 폴더 안 내 이름</p><p class="d">"내 폴더 1조_이범례_부찌대학 열어 줘". v1/PRD.md가 이미 있어요.</p></div>
@@ -180,11 +180,11 @@ d1.append(S("light", """<p class="eyebrow">사례 · 이범례 사장님 (부찌
 <div><p class="k">어떻게 시작했나</p><p class="t">GitHub에 있는 스타터 키트를 받아 내 가게에 맞게</p><p class="d">뼈대 + 안전장치 + AI에게 시킬 순서. 처음부터 만들지 않았어요.</p></div>
 <div class="on-acid"><p class="k">GitHub 덕분에</p><p class="t">남이 만든 뼈대를 내 것으로, 내 것을 또 남에게</p><p class="d">github.com/selfishclub/review-onetouch-starter — 리뷰 관리를 만들 분은 여기서 시작하세요.</p></div>
 </div>
-<div class="foot"><p class="note">10:45부터 이범례 사장님이 직접 발표합니다. 여러분 것도 이렇게 될 수 있어요.</p></div>"""))
+<div class="foot"><p class="note">이어서 이범례 사장님이 직접 발표합니다. 여러분 것도 이렇게 될 수 있어요.</p></div>"""))
 d1.append(S("light", """<p class="eyebrow">제출 구조</p><h2>내 폴더 안에 <mark>v1 / v2</mark></h2>
 <table class="table"><colgroup><col style="width:18%"><col style="width:41%"><col style="width:41%"></colgroup>
 <tr><th></th><th>v1</th><th>v2</th></tr>
-<tr><td>언제</td><td><b>오늘 9/17</b> 17:00까지</td><td><b>10/17(금)</b>까지 · 10/2 온라인 중간 점검</td></tr>
+<tr><td>언제</td><td><b>오늘 9/17</b> 안</td><td><b>10/17(금)</b>까지 · 10/2 온라인 중간 점검</td></tr>
 <tr><td>범위</td><td>오늘 안에 되는 것만. 외부 연결 없이</td><td>API · 배민 데이터 · 날씨 등 외부 데이터, 고도화</td></tr>
 <tr class="hi"><td>제출물</td><td>PRD.md + 제출서.md(두 링크) + 스크린샷</td><td>같은 구성</td></tr>
 <tr><td>코드는</td><td>내 개인 저장소(공개)에</td><td>같은 저장소, 같은 Vercel 주소</td></tr>
@@ -212,7 +212,7 @@ d2.append(S("", """<p class="eyebrow">무엇을 제출하나</p><h2>세 가지 �
 d2.append(S("light", """<p class="eyebrow">v1과 v2</p><h2>오늘은 <mark>v1</mark>, 한 달 뒤 <mark>v2</mark></h2>
 <table class="table"><colgroup><col style="width:18%"><col style="width:41%"><col style="width:41%"></colgroup>
 <tr><th></th><th>v1</th><th>v2</th></tr>
-<tr><td>언제</td><td><b>오늘</b> 17:00</td><td><b>10/17</b> · 10/2 온라인 점검</td></tr>
+<tr><td>언제</td><td><b>오늘</b> 안</td><td><b>10/17</b> · 10/2 온라인 점검</td></tr>
 <tr class="hi"><td>범위</td><td>오늘 안에 되는 것만. 외부 연결 없이. 화면 + 저장까지</td><td>API, 배민 데이터, 날씨, 카톡 알림 같은 외부 데이터·고도화</td></tr>
 <tr><td>예</td><td>근무표 입력 → 주급 계산 → 저장</td><td>배민 매출 자동 불러오기, 날씨 API로 준비량 추천</td></tr>
 <tr><td>어디</td><td>내폴더/v1/</td><td>내폴더/v2/</td></tr>
@@ -227,11 +227,11 @@ d2.append(S("", """<p class="eyebrow">실습 ② 순서</p><h2>AI에게 <span cl
 d2.append(S("light", """<p class="eyebrow">시간이 남으면</p><h2>같은 조 사장님 PRD를 <mark>AI에게 읽혀요</mark></h2>
 <div class="prompt"><span class="w">프롬프트</span>02_실전캠프_Day2_실습제출 폴더에서 2조 사장님들 PRD를 읽고, 내 PRD에 빠진 것이나 참고할 점을 알려 줘.</div>
 <p class="lead">같은 주제를 각자 만들고 서로 보는 게 이 캠프의 방식이에요.<br>좋은 건 가져오고, 내 것은 남에게 보여 줘요. GitHub이 그걸 가능하게 해요.</p>"""))
-d2.append(S("cover", """<p class="eyebrow">11:25 ~ 12:00</p><h1>실습 ② <span class="y">시작</span></h1><p class="by">막히면 손 드세요 · 오류 메시지는 그대로 AI에게<br><span style="font-size:28px">12시에 02 폴더 제출 현황표를 같이 봅니다</span></p>"""))
+d2.append(S("cover", """<p class="eyebrow">실습 ②</p><h1>실습 ② <span class="y">시작</span></h1><p class="by">막히면 손 드세요 · 오류 메시지는 그대로 AI에게<br><span style="font-size:28px">끝나면 02 폴더 제출 현황표를 같이 봅니다</span></p>"""))
 
 # ---------------- 발표 03 ----------------
 d3 = []
-d3.append(S("cover", """<p class="eyebrow">실전 캠프 Day 2 · 오후</p><h1>내가 만든 걸<br><span class="y">인터넷에서 열리게</span></h1><p class="by">내 GitHub 저장소 → Supabase → Vercel<br><span style="font-size:28px">"배포"라고 부르는 것</span></p>""", on=True))
+d3.append(S("cover", """<p class="eyebrow">실전 캠프 Day 2 · v1 만들기</p><h1>내가 만든 걸<br><span class="y">인터넷에서 열리게</span></h1><p class="by">내 GitHub 저장소 → Supabase → Vercel<br><span style="font-size:28px">"배포"라고 부르는 것</span></p>""", on=True))
 d3.append(S("", """<p class="eyebrow">왜</p><h2>내 컴퓨터에서만 열리면 <span class="y">나만</span> 봐요</h2>
 <div class="scenes">
 <div class="scene"><p class="when">직원에게</p><p class="q">이거 네 폰으로 열어 봐.</p><p class="d">근무표, 매뉴얼, 체크리스트는 직원이 자기 폰으로 봐야 쓸모가 있어요.</p></div>
@@ -271,7 +271,7 @@ d3.append(S("light", """<p class="eyebrow">제출 전</p><h2>여섯 개만 <mark
 <tr class="hi"><td>6</td><td>공동 저장소에 push</td><td>GitHub 웹에서 내 폴더 제출서 보임</td></tr>
 </table>
 <div class="foot"><p class="note">AI에게 "제출 전 체크리스트 여섯 개 확인하고 v1 제출로 커밋·push해 줘". 여섯 개 다 되면 v1 완료예요.</p></div>"""))
-d3.append(S("cover", """<p class="eyebrow">13:20 ~ 16:00</p><h1>각자 <span class="y">v1</span> 만들기</h1><p class="by">PRD의 v1 범위만 · 외부 연결 없이 · 가짜 데이터로<br><span style="font-size:28px">16:00부터 인터넷 주소 만들고 제출서 씁니다</span></p>"""))
+d3.append(S("cover", """<p class="eyebrow">미니 해커톤</p><h1>각자 <span class="y">v1</span> 만들기</h1><p class="by">PRD의 v1 범위만 · 외부 연결 없이 · 가짜 데이터로<br><span style="font-size:28px">다 만들면 인터넷 주소 만들고 제출서 씁니다</span></p>"""))
 
 DECKS = [
  ("01_GitHub_왜쓰고_어떻게쓰나", "GitHub, 왜 쓰고 어떻게 쓰나 — 실전 캠프 Day 2", d1),

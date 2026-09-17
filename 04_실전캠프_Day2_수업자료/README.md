@@ -7,17 +7,17 @@
 | [일정](일정.md) — 9/17 · 10/2 · 10/17 | 지금 |
 | [조별 주제](조별주제.md) | 오늘 뭐 만들지 정할 때 |
 | [사전 과제 안내](사전과제안내.md) — 과제 6·7 | 아직 안 냈으면 |
-| [사례 · 이범례 사장님 리뷰 원터치](사례_이범례_리뷰원터치/README.md) | 10:45 발표 · 참고할 때 |
+| [사례 · 이범례 사장님 리뷰 원터치](사례_이범례_리뷰원터치/README.md) | 사례 발표 · 참고할 때 |
 | [스타터 키트로 시작하기](사례_이범례_리뷰원터치/스타터키트로_시작하기.md) | 리뷰 관리를 만들 때 |
 
 ## 발표자료
 
-| 파일 | 웹에서 바로 보기 | 내용 | 언제 |
+| 파일 | 웹에서 바로 보기 | 내용 | 순서 |
 |---|---|---|---|
-| [01_GitHub_왜쓰고_어떻게쓰나.html](발표자료/01_GitHub_왜쓰고_어떻게쓰나.html) | [열기](https://claude.ai/artifact/6nLH9UXirZYdwgRef3YbxW) | GitHub이 왜 있고 어떻게 쓰나 (16장) | 10:00 |
-| [02_실습제출과_v1v2.html](발표자료/02_실습제출과_v1v2.html) | [열기](https://claude.ai/artifact/Wg8kVrFHGvJubNugGEvPfK) | 제출 구조, v1/v2 기준 (7장) | 11:15 |
-| [03_인터넷에서_접근가능하게.html](발표자료/03_인터넷에서_접근가능하게.html) | [열기](https://claude.ai/artifact/EjJ9g7RjJbVCW4pW5fWtGL) | 개인 저장소 → Supabase → Vercel (7장) | 13:00 |
-| [발표메모.md](발표자료/발표메모.md) | — | 강사용 말할 내용과 시간 | 강사 |
+| [01_GitHub_왜쓰고_어떻게쓰나.html](발표자료/01_GitHub_왜쓰고_어떻게쓰나.html) | [열기](https://claude.ai/artifact/6nLH9UXirZYdwgRef3YbxW) | GitHub이 왜 있고 어떻게 쓰나 (16장) | 첫 번째 |
+| [02_실습제출과_v1v2.html](발표자료/02_실습제출과_v1v2.html) | [열기](https://claude.ai/artifact/Wg8kVrFHGvJubNugGEvPfK) | 제출 구조, v1/v2 기준 (7장) | 실습 ② 전 |
+| [03_인터넷에서_접근가능하게.html](발표자료/03_인터넷에서_접근가능하게.html) | [열기](https://claude.ai/artifact/EjJ9g7RjJbVCW4pW5fWtGL) | 개인 저장소 → Supabase → Vercel (7장) | v1 만들기 전 |
+| [발표메모.md](발표자료/발표메모.md) | — | 강사용 말할 내용 | 강사 |
 
 슬라이드는 HTML 파일이라 **브라우저에서 열면** 됩니다. 화살표 키나 화면 클릭으로 넘깁니다.
 GitHub에서는 HTML이 바로 안 열리므로 **「웹에서 바로 보기」 링크**를 쓰거나, 파일을 Download 후 더블클릭합니다.
