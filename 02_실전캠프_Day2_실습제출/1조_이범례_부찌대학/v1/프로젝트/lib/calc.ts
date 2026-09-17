@@ -1,6 +1,6 @@
 // 급여 계산. 규칙은 v1/PRD.md 5번·6번.
 import type { DayPlan, DayRecord, Employee } from "./types";
-import { dayKeyOf, weekDates } from "./dates";
+import { addDays, dayKeyOf, mondayOf, monthDates, monthKey, weekDates } from "./dates";
 
 export const DIFF_THRESHOLD_MIN = 10; // 이 이상 차이면 노란 표시 → 인정/조정
 export const WEEKLY_HOLIDAY_MIN_HOURS = 15; // 주휴수당 기준 주 15시간
@@ -155,4 +155,64 @@ export function calcWeek(emp: Employee, monday: string, records: DayRecord[]): W
     diffMin: paidMin - plannedMin,
     diffPay: Math.round(basePay - plannedBase),
   };
+}
+
+export interface MonthCalc {
+  month: string; // "2026-09"
+  paidMin: number; // 그 달 날짜의 실근무 합
+  basePay: number;
+  holidayMin: number; // 그 달에 끝나는(일요일이 속한) 주들의 주휴 합
+  holidayPay: number;
+  total: number;
+  pending: number; // 확인 필요한 날 수
+  weeks: number; // 주휴를 센 주 수
+}
+
+/**
+ * 한 직원의 한 달 계산.
+ * [가정] 기본급은 그 달에 속한 날짜로, 주휴수당은 그 주의 일요일이 속한 달에 넣는다.
+ * (월 경계 주의 처리 기준은 노무사·세무사 확인 후 바꿀 수 있음)
+ */
+export function calcMonth(emp: Employee, month: string, records: DayRecord[]): MonthCalc {
+  const dates = monthDates(month);
+  let paidMin = 0;
+  let pending = 0;
+  for (const date of dates) {
+    const rec = records.find((r) => r.employeeId === emp.id && r.date === date);
+    const d = calcDay(date, emp.plan[dayKeyOf(date)], rec);
+    paidMin += d.paidMin;
+    if (d.status === "needs-decision" || d.status === "incomplete" || d.status === "error") pending++;
+  }
+  // 이 달에 일요일이 있는 주들
+  let holidayMin = 0;
+  let holidayPay = 0;
+  let weeks = 0;
+  let monday = mondayOf(dates[0]);
+  while (monthKey(addDays(monday, 6)) <= month) {
+    if (monthKey(addDays(monday, 6)) === month) {
+      const w = calcWeek(emp, monday, records);
+      holidayMin += w.holidayMin;
+      holidayPay += w.holidayPay;
+      weeks++;
+    }
+    monday = addDays(monday, 7);
+  }
+  const basePay = Math.round((paidMin / 60) * emp.wage);
+  return { month, paidMin, basePay, holidayMin, holidayPay, total: basePay + holidayPay, pending, weeks };
+}
+
+/** 엑셀에서 바로 열리는 CSV 내려받기 (한글 깨짐 방지 BOM 포함) */
+export function downloadCSV(filename: string, rows: (string | number)[][]) {
+  const esc = (v: string | number) => {
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const text = "﻿" + rows.map((r) => r.map(esc).join(",")).join("\n");
+  const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
