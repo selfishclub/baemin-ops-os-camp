@@ -3277,12 +3277,85 @@ const App = (() => {
     return bought ? { kg: Math.round(bought * 10) / 10, how: `${past.date.slice(0, 4)}년 ${ev.name} 전 1주 매입 kg` } : null;
   }
 
+  /* ── 매입 인사이트: 그래프(SVG) · 수조 용량 매입 계획 ── */
+  const doy = (k) => { const d = new Date(k + 'T00:00:00'); return Math.round((d - new Date(d.getFullYear(), 0, 1)) / 86400000); };
+  const YEAR_STYLE = ['#8a9aa0', '#c9a55c', '#59b9b2', '#e58a6e'];   // 오래된 해 → 최근 해
+  const tankMaxKg = () => Number(S.settings.tankMaxKg) || 700;
+  /* 수조 관리표 입고 kg 합계 — 품종별 현재 재고 */
+  function tankStockKg(sp) {
+    const T = S.tanks; if (!T || !T.items) return 0;
+    let kg = 0; T.items.forEach((it) => ['top', 'bottom'].forEach((pos) => { const c = it[pos]; if (c && c.species === sp && Number(c.kg) > 0) kg += Number(c.kg); }));
+    return Math.round(kg * 10) / 10;
+  }
+  /* 연간 단가 선 그래프 — 해마다 한 줄, x는 1~12월(날짜), y는 kg당 단가. 추석·설 위치 표시 */
+  function priceLineChart(sp, buys) {
+    const years = [...new Set(buys.map((x) => x.date.slice(0, 4)))].sort();
+    if (!years.length) return '';
+    const W = 760, H = 260, L = 58, R = 16, T = 26, B = 34, iw = W - L - R, ih = H - T - B;
+    const pts = {}; let ymax = 0;
+    years.forEach((y) => { pts[y] = []; for (let k = `${y}-01-01`; k.slice(0, 4) === y; k = shift(k, 7)) { const p = wavg(inRange(buys, k, shift(k, 6))); if (p != null) { pts[y].push({ x: doy(k) + 3, y: p, k }); ymax = Math.max(ymax, p); } } });
+    ymax = Math.ceil(ymax * 1.08 / 10000) * 10000 || 10000;
+    const X = (d) => L + d / 365 * iw, Y = (v) => T + ih - v / ymax * ih;
+    let g = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${sp} 연간 kg당 단가">`;
+    for (let i = 0; i <= 4; i++) { const v = ymax / 4 * i; g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" class="grid"/><text x="${L - 6}" y="${Y(v) + 4}" class="ty">${Math.round(v / 1000)}천</text>`; }
+    for (let m = 0; m < 12; m++) { const d = doy(`2025-${pad(m + 1)}-01`); g += `<line x1="${X(d)}" x2="${X(d)}" y1="${T}" y2="${T + ih}" class="grid v"/><text x="${X(d) + 3}" y="${H - 14}" class="tx">${m + 1}월</text>`; }
+    // 명절 표시 — 해마다 위치가 달라 해 색으로
+    years.forEach((y, i) => buyEvents().filter((e) => e.date.startsWith(y) && (e.name === '추석' || e.name === '설')).forEach((e) => {
+      const x = X(doy(e.date)); g += `<line x1="${x}" x2="${x}" y1="${T}" y2="${T + ih}" class="ev" style="stroke:${YEAR_STYLE[i % 4]}"/><text x="${x + 3}" y="${T + 11 + i * 12}" class="te" style="fill:${YEAR_STYLE[i % 4]}">${e.name} ${y.slice(2)}</text>`;
+    }));
+    years.forEach((y, i) => { const c = YEAR_STYLE[i % 4], p = pts[y]; if (!p.length) return;
+      // 4주 넘게 비면 선을 끊는다
+      let d = ''; p.forEach((q, j) => { d += (j === 0 || q.x - p[j - 1].x > 28 ? 'M' : 'L') + X(q.x).toFixed(1) + ' ' + Y(q.y).toFixed(1) + ' '; });
+      g += `<path d="${d}" class="ln" style="stroke:${c}"/>` + p.map((q) => `<circle cx="${X(q.x).toFixed(1)}" cy="${Y(q.y).toFixed(1)}" r="3" style="fill:${c}"><title>${q.k} 주 · ${fmtWon(q.y)}/kg</title></circle>`).join('');
+    });
+    g += years.map((y, i) => `<rect x="${L + i * 70}" y="4" width="12" height="4" style="fill:${YEAR_STYLE[i % 4]}"/><text x="${L + i * 70 + 16}" y="9" class="tl">${y}년</text>`).join('');
+    return g + `</svg>`;
+  }
+  /* 월별 매입 kg 막대 — 해별 나란히 */
+  function kgBarChart(sp, buys) {
+    const years = [...new Set(buys.map((x) => x.date.slice(0, 4)))].sort(); if (!years.length) return '';
+    const W = 760, H = 180, L = 50, R = 12, T = 14, B = 30, iw = W - L - R, ih = H - T - B;
+    const v = {}; let mx = 0; years.forEach((y) => { v[y] = []; for (let m = 1; m <= 12; m++) { const kg = buys.filter((x) => x.date.slice(0, 7) === `${y}-${pad(m)}`).reduce((a, x) => a + x.kg, 0); v[y].push(kg); mx = Math.max(mx, kg); } });
+    mx = Math.ceil(mx / 100) * 100 || 100;
+    const gw = iw / 12, bw = Math.max(3, (gw - 8) / years.length);
+    let g = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${sp} 월별 매입 kg">`;
+    for (let i = 0; i <= 2; i++) { const yy = T + ih - ih / 2 * i; g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" class="grid"/><text x="${L - 6}" y="${yy + 4}" class="ty">${Math.round(mx / 2 * i)}</text>`; }
+    for (let m = 0; m < 12; m++) { g += `<text x="${L + gw * m + gw / 2}" y="${H - 10}" class="tx mid">${m + 1}월</text>`; years.forEach((y, i) => { const kg = v[y][m]; if (!kg) return; const h = kg / mx * ih; g += `<rect x="${(L + gw * m + 4 + i * bw).toFixed(1)}" y="${(T + ih - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" style="fill:${YEAR_STYLE[i % 4]}"><title>${y}년 ${m + 1}월 · ${fmtKg(kg)}</title></rect>`; }); }
+    return g + `</svg>`;
+  }
+  /* 일정 매입 계획 — 품종별 필요량과 수조 남은 자리로 권장 kg */
+  function eventPlan(ev) {
+    const cap = tankMaxKg(), rows = [];
+    CRAB_SPECIES.forEach((sp) => {
+      const buys = crabBuys(sp); if (!buys.length) return;
+      const ad = eventAdvice(sp, ev, buys);
+      // 필요량: 지난 같은 일정마다 [E−7, E+3] 매입 kg 을 평균 (판매 kg 이 있으면 그것)
+      const occ = buyEvents().filter((e) => e.name === ev.name && e.date <= dateKey());
+      const needs = occ.map((e) => { const s2 = eventNeedKg(sp, { name: ev.name, date: e.date }); return s2 ? s2.kg : inRange(buys, shift(e.date, -7), shift(e.date, 3)).reduce((a, x) => a + x.kg, 0); }).filter((k) => k > 0);
+      const need = needs.length ? Math.round(needs.reduce((a, x) => a + x, 0) / needs.length) : 0;
+      rows.push({ sp, ad, need, stock: tankStockKg(sp) });
+    });
+    const stock = rows.reduce((a, r) => a + r.stock, 0), free = Math.max(0, cap - stock);
+    const wantTotal = rows.reduce((a, r) => a + Math.max(0, r.need - r.stock), 0);
+    rows.forEach((r) => { const want = Math.max(0, r.need - r.stock); r.buy = wantTotal ? Math.round(Math.min(want, free * want / wantTotal)) : 0; r.save = r.ad.ok && r.ad.saveRate != null && r.ad.saveRate < 0 ? Math.round(r.buy * (r.ad.atEvent - r.ad.price)) : 0; });
+    return { cap, stock, free, rows, buyTotal: rows.reduce((a, r) => a + r.buy, 0), saveTotal: rows.reduce((a, r) => a + r.save, 0), short: wantTotal > free };
+  }
+  function planTable(ev) {
+    const P = eventPlan(ev); if (!P.rows.length) return '';
+    return `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>품종</th><th>권장 매입 시기</th><th class="r">그때 단가</th><th class="r">일정 주간 단가</th><th class="r">필요량</th><th class="r">수조 재고</th><th class="r"><b>권장 매입</b></th><th class="r">절감</th></tr></thead><tbody>
+      ${P.rows.map((r) => `<tr><td><b>${r.sp}</b></td><td>${r.ad.ok ? (r.ad.late ? '지금 바로 <small class="mut">(권장 구간 지남)</small>' : `${r.ad.from.slice(5)} ~ ${r.ad.to.slice(5)} <small class="mut">(${-r.ad.pick === 0 ? '일정 주간' : -r.ad.pick + '주 전'})</small>`) : '<span class="mut">패턴 없음</span>'}</td>
+        <td class="r">${r.ad.ok ? fmtWon(r.ad.price) : '–'}</td><td class="r">${r.ad.ok ? fmtWon(r.ad.atEvent) : '–'}</td><td class="r">${r.need ? fmtKg(r.need) : '–'}</td><td class="r">${fmtKg(r.stock)}</td><td class="r"><b>${fmtKg(r.buy)}</b></td><td class="r">${r.save ? fmtWon(r.save) : '–'}</td></tr>`).join('')}
+      <tr class="sum"><td colspan="4">수조 ${fmtKg(P.cap)} · 재고 ${fmtKg(P.stock)} · 남는 자리 ${fmtKg(P.free)}</td><td class="r">${fmtKg(P.rows.reduce((a, r) => a + r.need, 0))}</td><td class="r">${fmtKg(P.stock)}</td><td class="r"><b>${fmtKg(P.buyTotal)}</b></td><td class="r"><b>${P.saveTotal ? fmtWon(P.saveTotal) : '–'}</b></td></tr></tbody></table></div>
+      ${P.short ? `<p class="hint warnTxt">필요량이 수조 남는 자리보다 많아 비율대로 줄였습니다. 일정에 가까워지며 팔린 만큼 추가 매입하세요.</p>` : ''}`;
+  }
+
   function vBuyInsight() {
     const have = CRAB_SPECIES.filter((sp) => crabBuys(sp).length);
     const sp = have.includes(S.ui.biSp) ? S.ui.biSp : (have[0] || '대게');
     const buys = crabBuys(sp), today = dateKey();
     let h = `<div class="hd"><div><h2>갑각류 매입 인사이트</h2><div class="sub">원가 관리의 매입 기록으로 kg당 단가 흐름을 읽고, 설·추석·가정의달·연말 앞에서 언제 사는 게 쌌는지 과거 패턴으로 다음 매입 시점을 권합니다.</div></div>
-      <div class="mnav"><span class="hint" style="margin:0">보관 가능</span><input type="number" class="tkIn" data-act="crabHold" data-sp="${sp}" value="${crabHold(sp)}" min="1" max="60"><span class="hint" style="margin:0">일</span></div></div>`;
+      <div class="mnav"><span class="hint" style="margin:0">보관 가능</span><input type="number" class="tkIn" data-act="crabHold" data-sp="${sp}" value="${crabHold(sp)}" min="1" max="60"><span class="hint" style="margin:0">일</span>
+        <span class="hint" style="margin:0 0 0 10px">수조 최대</span><input type="number" class="tkIn" data-act="tankMaxKg" value="${tankMaxKg()}" min="10" step="10"><span class="hint" style="margin:0">kg</span></div></div>`;
     h += `<div class="filters">${CRAB_SPECIES.map((s2) => `<button class="fl${s2 === sp ? ' on' : ''}" data-act="biSp" data-sp="${s2}">${s2}${have.includes(s2) ? '' : ' <small>(기록 없음)</small>'}</button>`).join('')}</div>`;
     if (!buys.length) return h + `<div class="notice"><b>${sp} 매입 기록이 없습니다.</b><div class="hint">원가 관리에서 매입을 kg 단위로 적거나, 거래처 원장을 CSV로 가져오면 여기에 단가 흐름이 나옵니다. <button class="btn sm" data-act="view" data-v="costs">원가 관리 열기</button></div></div>`;
 
@@ -3298,8 +3371,14 @@ const App = (() => {
       <div class="card${vsLy != null && vsLy >= 10 ? ' warn' : ''}"><div class="cl">작년 같은 시기 대비</div><div class="cv sm2">${vsLy != null ? signOf(vsLy) : '–'}</div><div class="cs">작년 이맘때 ${ly != null ? fmtWon(ly) : '기록 없음'}</div></div>
       <div class="card"><div class="cl">기록</div><div class="cv sm2">${buys.length}건 · ${fmtKg(buys.reduce((a, x) => a + x.kg, 0))}</div><div class="cs">${buys[0].date} ~ ${buys[buys.length - 1].date}</div></div></div>`;
 
-    /* 다음 일정 카드 */
+    /* 연간 단가 그래프 · 월별 kg */
+    h += `<div class="hd sub2"><h3>연간 kg당 단가 — 해마다 겹쳐 보기</h3><span class="hint" style="margin:0">주 단위 평균 · 점에 마우스를 올리면 단가 · 세로 점선은 그해 추석·설</span></div><div class="chartBox">${priceLineChart(sp, buys)}</div>
+      <div class="hd sub2"><h3>월별 매입 kg</h3></div><div class="chartBox">${kgBarChart(sp, buys)}</div>`;
+
+    /* 다음 일정 매입 계획 — 수조 용량 기준 (품종 전체) */
     const nexts = buyEvents().filter((e) => e.date >= today).slice(0, 3);
+    if (nexts.length) h += `<div class="hd sub2"><h3>${esc(nexts[0].name)} (${nexts[0].date}, D-${diffDays(today, nexts[0].date)}) 매입 계획 — 수조 ${fmtKg(tankMaxKg())} 기준</h3><span class="hint" style="margin:0">가장 쌌던 주에 얼마나 사둘지. 재고는 수조 관리표 입고 kg</span></div>` + planTable(nexts[0]);
+    if (nexts[1]) h += `<details class="notice" style="margin-top:10px"><summary><b>${esc(nexts[1].name)} (${nexts[1].date}) 계획도 보기</b></summary>${planTable(nexts[1])}</details>`;
     h += `<div class="hd sub2"><h3>다음 수요 일정 — 언제 사둘까</h3><span class="hint" style="margin:0">보관 ${crabHold(sp)}일 안에서 과거 패턴상 가장 쌌던 주</span></div><div class="biCards">`;
     nexts.forEach((ev) => {
       const ad = eventAdvice(sp, ev, buys), need = eventNeedKg(sp, ev), dday = diffDays(today, ev.date);
@@ -4017,6 +4096,7 @@ const App = (() => {
       if (b.dataset.act === 'dedRate') { dedRates()[b.dataset.k] = Math.max(0, Number(b.value) || 0); save(); }
       if (b.dataset.act === 'payDayText') { S.settings.payDayText = b.value.trim() || '매월 10일'; save(); }
       if (b.dataset.act === 'slipTax') { const p = payrollOf(S.ui.lmonth || curMonth()); if (p) { p.slips = p.slips || {}; p.slips[b.dataset.n] = p.slips[b.dataset.n] || {}; p.slips[b.dataset.n].tax = Math.max(0, Number(b.value) || 0); save(); render(); } }
+      if (b.dataset.act === 'tankMaxKg') { S.settings.tankMaxKg = Math.max(10, Number(b.value) || 700); save(); render(); }
       if (b.dataset.act === 'crabHold') { S.settings.crabHold = S.settings.crabHold || {}; S.settings.crabHold[b.dataset.sp] = Math.max(1, Number(b.value) || 28); save(); render(); }
       if (b.dataset.act === 'healthMonths') { S.settings.healthMonths = Math.max(1, Number(b.value) || 12); save(); render(); }
       if (b.dataset.act === 'healthDate' || b.dataset.act === 'healthMemo') {

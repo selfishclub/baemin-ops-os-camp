@@ -1050,3 +1050,17 @@ table.tkLog td.dear{background:var(--crit-soft);color:var(--crit);font-weight:70
 table.tkLog td small{display:block;font-size:11px;color:var(--muted);font-weight:400}
 .spark.bi{height:90px}
 @media (max-width:760px){.biCards{grid-template-columns:1fr}}
+
+/* 인사이트 그래프 */
+.chartBox{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:8px 6px 2px;margin-bottom:6px}
+.chart{width:100%;height:auto;display:block}
+.chart .grid{stroke:var(--rule);stroke-width:1}
+.chart .grid.v{stroke:var(--rule-soft)}
+.chart .ln{fill:none;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+.chart .ev{stroke-width:1.2;stroke-dasharray:4 3;opacity:.8}
+.chart text{fill:var(--muted);font-size:11px;font-family:inherit}
+.chart .ty{text-anchor:end}
+.chart .tx.mid{text-anchor:middle}
+.chart .te{font-size:10.5px;font-weight:700}
+.chart .tl{fill:var(--ink-2);font-size:11.5px}
+.chart circle{cursor:crosshair}
