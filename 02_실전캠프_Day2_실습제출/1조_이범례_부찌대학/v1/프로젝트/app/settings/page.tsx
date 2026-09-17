@@ -5,7 +5,7 @@ import { useData } from "@/components/DataProvider";
 import { SEED_EMPLOYEES } from "@/lib/seed";
 
 export default function SettingsPage() {
-  const { settings, saveSettings, loaded, employees, records, saveEmployee, deleteEmployee, removeRecord } = useData();
+  const { settings, saveSettings, loaded, employees, records, saveEmployee, deleteEmployee, removeRecord, storage } = useData();
   const [minWage, setMinWage] = useState(settings.minWage);
   const [saved, setSaved] = useState(false);
 
@@ -48,9 +48,13 @@ export default function SettingsPage() {
 
       <section className="card space-y-3">
         <h2 className="font-bold">저장 위치</h2>
-        <p className="text-sm text-muted">
-          지금은 <b>이 브라우저 안</b>에만 저장됩니다. 다른 기기에서는 보이지 않아요. 6단계에서 Supabase 데이터 창고로 바꾸면 홀·배달 두 매장이 같은 기록을 봅니다.
-        </p>
+        {storage === "supabase" ? (
+          <p className="text-sm text-ok font-semibold">Supabase 데이터 창고에 저장 중 — 홀·배달 두 매장 기기가 같은 기록을 봅니다.</p>
+        ) : (
+          <p className="text-sm text-muted">
+            지금은 <b>이 브라우저 안</b>에만 저장됩니다. 다른 기기에서는 보이지 않아요. Supabase 열쇠(.env.local)를 넣으면 홀·배달 두 매장이 같은 기록을 봅니다.
+          </p>
+        )}
         <p className="text-sm text-muted">직원 {employees.length}명 · 근무 기록 {records.length}건</p>
       </section>
 
