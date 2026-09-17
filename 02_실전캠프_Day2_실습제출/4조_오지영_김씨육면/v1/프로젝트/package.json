@@ -1,0 +1,24 @@
+{
+  "name": "kimssi-settlement",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3177",
+    "build": "NEXT_DIST_DIR=.next-build next build",
+    "start": "NEXT_DIST_DIR=.next-build next start -p 3177",
+    "verify": "tsx scripts/verify-july.ts",
+    "verify:card": "tsx scripts/verify-card.ts"
+  },
+  "dependencies": {
+    "next": "15.1.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.7",
+    "@types/react": "19.0.7",
+    "@types/react-dom": "19.0.3",
+    "tsx": "^4.23.13",
+    "typescript": "5.7.3"
+  }
+}
