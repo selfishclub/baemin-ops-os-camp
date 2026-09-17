@@ -148,6 +148,64 @@ drop policy if exists "audit_insert_owner" on public.recipe_audit_log;
 create policy "audit_insert_owner" on public.recipe_audit_log
   for insert to authenticated with check (public.is_owner());
 
+-- 3-1) 바뀐 레시피 알림 · 읽음 확인 (v2 꼭 할 것 2) -------------------------------
+create table if not exists public.recipe_change_notices (
+  id bigserial primary key,
+  version integer not null,
+  recipe_id text not null,
+  recipe_name text not null,
+  change_reason text not null default '',
+  published_by text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_change_notices_created on public.recipe_change_notices (created_at desc);
+
+create table if not exists public.recipe_acks (
+  notice_id bigint not null references public.recipe_change_notices (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  acked_at timestamptz not null default now(),
+  primary key (notice_id, user_id)
+);
+
+grant select, insert, update, delete on public.recipe_change_notices, public.recipe_acks to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+
+alter table public.recipe_change_notices enable row level security;
+alter table public.recipe_acks enable row level security;
+
+drop policy if exists "notices_select_active" on public.recipe_change_notices;
+create policy "notices_select_active" on public.recipe_change_notices
+  for select to authenticated using (public.is_active_user());
+
+drop policy if exists "notices_insert_owner" on public.recipe_change_notices;
+create policy "notices_insert_owner" on public.recipe_change_notices
+  for insert to authenticated with check (public.is_owner());
+
+drop policy if exists "notices_delete_owner" on public.recipe_change_notices;
+create policy "notices_delete_owner" on public.recipe_change_notices
+  for delete to authenticated using (public.is_owner());
+
+drop policy if exists "acks_select_self_or_owner" on public.recipe_acks;
+create policy "acks_select_self_or_owner" on public.recipe_acks
+  for select to authenticated using (user_id = auth.uid() or public.is_owner());
+
+drop policy if exists "acks_insert_self" on public.recipe_acks;
+create policy "acks_insert_self" on public.recipe_acks
+  for insert to authenticated with check (user_id = auth.uid() and public.is_active_user());
+
+-- 빈숲OS 배지용: 로그인 없이 "최근 N일 안에 바뀐 레시피 건수"만 준다 (메뉴 이름은 안 나감)
+create or replace function public.recent_change_count(days integer default 14)
+returns integer
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select count(*)::integer from public.recipe_change_notices
+  where created_at > now() - make_interval(days => days);
+$$;
+grant execute on function public.recent_change_count(integer) to anon, authenticated;
+
 -- 4) 사진 파일함 (비공개) -------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('recipe-media', 'recipe-media', false)

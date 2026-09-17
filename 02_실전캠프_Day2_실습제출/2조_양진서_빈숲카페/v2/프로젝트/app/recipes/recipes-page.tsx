@@ -111,6 +111,17 @@ function directVideoUrl(value: string) {
 
 export type RecipeViewer = { displayName: string; role: "owner" | "staff" };
 
+type ChangeNoticeItem = {
+  id: number;
+  version: number;
+  recipe_id: string;
+  recipe_name: string;
+  change_reason: string;
+  published_by: string;
+  created_at: string;
+  acked: boolean;
+};
+
 export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | null; demo: boolean }) {
   const canEdit = viewer?.role === "owner";
   const [content, setContent] = useState<RecipeContent>(defaultRecipeContent);
@@ -130,6 +141,50 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
   const [editDirty, setEditDirty] = useState(false);
   const [editBusy, setEditBusy] = useState(false);
   const [editMessage, setEditMessage] = useState("");
+  const [notices, setNotices] = useState<ChangeNoticeItem[]>([]);
+  const [noticeBusy, setNoticeBusy] = useState<number | null>(null);
+  const pendingNotices = notices.filter((notice) => !notice.acked);
+
+  // 바뀐 레시피 알림 (로그인한 직원만)
+  const loadNotices = async () => {
+    if (!viewer) return;
+    try {
+      const response = await fetch("/api/changes", { cache: "no-store" });
+      if (!response.ok) return;
+      const body = await response.json();
+      setNotices(body.notices ?? []);
+    } catch {
+      // 알림은 부가 기능이라 실패해도 레시피 화면은 그대로 둔다
+    }
+  };
+
+  const ackNotice = async (noticeId: number) => {
+    setNoticeBusy(noticeId);
+    try {
+      const response = await fetch("/api/changes/ack", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ noticeId }),
+      });
+      if (response.ok) {
+        const body = await response.json();
+        setNotices(body.notices ?? []);
+      }
+    } finally {
+      setNoticeBusy(null);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) void loadNotices();
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewer?.displayName]);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const detailTitleRef = useRef<HTMLHeadingElement>(null);
   const lastTriggerRef = useRef<HTMLElement | null>(null);
@@ -395,19 +450,21 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
     };
     const saved = await saveInlineDraft(nextContent);
     if (!saved || !window.confirm("저장한 초안을 지금 직원용 공식 레시피로 게시할까요?")) return;
+    const notifyStaff = window.confirm("직원들에게 '바뀐 레시피'로 알리고 확인을 받을까요?\n(오타만 고쳤으면 '취소' → 알림 없이 게시)");
     setEditBusy(true);
     try {
       const response = await fetch("/api/admin/publish", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ revision: saved.revision, changeReason: reason.trim(), effectiveAt }),
+        body: JSON.stringify({ revision: saved.revision, changeReason: reason.trim(), effectiveAt, notifyStaff }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? body.errors?.join("\n") ?? "공식 게시에 실패했습니다.");
       setContent(body.content);
       setInlineAdmin(null);
       setEditDirty(false);
-      setEditMessage(`공식 버전 ${body.version} 게시 완료`);
+      setEditMessage(`공식 버전 ${body.version} 게시 완료${body.notified ? ` · 직원 확인 요청 ${body.notified}건` : ""}`);
+      void loadNotices();
     } catch (error) {
       setEditMessage(error instanceof Error ? error.message : "공식 게시에 실패했습니다.");
     } finally {
@@ -450,6 +507,8 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
           ) : (
             <p className={styles.headerNote}>{viewer ? `${viewer.displayName}님 · ${viewer.role === "owner" ? "사장" : "직원"}` : "공식 제조 기준"}</p>
           )}
+          {viewer && pendingNotices.length > 0 && <a className={styles.noticeBadge} href="#changes-title">바뀐 레시피 {pendingNotices.length}</a>}
+          {canEdit && <a href="/recipes/changes">확인 현황</a>}
           {canEdit && <a href="/recipes/staff">직원 관리</a>}
           {(canEdit || demo) && <a href="/recipes/admin">관리자 편집</a>}
           {viewer && (
@@ -464,6 +523,36 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
         <p className={styles.dataWarning} role="status">
           관리 서버에 연결하지 못해 검증된 기본 레시피를 표시하고 있습니다.
         </p>
+      )}
+
+      {viewer && pendingNotices.length > 0 && (
+        <section className={styles.changes} aria-labelledby="changes-title">
+          <div className={styles.changesHead}>
+            <span className={styles.alertMark} aria-hidden="true">!</span>
+            <div>
+              <p>확인 필요 · {pendingNotices.length}건</p>
+              <h2 id="changes-title">바뀐 레시피가 있어요</h2>
+              <span>레시피를 열어 보고 ‘확인했어요’를 눌러 주세요. 사장님 화면에 누가 확인했는지 보여요.</span>
+            </div>
+          </div>
+          <ul>
+            {pendingNotices.map((notice) => {
+              const target = recipes.find((recipe) => recipe.id === notice.recipe_id);
+              return (
+                <li key={notice.id}>
+                  <div>
+                    <strong>{notice.recipe_name}</strong>
+                    <small>{notice.change_reason || "레시피 변경"} · Ver {notice.version} · {notice.created_at.slice(0, 10)}</small>
+                  </div>
+                  <div>
+                    {target && <button type="button" onClick={(event) => openRecipe(target, event.currentTarget)}>보기</button>}
+                    <button type="button" className={styles.ackButton} disabled={noticeBusy === notice.id} onClick={() => void ackNotice(notice.id)}>확인했어요</button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       {!announcementSeen ? (

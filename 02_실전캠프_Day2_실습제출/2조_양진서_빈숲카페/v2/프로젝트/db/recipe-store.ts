@@ -130,16 +130,24 @@ export async function saveDraft(
   return { revision: expectedRevision + 1, updatedAt: now, content: cascaded.content };
 }
 
+// 이전 공식본과 비교해 실제로 바뀐(또는 새로 생긴) 메뉴만 골라낸다
+function changedRecipes(previous: RecipeContent, next: RecipeContent) {
+  const before = new Map(previous.recipes.map((recipe) => [recipe.id, JSON.stringify(recipe)]));
+  return next.recipes.filter((recipe) => before.get(recipe.id) !== JSON.stringify(recipe));
+}
+
 export async function publishDraft(
   db: SupabaseClient,
   actor: AdminActor,
   expectedRevision: number,
   changeReason: string,
   effectiveAt: string,
+  notifyStaff = true,
 ) {
   const workspace = await ensureWorkspace(db);
   if (workspace.draft_revision !== expectedRevision) return { conflict: true as const };
 
+  const previous = parseRecipeContent(workspace.published_json);
   const cascaded = cascadeSharedStandards(parseRecipeContent(workspace.draft_json));
   const errors = validateRecipeContent(cascaded.content);
   if (!changeReason.trim()) errors.unshift("게시 변경 이유가 필요합니다.");
@@ -167,8 +175,91 @@ export async function publishDraft(
     published_at: now,
   });
   if (error) throw new Error(`버전 기록을 남기지 못했습니다: ${error.message}`);
-  await audit(db, actor, "published", { version: nextVersion, changeReason, effectiveAt, impactedRecipeIds: cascaded.impactedRecipeIds });
-  return { version: nextVersion, revision: expectedRevision + 1, publishedAt: now, content: cascaded.content };
+
+  // 직원 확인이 필요한 변경이면, 바뀐 메뉴마다 알림을 남긴다 (직원이 "확인했어요"를 누르는 단위)
+  const changed = notifyStaff ? changedRecipes(previous, cascaded.content) : [];
+  if (changed.length) {
+    const { error: noticeError } = await db.from("recipe_change_notices").insert(
+      changed.map((recipe) => ({
+        version: nextVersion,
+        recipe_id: recipe.id,
+        recipe_name: recipe.name,
+        change_reason: changeReason.trim(),
+        published_by: actor.email,
+        created_at: now,
+      })),
+    );
+    // 게시는 이미 끝났으므로 알림 실패로 게시를 되돌리지 않는다. 기록만 남긴다.
+    if (noticeError) console.error("[publish] 바뀐 레시피 알림을 남기지 못했습니다:", noticeError.message);
+  }
+
+  await audit(db, actor, "published", { version: nextVersion, changeReason, effectiveAt, impactedRecipeIds: cascaded.impactedRecipeIds, notified: changed.map((recipe) => recipe.id) });
+  return { version: nextVersion, revision: expectedRevision + 1, publishedAt: now, content: cascaded.content, notified: changed.length };
+}
+
+// ---- 바뀐 레시피 알림 · 읽음 확인 ------------------------------------------------
+
+export type ChangeNotice = {
+  id: number;
+  version: number;
+  recipe_id: string;
+  recipe_name: string;
+  change_reason: string;
+  published_by: string;
+  created_at: string;
+};
+
+type NoticeWithAcks = ChangeNotice & { recipe_acks: { user_id: string; acked_at: string }[] };
+
+async function readNotices(db: SupabaseClient, limit = 60): Promise<NoticeWithAcks[]> {
+  const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * 60).toISOString();
+  const { data, error } = await db
+    .from("recipe_change_notices")
+    .select("id, version, recipe_id, recipe_name, change_reason, published_by, created_at, recipe_acks(user_id, acked_at)")
+    .gt("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`바뀐 레시피 목록을 읽지 못했습니다: ${error.message}`);
+  return (data ?? []) as NoticeWithAcks[];
+}
+
+// 직원용: 내가 확인했는지 표시해서 준다
+export async function listMyChangeNotices(db: SupabaseClient, userId: string) {
+  const notices = await readNotices(db);
+  const items = notices.map(({ recipe_acks, ...notice }) => ({
+    ...notice,
+    acked: recipe_acks.some((ack) => ack.user_id === userId),
+  }));
+  return { notices: items, pending: items.filter((item) => !item.acked).length };
+}
+
+export async function ackChangeNotice(db: SupabaseClient, userId: string, noticeId: number) {
+  const { error } = await db
+    .from("recipe_acks")
+    .upsert({ notice_id: noticeId, user_id: userId }, { onConflict: "notice_id,user_id", ignoreDuplicates: true });
+  if (error) throw new Error(`확인을 저장하지 못했습니다: ${error.message}`);
+}
+
+// 사장용: 알림마다 누가 확인했고 누가 안 봤는지
+export async function readChangeStatus(db: SupabaseClient) {
+  const [notices, staffResult] = await Promise.all([
+    readNotices(db, 100),
+    db.from("profiles").select("id, login_id, display_name, role, active").order("created_at", { ascending: true }),
+  ]);
+  if (staffResult.error) throw new Error(`직원 목록을 읽지 못했습니다: ${staffResult.error.message}`);
+  const staff = staffResult.data ?? [];
+  const activeStaff = staff.filter((person) => person.active);
+  return {
+    staff,
+    notices: notices.map(({ recipe_acks, ...notice }) => {
+      const ackedIds = new Set(recipe_acks.map((ack) => ack.user_id));
+      return {
+        ...notice,
+        acked: activeStaff.filter((person) => ackedIds.has(person.id)).map((person) => ({ id: person.id, name: person.display_name || person.login_id, at: recipe_acks.find((ack) => ack.user_id === person.id)?.acked_at ?? "" })),
+        pending: activeStaff.filter((person) => !ackedIds.has(person.id)).map((person) => ({ id: person.id, name: person.display_name || person.login_id })),
+      };
+    }),
+  };
 }
 
 export async function restoreVersionToDraft(

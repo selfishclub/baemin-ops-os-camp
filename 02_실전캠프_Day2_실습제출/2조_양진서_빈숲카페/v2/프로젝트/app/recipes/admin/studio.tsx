@@ -139,6 +139,7 @@ export default function AdminStudio({ userName }: { userName: string }) {
   const [errors, setErrors] = useState<string[]>([]);
   const [changeReason, setChangeReason] = useState("");
   const [effectiveAt, setEffectiveAt] = useState(new Date().toISOString().slice(0, 10));
+  const [notifyStaff, setNotifyStaff] = useState(true);
 
   const load = async () => {
     setBusy(true);
@@ -250,14 +251,14 @@ export default function AdminStudio({ userName }: { userName: string }) {
       const response = await fetch("/api/admin/publish", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ revision, changeReason, effectiveAt }),
+        body: JSON.stringify({ revision, changeReason, effectiveAt, notifyStaff }),
       });
       const body = await response.json();
       if (!response.ok) {
         setErrors(body.errors ?? []);
         throw new Error(body.error ?? "게시하지 못했습니다.");
       }
-      setMessage(`공식 버전 ${body.version} 게시 완료`);
+      setMessage(`공식 버전 ${body.version} 게시 완료${body.notified ? ` · 바뀐 메뉴 ${body.notified}개에 직원 확인 요청` : notifyStaff ? " · 바뀐 메뉴 없음(알림 없음)" : " · 알림 없이 게시"}`);
       setChangeReason("");
       await load();
     } catch (error) {
@@ -520,6 +521,10 @@ export default function AdminStudio({ userName }: { userName: string }) {
       <footer className={styles.publishBar}>
         <div><Field label="게시 변경 이유"><input placeholder="예: HOT 우유 공통 기준 변경" value={changeReason} onChange={(e) => setChangeReason(e.target.value)} /></Field></div>
         <div><Field label="시행일"><input type="date" value={effectiveAt} onChange={(e) => setEffectiveAt(e.target.value)} /></Field></div>
+        <label className={styles.notifyToggle}>
+          <input type="checkbox" checked={notifyStaff} onChange={(e) => setNotifyStaff(e.target.checked)} />
+          직원 확인 필요 (바뀐 메뉴에 ‘확인했어요’ 받기. 오타 수정이면 끄기)
+        </label>
         <button type="button" className={styles.primary} disabled={busy} onClick={() => void publish()}>검토 후 공식 게시</button>
       </footer>
     </main>

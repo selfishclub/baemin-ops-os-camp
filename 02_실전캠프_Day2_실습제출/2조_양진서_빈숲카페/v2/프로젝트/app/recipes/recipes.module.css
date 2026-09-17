@@ -123,6 +123,27 @@
   font-weight: 700;
 }
 
+.changes {
+  margin-top: 18px;
+  padding: 15px 17px;
+  border: 1px solid #cfe0d5;
+  border-radius: 16px;
+  background: #eef7f1;
+}
+.changesHead { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px; }
+.changesHead p { margin: 0; color: #2f6b47; font-size: 10px; font-weight: 900; letter-spacing: .12em; }
+.changesHead h2 { margin: 2px 0; font-size: 17px; color: #173f31; }
+.changesHead span { color: #4d5a50; font-size: 12px; }
+.changes ul { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+.changes li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .8); }
+.changes li strong { display: block; font-size: 14px; color: #173f31; }
+.changes li small { color: #6b7770; font-size: 11px; }
+.changes li > div:last-child { display: flex; gap: 6px; }
+.changes li button { min-height: 36px; padding: 0 12px; border: 1px solid #2f6b47; border-radius: 999px; background: white; color: #2f6b47; font-size: 12px; font-weight: 800; cursor: pointer; }
+.changes li button.ackButton { background: #2f6b47; color: white; }
+.changes li button:disabled { opacity: .5; }
+.noticeBadge { background: #ff7a59 !important; border-color: #ff7a59 !important; color: white !important; }
+
 .announcement {
   display: grid;
   grid-template-columns: auto 1fr auto;
