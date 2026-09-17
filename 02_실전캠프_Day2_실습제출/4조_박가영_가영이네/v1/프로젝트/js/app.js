@@ -35,6 +35,11 @@ function spiceLabel(level) {
 function categoryLabel(id) {
   return t(`foodType.${id}`);
 }
+function photoHTML(menu, large) {
+  const cls = large ? "photo large" : "photo";
+  if (menu.imageAsset) return `<div class="${cls} has-img"><img src="content/images/${esc(menu.imageAsset)}" alt="${esc(menuName(menu))}" loading="lazy" onerror="this.parentNode.classList.remove('has-img'); this.remove();"><span class="photo-fallback">${t("card.photoMissing")}</span></div>`;
+  return `<div class="${cls}" aria-hidden="true">${t("card.photoMissing")}</div>`;
+}
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
@@ -96,16 +101,18 @@ function render() {
 
 // ── 카드
 function cardHTML(menu, extra = "") {
-  const check = Filter.hasUnverifiedIngredient(menu) ? `<span class="badge check">${t("card.needsCheck")}</span>` : "";
+  const spiceUnknown = menu.spiceLevel === null || menu.spiceLevel === undefined;
+  const ingUnknown = Object.values(menu.ingredients ?? {}).some((s) => s === "unknown");
+  const check = ingUnknown && !spiceUnknown ? `<span class="badge check">${t("card.needsCheck")}</span>` : "";
   const sold = menu.availability === "sold_out" ? `<span class="badge sold">${t("card.soldOut")}</span>` : "";
   return `
     <a class="card" href="#/menu/${esc(menu.menuNumber)}">
-      <div class="photo" aria-hidden="true">${t("card.photoPending")}</div>
+      ${photoHTML(menu, false)}
       <div class="card-body">
         <span class="num">${menu.sample ? t("card.sample") + " · " : ""}${esc(menu.menuNumber)}</span>
         <span class="name">${esc(menuName(menu))}</span>
         <span class="name-ko" lang="ko">${esc(menu.nameKo)}</span>
-        <div class="badges"><span class="badge spice">${spiceLabel(menu.spiceLevel)}</span>${sold}${check}</div>
+        <div class="badges"><span class="badge ${spiceUnknown && ingUnknown ? "check" : "spice"}">${spiceUnknown && ingUnknown ? t("card.detailsUnverified") : spiceLabel(menu.spiceLevel)}</span>${sold}${check}</div>
         <span class="meta">${menu.priceKrw === null ? t("card.pricePending") : `${menu.priceKrw.toLocaleString()} KRW`}</span>
         ${extra}
       </div>
@@ -198,7 +205,7 @@ function renderDetail(id) {
 
   main.innerHTML = `
     <a class="back" href="#/" id="back">‹ ${t("detail.back")}</a>
-    <div class="photo large" aria-hidden="true">${t("card.photoPending")}</div>
+    ${photoHTML(menu, true)}
     <div class="detail-head">
       <span class="num">${menu.sample ? t("card.sample") + " · " : ""}${t("card.menuNo")} ${esc(menu.menuNumber)} ${sold}</span>
       <h1>${esc(menuName(menu))}</h1>
@@ -206,6 +213,8 @@ function renderDetail(id) {
       <div class="price">${menu.priceKrw === null ? t("card.pricePending") : `${menu.priceKrw.toLocaleString()} KRW`}${menu.servingKo ? ` · <span lang="ko">${esc(menu.servingKo)}</span>` : ""}</div>
     </div>
     ${menuField(menu, "description") ? `<p class="lead">${esc(menuField(menu, "description"))}</p>` : ""}
+    ${menu.salesNoteKo ? `<p class="notice info"><strong>${t("detail.salesNote")}:</strong> <span lang="ko">${esc(menu.salesNoteKo)}</span></p>` : ""}
+    ${menu.translations?.[state.lang]?.status === "draft" || (!menu.translations?.[state.lang] && menu.translations?.en?.status === "draft") ? `<p class="small">${t("detail.draftTranslation")}</p>` : ""}
     <section class="panel"><h2>${t("detail.ingredients")}</h2><ul class="ing-list">${ing}</ul>
       ${menuField(menu, "ingredientNote") ? `<p class="small">${esc(menuField(menu, "ingredientNote"))}</p>` : ""}
       <p class="small">${t("detail.statusNote")}</p></section>
@@ -228,7 +237,7 @@ function renderFind(id) {
       <div class="big-num">${esc(menu.menuNumber)}</div>
       <p class="big-ko" lang="ko">${esc(menu.nameKo)}</p>
       <p class="sub">${esc(menuName(menu))}</p>
-      <div class="photo large" aria-hidden="true">${t("card.photoPending")}</div>
+      ${photoHTML(menu, true)}
       <p class="instruction">${t("find.instruction")}</p>
       <p class="notice info">${t("order.note")}</p>
       ${menu.sample ? `<p class="small">${t("find.demoNumber")}</p>` : ""}

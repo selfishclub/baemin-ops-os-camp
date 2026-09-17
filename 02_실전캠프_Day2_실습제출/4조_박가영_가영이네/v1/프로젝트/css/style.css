@@ -215,3 +215,9 @@ h2 { font-size: 18px; margin: 0 0 8px; }
   .site-nav { grid-template-columns: repeat(4, 1fr); }
   h1 { font-size: 30px; }
 }
+
+/* ── real photos ── */
+.photo.has-img { position: relative; padding: 0; background: #ece4dc; }
+.photo.has-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo.has-img .photo-fallback { display: none; }
+.photo.large.has-img { border-radius: var(--radius); overflow: hidden; }
