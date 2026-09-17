@@ -115,7 +115,8 @@ h3 { font-size: 17px; margin: 18px 0 8px; }
 }
 .content hr { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
 .content table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0 14px; display: block; overflow-x: auto; }
-.content th, .content td { border: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; }
+.content th, .content td { border: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; min-width: 96px; word-break: keep-all; overflow-wrap: anywhere; }
+.content td:first-child { font-weight: 700; }
 .content th { background: var(--brand-soft); }
 mark.todo { background: var(--todo); color: var(--todo-ink); padding: 0 4px; border-radius: 4px; font-weight: 700; }
 .hl { animation: hl 2.4s ease-out; outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
