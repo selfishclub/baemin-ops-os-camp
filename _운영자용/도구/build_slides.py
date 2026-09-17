@@ -221,7 +221,7 @@ d2.append(S("light", """<p class="eyebrow">v1과 v2</p><h2>오늘은 <mark>v1</m
 <tr><td>예</td><td>근무표 입력 → 주급 계산 → 저장</td><td>배민 매출 자동 불러오기, 날씨 API로 준비량 추천</td></tr>
 <tr><td>어디</td><td>내폴더/v1/ · 코드는 v1/프로젝트/</td><td>내폴더/v2/ · 코드는 v2/프로젝트/ (v1/프로젝트 복사해 이어 만듦)</td></tr>
 </table>
-<div class="foot"><p class="note">범위가 크면 AI에게 "PRD_전체에서 오늘 되는 것만 [v1]으로 남기고 나머지는 [v2]로 옮겨 줘"라고 하세요.</p></div>"""))
+<div class="foot"><p class="note">범위가 크면 AI에게 "PRD_전체에서 오늘 되는 것만 [v1]으로 남기고 나머지는 [v2]로 옮겨 줘"라고 하세요. 반대로 v1이 일찍 끝나면 오늘 v2까지 시작해서 올려도 돼요.</p></div>"""))
 d2.append(S("", """<p class="eyebrow">실습 ② 순서</p><h2>AI에게 <span class="y">다섯 마디</span></h2>
 <div class="prompt"><span class="w">1 · 받기</span>https://github.com/selfishclub/baemin-ops-os-camp 저장소를 내 컴퓨터에 처음 가져와 줘. 홈 폴더 아래에.</div>
 <div class="prompt"><span class="w">2 · 내 폴더</span>02_실전캠프_Day2_실습제출 안의 내 폴더 [1조_이범례_부찌대학]을 열어 줘.</div>
@@ -243,7 +243,7 @@ d3.append(S("light", """<p class="eyebrow">오늘 목표</p><h2>여기까지가 
 <div class="hi"><p class="k">3</p><p class="t">v1 만들기</p><p class="d">내 폴더 v1/프로젝트 안에. 외부 연결 없이, 가짜 데이터로.</p></div>
 <div><p class="k">4</p><p class="t">push · 제출서</p><p class="d">한 기능 될 때마다 push. 제출서에 실행 방법과 스크린샷.</p></div>
 </div>
-<div class="foot"><p class="note">개인 저장소·Vercel 인터넷 주소는 오늘 안 해요. 10/17 다 만든 뒤에.</p></div>"""))
+<div class="foot"><p class="note">v1이 일찍 끝나면 v1/프로젝트를 v2/프로젝트로 복사해서 오늘 v2까지 해도 돼요. 개인 저장소·Vercel 인터넷 주소만 완성 후에.</p></div>"""))
 d3.append(S("", """<p class="eyebrow">제일 중요한 것</p><h2>만든 건 <span class="y">내 폴더 v1/프로젝트</span>에 통째로</h2>
 <div class="prompt"><span class="w">AI에게 · 시작할 때</span>v1/PRD.md를 읽고 v1 범위만 만들어 줘. <b>02_실전캠프_Day2_실습제출/[내폴더]/v1/프로젝트 폴더 안에</b> 만들어. 이 폴더는 이미 GitHub 저장소 안이니 <b>git init은 하지 마.</b></div>
 <div class="split" style="margin-top:36px">
@@ -285,7 +285,7 @@ d3.append(S("light", """<p class="eyebrow">완성 후 · 10/17 이후</p><h2>다
 <div class="hi"><p class="k">3</p><p class="t">Vercel</p><p class="d">저장소 하나 = 사이트 하나. 직원 폰에서 열리는 주소.</p></div>
 </div>
 <div class="foot"><p class="note">왜 나중에? 만드는 동안은 한곳이 편하고, Vercel은 저장소 하나에 사이트 하나라서요. 순서는 03 폴더 문서에 다 있어요.</p></div>"""))
-d3.append(S("cover", """<p class="eyebrow">미니 해커톤</p><h1>각자 <span class="y">v1</span> 만들기</h1><p class="by">내 폴더 v1/프로젝트 안에 · git init 없이 · 30분마다 push<br><span style="font-size:28px">막히면 오류 메시지 그대로 AI에게, 그다음 운영진</span></p>"""))
+d3.append(S("cover", """<p class="eyebrow">미니 해커톤</p><h1>각자 <span class="y">v1</span> 만들기</h1><p class="by">내 폴더 v1/프로젝트 안에 · git init 없이 · 30분마다 push<br><span style="font-size:28px">v1이 끝나면 오늘 v2까지 해도 돼요 · 막히면 오류 메시지 그대로 AI에게</span></p>"""))
 
 DECKS = [
  ("01_GitHub_왜쓰고_어떻게쓰나", "GitHub, 왜 쓰고 어떻게 쓰나 — 실전 캠프 Day 2", d1),
