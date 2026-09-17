@@ -17,7 +17,8 @@ GitHub 접근 허용 화면이 나오면 **Authorize**.
 
 ## 3. 환경변수 넣기 (Supabase를 썼을 때만)
 
-**Environment Variables** 칸을 펼치고, `.env.local`에 있던 것과 **같은 이름, 같은 값**을 넣습니다.
+**Environment Variables** 칸을 펼치고, `.env.local`에 있던 것과 **같은 이름, 같은 값**을 **사장님이 직접** 붙여넣습니다.
+AI에게 "Vercel 환경변수 칸 열어 줘"라고 하면 Claude in Chrome이 칸까지 열어 두고 멈춥니다. 값은 Supabase 열쇠 화면(Project Settings → API)에서 복사해 옵니다.
 
 | Key | Value |
 |---|---|

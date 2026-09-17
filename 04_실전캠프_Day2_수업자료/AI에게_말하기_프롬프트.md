@@ -83,12 +83,12 @@ Claude(클로드) 기준이지만 다른 AI도 같은 말이 통합니다.
 > 이 프로젝트를 내 GitHub 계정에 새 저장소 `[staff-schedule]`로 Public으로 올려 줘. 올리기 전에 `.gitignore`에 `.env*`가 있는지, 키가 들어간 파일이 없는지 확인해 줘.
 
 **Supabase**
-> Supabase를 연결해 줘. 주소는 `[URL]`, anon 키는 `[키]`. `.env.local`에 넣고 `.gitignore`에 있는지 확인해 줘. 코드에 직접 적지 마.
+> Supabase 연결을 Claude in Chrome으로 진행해 줘. PRD를 보고 필요한 테이블도 만들고 RLS도 켜 줘. 가입·로그인과 열쇠 붙여넣기는 내가 할게. 내 차례가 오면 멈추고, 무엇을 어디에 하면 되는지 알려 줘. 열쇠 값을 채팅에 적거나 대신 입력하지는 마.
 
-> PRD를 보고 필요한 테이블을 만드는 SQL을 보여 줘. 내가 Supabase SQL Editor에 붙여넣을게. RLS도 켜 줘.
+> (열쇠 붙여넣을 차례) `.env.local`을 텍스트 편집기로 열어 줘. 이름만 적어 두고 값은 비워 둬. 내가 붙여넣고 저장할게.
 
 **Vercel 환경변수**
-> Vercel 환경변수에 넣어야 할 이름과 값을 표로 알려 줘. `.env.local` 기준으로. service_role 키는 빼 줘.
+> Vercel 환경변수에 넣어야 할 이름을 표로 알려 주고, Claude in Chrome으로 환경변수 칸까지 열어 줘. 값은 내가 붙여넣을게. service_role 키는 빼 줘.
 
 **배포 실패**
 > Vercel 배포가 실패했어. 로그는 이거야: [붙여넣기]. 원인을 찾고 고쳐서 push해 줘.

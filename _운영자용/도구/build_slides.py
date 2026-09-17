@@ -248,8 +248,8 @@ d3.append(S("light", """<p class="eyebrow">왜 공동 저장소에 코드를 안
 d3.append(S("light", """<p class="eyebrow">세 단계</p><h2>한 번 해 두면 <mark>push만 하면</mark> 자동이에요</h2>
 <div class="steps three">
 <div><p class="k">1 · 5분</p><p class="t">내 GitHub 저장소</p><p class="d">"이 프로젝트를 내 GitHub에 새 저장소로, Public으로 올려 줘. .gitignore에 .env* 있는지 확인하고." AI가 주소를 알려 줘요.</p></div>
-<div><p class="k">2 · 10분 · 저장이 필요할 때만</p><p class="t">Supabase 창고</p><p class="d">GitHub 계정으로 가입 → 새 프로젝트(Seoul) → URL과 anon 키만 복사 → AI에게 "연결해 줘, 코드에 직접 적지 마". 테이블은 AI가 SQL로.</p></div>
-<div class="hi"><p class="k">3 · 10분</p><p class="t">Vercel 주소</p><p class="d">GitHub 계정으로 가입 → Import 내 저장소 → 환경변수(Supabase 값) → Deploy → 주소. 내 폰에서 열리면 성공.</p></div>
+<div><p class="k">2 · 10분 · 저장이 필요할 때만</p><p class="t">Supabase 창고</p><p class="d"><b>사장님</b>: GitHub 계정으로 가입·로그인 → <b>Claude in Chrome</b>: 새 프로젝트(Seoul)·테이블·잠금(RLS) → <b>사장님</b>: URL과 anon 키를 .env.local에 붙여넣기.</p></div>
+<div class="hi"><p class="k">3 · 10분</p><p class="t">Vercel 주소</p><p class="d">GitHub 계정으로 가입 → Import 내 저장소 → 환경변수 칸에 Supabase 값 <b>직접</b> 붙여넣기 → Deploy → 주소. 내 폰에서 열리면 성공.</p></div>
 </div>
 <div class="foot"><p class="note">셋 다 GitHub 계정 하나로 로그인돼요. 새 비밀번호 안 만들어도 돼요. 무료로 시작합니다.</p></div>"""))
 d3.append(S("", """<p class="eyebrow">열쇠 이야기</p><h2>공개해도 되는 열쇠, <span class="y">절대 안 되는 열쇠</span></h2>
