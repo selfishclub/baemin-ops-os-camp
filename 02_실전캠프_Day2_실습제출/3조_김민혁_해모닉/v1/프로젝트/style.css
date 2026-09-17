@@ -1037,3 +1037,16 @@ table.tkLog tr.sum td{font-weight:700;border-top:2px solid var(--rule);backgroun
 .paper.slip .slipT tr.sum td{font-weight:700;background:#fafafa}
 .paper.slip .slipNet{margin:16px 0 6px;padding:12px 14px;border:2px solid #222;border-radius:6px;font-size:16px;display:flex;justify-content:space-between}
 .pageBreak{page-break-after:always}
+
+/* 갑각류 매입 인사이트 */
+.biCards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}
+.biCard{padding:14px 16px}
+.biTop{display:flex;align-items:center;gap:8px;font-size:15px;margin-bottom:8px}
+.biTop .mut{color:var(--muted);font-size:13px}
+.biRec{font-size:14px}
+.biRec .hint{margin-top:4px}
+table.tkLog td.cheap{background:var(--ok-soft);color:var(--ok);font-weight:700}
+table.tkLog td.dear{background:var(--crit-soft);color:var(--crit);font-weight:700}
+table.tkLog td small{display:block;font-size:11px;color:var(--muted);font-weight:400}
+.spark.bi{height:90px}
+@media (max-width:760px){.biCards{grid-template-columns:1fr}}
