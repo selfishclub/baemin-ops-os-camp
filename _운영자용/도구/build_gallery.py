@@ -7,6 +7,7 @@ ORDER=["1조_유승균_마선생얼큰국밥","1조_이범례_부찌대학","2�
 def field(text,label):
     m=re.search(r"^- \**"+re.escape(label.strip("*"))+r"\**[^:：\n]*[:：]\**[ \t]*(.*)$", text, re.M)
     v=(m.group(1).strip() if m else "")
+    v=v.strip("*").strip()
     return "" if v.startswith("(") and v.endswith(")") else v
 def first_image(folder):
     imgs=[p for p in glob.glob(f"{folder}/결과물/*") if p.lower().endswith((".png",".jpg",".jpeg",".gif",".webp"))]
