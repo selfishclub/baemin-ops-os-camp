@@ -972,3 +972,17 @@ button.notice.rlink .hint{display:block;margin-top:4px}
   body.printMode{background:#fff}
   #printBox .paper{border:0;margin:0;max-width:none;padding:0}
 }
+
+/* ── 회계 (매출 입력 · 분석 · 손익 · 인건비) ── */
+.frow3{display:flex;gap:10px}.frow3 label{flex:1}
+.sfIn.bad{border-color:var(--crit)!important;background:var(--crit-soft)!important}
+tr.rowbtn{cursor:pointer}tr.rowbtn:hover td{background:var(--surface-2)}tr.rowbtn.empty td{color:var(--muted)}
+.dim{color:var(--muted)}
+.spark.sales .sb i{background:var(--accent)}
+.spark .sb.none{opacity:.35}
+.hintlist{margin:6px 0 0 18px;padding:0;font-size:13.5px;line-height:1.7}
+.warnTxt{color:var(--crit)}
+.pnlBig{margin:14px 0;padding:20px}.pnlBig .cv{font-size:32px;font-weight:800}.pnlBig.neg .cv{color:var(--crit)}
+table.tkLog tr.sum td{font-weight:700;border-top:2px solid var(--rule);background:var(--surface-2)}
+.stRule input.stSel{font-family:inherit}
+@media (max-width:760px){.frow3{flex-direction:column}}
