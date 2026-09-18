@@ -13,7 +13,7 @@ v1(월 정산 손익 한 장)에 **오늘 마감 입력 · 정산 주기 규칙�
 
 ## 열어 보기
 
-시연 주소: https://sootdak-ledger.vercel.app (시연 모드 — **가짜 데이터만** 넣으세요. 로그인이 없어 누구나 볼 수 있습니다)
+시연 주소: https://sootdak-ledger.vercel.app (v2 · 시연 모드 — **가짜 데이터만** 넣으세요. 로그인이 없어 누구나 볼 수 있습니다)
 
 고친 뒤 다시 올리기: 이 폴더에서 `npx vercel deploy --prod`
 
