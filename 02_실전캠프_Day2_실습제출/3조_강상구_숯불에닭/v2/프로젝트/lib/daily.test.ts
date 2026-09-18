@@ -1,3 +1,4 @@
+import { normalizeTime } from "./daily";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CHANNELS } from "./categories";
 import { checkDay, dayTotals, daysInMonth, hoursBetween, monthChannelTotals, monthSummary, shiftDate, weekHoursByStaff, weekStart } from "./daily";
@@ -60,5 +61,23 @@ describe("출퇴근 시각 → 근무시간", () => {
     expect(hoursBetween("18:00", "22:30")).toBe(4.5);
     expect(hoursBetween("17:00", "01:00")).toBe(8);
     expect(hoursBetween("", "10:00")).toBe(0);
+  });
+});
+
+describe("normalizeTime", () => {
+  it("숫자만 쳐도 HH:MM으로 정리한다", () => {
+    expect(normalizeTime("6")).toBe("06:00");
+    expect(normalizeTime("18")).toBe("18:00");
+    expect(normalizeTime("610")).toBe("06:10");
+    expect(normalizeTime("1830")).toBe("18:30");
+    expect(normalizeTime("18:3")).toBe("18:03");
+    expect(normalizeTime("6.10")).toBe("06:10");
+    expect(normalizeTime("24:00")).toBe("00:00");
+  });
+  it("이상한 값은 빈 문자열", () => {
+    expect(normalizeTime("")).toBe("");
+    expect(normalizeTime("25")).toBe("");
+    expect(normalizeTime("18:75")).toBe("");
+    expect(normalizeTime("abc")).toBe("");
   });
 });

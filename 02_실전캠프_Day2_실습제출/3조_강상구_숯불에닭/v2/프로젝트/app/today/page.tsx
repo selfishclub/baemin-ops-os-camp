@@ -8,7 +8,7 @@ import { CHANNELS_KEY, useDaily } from "@/components/useDaily";
 import { CARD_PRESETS, groupChannels, type Channel, type ChannelKind } from "@/lib/categories";
 import { CARD_RULE_DAYS, DEFAULT_CARD_DAYS, SETTLEMENT_RULES_KEY, type SettlementRule } from "@/lib/settlement";
 import { newId } from "@/lib/classify";
-import { checkDay, dayTotals, daysInMonth, hoursBetween, monthSummary, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
+import { checkDay, dayTotals, daysInMonth, hoursBetween, monthSummary, normalizeTime, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
 import { getStore } from "@/lib/storage";
@@ -18,6 +18,31 @@ import { useWeather } from "@/components/useWeather";
 import { KIND_ICON, expectedSales } from "@/lib/weather";
 
 const DOW = ["월", "화", "수", "목", "금", "토", "일"];
+
+// 출근·퇴근 시각 칸 — 브라우저 기본 시각 칸은 한국어에서 "오전/오후"만 보여 글자 칸으로 받고, 칸을 떠날 때 HH:MM으로 정리한다.
+function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+  const commit = () => {
+    const n = normalizeTime(text);
+    setText(n);
+    if (n !== value) onChange(n);
+  };
+  return (
+    <input
+      aria-label={label}
+      inputMode="numeric"
+      placeholder="18:00"
+      className={`field num px-1 text-center ${text && !normalizeTime(text) ? "border-red-400" : ""}`}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+    />
+  );
+}
 
 export default function TodayPage() {
   const { month, setMonth } = useMonth();
@@ -195,7 +220,7 @@ export default function TodayPage() {
                 <b>배달앱</b> — 각 앱 사장님 앱의 오늘 주문금액(손님 결제 금액, 수수료 빼기 전)
               </li>
               <li>
-                <b>알바</b> — 별칭을 고르고 <b>출근·퇴근 시각</b>을 넣으면 근무시간이 계산돼요(예: 18:00~22:30 → 4.5h, 자정을 넘기면 다음날로). 시급은 아래 “직원·채널 설정”에서 한 번만 등록
+                <b>알바</b> — 별칭을 고르고 <b>출근·퇴근 시각</b>을 24시간제로 넣으면 근무시간이 계산돼요(예: 18:00~22:30 → 4.5h, 저녁 6시는 18, 자정을 넘기면 다음날로). 숫자만 쳐도 돼요(1830 → 18:30). 시급은 아래 “직원·채널 설정”에서 한 번만 등록
               </li>
             </ul>
             <p className="mt-1">빠뜨린 날은 아래 달력의 회색 날짜를 눌러 나중에 채우면 돼요.</p>
@@ -291,6 +316,7 @@ export default function TodayPage() {
                     if (j !== i) return x;
                     const next = { ...x, ...p };
                     if (next.start && next.end) next.hours = hoursBetween(next.start, next.end);
+                    else if ("start" in p || "end" in p) next.hours = 0; // 시각을 지우면 자동 계산값도 지운다
                     return next;
                   }),
                 );
@@ -304,10 +330,10 @@ export default function TodayPage() {
                       </option>
                     ))}
                   </select>
-                  <input aria-label={`근무 ${i + 1} 출근`} type="time" className="field num px-1" value={r.start} onChange={(e) => patchRow({ start: e.target.value })} />
-                  <input aria-label={`근무 ${i + 1} 퇴근`} type="time" className="field num px-1" value={r.end} onChange={(e) => patchRow({ end: e.target.value })} />
+                  <TimeField label={`근무 ${i + 1} 출근`} value={r.start} onChange={(v) => patchRow({ start: v })} />
+                  <TimeField label={`근무 ${i + 1} 퇴근`} value={r.end} onChange={(v) => patchRow({ end: v })} />
                   {r.start && r.end ? (
-                    <span className="num text-right text-sm font-bold">{r.hours}h</span>
+                    <span className="num text-right text-sm font-bold text-orange-700">{r.hours}h</span>
                   ) : (
                     <input aria-label={`근무 ${i + 1} 시간`} inputMode="decimal" className="field num px-1 text-right" placeholder="시간" value={r.hours || ""} onChange={(e) => patchRow({ hours: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })} />
                   )}

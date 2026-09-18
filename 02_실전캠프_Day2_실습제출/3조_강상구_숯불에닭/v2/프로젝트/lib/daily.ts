@@ -146,6 +146,34 @@ export function hoursBetween(start: string, end: string): number {
   return Math.round((diff / 60) * 10) / 10;
 }
 
+// 사람이 친 시각을 "HH:MM"으로 정리한다. "6"→"06:00", "610"→"06:10", "1830"→"18:30", "18:3"→"18:03", "24:00"→"00:00". 못 알아들으면 "".
+export function normalizeTime(raw: string): string {
+  const t = raw.trim().replace(/[.\s]/g, ":");
+  let h: number;
+  let m: number;
+  if (t.includes(":")) {
+    const [a, b = "0"] = t.split(":");
+    h = Number(a);
+    m = Number(b);
+  } else {
+    const d = t.replace(/\D/g, "");
+    if (!d) return "";
+    if (d.length <= 2) {
+      h = Number(d);
+      m = 0;
+    } else if (d.length === 3) {
+      h = Number(d[0]);
+      m = Number(d.slice(1));
+    } else {
+      h = Number(d.slice(0, 2));
+      m = Number(d.slice(2, 4));
+    }
+  }
+  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 24 || m < 0 || m > 59) return "";
+  if (h === 24) h = 0;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 export interface DailyIssue {
   level: "error" | "warn";
   message: string;
