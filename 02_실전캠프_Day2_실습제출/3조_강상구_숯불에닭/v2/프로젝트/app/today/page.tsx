@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, MoneyInput, Notice } from "@/components/ui";
 import { CHANNELS_KEY, useDaily } from "@/components/useDaily";
 import { CARD_PRESETS, groupChannels, type Channel, type ChannelKind } from "@/lib/categories";
 import { CARD_RULE_DAYS, DEFAULT_CARD_DAYS, SETTLEMENT_RULES_KEY, type SettlementRule } from "@/lib/settlement";
 import { newId } from "@/lib/classify";
+import { CardApprovalError, parseCardApproval, type ParsedCardApproval } from "@/lib/cardApproval";
 import { checkDay, dayTotals, daysInMonth, hoursBetween, monthSummary, normalizeTime, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
@@ -57,6 +58,9 @@ export default function TodayPage() {
   const [saved, setSaved] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [help, setHelp] = useState(false);
+  const [cardFile, setCardFile] = useState<{ parsed: ParsedCardApproval; name: string } | null>(null);
+  const [cardFileMsg, setCardFileMsg] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const cardFileRef = useRef<HTMLInputElement>(null);
   const weather = useWeather();
   const todayWeather = weather.weather.find((w) => w.date === date) ?? weather.forecast.find((w) => w.date === date);
 
@@ -144,6 +148,47 @@ export default function TodayPage() {
   }
 
   const dow = DOW[(new Date(date + "T00:00:00Z").getUTCDay() + 6) % 7];
+
+  // 포스 "승인현황 (카드승인현황)" 엑셀 → 날짜별 카드사 매출. 파일은 이 화면 안에서만 읽는다.
+  async function readCardFile(file: File) {
+    setCardFileMsg(null);
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true }) as never[][];
+      setCardFile({ parsed: parseCardApproval(grid), name: file.name });
+    } catch (e) {
+      setCardFileMsg({ tone: "error", text: e instanceof CardApprovalError ? e.message : `파일을 읽지 못했어요. 포스 승인현황 엑셀(.xls, .xlsx)이 맞나요? (${e instanceof Error ? e.message : e})` });
+    } finally {
+      if (cardFileRef.current) cardFileRef.current.value = "";
+    }
+  }
+
+  // 파일의 날짜마다: 그날 카드 줄은 파일 값으로 바꾸고, 현금·배달앱은 그대로 둔다
+  async function applyCardFile() {
+    if (!cardFile) return;
+    const { parsed } = cardFile;
+    const store = getStore();
+    const isCard = (id: string) => id === "hall_card" || id === "hall" || CARD_PRESETS.some((p) => p.id === id);
+    const used = new Set<string>();
+    for (const d of parsed.days) {
+      const keep = daily.sales.filter((s) => s.date === d.date && !isCard(s.channel));
+      const cards: DailySale[] = Object.entries(d.byCard)
+        .filter(([, amt]) => amt > 0)
+        .map(([channel, amount]) => ({ date: d.date, channel, amount }));
+      for (const c of cards) used.add(c.channel);
+      await store.saveDailySales(d.date, [...keep, ...cards]);
+    }
+    for (const id of used) {
+      const preset = CARD_PRESETS.find((p) => p.id === id);
+      if (preset) await ensureCardChannel(preset);
+    }
+    setCardFile(null);
+    await daily.reload();
+    if (!date.startsWith(parsed.from.slice(0, 7))) setDate(parsed.to);
+    setCardFileMsg({ tone: "ok", text: `${parsed.from.slice(5).replace("-", "/")}~${parsed.to.slice(5).replace("-", "/")} ${parsed.days.length}일치 카드 매출을 넣었어요. 현금·배달앱은 날마다 따로 넣어 주세요.` });
+    weather.fillMissing().catch(() => {});
+  }
 
   // 카드사를 처음 쓰면 채널(카드) + 정산 규칙(+2영업일) + 통장 입금 분류 규칙을 같이 만든다
   async function ensureCardChannel(preset: (typeof CARD_PRESETS)[number]) {
@@ -259,6 +304,18 @@ export default function TodayPage() {
             <p className="num mt-1 text-right text-xs text-stone-600">
               카드 합계 <b>{won(cardTotal)}</b>
             </p>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border-t border-stone-200 pt-2">
+              <p className="text-[11px] text-stone-500">여러 날을 한 번에: 포스 ASP → 매출관리 → 승인현황(카드승인현황) 엑셀</p>
+              <input ref={cardFileRef} type="file" accept=".xls,.xlsx" aria-label="포스 카드승인현황 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readCardFile(e.target.files[0])} />
+              <button className="btn-ghost px-3 py-1.5 text-xs" onClick={() => cardFileRef.current?.click()}>
+                카드승인현황 파일 올리기
+              </button>
+            </div>
+            {cardFileMsg && (
+              <div className="mt-2">
+                <Notice tone={cardFileMsg.tone}>{cardFileMsg.text}</Notice>
+              </div>
+            )}
           </div>
           {(
             [
@@ -461,6 +518,29 @@ export default function TodayPage() {
 
       {showSettings && <SettingsDialog daily={daily} onClose={() => setShowSettings(false)} />}
 
+      {cardFile && (
+        <ConfirmDialog title="카드승인현황 파일 — 이대로 넣을까요?" confirmLabel={`${cardFile.parsed.days.length}일치 넣기`} onConfirm={applyCardFile} onCancel={() => setCardFile(null)}>
+          <p>
+            <b>{cardFile.parsed.from}</b> ~ <b>{cardFile.parsed.to}</b> · {cardFile.parsed.days.length}일 · 승인 {num(cardFile.parsed.days.reduce((a, d) => a + d.count, 0))}건
+          </p>
+          <p className="num">
+            카드 합계 <b>{won(cardFile.parsed.total)}</b>
+            {cardFile.parsed.sheetTotal !== null && cardFile.parsed.sheetTotal !== cardFile.parsed.total && <span className="text-stone-500"> (파일 합계 줄 {won(cardFile.parsed.sheetTotal)} — 취소 건 차이)</span>}
+          </p>
+          <ul className="num grid grid-cols-2 gap-x-3 text-xs text-stone-600">
+            {Object.entries(cardFile.parsed.byCard)
+              .sort((a, b) => b[1] - a[1])
+              .map(([id, amt]) => (
+                <li key={id} className="flex justify-between">
+                  <span>{cardLabel(id)}</span>
+                  <span>{won(amt)}</span>
+                </li>
+              ))}
+          </ul>
+          {cardFile.parsed.unknownIssuers.length > 0 && <Notice tone="warn">카드사 목록에 없는 매입사 “{cardFile.parsed.unknownIssuers.join(", ")}”는 ‘카드 전체 / 기타’로 넣어요.</Notice>}
+          <p className="text-xs text-stone-500">이 날짜들의 카드 매출은 파일 값으로 바뀌어요. 현금·배달앱·근무는 그대로예요. 자정 넘어 결제한 것도 영업일자대로 전날에 붙어요.</p>
+        </ConfirmDialog>
+      )}
       {asking === "check" && (
         <ConfirmDialog title="숫자를 한 번 더 확인해 주세요" confirmLabel="맞아요, 저장" onConfirm={save} onCancel={() => setAsking(null)}>
           {issues.map((i) => (
