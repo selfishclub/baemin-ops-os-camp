@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "sample": "node scripts/make-sample-xlsx.mjs",
-    "sample:daily": "node scripts/make-sample-daily.mjs"
+    "sample:daily": "node scripts/make-sample-daily.mjs",
+    "sample:pos": "node scripts/make-sample-pos.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

@@ -1,0 +1,56 @@
+{
+  "_note": "시연용 가짜 품목·메뉴·레시피·단가. 실제 가게 레시피·단가가 아니다.",
+  "items": [
+    { "id": "it_chicken", "name": "닭 원육", "baseUnit": "kg", "standardCost": 7000, "category": "meat", "active": true },
+    { "id": "it_sauce", "name": "양념 소스", "baseUnit": "kg", "standardCost": 4500, "category": "sauce", "active": true },
+    { "id": "it_charcoal", "name": "숯", "baseUnit": "kg", "standardCost": 1800, "category": "etc", "active": true },
+    { "id": "it_rice", "name": "쌀", "baseUnit": "kg", "standardCost": 3200, "category": "produce", "active": true },
+    { "id": "it_veg", "name": "채소 모둠", "baseUnit": "kg", "standardCost": 3000, "category": "produce", "active": true },
+    { "id": "it_cheese", "name": "치즈", "baseUnit": "kg", "standardCost": 12000, "category": "etc", "active": true },
+    { "id": "it_egg", "name": "계란", "baseUnit": "ea", "standardCost": 300, "category": "produce", "active": true },
+    { "id": "it_soju", "name": "소주", "baseUnit": "ea", "standardCost": 1400, "category": "drink", "active": true },
+    { "id": "it_beer", "name": "맥주", "baseUnit": "ea", "standardCost": 1700, "category": "drink", "active": true },
+    { "id": "it_soda", "name": "음료수", "baseUnit": "ea", "standardCost": 600, "category": "drink", "active": true },
+    { "id": "it_box", "name": "포장 용기", "baseUnit": "ea", "standardCost": 350, "category": "packaging", "active": true }
+  ],
+  "menus": [
+    { "id": "m_001", "name": "양념닭갈비", "posCode": "002001", "price": 15000, "active": true },
+    { "id": "m_002", "name": "소금닭갈비", "posCode": "002002", "price": 15000, "active": true },
+    { "id": "m_003", "name": "치즈닭갈비", "posCode": "002003", "price": 17000, "active": true },
+    { "id": "m_004", "name": "닭목살구이", "posCode": "002004", "price": 16000, "active": true },
+    { "id": "m_005", "name": "볶음밥", "posCode": "003001", "price": 4000, "active": true },
+    { "id": "m_006", "name": "계란찜", "posCode": "003002", "price": 4000, "active": true },
+    { "id": "m_007", "name": "소주", "posCode": "005001", "price": 5000, "active": true },
+    { "id": "m_008", "name": "맥주", "posCode": "005002", "price": 5000, "active": true },
+    { "id": "m_009", "name": "음료수", "posCode": "005003", "price": 2000, "active": true },
+    { "id": "m_010", "name": "포장 양념닭갈비", "posCode": "002101", "price": 15000, "active": true },
+    { "id": "m_011", "name": "치즈퐁듀", "posCode": "003003", "price": 5000, "active": true },
+    { "id": "m_012", "name": "국수", "posCode": "003004", "price": 4000, "active": true }
+  ],
+  "recipes": [
+    { "menuId": "m_001", "effectiveFrom": "2026-01-01", "lines": [ { "itemId": "it_chicken", "unit": "g", "quantity": 350 }, { "itemId": "it_sauce", "unit": "g", "quantity": 60 }, { "itemId": "it_charcoal", "unit": "g", "quantity": 120 }, { "itemId": "it_veg", "unit": "g", "quantity": 80 } ] },
+    { "menuId": "m_002", "effectiveFrom": "2026-01-01", "lines": [ { "itemId": "it_chicken", "unit": "g", "quantity": 350 }, { "itemId": "it_charcoal", "unit": "g", "quantity": 120 }, { "itemId": "it_veg", "unit": "g", "quantity": 80 } ] },
+    { "menuId": "m_003", "effectiveFrom": "2026-01-01", "lines": [ { "itemId": "it_chicken", "unit": "g", "quantity": 350 }, { "itemId": "it_sauce", "unit": "g", "quantity": 60 }, { "itemId": "it_cheese", "unit": "g", "quantity": 80 }, { "itemId": "it_charcoal", "unit": "g", "quantity": 120 } ] },
+    { "menuId": "m_004", "effectiveFrom": "2026-01-01", "lines": [ { "itemId": "it_chicken", "unit": "g", "quantity": 400 }, { "itemId": "it_charcoal", "unit": "g", "quantity": 120 } ] },
+    { "menuId": "m_005", "effectiveFrom": "2026-01-01", "lines": [ { "itemId": "it_rice", "unit": "g", "quantity": 180 }, { "itemId": "it_veg", "unit": "g", "quantity": 40 }, { "itemId": "it_egg", "unit": "ea", "quantity": 1 } ] },
+    { "menuId": "m_006", "effectiveFrom": "2026-01-01", "lines": [ { "itemId": "it_egg", "unit": "ea", "quantity": 3 } ] },
+    { "menuId": "m_007", "effectiveFrom": "2026-01-01", "lines": [ { "itemId": "it_soju", "unit": "ea", "quantity": 1 } ] },
+    { "menuId": "m_008", "effectiveFrom": "2026-01-01", "lines": [ { "itemId": "it_beer", "unit": "ea", "quantity": 1 } ] },
+    { "menuId": "m_009", "effectiveFrom": "2026-01-01", "lines": [ { "itemId": "it_soda", "unit": "ea", "quantity": 1 } ] },
+    { "menuId": "m_010", "effectiveFrom": "2026-01-01", "lines": [ { "itemId": "it_chicken", "unit": "g", "quantity": 350 }, { "itemId": "it_sauce", "unit": "g", "quantity": 60 }, { "itemId": "it_charcoal", "unit": "g", "quantity": 120 }, { "itemId": "it_box", "unit": "ea", "quantity": 2 } ] }
+  ],
+  "posSales": [
+    { "code": "002001", "name": "양념닭갈비", "quantity": 420, "amount": 6300000 },
+    { "code": "002002", "name": "소금닭갈비", "quantity": 180, "amount": 2700000 },
+    { "code": "002003", "name": "치즈닭갈비", "quantity": 150, "amount": 2550000 },
+    { "code": "002004", "name": "닭목살구이", "quantity": 95, "amount": 1520000 },
+    { "code": "002101", "name": "포장 양념닭갈비", "quantity": 260, "amount": 3900000 },
+    { "code": "003001", "name": "볶음밥", "quantity": 310, "amount": 1240000 },
+    { "code": "003002", "name": "계란찜", "quantity": 120, "amount": 480000 },
+    { "code": "003003", "name": "치즈퐁듀", "quantity": 60, "amount": 300000 },
+    { "code": "003004", "name": "국수", "quantity": 85, "amount": 340000 },
+    { "code": "005001", "name": "소주", "quantity": 520, "amount": 2600000 },
+    { "code": "005002", "name": "맥주", "quantity": 330, "amount": 1650000 },
+    { "code": "005003", "name": "음료수", "quantity": 210, "amount": 420000 }
+  ]
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { CategorySelect, ConfirmDialog, Notice } from "@/components/ui";
@@ -64,6 +65,11 @@ export default function RulesPage() {
 
   return (
     <>
+      <Link href="/guide" className="card flex items-center justify-between text-sm font-semibold text-orange-800">
+        <span>📖 처음이세요? 사용법 — 어디에 무엇을 넣나</span>
+        <span>→</span>
+      </Link>
+
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-bold">

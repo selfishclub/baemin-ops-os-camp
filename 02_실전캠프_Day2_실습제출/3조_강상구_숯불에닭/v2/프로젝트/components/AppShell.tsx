@@ -26,6 +26,7 @@ const TABS = [
   { href: "/today", label: "오늘", icon: "📝" },
   { href: "/upload", label: "올리기", icon: "📥" },
   { href: "/channels", label: "정산", icon: "🛵" },
+  { href: "/costing", label: "원가율", icon: "🍗" },
   { href: "/rules", label: "규칙", icon: "⚙️" },
 ];
 
@@ -76,7 +77,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-stone-200 bg-white">
-        <ul className="mx-auto grid max-w-3xl grid-cols-5">
+        <ul className="mx-auto grid max-w-3xl grid-cols-6">
           {TABS.map((t) => {
             const active = pathname === t.href;
             return (
