@@ -5,6 +5,8 @@ import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, MoneyInput, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
 import { useDaily } from "@/components/useDaily";
+import SettlementSection from "@/components/SettlementSection";
+import { useSettlement } from "@/components/useSettlement";
 import { monthChannelTotals } from "@/lib/daily";
 import { channelKind } from "@/lib/categories";
 import { channelFees, type ChannelFee } from "@/lib/channels";
@@ -21,6 +23,8 @@ export default function ChannelsPage() {
   const daily = useDaily(month);
   const [form, setForm] = useState<ChannelSale[]>([]);
   const [fromDaily, setFromDaily] = useState<string[]>([]);
+  const settlement = useSettlement(month, ledger, daily);
+  const autoChannels = settlement.results.map((r) => r.channel);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [asking, setAsking] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -72,16 +76,19 @@ export default function ChannelsPage() {
     setSaved(true);
   }
 
-  const fees = channelFees(ledger.sales, ledger.txs, ledger.prevSales);
+  const fees = channelFees(settlement.effectiveSales, ledger.txs, ledger.prevSales);
+  const manualFees = fees.filter((f) => !autoChannels.includes(f.channel) && channelKind(f.channel, daily.channels) !== "cash");
   const delivery = fees.filter((f) => f.channel !== "hall" && f.feeRate !== null);
   const worst = delivery.length ? delivery.reduce((a, b) => ((b.feeRate ?? 0) > (a.feeRate ?? 0) ? b : a)) : null;
   const hasBank = ledger.txs.some((t) => t.channel && t.in > 0);
 
   return (
     <>
+      <SettlementSection month={month} ledger={ledger} daily={daily} settlement={settlement} />
+
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-base font-bold">채널별 실매출 입력</h2>
+          <h2 className="text-base font-bold">{autoChannels.length ? "직접 입력 (규칙이 없는 채널)" : "채널별 실매출 입력"}</h2>
           <span className="text-xs text-stone-500">{monthLabel(month)} 주문분</span>
         </div>
 
@@ -105,8 +112,9 @@ export default function ChannelsPage() {
 
         {isClosed(ledger.closing) && <Notice tone="warn">마감한 달이에요. 고치면 수정 기록이 남아요.</Notice>}
 
+        {autoChannels.length > 0 && <Notice tone="info">규칙이 있는 채널({autoChannels.map((id) => form.find((f) => f.channel === id)?.name ?? id).join(", ")})은 위에서 자동으로 집계돼요. 아래는 규칙이 없는 채널만 직접 넣습니다.</Notice>}
         <div className="space-y-3">
-          {form.map((s, i) => (
+          {form.map((s, i) => autoChannels.includes(s.channel) ? null : (
             <div key={s.channel} className="rounded-xl bg-stone-50 p-3">
               <input aria-label={`${s.channel} 채널 이름`} className="mb-2 w-full bg-transparent text-sm font-bold outline-none" value={s.name} onChange={(e) => patch(i, { name: e.target.value })} />
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -197,10 +205,10 @@ export default function ChannelsPage() {
         )}
       </section>
 
-      {fees.length > 0 && (
+      {manualFees.length > 0 && (
         <section className="card space-y-3">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-base font-bold">통장 입금과 맞춰 보기</h2>
+            <h2 className="text-base font-bold">통장 입금과 맞춰 보기{autoChannels.length > 0 && " (규칙 없는 채널)"}</h2>
             <span className="text-[11px] text-stone-500">{monthNo}월에 통장에 들어온 돈 기준</span>
           </div>
           <p className="text-sm text-stone-600">
@@ -223,7 +231,7 @@ export default function ChannelsPage() {
                   </tr>
                 </thead>
                 <tbody className="num divide-y divide-stone-100">
-                  {fees.map((f) => (
+                  {manualFees.map((f) => (
                     <tr key={f.channel}>
                       <td className="py-2 font-semibold">{f.name}</td>
                       <td className="text-right">{num(f.carriedIn)}</td>

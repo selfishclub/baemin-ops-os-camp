@@ -1,0 +1,63 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { useDaily } from "@/components/useDaily";
+import type { useLedger } from "@/components/useLedger";
+import { effectiveChannelSales } from "@/lib/effective";
+import { HOLIDAYS_KEY, SETTLEMENT_RULES_KEY, settleChannel, type ChannelSettlementSummary, type SettlementRule } from "@/lib/settlement";
+import { getStore } from "@/lib/storage";
+import type { ChannelSale } from "@/lib/types";
+
+export interface SettlementState {
+  loaded: boolean;
+  rules: SettlementRule[];
+  holidays: string[];
+  results: ChannelSettlementSummary[]; // 규칙이 있고 일별 매출이 있는 채널만
+  effectiveSales: ChannelSale[]; // 손익·수수료 계산용 이 달 실매출
+  saveRules: (rules: SettlementRule[]) => Promise<void>;
+  saveHolidays: (days: string[]) => Promise<void>;
+}
+
+// 정산 규칙 + 짝 맞춤 결과 + 손익용 실매출. 정산 탭과 손익 탭이 같이 쓴다.
+export function useSettlement(month: string, ledger: ReturnType<typeof useLedger>, daily: ReturnType<typeof useDaily>): SettlementState {
+  const [rules, setRules] = useState<SettlementRule[]>([]);
+  const [holidays, setHolidays] = useState<string[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const store = getStore();
+      const [r, h] = await Promise.all([store.getSetting<SettlementRule[]>(SETTLEMENT_RULES_KEY), store.getSetting<string[]>(HOLIDAYS_KEY)]);
+      setRules(r ?? []);
+      setHolidays(h ?? []);
+      setLoaded(true);
+    })();
+  }, []);
+
+  const saveRules = useCallback(async (next: SettlementRule[]) => {
+    setRules(next);
+    await getStore().saveSetting(SETTLEMENT_RULES_KEY, next);
+  }, []);
+  const saveHolidays = useCallback(async (next: string[]) => {
+    setHolidays(next);
+    await getStore().saveSetting(HOLIDAYS_KEY, next);
+  }, []);
+
+  const txsAll = useMemo(() => [...ledger.txs, ...ledger.nextTxs], [ledger.txs, ledger.nextTxs]);
+  const hasDaily = daily.sales.some((s) => s.date.startsWith(month));
+
+  const results = useMemo(() => {
+    if (!hasDaily) return [];
+    const settleable = daily.channels.filter((c) => c.active && c.kind !== "cash");
+    return rules
+      .filter((r) => settleable.some((c) => c.id === r.channel))
+      .map((r) => settleChannel(r.channel, month, r, daily.sales, txsAll, ledger.lastBankDate, holidays));
+  }, [rules, hasDaily, daily.channels, daily.sales, month, txsAll, ledger.lastBankDate, holidays]);
+
+  const effectiveSales = useMemo(
+    () => (ledger.loading || daily.loading ? [] : effectiveChannelSales(month, ledger.sales, daily.sales, daily.channels, results)),
+    [ledger.loading, daily.loading, month, ledger.sales, daily.sales, daily.channels, results],
+  );
+
+  return { loaded, rules, holidays, results, effectiveSales, saveRules, saveHolidays };
+}

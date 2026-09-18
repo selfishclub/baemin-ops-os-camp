@@ -37,7 +37,7 @@ const SEEDS: Seed[] = [
   ["쿠팡이츠", "in", "수입", "매출액", "coupang"],
   ["요기요", "in", "수입", "매출액", "yogiyo"],
   ["땡겨요", "in", "수입", "매출액", "etc"],
-  ["카드매출", "in", "수입", "매출액", "hall"],
+  ["카드매출", "in", "수입", "매출액", "hall_card"],
 ];
 
 export function seedRules(): Rule[] {
@@ -57,7 +57,8 @@ export function seedRules(): Rule[] {
 // 요기요는 월말 미입금액을 비워서 "시차 포함"으로 보이게 했다.
 export function sampleChannelSales(month: string): ChannelSale[] {
   return [
-    { month, channel: "hall", name: "홀(포스)", orders: 14_000_000, deposit: 12_880_000, count: 520, unsettled: 380_000 },
+    { month, channel: "hall_card", name: "홀 카드", orders: 13_260_000, deposit: 12_880_000, count: 480, unsettled: 380_000 },
+    { month, channel: "hall_cash", name: "홀 현금", orders: 740_000, deposit: 0, count: 40, unsettled: 0 },
     { month, channel: "baemin", name: "배달의민족", orders: 9_000_000, deposit: 7_650_000, count: 300, unsettled: 450_000 },
     { month, channel: "coupang", name: "쿠팡이츠", orders: 5_000_000, deposit: 4_100_000, count: 170, unsettled: 300_000 },
     { month, channel: "yogiyo", name: "요기요", orders: 2_000_000, deposit: 1_720_000, count: 70, unsettled: null },

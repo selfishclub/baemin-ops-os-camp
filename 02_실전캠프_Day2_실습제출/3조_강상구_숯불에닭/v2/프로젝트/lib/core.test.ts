@@ -88,6 +88,7 @@ describe("손익", () => {
   const pnl = computePnl(txs, sales);
 
   it("매출은 채널 주문금액 합계 — 통장 입금을 또 더하지 않는다", () => {
+    expect(pnl.hallRevenue).toBe(14_000_000);
     expect(pnl.revenue).toBe(31_000_000);
     expect(pnl.revenueBasis).toBe("실매출");
   });
@@ -176,7 +177,7 @@ describe("시연 파일 한 바퀴", () => {
     const fees = channelFees(sampleChannelSales("2026-08"), txs);
     const of = (c: string) => fees.find((f) => f.channel === c)!;
     expect(of("baemin").gap).toBe(0); // 월말 미입금 45만 원을 빼면 통장과 일치
-    expect(of("hall").gap).toBe(0);
+    expect(of("hall_card").gap).toBe(0);
     expect(of("coupang").gap).toBe(50_000); // 진짜 차이
     expect(of("coupang").gapKind).toBe("확정");
     expect(of("yogiyo").gapKind).toBe("시차 포함"); // 월말 미입금액을 안 넣음

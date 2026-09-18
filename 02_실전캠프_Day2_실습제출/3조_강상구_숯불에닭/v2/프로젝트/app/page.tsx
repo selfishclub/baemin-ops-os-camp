@@ -5,6 +5,8 @@ import { useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
+import { useDaily } from "@/components/useDaily";
+import { useSettlement } from "@/components/useSettlement";
 import { num, pctText, signed, won } from "@/lib/format";
 import { closeMonth, isClosed, monthLabel } from "@/lib/month";
 import { compareLines, computePnl, type PnlLine } from "@/lib/pnl";
@@ -13,17 +15,19 @@ import { getStore } from "@/lib/storage";
 export default function PnlPage() {
   const { month } = useMonth();
   const ledger = useLedger(month);
+  const daily = useDaily(month);
+  const settlement = useSettlement(month, ledger, daily);
   const [open, setOpen] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
 
-  if (ledger.loading) return <p className="py-10 text-center text-sm text-stone-500">불러오는 중…</p>;
+  if (ledger.loading || daily.loading || !settlement.loaded) return <p className="py-10 text-center text-sm text-stone-500">불러오는 중…</p>;
   if (ledger.error) return <Notice tone="error">{ledger.error}</Notice>;
 
-  const pnl = computePnl(ledger.txs, ledger.sales);
+  const pnl = computePnl(ledger.txs, settlement.effectiveSales);
   const hasPrev = ledger.prevTxs.length > 0 || ledger.prevSales.length > 0;
   const diff = compareLines(pnl, hasPrev ? computePnl(ledger.prevTxs, ledger.prevSales) : null);
   const closed = isClosed(ledger.closing);
-  const empty = ledger.txs.length === 0 && ledger.sales.length === 0;
+  const empty = ledger.txs.length === 0 && settlement.effectiveSales.length === 0;
 
   async function close() {
     setAsking(false);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { logEdit, prevMonth } from "@/lib/month";
+import { logEdit, nextMonth, prevMonth } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 import type { ChannelSale, Month, MonthClosing, Rule, Transaction } from "@/lib/types";
 
@@ -12,6 +12,8 @@ export interface Ledger {
   sales: ChannelSale[];
   prevTxs: Transaction[];
   prevSales: ChannelSale[];
+  nextTxs: Transaction[]; // 다음 달 초 통장 거래 (이 달 주문분 정산이 들어오는 곳)
+  lastBankDate: string; // 올린 통장 내역의 마지막 날짜
   rules: Rule[];
   closing: MonthClosing | null;
   reload: () => Promise<void>;
@@ -27,6 +29,8 @@ export function useLedger(month: Month): Ledger {
     sales: [],
     prevTxs: [],
     prevSales: [],
+    nextTxs: [],
+    lastBankDate: "",
     rules: [],
     closing: null,
   });
@@ -35,16 +39,19 @@ export function useLedger(month: Month): Ledger {
     const store = getStore();
     try {
       const prev = prevMonth(month);
-      const [txs, sales, prevTxs, prevSales, rules, closing] = await Promise.all([
+      const [txs, sales, prevTxs, prevSales, nextTxs, uploads, rules, closing] = await Promise.all([
         store.listTransactions(month),
         store.listChannelSales(month),
         store.listTransactions(prev),
         store.listChannelSales(prev),
+        store.listTransactions(nextMonth(month)),
+        store.listUploads(),
         store.listRules(),
         store.getClosing(month),
       ]);
       txs.sort((a, b) => a.date.localeCompare(b.date));
-      setState({ loading: false, error: null, txs, sales, prevTxs, prevSales, rules, closing });
+      const lastBankDate = uploads.reduce((a, u) => (u.to > a ? u.to : a), "");
+      setState({ loading: false, error: null, txs, sales, prevTxs, prevSales, nextTxs, lastBankDate, rules, closing });
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e instanceof Error ? e.message : String(e) }));
     }

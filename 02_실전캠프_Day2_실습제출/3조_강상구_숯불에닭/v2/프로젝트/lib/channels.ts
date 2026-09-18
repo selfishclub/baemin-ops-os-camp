@@ -28,7 +28,9 @@ export interface ChannelFee {
 export function bankDepositsByChannel(txs: Transaction[]): Partial<Record<ChannelId, number>> {
   const out: Partial<Record<ChannelId, number>> = {};
   for (const t of txs) {
-    if (t.channel && t.in > 0) out[t.channel] = (out[t.channel] ?? 0) + t.in;
+    if (!t.channel || t.in <= 0) continue;
+    const id = t.channel === "hall" ? "hall_card" : t.channel; // v1 때 이름
+    out[id] = (out[id] ?? 0) + t.in;
   }
   return out;
 }

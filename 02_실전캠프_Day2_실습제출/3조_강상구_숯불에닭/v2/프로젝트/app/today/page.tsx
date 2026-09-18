@@ -11,6 +11,7 @@ import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 import type { DailySale, Shift, Staff } from "@/lib/types";
+import sample from "@/lib/sampleDaily.json";
 
 const DOW = ["월", "화", "수", "목", "금", "토", "일"];
 
@@ -81,6 +82,21 @@ export default function TodayPage() {
   }
 
   const dow = DOW[(new Date(date + "T00:00:00Z").getUTCDay() + 6) % 7];
+
+  // 시연용: 가짜 직원 3명 + 9/1~9/17 일별 매출·근무를 한 번에 넣는다
+  async function loadSample() {
+    const store = getStore();
+    for (const p of sample.staff as Staff[]) await store.saveStaff(p);
+    const byDate = new Map<string, DailySale[]>();
+    for (const s of sample.sales as DailySale[]) byDate.set(s.date, [...(byDate.get(s.date) ?? []), s]);
+    for (const [d, list] of byDate) await store.saveDailySales(d, list);
+    const shiftsByDate = new Map<string, Shift[]>();
+    for (const s of sample.shifts as Shift[]) shiftsByDate.set(s.date, [...(shiftsByDate.get(s.date) ?? []), s]);
+    for (const [d, list] of shiftsByDate) await store.saveShifts(d, list);
+    setMonth(sample.month);
+    setDate(`${sample.month}-17`);
+    await daily.reload();
+  }
 
   return (
     <>
@@ -222,6 +238,11 @@ export default function TodayPage() {
             );
           })}
         </div>
+        {summary.enteredDays === 0 && (
+          <button className="btn-ghost w-full" onClick={loadSample}>
+            가짜 예시 자료 넣기 (9/1~9/17, 직원 3명)
+          </button>
+        )}
         <div className="num grid grid-cols-3 gap-2 pt-1 text-center text-sm">
           <div>
             <p className="text-[11px] text-stone-500">누적 매출</p>

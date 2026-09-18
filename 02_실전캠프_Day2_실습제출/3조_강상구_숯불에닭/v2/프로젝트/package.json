@@ -8,7 +8,8 @@
     "start": "next start -p 3200",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "sample": "node scripts/make-sample-xlsx.mjs"
+    "sample": "node scripts/make-sample-xlsx.mjs",
+    "sample:daily": "node scripts/make-sample-daily.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

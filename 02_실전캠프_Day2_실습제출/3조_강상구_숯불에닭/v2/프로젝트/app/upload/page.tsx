@@ -13,7 +13,10 @@ import { findOverlap, monthLabel } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 import type { Transaction } from "@/lib/types";
 
-const SAMPLE = "/sample/가짜_거래내역_2026-08.xlsx";
+const SAMPLES = [
+  { label: "8월", file: "/sample/가짜_거래내역_2026-08.xlsx" },
+  { label: "9월 (일별 자료와 짝)", file: "/sample/가짜_거래내역_2026-09.xlsx" },
+];
 
 export default function UploadPage() {
   const { month, setMonth } = useMonth();
@@ -74,8 +77,8 @@ export default function UploadPage() {
     }
   }
 
-  async function loadSample() {
-    const res = await fetch(SAMPLE);
+  async function loadSample(file: string) {
+    const res = await fetch(file);
     await handleFile(await res.blob(), "가짜 예시 파일");
   }
 
@@ -99,10 +102,12 @@ export default function UploadPage() {
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0], e.target.files[0].name)}
         />
         <div className="flex flex-wrap gap-2">
-          <button className="btn-ghost" disabled={busy} onClick={loadSample}>
-            가짜 예시 파일로 해 보기
-          </button>
-          <a className="btn-ghost" href={SAMPLE} download>
+          {SAMPLES.map((s) => (
+            <button key={s.file} className="btn-ghost" disabled={busy} onClick={() => loadSample(s.file)}>
+              가짜 {s.label} 파일로 해 보기
+            </button>
+          ))}
+          <a className="btn-ghost" href={SAMPLES[0].file} download>
             예시 파일 받기
           </a>
         </div>
