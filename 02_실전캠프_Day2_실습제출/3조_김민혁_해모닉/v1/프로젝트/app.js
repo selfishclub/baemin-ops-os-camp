@@ -423,7 +423,7 @@ const App = (() => {
     { id: 'work', g: '업무', ic: '🗂️', items: [['rules', '공지사항 필독', '📌'], ['tanks', '수조 관리표', '🐟'], ['today', '할 일', '✅'], ['report', '기록', '📊']] },
     { id: 'people', g: '직원', ic: '👥', items: [['month', '월간 근무표', '📅'], ['staff', '직원 명단', '🧑‍🍳'], ['contracts', '근로계약서', '📄'], ['payslip', '급여명세서', '💳'], ['health', '보건증 관리', '🩺'], ['hygiene', '위생교육 일정관리', '🧼']] },
     { id: 'ops', g: '운영', ic: '🏪', items: [['costs', '원가 관리', '💰'], ['buyInsight', '갑각류 매입 인사이트', '🦀'], ['notices', '월간 공지', '📢'], ['issues', '트러블시트', '📝']] },
-    { id: 'kitchen', g: '주방', ic: '🍳', items: [['recipes', '레시피 관리', '📖']] },
+    { id: 'kitchen', g: '서비스 교육', ic: '🎓', items: [['training', '교육 자료', '🎓'], ['recipes', '레시피 관리', '📖']] },
     { id: 'acct', g: '회계', ic: '💵', items: [['salesIn', '매출 입력', '🧾'], ['salesStat', '매출 분석', '📈'], ['pnl', '월 손익', '📘'], ['labor', '인건비', '👷']] },
     { id: 'sys', g: '설정', ic: '⚙️', items: [['settings', '설정', '⚙️'], ['routines', '루틴', '🔁']] },
   ];
@@ -493,7 +493,7 @@ const App = (() => {
     const sb = $('#storebar'); if (sb) sb.innerHTML = `<div class="sstore top">${storeBtns}</div>`;
 
     const y = window.scrollY;
-    $('#main').innerHTML = ({ rules: vRules, tanks: vTanks, today: vToday, staff: vStaff, contracts: vContracts, month: vMonth, costs: vCosts, notices: vNotices, issues: vIssues, recipes: vRecipes, routines: vRoutines, report: vReport, salesIn: vSalesIn, salesStat: vSalesStat, pnl: vPnl, labor: vLabor, payslip: vPayslip, health: vHealth, hygiene: vHygiene, buyInsight: vBuyInsight, settings: vSettings })[view]();
+    $('#main').innerHTML = ({ rules: vRules, tanks: vTanks, today: vToday, staff: vStaff, contracts: vContracts, month: vMonth, costs: vCosts, notices: vNotices, issues: vIssues, recipes: vRecipes, routines: vRoutines, report: vReport, salesIn: vSalesIn, salesStat: vSalesStat, pnl: vPnl, labor: vLabor, payslip: vPayslip, health: vHealth, hygiene: vHygiene, buyInsight: vBuyInsight, training: vTraining, settings: vSettings })[view]();
     /* 지금 어느 매장 데이터를 보고 있는지 화면마다 박아둔다.
        직원·기록이 매장별로 따로인데 표시가 없으면 공유되는 것처럼 오해한다. */
     const h2 = $('#main .hd h2');
@@ -3688,6 +3688,60 @@ const App = (() => {
     inp.click();
   }
 
+  /* ── 서비스 교육 › 교육 자료 ─────────────────────────────
+     S.training[{id, cat, title, url, memo, by, createdAt, pin}] — 사장님이 유튜브·교육 사이트 주소를 넣고, 직원이 카드에서 바로 연다 */
+  const TRAIN_CATS = ['서비스', '위생', '조리', '안전', '기타'];
+  let trainCat = 'all';
+  const trainList = () => (S.training = S.training || []);
+  function ytId(url) {
+    try { const u = new URL(url); if (/youtu\.be$/.test(u.hostname)) return u.pathname.slice(1).split('/')[0]; if (/youtube\.com$/.test(u.hostname) || /youtube-nocookie\.com$/.test(u.hostname)) { if (u.searchParams.get('v')) return u.searchParams.get('v'); const m = u.pathname.match(/\/(shorts|embed|live)\/([^/?]+)/); if (m) return m[2]; } } catch (e) { /* 주소 아님 */ }
+    return null;
+  }
+  const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return ''; } };
+  function vTraining() {
+    let list = trainList().slice().sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0) || (b.createdAt || 0) - (a.createdAt || 0));
+    if (trainCat !== 'all') list = list.filter((x) => x.cat === trainCat);
+    let h = `<div class="hd"><div><h2>교육 자료</h2><div class="sub">서비스 · 위생 · 조리 교육 영상이나 문서 주소를 넣어 두면 직원이 여기서 바로 봅니다. 유튜브는 앱 안에서 재생됩니다.</div></div>
+      <button class="btn primary" data-act="trainAdd" style="margin-left:auto">+ 자료 추가</button></div>`;
+    h += `<div class="filters">${['all', ...TRAIN_CATS].map((c) => `<button class="fl${trainCat === c ? ' on' : ''}" data-act="trainCat" data-c="${c}">${c === 'all' ? '전체' : c}</button>`).join('')}</div>`;
+    if (!list.length) {
+      h += `<div class="notice"><b>아직 등록한 교육 자료가 없습니다.</b>
+        <div class="hint">예: 손 씻기 · 교차오염 예방(위생), 룸 안내와 주문 받기(서비스), 대게 찜 시간(조리). 유튜브 주소를 붙여 넣으면 화면에서 바로 재생됩니다.</div>
+        <div class="hint">참고할 만한 곳 — 식품안전나라(foodsafetykorea.go.kr) 위생교육 자료, 한국외식업중앙회(foodservice.or.kr) 위생교육, 유튜브의 접객 서비스 교육 영상.</div></div>`;
+    } else {
+      h += `<div class="trainGrid">${list.map((x) => { const id = ytId(x.url); return `<div class="trCard${x.pin ? ' pin' : ''}">
+        <div class="rcTop"><span class="chip cat">${esc(x.cat)}</span>${x.pin ? '<span class="chip crit">필독</span>' : ''}<span class="rcMeta" style="margin-left:auto">${esc(hostOf(x.url))}</span></div>
+        <div class="rcName">${esc(x.title)}</div>
+        ${x.memo ? `<div class="nbody">${esc(x.memo)}</div>` : ''}
+        ${id ? `<div class="ytBox"><iframe src="https://www.youtube-nocookie.com/embed/${esc(id)}" title="${esc(x.title)}" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : ''}
+        <div class="rowbtns"><a class="btn sm primary" href="${esc(x.url)}" target="_blank" rel="noopener">${id ? '유튜브에서 열기' : '열기'}</a>
+          <button class="btn sm ghost" data-act="trainEdit" data-id="${x.id}">수정</button></div>
+        <div class="rcMeta">${esc(x.by || '')}${x.createdAt ? ' · ' + new Date(x.createdAt).toLocaleDateString('ko-KR') : ''}</div></div>`; }).join('')}</div>`;
+    }
+    return h;
+  }
+  function trainForm(x) {
+    const isNew = !x; x = x || { cat: TRAIN_CATS[0] };
+    modal(isNew ? '교육 자료 추가' : '교육 자료 수정', `
+      <div class="mlabel">분류</div>
+      <div class="roles wrap" id="trCats">${TRAIN_CATS.map((c) => `<button type="button" class="rl${c === x.cat ? ' on' : ''}" data-cat="${c}">${c}</button>`).join('')}</div>
+      <label>제목<input id="trT" value="${esc(x.title || '')}" placeholder="예: 손 씻기와 교차오염 예방"></label>
+      <label>주소 (URL)<input id="trU" value="${esc(x.url || '')}" placeholder="https://www.youtube.com/watch?v=… 또는 문서 주소" inputmode="url" autocomplete="off"></label>
+      <label>메모 <span class="opt">선택</span><textarea id="trM" rows="2" placeholder="직원에게 한 줄 (예: 신입 첫 주에 꼭 보기)">${esc(x.memo || '')}</textarea></label>
+      <label class="chk"><input type="checkbox" id="trP"${x.pin ? ' checked' : ''}> 필독 — 목록 맨 위에 고정</label>
+      ${isNew ? '' : `<div class="rowbtns"><button class="btn danger sm" data-act="trainDel" data-id="${x.id}">이 자료 삭제</button></div>`}
+    `, () => {
+      const title = $('#trT').value.trim(), url = $('#trU').value.trim();
+      if (!title) { alert('제목을 넣어 주세요.'); return false; }
+      if (!/^https?:\/\/\S+$/i.test(url)) { alert('주소는 https:// 로 시작하는 인터넷 주소여야 합니다.'); return false; }
+      const catSel = document.querySelector('#trCats .rl.on'), cat = catSel ? catSel.dataset.cat : TRAIN_CATS[0];
+      const rec = { id: x.id || newId('tr'), cat, title, url, memo: $('#trM').value.trim(), pin: $('#trP').checked, by: x.by || whoNow() || '', createdAt: x.createdAt || Date.now() };
+      if (x.id) S.training = trainList().map((t) => (t.id === x.id ? rec : t)); else trainList().push(rec);
+      save(); render();
+    }, '저장');
+    $('#trCats').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return; $('#trCats').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); });
+  }
+
   /* ── 모달 ────────────────────────────────────────────────── */
   function modal(title, bodyHTML, onOk, okLabel = '확인') {
     const m = $('#modal');
@@ -4002,6 +4056,10 @@ const App = (() => {
           });
           break;
         }
+        case 'trainAdd': trainForm(null); break;
+        case 'trainEdit': closeModal(); trainForm(trainList().find((t) => t.id === id)); break;
+        case 'trainCat': trainCat = b.dataset.c; render(); break;
+        case 'trainDel': { if (!confirm('이 교육 자료를 삭제할까요?')) return; S.training = trainList().filter((t) => t.id !== id); save(); closeModal(); render(); break; }
         case 'recipeAdd': recipeForm(null); break;
         case 'recipeOpen': recipeShow(id); break;
         case 'recipeEdit': closeModal(); recipeForm((S.recipes || []).find((x) => x.id === id)); break;
