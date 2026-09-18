@@ -67,7 +67,7 @@ export function MoneyInput({
       value={text}
       placeholder={placeholder}
       onChange={(e) => {
-        const digits = e.target.value.replace(/[^d]/g, "");
+        const digits = e.target.value.replace(/D/g, "");
         onChange(digits === "" ? (allowEmpty ? null : 0) : parseNum(digits));
       }}
     />
