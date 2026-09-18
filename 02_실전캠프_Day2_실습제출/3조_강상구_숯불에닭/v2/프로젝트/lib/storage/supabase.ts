@@ -163,11 +163,11 @@ export class SupabaseStore implements Store {
   }
   async listShifts(month: Month) {
     const rows = await this.run<Row[]>(this.db.from("shifts").select("*").gte("date", month + "-01").lt("date", monthEnd(month)));
-    return (rows ?? []).map((r): Shift => ({ date: r.date as string, staffId: r.staff_id as string, hours: Number(r.hours) }));
+    return (rows ?? []).map((r): Shift => ({ date: r.date as string, staffId: r.staff_id as string, hours: Number(r.hours), start: (r.start_time as string | null) ?? undefined, end: (r.end_time as string | null) ?? undefined }));
   }
   async saveShifts(date: string, shifts: Shift[]) {
     await this.run(this.db.from("shifts").delete().eq("date", date));
-    const rows = shifts.filter((s) => s.date === date).map((s) => ({ date: s.date, staff_id: s.staffId, hours: s.hours }));
+    const rows = shifts.filter((s) => s.date === date).map((s) => ({ date: s.date, staff_id: s.staffId, hours: s.hours, start_time: s.start ?? null, end_time: s.end ?? null }));
     if (rows.length) await this.run(this.db.from("shifts").insert(rows));
   }
   async listStaff() {
@@ -183,7 +183,7 @@ export class SupabaseStore implements Store {
   }
   async listAllShifts() {
     const rows = await this.run<Row[]>(this.db.from("shifts").select("*"));
-    return (rows ?? []).map((r): Shift => ({ date: r.date as string, staffId: r.staff_id as string, hours: Number(r.hours) }));
+    return (rows ?? []).map((r): Shift => ({ date: r.date as string, staffId: r.staff_id as string, hours: Number(r.hours), start: (r.start_time as string | null) ?? undefined, end: (r.end_time as string | null) ?? undefined }));
   }
   async listWeather(from: string, to: string) {
     const rows = await this.run<Row[]>(this.db.from("daily_weather").select("*").gte("date", from).lte("date", to));

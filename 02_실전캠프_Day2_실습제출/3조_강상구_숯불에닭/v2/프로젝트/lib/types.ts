@@ -85,7 +85,9 @@ export interface Staff {
 export interface Shift {
   date: string;
   staffId: string;
-  hours: number;
+  hours: number; // 근무시간 (start·end가 있으면 거기서 계산)
+  start?: string; // "18:00"
+  end?: string; // "22:30" (자정을 넘기면 다음날 시각, 예: "01:00")
 }
 
 // 화면 설정 (채널 목록 등). key별로 JSON 하나.

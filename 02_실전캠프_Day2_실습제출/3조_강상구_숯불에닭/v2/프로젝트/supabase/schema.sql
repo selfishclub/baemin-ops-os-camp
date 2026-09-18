@@ -122,3 +122,7 @@ create table if not exists daily_weather (
 alter table daily_weather enable row level security;
 drop policy if exists "demo anon all" on daily_weather;
 create policy "demo anon all" on daily_weather for all to anon using (true) with check (true);
+
+-- v2: 출퇴근 시각 (근무시간 자동 계산용)
+alter table shifts add column if not exists start_time text;
+alter table shifts add column if not exists end_time text;

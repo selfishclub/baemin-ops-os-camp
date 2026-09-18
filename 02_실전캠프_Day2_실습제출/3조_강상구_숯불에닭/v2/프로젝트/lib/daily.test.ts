@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CHANNELS } from "./categories";
-import { checkDay, dayTotals, daysInMonth, monthChannelTotals, monthSummary, shiftDate, weekHoursByStaff, weekStart } from "./daily";
+import { checkDay, dayTotals, daysInMonth, hoursBetween, monthChannelTotals, monthSummary, shiftDate, weekHoursByStaff, weekStart } from "./daily";
 import type { DailySale, Shift, Staff } from "./types";
 
 const staff: Staff[] = [
@@ -51,5 +51,14 @@ describe("오늘 마감 입력", () => {
   it("이상한 숫자: 24시간 초과는 막고, 12시간 초과·10배 매출은 묻는다", () => {
     const issues = checkDay([{ channelName: "홀 카드", amount: 7_000_000 }], [{ alias: "홀A", hours: 25 }, { alias: "화덕A", hours: 13 }], 650_000);
     expect(issues.map((i) => i.level)).toEqual(["error", "warn", "warn"]);
+  });
+});
+
+describe("출퇴근 시각 → 근무시간", () => {
+  it("6시~10시는 4시간, 18:00~22:30은 4.5시간, 자정 넘기면 다음날로", () => {
+    expect(hoursBetween("06:00", "10:00")).toBe(4);
+    expect(hoursBetween("18:00", "22:30")).toBe(4.5);
+    expect(hoursBetween("17:00", "01:00")).toBe(8);
+    expect(hoursBetween("", "10:00")).toBe(0);
   });
 });

@@ -14,7 +14,7 @@ const LAST_BANK = "2026-09-18";
 const RULES = {
   hall_card: { mode: "days", days: 2 },
   baemin: { mode: "days", days: 3 },
-  coupang: { mode: "weekly", weekday: 4 },
+  coupang: { mode: "days", days: 4 },
   yogiyo: { mode: "days", days: 5 },
   etc: { mode: "days", days: 1 },
 };
@@ -40,9 +40,9 @@ for (let day = 1; day <= LAST_DAY; day++) {
   const date = `${MONTH}-${String(day).padStart(2, "0")}`;
   const f = dowFactor[dow(date)] * (0.9 + rnd() * 0.2);
   for (const [ch, b] of Object.entries(base)) sales.push({ date, channel: ch, amount: Math.round((b * f) / 1000) * 1000 });
-  shifts.push({ date, staffId: staffIds.hwadeokA, hours: 8 });
-  shifts.push({ date, staffId: staffIds.holA, hours: dow(date) >= 4 ? 6 : 4 });
-  if (dow(date) >= 4) shifts.push({ date, staffId: staffIds.holB, hours: 5 });
+  shifts.push({ date, staffId: staffIds.hwadeokA, hours: 8, start: "16:00", end: "00:00" });
+  shifts.push(dow(date) >= 4 ? { date, staffId: staffIds.holA, hours: 6, start: "17:00", end: "23:00" } : { date, staffId: staffIds.holA, hours: 4, start: "18:00", end: "22:00" });
+  if (dow(date) >= 4) shifts.push({ date, staffId: staffIds.holB, hours: 5, start: "18:00", end: "23:00" });
 }
 const staff = [
   { id: staffIds.hwadeokA, alias: "화덕A", wage: 12000, active: true },

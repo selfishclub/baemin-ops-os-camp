@@ -132,6 +132,20 @@ export function monthChannelTotals(month: Month, sales: DailySale[], channels: C
   return out;
 }
 
+// 출근·퇴근 시각("HH:MM")으로 근무시간을 구한다. 퇴근이 출근보다 이르면 자정을 넘긴 것으로 본다. 0.5시간 단위 반올림 없이 소수 1자리.
+export function hoursBetween(start: string, end: string): number {
+  const m = (t: string) => {
+    const [h, mi] = t.split(":").map(Number);
+    return Number.isFinite(h) && Number.isFinite(mi) ? h * 60 + mi : NaN;
+  };
+  const a = m(start);
+  const b = m(end);
+  if (Number.isNaN(a) || Number.isNaN(b)) return 0;
+  let diff = b - a;
+  if (diff < 0) diff += 24 * 60;
+  return Math.round((diff / 60) * 10) / 10;
+}
+
 export interface DailyIssue {
   level: "error" | "warn";
   message: string;

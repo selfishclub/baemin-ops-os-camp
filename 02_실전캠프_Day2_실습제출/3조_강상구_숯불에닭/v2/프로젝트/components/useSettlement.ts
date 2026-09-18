@@ -28,7 +28,10 @@ export function useSettlement(month: string, ledger: ReturnType<typeof useLedger
     (async () => {
       const store = getStore();
       const [r, h] = await Promise.all([store.getSetting<SettlementRule[]>(SETTLEMENT_RULES_KEY), store.getSetting<string[]>(HOLIDAYS_KEY)]);
-      setRules(r ?? []);
+      // 예전 기본값(쿠팡이츠 주 단위 금요일 = 미확인 상태)은 확인된 규칙(+4영업일)으로 바꿔 둔다
+      const fixed = (r ?? []).map((x) => (x.channel === "coupang" && x.mode === "weekly" && x.weekday === 4 ? { ...x, mode: "days" as const, days: 4 } : x));
+      if (JSON.stringify(fixed) !== JSON.stringify(r ?? [])) await store.saveSetting(SETTLEMENT_RULES_KEY, fixed);
+      setRules(fixed);
       setHolidays(h ?? []);
       setLoaded(true);
     })();

@@ -8,7 +8,7 @@ import { CHANNELS_KEY, useDaily } from "@/components/useDaily";
 import { CARD_PRESETS, groupChannels, type Channel, type ChannelKind } from "@/lib/categories";
 import { CARD_RULE_DAYS, DEFAULT_CARD_DAYS, SETTLEMENT_RULES_KEY, type SettlementRule } from "@/lib/settlement";
 import { newId } from "@/lib/classify";
-import { checkDay, dayTotals, daysInMonth, monthSummary, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
+import { checkDay, dayTotals, daysInMonth, hoursBetween, monthSummary, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
 import { getStore } from "@/lib/storage";
@@ -26,7 +26,7 @@ export default function TodayPage() {
   const [date, setDate] = useState(() => (today.startsWith(month) ? today : `${month}-01`));
   const [amounts, setAmounts] = useState<Record<string, number>>({});
   const [cardRows, setCardRows] = useState<{ channel: string; amount: number }[]>([]);
-  const [rows, setRows] = useState<{ staffId: string; hours: number }[]>([]);
+  const [rows, setRows] = useState<{ staffId: string; start: string; end: string; hours: number }[]>([]);
   const [issues, setIssues] = useState<DailyIssue[]>([]);
   const [asking, setAsking] = useState<"check" | "overwrite" | null>(null);
   const [saved, setSaved] = useState(false);
@@ -64,7 +64,7 @@ export default function TodayPage() {
       const lastCards = lastDay ? daily.sales.filter((x) => x.date === lastDay && isCard(x.channel)).map((x) => x.channel) : [];
       setCardRows((lastCards.length ? lastCards : ["hall_card"]).map((channel) => ({ channel, amount: 0 })));
     }
-    setRows(daily.shifts.filter((s) => s.date === date).map((s) => ({ staffId: s.staffId, hours: s.hours })));
+    setRows(daily.shifts.filter((s) => s.date === date).map((s) => ({ staffId: s.staffId, start: s.start ?? "", end: s.end ?? "", hours: s.hours })));
     setIssues([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daily.loading, date, daily.sales, daily.shifts, daily.channels]);
@@ -110,7 +110,7 @@ export default function TodayPage() {
       if (preset) await ensureCardChannel(preset);
     }
     const sales = [...cardSales, ...others];
-    const shifts: Shift[] = rows.filter((r) => r.staffId && r.hours > 0).map((r) => ({ date, staffId: r.staffId, hours: r.hours }));
+    const shifts: Shift[] = rows.filter((r) => r.staffId && r.hours > 0).map((r) => ({ date, staffId: r.staffId, hours: r.hours, start: r.start || undefined, end: r.end || undefined }));
     await store.saveDailySales(date, sales);
     await store.saveShifts(date, shifts);
     await daily.reload();
@@ -195,7 +195,7 @@ export default function TodayPage() {
                 <b>배달앱</b> — 각 앱 사장님 앱의 오늘 주문금액(손님 결제 금액, 수수료 빼기 전)
               </li>
               <li>
-                <b>알바</b> — 별칭을 고르고 오늘 일한 시간. 시급은 아래 “직원·채널 설정”에서 한 번만 등록
+                <b>알바</b> — 별칭을 고르고 <b>출근·퇴근 시각</b>을 넣으면 근무시간이 계산돼요(예: 18:00~22:30 → 4.5h, 자정을 넘기면 다음날로). 시급은 아래 “직원·채널 설정”에서 한 번만 등록
               </li>
             </ul>
             <p className="mt-1">빠뜨린 날은 아래 달력의 회색 날짜를 눌러 나중에 채우면 돼요.</p>
@@ -275,30 +275,61 @@ export default function TodayPage() {
           </div>
           {activeStaff.length === 0 && <Notice tone="info">직원 별칭과 시급을 먼저 등록해 주세요 (실명은 넣지 마세요).</Notice>}
           <div className="space-y-2">
-            {rows.map((r, i) => (
-              <div key={i} className="grid grid-cols-[1fr_5rem_2.5rem] items-center gap-2">
-                <select aria-label={`근무 ${i + 1} 직원`} className="field" value={r.staffId} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, staffId: e.target.value } : x)))}>
-                  <option value="">직원 고르기</option>
-                  {activeStaff.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.alias}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  aria-label={`근무 ${i + 1} 시간`}
-                  inputMode="decimal"
-                  className="field num text-right"
-                  placeholder="시간"
-                  value={r.hours || ""}
-                  onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, hours: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 } : x)))}
-                />
-                <button className="btn-ghost px-2 py-1 text-xs" aria-label="근무 줄 지우기" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}>
-                  ✕
-                </button>
+            {rows.length > 0 && (
+              <div className="grid grid-cols-[1fr_5.5rem_5.5rem_3.5rem_2rem] gap-2 px-1 text-[10px] text-stone-400">
+                <span>직원</span>
+                <span>출근</span>
+                <span>퇴근</span>
+                <span className="text-right">시간</span>
+                <span />
               </div>
-            ))}
-            <button className="btn-ghost w-full" disabled={activeStaff.length === 0} onClick={() => setRows((rs) => [...rs, { staffId: activeStaff.find((s) => !rs.some((r) => r.staffId === s.id))?.id ?? "", hours: 0 }])}>
+            )}
+            {rows.map((r, i) => {
+              const patchRow = (p: Partial<typeof r>) =>
+                setRows((rs) =>
+                  rs.map((x, j) => {
+                    if (j !== i) return x;
+                    const next = { ...x, ...p };
+                    if (next.start && next.end) next.hours = hoursBetween(next.start, next.end);
+                    return next;
+                  }),
+                );
+              return (
+                <div key={i} className="grid grid-cols-[1fr_5.5rem_5.5rem_3.5rem_2rem] items-center gap-2">
+                  <select aria-label={`근무 ${i + 1} 직원`} className="field" value={r.staffId} onChange={(e) => patchRow({ staffId: e.target.value })}>
+                    <option value="">직원 고르기</option>
+                    {activeStaff.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.alias}
+                      </option>
+                    ))}
+                  </select>
+                  <input aria-label={`근무 ${i + 1} 출근`} type="time" className="field num px-1" value={r.start} onChange={(e) => patchRow({ start: e.target.value })} />
+                  <input aria-label={`근무 ${i + 1} 퇴근`} type="time" className="field num px-1" value={r.end} onChange={(e) => patchRow({ end: e.target.value })} />
+                  {r.start && r.end ? (
+                    <span className="num text-right text-sm font-bold">{r.hours}h</span>
+                  ) : (
+                    <input aria-label={`근무 ${i + 1} 시간`} inputMode="decimal" className="field num px-1 text-right" placeholder="시간" value={r.hours || ""} onChange={(e) => patchRow({ hours: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })} />
+                  )}
+                  <button className="btn-ghost px-1 py-1 text-xs" aria-label="근무 줄 지우기" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}>
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+            <button
+              className="btn-ghost w-full"
+              disabled={activeStaff.length === 0}
+              onClick={() =>
+                setRows((rs) => {
+                  const staffId = activeStaff.find((s) => !rs.some((r) => r.staffId === s.id))?.id ?? "";
+                  const last = [...daily.shifts].filter((x) => x.staffId === staffId && x.start && x.end).sort((a, b) => b.date.localeCompare(a.date))[0];
+                  const start = last?.start ?? "";
+                  const end = last?.end ?? "";
+                  return [...rs, { staffId, start, end, hours: start && end ? hoursBetween(start, end) : 0 }];
+                })
+              }
+            >
               + 근무 추가
             </button>
           </div>
