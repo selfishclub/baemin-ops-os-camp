@@ -301,7 +301,7 @@ export default function TodayPage() {
           {activeStaff.length === 0 && <Notice tone="info">직원 별칭과 시급을 먼저 등록해 주세요 (실명은 넣지 마세요).</Notice>}
           <div className="space-y-2">
             {rows.length > 0 && (
-              <div className="grid grid-cols-[1fr_5.5rem_5.5rem_3.5rem_2rem] gap-2 px-1 text-[10px] text-stone-400">
+              <div className="grid grid-cols-[1fr_4rem_4rem_3rem_1.5rem] gap-1.5 px-1 text-[10px] text-stone-400">
                 <span>직원</span>
                 <span>출근</span>
                 <span>퇴근</span>
@@ -321,7 +321,7 @@ export default function TodayPage() {
                   }),
                 );
               return (
-                <div key={i} className="grid grid-cols-[1fr_5.5rem_5.5rem_3.5rem_2rem] items-center gap-2">
+                <div key={i} className="grid grid-cols-[1fr_4rem_4rem_3rem_1.5rem] items-center gap-1.5">
                   <select aria-label={`근무 ${i + 1} 직원`} className="field" value={r.staffId} onChange={(e) => patchRow({ staffId: e.target.value })}>
                     <option value="">직원 고르기</option>
                     {activeStaff.map((s) => (
