@@ -1,6 +1,15 @@
-# 숯불에닭 한눈 손익 장부 · v1
+# 숯불에닭 한눈 손익 장부 · v2
 
-은행 거래내역 엑셀을 올리고 배달앱별 실매출을 넣으면, 임대료·수수료까지 들어간 "이번 달 실제로 남은 돈"을 한 장으로 보여 주는 도구입니다. 기획은 [`../PRD.md`](../PRD.md).
+v1(월 정산 손익 한 장)에 **오늘 마감 입력 · 정산 주기 규칙으로 통장 입금 짝 맞추기 · 원가율 탭 · 사용법 페이지**를 더한 버전입니다. 기획은 [`../PRD.md`](../PRD.md).
+
+| 탭 | 하는 일 |
+|---|---|
+| 손익 | 임대료 포함 영업이익 한 장. 일별 합계와 정산 결과로 자동 계산 |
+| 오늘 | 마감 때 채널별 매출 + 시급제 직원 근무시간 (1분). 달력·누적·인건비율. 직원·채널 설정 |
+| 올리기 | 은행 엑셀 자동 분류, 확인 필요 줄, 지출 직접 추가 |
+| 정산 | 정산 규칙(+N영업일 / 주 단위) → 입금 짝 맞추기 → 채널별 수수료율. 규칙 없는 채널은 직접 입력 |
+| 원가율 | 포스 상품ABC분석 엑셀 → 이론 원가율 vs 통장 원가율, 메뉴별 원가율·마진. 품목·레시피 설정 |
+| 규칙 | 분류 규칙, 백업, 사용법 페이지 |
 
 ## 열어 보기
 
@@ -12,10 +21,10 @@
 
 ```
 npm install
-npm run dev      # http://localhost:3100
+npm run dev      # http://localhost:3200
 ```
 
-처음이면 **올리기 탭 → "가짜 예시 파일로 해 보기"** → **배달앱 탭 → "가짜 예시 채우기" → 저장** → **손익 탭** 순서로 한 바퀴 돌아 보세요.
+처음이면 규칙 탭 맨 위 **"처음이세요? 사용법"**을 열어 보세요. 시연은 **오늘 탭 "가짜 예시 자료 넣기" → 올리기 탭 "가짜 9월 파일" → 정산 탭 "기본 규칙 넣기" → 원가율 탭 "가짜 품목·레시피 넣기"·"가짜 9월 포스 파일" → 손익 탭** 순서입니다.
 
 ## 저장 모드 두 가지 (중요)
 
@@ -31,12 +40,14 @@ npm run dev      # http://localhost:3100
 ## 구조
 
 ```
-app/          ① 손익(/) ② 올리기(/upload) ③ 배달앱(/channels) ④ 지출추가(/expenses) ⑤ 규칙(/rules)
+app/          손익(/) · 오늘(/today) · 올리기(/upload) · 정산(/channels) · 원가율(/costing) · 규칙(/rules) · 사용법(/guide)
 components/   AppShell(모드 띠·달 선택·아래 탭) · useLedger(한 달 데이터) · ui
 lib/          categories(8개 대분류) · bank/parse(은행 엑셀 읽기) · classify(자동 분류)
               pnl(손익) · channels(수수료·입금 대조) · validate(이상 숫자) · month(마감·중복)
+              daily(일별 매출·근무) · settlement(정산 규칙·입금 짝 맞추기) · effective(손익용 실매출)
+              costing/(포스 ABC 파서 · 레시피 원가 · 원가율 리포트 · 가짜 시드)
               storage/(local · supabase · backup) · seed(가짜 거래처 규칙·예시 실매출)
-scripts/      make-sample-xlsx.mjs — 가짜 은행 엑셀 만들기 (npm run sample)
+scripts/      make-sample-xlsx.mjs(8월 은행) · make-sample-daily.mjs(9월 일별+은행) · make-sample-pos.mjs(9월 포스)
 supabase/     schema.sql — 시연 모드 테이블과 잠금(RLS)
 ```
 
@@ -53,7 +64,7 @@ supabase/     schema.sql — 시연 모드 테이블과 잠금(RLS)
 ## 테스트
 
 ```
-npm test          # 계산 로직 19개 (가짜 엑셀 한 바퀴 포함)
+npm test          # 계산 로직 38개 (가짜 엑셀 한 바퀴 포함)
 npm run typecheck
 npm run build
 ```
