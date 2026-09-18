@@ -1635,8 +1635,6 @@ const App = (() => {
           <label>고용 형태<select class="stSel" data-act="staffType" data-store="${tab}" data-id="${s2.id}">${Object.entries(EMP_TYPES).map(([k, v]) => `<option value="${k}"${(s2.type || 'regular') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
           <div><span class="stLbl">고정 휴무</span><div class="roles sm">${WD.map((n, i) => `<button class="rl${(s2.offDays || []).includes(i) ? ' on' : ''}" data-act="staffOff" data-store="${tab}" data-id="${s2.id}" data-d="${i}">${n}</button>`).join('')}</div></div>
           <div><span class="stLbl">기본 구간 <small>(비우면 모든 구간)</small></span><div class="roles sm">${SEGMENTS_DEFAULT.map((sg) => `<button class="rl${(s2.segs || []).includes(sg.key) ? ' on' : ''}" data-act="staffSeg" data-store="${tab}" data-id="${s2.id}" data-k="${sg.key}">${(segList().find((x) => x.key === sg.key) || sg).name}</button>`).join('')}</div></div>
-          <label>급여 형태 <small>(인건비 계산용)</small><select class="stSel" data-act="staffPayType" data-store="${tab}" data-id="${s2.id}"><option value=""${!(s2.pay && s2.pay.type) ? ' selected' : ''}>없음</option><option value="hour"${s2.pay && s2.pay.type === 'hour' ? ' selected' : ''}>시급</option><option value="month"${s2.pay && s2.pay.type === 'month' ? ' selected' : ''}>월급</option></select></label>
-          <label>금액 (원)${s2.pay && s2.pay.type === 'hour' && Number(s2.pay.amount) > 0 && Number(s2.pay.amount) < minWage() ? ' <span class="chip crit">최저임금 미만</span>' : ''}<input type="number" class="stSel" data-act="staffPayAmt" data-store="${tab}" data-id="${s2.id}" value="${s2.pay && s2.pay.amount ? s2.pay.amount : ''}" min="0" step="10" inputmode="numeric" placeholder="예: ${minWage()}"></label>
           <label>이메일 <small>(급여명세서용 · 다음 버전)</small><input type="email" class="stSel" data-act="staffEmail" data-store="${tab}" data-id="${s2.id}" value="${esc(s2.email || '')}" placeholder="name@example.com"></label>
         </div></div>`).join('');
       h += `<button class="add" data-act="staffAdd" data-store="${tab}">+ ${esc(tabName)} 직원 추가</button></div>`;
@@ -2988,9 +2986,19 @@ const App = (() => {
       <div class="mnav"><button class="dnav" data-act="lmonthNav" data-d="-1" aria-label="이전 달">‹</button><span class="mtitle">${monthLabel(m)}</span><button class="dnav" data-act="lmonthNav" data-d="1" aria-label="다음 달">›</button>
       ${p ? `<button class="btn ghost" data-act="laborUnconfirm">확정 풀기</button>` : `<button class="btn primary" data-act="laborConfirm"${L.rows.length ? '' : ' disabled'}>이달 급여 확정</button>`}</div></div>`;
     if (p) h += `<div class="notice ok"><b>확정됨</b> · ${esc(p.at)}${p.by ? ' · ' + esc(p.by) : ''} — 이 숫자가 월 손익에 들어갑니다.${changed ? `<div class="hint warnTxt">⚠️ 확정 후 근무표가 바뀌었습니다. 다시 계산하려면 "확정 풀기"를 누른 뒤 다시 확정하세요.</div>` : ''}</div>`;
+    /* 급여 기준 — 직원별 시급/월급 (직원 명단에서 이곳으로 옮김) */
+    const sid = Store.meta ? Store.meta.current : 'ansan';
+    h += `<details class="notice" ${(L.rows.some((r) => !r.payType) || !L.anySched) ? 'open' : ''}><summary><b>급여 기준 — 직원별 시급 · 월급</b> <small class="mut">인건비 계산에 씁니다. 최저시급 ${fmtNum(minWage())}원</small></summary>
+      <div class="tkLogWrap"><table class="tkLog"><thead><tr><th>직원</th><th>급여 형태</th><th class="r">금액 (원)</th><th></th></tr></thead><tbody>
+      ${S.staff.filter((s) => s.active).map((s2) => `<tr><td><b>${esc(s2.name)}</b></td>
+        <td><select class="tkIn wide" data-act="staffPayType" data-store="${sid}" data-id="${s2.id}"><option value=""${!(s2.pay && s2.pay.type) ? ' selected' : ''}>없음</option><option value="hour"${s2.pay && s2.pay.type === 'hour' ? ' selected' : ''}>시급</option><option value="month"${s2.pay && s2.pay.type === 'month' ? ' selected' : ''}>월급</option></select></td>
+        <td class="r"><input type="number" class="tkIn wide" data-act="staffPayAmt" data-store="${sid}" data-id="${s2.id}" value="${s2.pay && s2.pay.amount ? s2.pay.amount : ''}" min="0" step="10" inputmode="numeric" placeholder="예: ${minWage()}"></td>
+        <td>${s2.pay && s2.pay.type === 'hour' && Number(s2.pay.amount) > 0 && Number(s2.pay.amount) < minWage() ? '<span class="chip crit">최저임금 미만</span>' : ''}</td></tr>`).join('')}
+      ${S.staff.filter((s) => s.active).length ? '' : '<tr><td colspan="4">재직 직원이 없습니다.</td></tr>'}</tbody></table></div></details>`;
     if (!L.anySched) return h + `<div class="notice warn"><b>${monthLabel(m)} 근무표가 없습니다.</b><div class="hint">근무표를 짜면 여기에 사람별 시간과 예상 급여가 나옵니다. 손익에는 0원이 아니라 "근무표 없음"으로 표시됩니다. <button class="btn sm" data-act="view" data-v="month">월간 근무표 열기</button></div></div>`;
     const noPay = L.rows.filter((r) => !r.payType);
-    if (noPay.length) h += `<div class="notice warn"><b>급여 기준이 없는 사람 ${noPay.length}명</b> — ${noPay.map((r) => esc(r.name)).join(' · ')}<div class="hint">직원 명단에서 급여 형태(시급/월급)와 금액을 넣으면 계산됩니다. <button class="btn sm" data-act="view" data-v="staff">직원 명단 열기</button></div></div>`;
+    if (noPay.length) h += `<div class="notice warn"><b>급여 기준이 없는 사람 ${noPay.length}명</b> — ${noPay.map((r) => esc(r.name)).join(' · ')}<div class="hint">아래 급여 기준 표에서 시급/월급과 금액을 넣으면 계산됩니다.</div></div>`;
+
     h += `<div class="cards m4">
       <div class="card"><div class="cl">${p ? '확정 인건비' : '예상 인건비'}</div><div class="cv sm2">${fmtWon(L.total)}</div></div>
       <div class="card"><div class="cl">근무 시간 합계</div><div class="cv">${(Math.round(L.rows.reduce((a, r) => a + r.hours, 0) * 10) / 10).toLocaleString('ko-KR')}<small>시간</small></div></div>
@@ -3063,7 +3071,17 @@ const App = (() => {
     const label = level === 'expired' ? `만료 ${-left}일 지남` : level === 'ok' ? `${left}일 남음` : `${left}일 남음 · 곧 만료`;
     return { level, label, left, due };
   }
-  const healthOf = (st) => dueStatus(st && st.health && st.health.issued, healthMonths());
+  /* 보건증 목록 — 직원 명단과 별개로 이름을 직접 적는다. S.health[{id, name, issued, memo}]
+     예전 staff.health 기록과 재직 직원 이름은 처음 열 때 한 번 옮겨 넣는다 */
+  function healthList() {
+    if (!Array.isArray(S.health)) {
+      S.health = [];
+      S.staff.filter((s) => s.active).forEach((s) => S.health.push({ id: newId('h'), name: s.name, issued: (s.health && s.health.issued) || '', memo: (s.health && s.health.memo) || '' }));
+    }
+    return S.health;
+  }
+  const healthEntry = (name) => healthList().find((x) => x.name === name);
+  const healthOf = (st) => { const e = st && healthEntry(st.name); return dueStatus(e && e.issued, healthMonths()); };
   function hygieneOf() {
     if (!S.hygiene) S.hygiene = {};
     if (!S.hygiene.owner) S.hygiene.owner = { done: '', every: 12, org: '', memo: '' };
@@ -3075,7 +3093,7 @@ const App = (() => {
   /* 할 일 화면 맨 위 알림 */
   function staffAlerts() {
     const out = [];
-    S.staff.filter((s) => s.active).forEach((s) => { const h = healthOf(s); if (dueBad(h)) out.push({ v: 'health', text: `${s.name} 보건증 ${h.label}` }); });
+    healthList().forEach((e) => { const h = dueStatus(e.issued, healthMonths()); if (e.name && dueBad(h)) out.push({ v: 'health', text: `${e.name} 보건증 ${h.label}` }); });
     const o = ownerHygiene(); if (dueBad(o)) out.push({ v: 'hygiene', text: `영업자 위생교육 ${o.label}` });
     const hs = hygieneOf().staff;
     S.staff.filter((s) => s.active && hs[s.id] && hs[s.id].done).forEach((s) => { const st = dueStatus(hs[s.id].done, 12); if (dueBad(st)) out.push({ v: 'hygiene', text: `${s.name} 위생교육 ${st.label}` }); });
@@ -3084,22 +3102,25 @@ const App = (() => {
   const lvlChip = (st) => `<span class="chip ${st.level === 'ok' ? 'today' : st.level === 'none' ? 'missed' : 'crit'}">${st.label}</span>`;
 
   function vHealth() {
-    const act = S.staff.filter((s) => s.active);
-    const bad = act.filter((s) => dueBad(healthOf(s))), none = act.filter((s) => healthOf(s).level === 'none');
-    let h = `<div class="hd"><div><h2>보건증 관리</h2><div class="sub">식품을 다루는 직원은 건강진단(보건증)을 받아야 합니다. 발급일만 적어 두면 만료 30일·7일 전에 할 일 화면에 알림이 뜹니다.</div></div>
-      <div class="mnav"><span class="hint" style="margin:0">유효기간</span><input type="number" class="tkIn" data-act="healthMonths" value="${healthMonths()}" min="1" max="36"><span class="hint" style="margin:0">개월</span></div></div>`;
+    const list = healthList();
+    const stat = (e) => dueStatus(e.issued, healthMonths());
+    const bad = list.filter((e) => dueBad(stat(e))), none = list.filter((e) => stat(e).level === 'none');
+    let h = `<div class="hd"><div><h2>보건증 관리</h2><div class="sub">식품을 다루는 사람은 건강진단(보건증)을 받아야 합니다. 이름과 발급일만 적어 두면 만료 30일·7일 전에 할 일 화면에 알림이 뜹니다.</div></div>
+      <div class="mnav"><span class="hint" style="margin:0">유효기간</span><input type="number" class="tkIn" data-act="healthMonths" value="${healthMonths()}" min="1" max="36"><span class="hint" style="margin:0">개월</span>
+        <button class="btn primary" data-act="healthAdd">+ 사람 추가</button></div></div>`;
     h += `<div class="cards m4">
-      <div class="card"><div class="cl">재직 직원</div><div class="cv">${act.length}<small>명</small></div></div>
+      <div class="card"><div class="cl">등록 인원</div><div class="cv">${list.length}<small>명</small></div></div>
       <div class="card${bad.length ? ' warn' : ''}"><div class="cl">만료 · 임박</div><div class="cv">${bad.length}<small>명</small></div><div class="cs">30일 이내</div></div>
-      <div class="card${none.length ? ' warn' : ''}"><div class="cl">미등록</div><div class="cv">${none.length}<small>명</small></div></div>
-      <div class="card"><div class="cl">정상</div><div class="cv">${act.length - bad.length - none.length}<small>명</small></div></div></div>`;
-    h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>직원</th><th>역할</th><th>발급일</th><th>만료일</th><th>상태</th><th>메모</th></tr></thead><tbody>
-      ${act.map((s) => { const st = healthOf(s), hh = s.health || {}; return `<tr><td><b>${esc(s.name)}</b></td><td class="mut">${(s.roles || []).join('·')}</td>
-        <td><input type="date" class="tkIn wide" data-act="healthDate" data-id="${s.id}" value="${esc(hh.issued || '')}" max="${dateKey()}"></td>
+      <div class="card${none.length ? ' warn' : ''}"><div class="cl">발급일 미입력</div><div class="cv">${none.length}<small>명</small></div></div>
+      <div class="card"><div class="cl">정상</div><div class="cv">${list.length - bad.length - none.length}<small>명</small></div></div></div>`;
+    h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>이름</th><th>발급일</th><th>만료일</th><th>상태</th><th>메모</th><th></th></tr></thead><tbody>
+      ${list.map((e) => { const st = stat(e); return `<tr><td><input class="tkIn wide" data-act="healthName" data-id="${e.id}" value="${esc(e.name || '')}" placeholder="이름"></td>
+        <td><input type="date" class="tkIn wide" data-act="healthDate" data-id="${e.id}" value="${esc(e.issued || '')}" max="${dateKey()}"></td>
         <td class="mut">${st.due || '—'}</td><td>${lvlChip(st)}</td>
-        <td><input class="tkIn wide2" data-act="healthMemo" data-id="${s.id}" value="${esc(hh.memo || '')}" placeholder="보건소 · 검진기관 등"></td></tr>`; }).join('')}
-      ${act.length ? '' : '<tr><td colspan="6">재직 직원이 없습니다. 직원 명단에서 먼저 추가하세요.</td></tr>'}</tbody></table></div>
-      <p class="hint">기준 — 식품위생법 제40조: 식품 조리·판매 종사자는 건강진단을 받아야 하며 유효기간은 통상 1년으로 봅니다(관할 보건소 기준 확인). 만료된 직원을 근무표에 배치하면 배치 창에 경고가 보입니다.</p>`;
+        <td><input class="tkIn wide2" data-act="healthMemo" data-id="${e.id}" value="${esc(e.memo || '')}" placeholder="보건소 · 검진기관 등"></td>
+        <td><button class="btn sm ghost danger" data-act="healthDel" data-id="${e.id}">삭제</button></td></tr>`; }).join('')}
+      ${list.length ? '' : '<tr><td colspan="6">아직 등록한 사람이 없습니다. <b>+ 사람 추가</b>로 시작하세요.</td></tr>'}</tbody></table></div>
+      <p class="hint">기준 — 식품위생법 제40조: 식품 조리·판매 종사자는 건강진단을 받아야 하며 유효기간은 통상 1년으로 봅니다(관할 보건소 기준 확인). 여기 적은 이름이 직원 명단의 이름과 같으면, 만료된 사람을 근무표에 배치할 때 배치 창에 경고가 보입니다.</p>`;
     return h;
   }
   function vHygiene() {
@@ -3877,6 +3898,8 @@ const App = (() => {
         case 'biSp': S.ui.biSp = b.dataset.sp; save(); render(); break;
         case 'buyEvAdd': buyEvForm(); break;
         case 'biEv': S.ui.biEv = b.dataset.d; save(); render(); break;
+        case 'healthAdd': healthList().push({ id: newId('h'), name: '', issued: '', memo: '' }); save(); render(); setTimeout(() => { const el = document.querySelector('input[data-act="healthName"][value=""]'); if (el) el.focus(); }, 50); break;
+        case 'healthDel': { const e = healthList().find((x) => x.id === id); if (!e) return; if (e.name && !confirm(`${e.name} 보건증 기록을 지울까요?`)) return; S.health = healthList().filter((x) => x.id !== id); save(); render(); break; }
         case 'sampleLoad': loadSampleData(); break;
         case 'sampleClear': if (!confirm('샘플 자료를 지울까요? 직접 넣은 기록은 그대로 남습니다.')) return; clearSampleData(); break;
         case 'buyEvDel': S.settings.buyEvents = (S.settings.buyEvents || []).filter((e) => !(e.date === b.dataset.d && e.name === b.dataset.n)); save(); render(); break;
@@ -4299,9 +4322,9 @@ const App = (() => {
       if (b.dataset.act === 'tankMaxKg') { S.settings.tankMaxKg = Math.max(10, Number(b.value) || 700); save(); render(); }
       if (b.dataset.act === 'crabHold') { S.settings.crabHold = S.settings.crabHold || {}; S.settings.crabHold[b.dataset.sp] = Math.max(1, Number(b.value) || 28); save(); render(); }
       if (b.dataset.act === 'healthMonths') { S.settings.healthMonths = Math.max(1, Number(b.value) || 12); save(); render(); }
-      if (b.dataset.act === 'healthDate' || b.dataset.act === 'healthMemo') {
-        const st = S.staff.find((x) => x.id === b.dataset.id); if (!st) return;
-        st.health = st.health || {}; if (b.dataset.act === 'healthDate') st.health.issued = b.value; else st.health.memo = b.value.trim();
+      if (b.dataset.act === 'healthDate' || b.dataset.act === 'healthMemo' || b.dataset.act === 'healthName') {
+        const e = healthList().find((x) => x.id === b.dataset.id); if (!e) return;
+        if (b.dataset.act === 'healthDate') e.issued = b.value; else if (b.dataset.act === 'healthMemo') e.memo = b.value.trim(); else e.name = b.value.trim();
         save(); if (b.dataset.act === 'healthDate') render();
       }
       if (b.dataset.act === 'hyOwner') { const o = hygieneOf().owner; o[b.dataset.f] = b.dataset.f === 'every' ? Math.max(1, Number(b.value) || 12) : b.value.trim(); save(); if (b.dataset.f !== 'org') render(); }
