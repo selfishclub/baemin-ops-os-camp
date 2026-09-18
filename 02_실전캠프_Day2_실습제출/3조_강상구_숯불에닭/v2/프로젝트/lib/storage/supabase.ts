@@ -3,6 +3,10 @@ import type { ChannelId, Major } from "../categories";
 import { seedRules } from "../seed";
 import type { ChannelSale, DailySale, Month, MonthClosing, Rule, Shift, Staff, Transaction, UploadRecord } from "../types";
 import type { Store } from "./index";
+import { nextMonth } from "../month";
+
+// "2026-09-31" 같은 없는 날짜를 만들지 않도록, 달의 끝은 "다음 달 1일 미만"으로 잡는다
+const monthEnd = (month: Month) => nextMonth(month) + "-01";
 
 // 시연 모드 전용. anon 공개 열쇠만 쓴다(service_role 금지). 테이블은 supabase/schema.sql.
 type Row = Record<string, unknown>;
@@ -145,11 +149,11 @@ export class SupabaseStore implements Store {
       await this.run(this.db.from(table).delete().eq("month", month));
     }
     for (const table of ["daily_sales", "shifts"]) {
-      await this.run(this.db.from(table).delete().gte("date", month + "-01").lte("date", month + "-31"));
+      await this.run(this.db.from(table).delete().gte("date", month + "-01").lt("date", monthEnd(month)));
     }
   }
   async listDailySales(month: Month) {
-    const rows = await this.run<Row[]>(this.db.from("daily_sales").select("*").gte("date", month + "-01").lte("date", month + "-31"));
+    const rows = await this.run<Row[]>(this.db.from("daily_sales").select("*").gte("date", month + "-01").lt("date", monthEnd(month)));
     return (rows ?? []).map((r): DailySale => ({ date: r.date as string, channel: r.channel as string, amount: Number(r.amount) }));
   }
   async saveDailySales(date: string, sales: DailySale[]) {
@@ -158,7 +162,7 @@ export class SupabaseStore implements Store {
     if (rows.length) await this.run(this.db.from("daily_sales").insert(rows));
   }
   async listShifts(month: Month) {
-    const rows = await this.run<Row[]>(this.db.from("shifts").select("*").gte("date", month + "-01").lte("date", month + "-31"));
+    const rows = await this.run<Row[]>(this.db.from("shifts").select("*").gte("date", month + "-01").lt("date", monthEnd(month)));
     return (rows ?? []).map((r): Shift => ({ date: r.date as string, staffId: r.staff_id as string, hours: Number(r.hours) }));
   }
   async saveShifts(date: string, shifts: Shift[]) {
