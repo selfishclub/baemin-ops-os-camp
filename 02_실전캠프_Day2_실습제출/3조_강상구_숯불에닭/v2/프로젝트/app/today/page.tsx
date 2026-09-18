@@ -6,7 +6,7 @@ import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, MoneyInput, Notice } from "@/components/ui";
 import { CHANNELS_KEY, useDaily } from "@/components/useDaily";
 import { CARD_PRESETS, groupChannels, type Channel, type ChannelKind } from "@/lib/categories";
-import { SETTLEMENT_RULES_KEY, type SettlementRule } from "@/lib/settlement";
+import { CARD_RULE_DAYS, DEFAULT_CARD_DAYS, SETTLEMENT_RULES_KEY, type SettlementRule } from "@/lib/settlement";
 import { newId } from "@/lib/classify";
 import { checkDay, dayTotals, daysInMonth, monthSummary, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
@@ -132,7 +132,7 @@ export default function TodayPage() {
       await store.saveSetting(CHANNELS_KEY, next.map((c) => (c.id === "hall_card" ? { ...c, name: "기타 카드" } : c)));
     }
     const rules = (await store.getSetting<SettlementRule[]>(SETTLEMENT_RULES_KEY)) ?? [];
-    if (!rules.some((r) => r.channel === preset.id)) await store.saveSetting(SETTLEMENT_RULES_KEY, [...rules, { channel: preset.id, mode: "days", days: 2, weekday: 0 }]);
+    if (!rules.some((r) => r.channel === preset.id)) await store.saveSetting(SETTLEMENT_RULES_KEY, [...rules, { channel: preset.id, mode: "days", days: CARD_RULE_DAYS[preset.id] ?? DEFAULT_CARD_DAYS, weekday: 0 }]);
     const bankRules = await store.listRules();
     for (const k of preset.keywords) {
       if (!bankRules.some((r) => r.keyword === k && r.direction === "in")) {

@@ -13,10 +13,10 @@ const LAST_BANK = "2026-09-18";
 // 규칙 (lib/settlement.ts 의 DEFAULT_RULES 와 같게 유지)
 const RULES = {
   hall_card: { mode: "days", days: 2 },
-  baemin: { mode: "weekly", weekday: 0 },
+  baemin: { mode: "days", days: 3 },
   coupang: { mode: "weekly", weekday: 4 },
   yogiyo: { mode: "days", days: 5 },
-  etc: { mode: "days", days: 3 },
+  etc: { mode: "days", days: 1 },
 };
 const FEE = { hall_card: 0.012, baemin: 0.15, coupang: 0.18, yogiyo: 0.14, etc: 0.07 };
 const PAYEE = { hall_card: "BC카드매출", baemin: "우아한형제들", coupang: "쿠팡이츠정산", yogiyo: "요기요정산", etc: "땡겨요정산" };

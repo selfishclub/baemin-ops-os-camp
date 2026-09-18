@@ -167,10 +167,34 @@ export function prevMonthPayoutsInto(month: Month, rule: SettlementRule, prevDai
   return [...days];
 }
 
+// 기본 규칙 — 각 사가 공개한 정산 안내를 기준으로 (2026-09-19 조사). 실제 입금과 다르면 정산 탭에서 고친다.
 export const DEFAULT_RULES: SettlementRule[] = [
-  { channel: "hall_card", mode: "days", days: 2, weekday: 0 },
-  { channel: "baemin", mode: "weekly", days: 0, weekday: 0 },
-  { channel: "coupang", mode: "weekly", days: 0, weekday: 4 },
-  { channel: "yogiyo", mode: "days", days: 5, weekday: 0 },
-  { channel: "etc", mode: "days", days: 3, weekday: 0 },
+  { channel: "hall_card", mode: "days", days: 2, weekday: 0 }, // 카드사 일반: 매출일 + 2영업일
+  { channel: "baemin", mode: "days", days: 3, weekday: 0 }, // 배민: 주문(구매확정)일 + 3영업일 (2022.2~)
+  { channel: "coupang", mode: "weekly", days: 0, weekday: 4 }, // 쿠팡이츠: 공개 안내 못 찾음 — 사장님 사이트 정산 메뉴에서 확인 필요
+  { channel: "yogiyo", mode: "days", days: 5, weekday: 0 }, // 요기요: 결제일 + 5영업일 (2024.8~ 일 단위)
+  { channel: "etc", mode: "days", days: 1, weekday: 0 }, // 땡겨요: 당일~익영업일 (카드결제는 익영업일)
 ];
+
+// 카드사별 기본 (매출일 + N영업일). 간편결제(카카오페이 등)는 정산기준일 + 1영업일
+export const CARD_RULE_DAYS: Record<string, number> = { card_easy: 1 };
+export const DEFAULT_CARD_DAYS = 2;
+
+// 규칙의 근거 — 화면에 "공식 안내 기준 / 확인 필요"로 보여 준다
+export const RULE_NOTES: Record<string, { source: "official" | "general" | "unknown"; text: string }> = {
+  hall_card: { source: "general", text: "카드사 일반 관행 D+2영업일. 카드사마다 D+1~3으로 다를 수 있어요" },
+  card_bc: { source: "general", text: "카드사 일반 관행 D+2영업일" },
+  card_kb: { source: "general", text: "카드사 일반 관행 D+2영업일" },
+  card_shinhan: { source: "general", text: "카드사 일반 관행 D+2영업일" },
+  card_samsung: { source: "general", text: "카드사 일반 관행 D+2영업일" },
+  card_hyundai: { source: "general", text: "카드사 일반 관행 D+2영업일" },
+  card_lotte: { source: "general", text: "카드사 일반 관행 D+2영업일" },
+  card_hana: { source: "general", text: "카드사 일반 관행 D+2영업일" },
+  card_nh: { source: "general", text: "카드사 일반 관행 D+2영업일" },
+  card_woori: { source: "general", text: "카드사 일반 관행 D+2영업일" },
+  card_easy: { source: "official", text: "카카오페이 안내: 정산기준일 + 1영업일 (네이버페이 등은 다를 수 있음)" },
+  baemin: { source: "official", text: "배민 안내: 주문일 + 3영업일 (주말·공휴일 제외)" },
+  coupang: { source: "unknown", text: "공개 안내를 찾지 못했어요. 쿠팡이츠 사장님 사이트 › 정산에서 확인해 주세요" },
+  yogiyo: { source: "official", text: "요기요 안내: 결제일 + 5영업일 (2024.8부터 일 단위)" },
+  etc: { source: "official", text: "땡겨요 안내: 당일~익영업일 입금 (카드결제는 익영업일)" },
+};

@@ -7,7 +7,7 @@ import type { useLedger } from "@/components/useLedger";
 import type { SettlementState } from "@/components/useSettlement";
 import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
-import { DEFAULT_RULES, type SettlementRule } from "@/lib/settlement";
+import { DEFAULT_RULES, RULE_NOTES, type SettlementRule } from "@/lib/settlement";
 
 const DOW = ["월", "화", "수", "목", "금", "토", "일"];
 
@@ -30,6 +30,7 @@ export default function SettlementSection({
   const [help, setHelp] = useState(false);
 
   const settleable = daily.channels.filter((c) => c.active && c.kind !== "cash");
+  const missingRule = settleable.filter((c) => !rules.some((r) => r.channel === c.id) && DEFAULT_RULES.some((r) => r.channel === c.id));
   const hasDaily = daily.sales.some((s) => s.date.startsWith(month));
   const name = (id: string) => daily.channels.find((c) => c.id === id)?.name ?? id;
 
@@ -92,9 +93,14 @@ export default function SettlementSection({
             </ul>
           </div>
         )}
+        {!editing && rules.length > 0 && missingRule.length > 0 && (
+          <button className="btn-ghost w-full" onClick={() => saveRules([...rules, ...DEFAULT_RULES.filter((r) => missingRule.some((c) => c.id === r.channel))])}>
+            규칙 없는 채널({missingRule.map((c) => c.name).join(", ")})에 기본 규칙 넣기
+          </button>
+        )}
         {!editing && rules.length === 0 && (
           <div className="space-y-2">
-            <Notice tone="info">아직 규칙이 없어요. 기본 규칙(카드 +2영업일, 배민 주 단위 월요일, 쿠팡이츠 주 단위 금요일, 요기요 +5영업일, 기타 +3영업일)으로 시작해 보세요.</Notice>
+            <Notice tone="info">아직 규칙이 없어요. 각 사 공개 안내를 기준으로 한 기본 규칙(카드 +2영업일, 배민 +3영업일, 요기요 +5영업일, 땡겨요 +1영업일, 쿠팡이츠는 확인 필요)으로 시작해 보세요.</Notice>
             <button className="btn-ghost" onClick={() => saveRules(DEFAULT_RULES.filter((r) => settleable.some((c) => c.id === r.channel)))}>
               기본 규칙 넣기
             </button>
@@ -105,11 +111,19 @@ export default function SettlementSection({
             {settleable.map((c) => {
               const r = rules.find((x) => x.channel === c.id);
               return (
-                <li key={c.id} className="flex justify-between py-1.5">
-                  <span className="font-semibold">{c.name}</span>
-                  <span className="text-stone-600">
-                    {!r ? <span className="text-stone-400">규칙 없음 (직접 입력)</span> : r.mode === "days" ? `매출일 + ${r.days}영업일` : `매주 ${DOW[r.weekday]}요일에 지난주분`}
-                  </span>
+                <li key={c.id} className="py-1.5">
+                  <div className="flex justify-between">
+                    <span className="font-semibold">{c.name}</span>
+                    <span className="text-stone-600">
+                      {!r ? <span className="text-stone-400">규칙 없음 (직접 입력)</span> : r.mode === "days" ? `매출일 + ${r.days}영업일` : `매주 ${DOW[r.weekday]}요일에 지난주분`}
+                    </span>
+                  </div>
+                  {RULE_NOTES[c.id] && (
+                    <p className={`text-[11px] ${RULE_NOTES[c.id].source === "unknown" ? "text-amber-700" : "text-stone-400"}`}>
+                      {RULE_NOTES[c.id].source === "official" ? "공식 안내 · " : RULE_NOTES[c.id].source === "unknown" ? "확인 필요 · " : "일반 관행 · "}
+                      {RULE_NOTES[c.id].text}
+                    </p>
+                  )}
                 </li>
               );
             })}
