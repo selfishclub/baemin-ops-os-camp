@@ -14,3 +14,13 @@ describe("채널 묶기", () => {
     expect(new Set(CARD_PRESETS.map((c) => c.id)).size).toBe(CARD_PRESETS.length);
   });
 });
+
+import { channelKind } from "./categories";
+describe("채널 종류 판정", () => {
+  it("카드사 채널은 설정에 없어도 카드", () => {
+    expect(channelKind("card_kb")).toBe("card");
+    expect(channelKind("hall")).toBe("card");
+    expect(channelKind("hall_cash")).toBe("cash");
+    expect(channelKind("baemin")).toBe("delivery");
+  });
+});

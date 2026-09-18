@@ -69,7 +69,10 @@ export const DEFAULT_CHANNELS: Channel[] = [
 // v1에서 쓰던 "hall"(홀 전체)은 카드로 본다
 export function channelKind(id: ChannelId, channels: Channel[] = DEFAULT_CHANNELS): ChannelKind {
   if (id === "hall") return "card";
-  return channels.find((c) => c.id === id)?.kind ?? "delivery";
+  const found = channels.find((c) => c.id === id)?.kind;
+  if (found) return found;
+  if (id.startsWith("card_")) return "card"; // 카드사 채널(CARD_PRESETS)은 설정에 없어도 카드로 본다
+  return "delivery";
 }
 
 export const isHall = (id: ChannelId, channels: Channel[] = DEFAULT_CHANNELS) => id === "hall" || channelKind(id, channels) !== "delivery";
