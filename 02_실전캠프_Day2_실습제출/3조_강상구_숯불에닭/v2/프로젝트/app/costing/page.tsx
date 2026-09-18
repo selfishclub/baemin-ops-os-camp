@@ -242,6 +242,8 @@ function Stat({ label, value, sub, tone }: { label: string; value: string; sub: 
 
 // 품목·메뉴·레시피 설정. 실제 레시피와 단가는 내 PC 모드에서만 넣는다.
 function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu[]; recipes: Recipe[]; onChange: () => Promise<void> }) {
+  const importRef = useRef<HTMLInputElement>(null);
+  const [ioNote, setIoNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [itemName, setItemName] = useState("");
   const [itemUnit, setItemUnit] = useState<BaseUnit>("kg");
   const [itemCost, setItemCost] = useState(0);
@@ -273,6 +275,45 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
     setMenuPrice(0);
     await onChange();
   }
+  function exportJson() {
+    const blob = new Blob([JSON.stringify({ app: "sootdak-ledger-costing", version: 1, exportedAt: new Date().toISOString(), items, menus, recipes }, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `레시피_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setIoNote({ tone: "ok", text: "레시피 파일을 저장했어요. 가게 노하우라 GitHub·단톡방에 올리지 마세요." });
+  }
+  async function importJson(file: File) {
+    try {
+      const j = JSON.parse(await file.text()) as { app?: string; items?: Item[]; menus?: Menu[]; recipes?: Recipe[] };
+      if (j.app !== "sootdak-ledger-costing" || !Array.isArray(j.items) || !Array.isArray(j.menus) || !Array.isArray(j.recipes)) throw new Error("이 도구의 레시피 파일이 아니에요.");
+      // 같은 id는 덮어쓰고, 없는 것은 더한다 (기준단가는 파일 값이 0이면 기존 값을 지킨다)
+      const mergedItems = [...items];
+      for (const it of j.items) {
+        const i = mergedItems.findIndex((x) => x.id === it.id);
+        if (i >= 0) mergedItems[i] = { ...mergedItems[i], ...it, standardCost: it.standardCost || mergedItems[i].standardCost };
+        else mergedItems.push(it);
+      }
+      const mergedMenus = [...menus];
+      for (const m of j.menus) {
+        const i = mergedMenus.findIndex((x) => x.id === m.id);
+        if (i >= 0) mergedMenus[i] = { ...mergedMenus[i], ...m };
+        else mergedMenus.push(m);
+      }
+      const mergedRecipes = [...recipes.filter((r) => !j.recipes!.some((x) => x.menuId === r.menuId && x.effectiveFrom === r.effectiveFrom)), ...j.recipes];
+      await store.saveSetting(ITEMS_KEY, mergedItems);
+      await store.saveSetting(MENUS_KEY, mergedMenus);
+      await store.saveSetting(RECIPES_KEY, mergedRecipes);
+      await onChange();
+      const noCost = mergedItems.filter((x) => x.active && !x.standardCost).length;
+      setIoNote({ tone: "ok", text: `품목 ${j.items.length}·메뉴 ${j.menus.length}·레시피 ${j.recipes.length}개를 가져왔어요.${noCost ? ` 기준단가가 비어 있는 품목 ${noCost}개는 위에서 대략값을 넣어 주세요.` : ""}` });
+    } catch (e) {
+      setIoNote({ tone: "error", text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      if (importRef.current) importRef.current.value = "";
+    }
+  }
   function currentRecipe(menuId: string): Recipe | undefined {
     return recipes.filter((r) => r.menuId === menuId).sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0];
   }
@@ -285,12 +326,32 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
 
   return (
     <>
+      <section className="card space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-bold">레시피 파일</h2>
+          <div className="flex gap-2">
+            <button className="btn-ghost" onClick={() => importRef.current?.click()}>
+              가져오기 (JSON)
+            </button>
+            <button className="btn-ghost" onClick={exportJson} disabled={items.length === 0 && menus.length === 0}>
+              내보내기
+            </button>
+            <input ref={importRef} type="file" accept=".json" aria-label="레시피 파일" className="hidden" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} />
+          </div>
+        </div>
+        <p className="text-[11px] text-stone-500">다른 곳에서 만든 품목·메뉴·레시피(예: 매장관리자에서 뽑은 파일)를 한 번에 가져와요. 실제 레시피 파일은 내 PC 모드에서만 쓰고 저장소에 올리지 않아요.</p>
+        {ioNote && <Notice tone={ioNote.tone}>{ioNote.text}</Notice>}
+      </section>
+
       <section className="card space-y-3">
         <h2 className="text-base font-bold">품목과 기준단가 <span className="text-[11px] font-normal text-stone-500">대략값이면 돼요</span></h2>
         <ul className="divide-y divide-stone-100 text-sm">
           {items.map((i) => (
-            <li key={i.id} className="grid grid-cols-[1fr_8rem_3rem] items-center gap-2 py-1.5">
-              <span className="font-semibold">{i.name}</span>
+            <li key={i.id} className={`grid grid-cols-[1fr_8rem_3rem] items-center gap-2 py-1.5 ${!i.standardCost ? "bg-amber-50" : ""}`}>
+              <span className="font-semibold">
+                {i.name}
+                {!i.standardCost && <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-800">단가 필요</span>}
+              </span>
               <MoneyInput label={`${i.name} 기준단가`} value={i.standardCost} onChange={(n) => setItemCostOf(i.id, n ?? 0)} />
               <span className="text-xs text-stone-500">원/{i.baseUnit}</span>
             </li>
