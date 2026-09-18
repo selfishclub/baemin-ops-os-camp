@@ -3692,7 +3692,26 @@ const App = (() => {
      S.training[{id, cat, title, url, memo, by, createdAt, pin}] — 사장님이 유튜브·교육 사이트 주소를 넣고, 직원이 카드에서 바로 연다 */
   const TRAIN_CATS = ['서비스', '위생', '조리', '안전', '기타'];
   let trainCat = 'all';
-  const trainList = () => (S.training = S.training || []);
+  /* 추천 영상 — 2026-09-18 확인한 공식·전문 채널 영상. 처음 열 때 넣고, "추천 영상 넣기"로 다시 넣을 수 있다 */
+  const TRAIN_SEED = [
+    { cat: '위생', title: '조리종사자 식중독 예방 교육 (식약처)', url: 'https://www.youtube.com/watch?v=Xq7kBre2YpQ', memo: '주방·홀 모두 필수. 식중독 이해와 조리종사자 위생관리 요령', pin: true },
+    { cat: '위생', title: '손씻기 6단계 수칙 (질병관리청)', url: 'https://www.youtube.com/watch?v=wd6XR9Q1IM8', memo: '출근 직후 · 화장실 후 · 생물 만진 뒤 30초', pin: true },
+    { cat: '위생', title: '식품 위생 관리 방안과 사례 (식약처)', url: 'https://www.youtube.com/watch?v=ELIrOXSHS-Q', memo: '제조·가공업소 대상 영상이지만 교차오염·보관 원칙은 같음' },
+    { cat: '위생', title: 'HACCP 교육 동영상 — 음식점편 (식약처 홈페이지)', url: 'https://www.mfds.go.kr/brd/m_232/view.do?seq=517', memo: '손씻기 · 위생복장 · 교차오염 예방 세 가지' },
+    { cat: '위생', title: '기존 영업자 온라인 위생교육 수강 방법 (한국외식업중앙회)', url: 'https://www.youtube.com/watch?v=O5uMAWiJJHk', memo: '사장님용 · 매년 받는 위생교육(3시간) 온라인 수강 절차' },
+    { cat: '위생', title: '신규 영업자 집합 위생교육 수강 방법 (한국외식업중앙회)', url: 'https://www.youtube.com/watch?v=HWJG_KbzwTE', memo: '새 매장 열 때' },
+    { cat: '서비스', title: '고객 응대 시 직원의 금기행동 5가지 (박강사TV)', url: 'https://www.youtube.com/watch?v=SYIaY9kL_Do', memo: '홀 신입 첫 주 필독', pin: true },
+    { cat: '서비스', title: '클레임 대응 STAR 기법 — 불만 처리 절차와 응대 멘트 (박강사TV)', url: 'https://www.youtube.com/watch?v=IhyDt3K1B-w', memo: '컴플레인 났을 때 순서대로' },
+    { cat: '서비스', title: '컴플레인과 클레임의 차이, 사례로 보는 응대 기법 (박강사TV)', url: 'https://www.youtube.com/watch?v=nBTmGw4p2eE', memo: '' },
+    { cat: '서비스', title: '세대별 고객 소통 — MZ 고객 응대 기법 (박강사TV)', url: 'https://www.youtube.com/watch?v=eliBweBCONs', memo: '' },
+  ];
+  function seedTraining() {
+    const list = (S.training = S.training || []);
+    let n = 0;
+    TRAIN_SEED.forEach((t) => { if (list.some((x) => x.url === t.url)) return; list.push({ id: newId('tr'), cat: t.cat, title: t.title, url: t.url, memo: t.memo || '', pin: !!t.pin, by: '추천', createdAt: Date.now() + n, seed: true }); n++; });
+    return n;
+  }
+  const trainList = () => { if (!Array.isArray(S.training)) { S.training = []; seedTraining(); } return S.training; };
   function ytId(url) {
     try { const u = new URL(url); if (/youtu\.be$/.test(u.hostname)) return u.pathname.slice(1).split('/')[0]; if (/youtube\.com$/.test(u.hostname) || /youtube-nocookie\.com$/.test(u.hostname)) { if (u.searchParams.get('v')) return u.searchParams.get('v'); const m = u.pathname.match(/\/(shorts|embed|live)\/([^/?]+)/); if (m) return m[2]; } } catch (e) { /* 주소 아님 */ }
     return null;
@@ -3702,7 +3721,7 @@ const App = (() => {
     let list = trainList().slice().sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0) || (b.createdAt || 0) - (a.createdAt || 0));
     if (trainCat !== 'all') list = list.filter((x) => x.cat === trainCat);
     let h = `<div class="hd"><div><h2>교육 자료</h2><div class="sub">서비스 · 위생 · 조리 교육 영상이나 문서 주소를 넣어 두면 직원이 여기서 바로 봅니다. 유튜브는 앱 안에서 재생됩니다.</div></div>
-      <button class="btn primary" data-act="trainAdd" style="margin-left:auto">+ 자료 추가</button></div>`;
+      <div class="mnav"><button class="btn" data-act="trainSeed">추천 영상 넣기</button><button class="btn primary" data-act="trainAdd">+ 자료 추가</button></div></div>`;
     h += `<div class="filters">${['all', ...TRAIN_CATS].map((c) => `<button class="fl${trainCat === c ? ' on' : ''}" data-act="trainCat" data-c="${c}">${c === 'all' ? '전체' : c}</button>`).join('')}</div>`;
     if (!list.length) {
       h += `<div class="notice"><b>아직 등록한 교육 자료가 없습니다.</b>
@@ -4057,6 +4076,7 @@ const App = (() => {
           break;
         }
         case 'trainAdd': trainForm(null); break;
+        case 'trainSeed': { const n = seedTraining(); save(); render(); banner(n ? `추천 영상 ${n}개를 넣었습니다` : '추천 영상이 이미 다 들어 있습니다', '식약처 · 질병관리청 · 한국외식업중앙회 · 박강사TV'); break; }
         case 'trainEdit': closeModal(); trainForm(trainList().find((t) => t.id === id)); break;
         case 'trainCat': trainCat = b.dataset.c; render(); break;
         case 'trainDel': { if (!confirm('이 교육 자료를 삭제할까요?')) return; S.training = trainList().filter((t) => t.id !== id); save(); closeModal(); render(); break; }
