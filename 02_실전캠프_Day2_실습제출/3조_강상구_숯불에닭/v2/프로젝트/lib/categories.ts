@@ -73,3 +73,39 @@ export function channelKind(id: ChannelId, channels: Channel[] = DEFAULT_CHANNEL
 }
 
 export const isHall = (id: ChannelId, channels: Channel[] = DEFAULT_CHANNELS) => id === "hall" || channelKind(id, channels) !== "delivery";
+
+// 카드사 (선택 사항: 카드사별로 나눠 넣을 때). 통장 입금 내용에 keywords가 있으면 그 카드사 입금으로 본다.
+export interface CardPreset {
+  id: ChannelId;
+  name: string;
+  keywords: string[];
+}
+
+// 이름은 포스 마감정산서의 "카드사별 매출내역"과 같게 둔다
+export const CARD_PRESETS: CardPreset[] = [
+  { id: "card_bc", name: "BC카드", keywords: ["BC", "비씨"] },
+  { id: "card_kb", name: "국민카드", keywords: ["KB", "국민"] },
+  { id: "card_shinhan", name: "신한카드", keywords: ["신한"] },
+  { id: "card_samsung", name: "삼성카드", keywords: ["삼성"] },
+  { id: "card_hyundai", name: "현대카드", keywords: ["현대"] },
+  { id: "card_lotte", name: "롯데카드", keywords: ["롯데"] },
+  { id: "card_hana", name: "하나카드(구외환)", keywords: ["하나", "외환"] },
+  { id: "card_nh", name: "NH카드", keywords: ["NH", "농협"] },
+  { id: "card_woori", name: "우리카드", keywords: ["우리"] },
+  { id: "card_easy", name: "간편결제", keywords: ["카카오페이", "네이버페이", "페이코", "간편"] }, // 카카오페이·네이버페이 등. 카드와 따로 입금
+];
+
+// 채널을 종류별로 묶고 합계를 낸다 (오늘 탭·정산 탭의 "카드 합계"·"배달 합계")
+export function groupChannels(channels: Channel[], amounts: Record<string, number>) {
+  const active = channels.filter((c) => c.active);
+  const sum = (kind: ChannelKind) => active.filter((c) => c.kind === kind).reduce((a, c) => a + (amounts[c.id] ?? 0), 0);
+  return {
+    card: active.filter((c) => c.kind === "card"),
+    cash: active.filter((c) => c.kind === "cash"),
+    delivery: active.filter((c) => c.kind === "delivery"),
+    cardTotal: sum("card"),
+    cashTotal: sum("cash"),
+    deliveryTotal: sum("delivery"),
+    total: sum("card") + sum("cash") + sum("delivery"),
+  };
+}

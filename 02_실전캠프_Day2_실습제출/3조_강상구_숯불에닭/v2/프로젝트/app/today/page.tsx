@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, MoneyInput, Notice } from "@/components/ui";
 import { CHANNELS_KEY, useDaily } from "@/components/useDaily";
-import type { Channel, ChannelKind } from "@/lib/categories";
+import { CARD_PRESETS, groupChannels, type Channel, type ChannelKind } from "@/lib/categories";
+import { SETTLEMENT_RULES_KEY, type SettlementRule } from "@/lib/settlement";
 import { newId } from "@/lib/classify";
 import { checkDay, dayTotals, daysInMonth, monthSummary, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
@@ -66,7 +67,8 @@ export default function TodayPage() {
   const summary = useMemo(() => monthSummary(month, daily.sales, daily.shifts, daily.staff, today), [month, daily.sales, daily.shifts, daily.staff, today]);
   const week = useMemo(() => weekHoursByStaff(date, daily.shifts, daily.staff), [date, daily.shifts, daily.staff]);
 
-  const dayTotal = active.reduce((a, c) => a + (amounts[c.id] ?? 0), 0);
+  const groups = groupChannels(daily.channels, amounts);
+  const dayTotal = groups.total;
   const dayLabor = rows.reduce((a, r) => a + r.hours * (daily.staff.find((s) => s.id === r.staffId)?.wage ?? 0), 0);
 
   function trySave() {
@@ -141,7 +143,10 @@ export default function TodayPage() {
           <div className="rounded-xl bg-sky-50 px-3 py-2 text-[12px] text-sky-950 ring-1 ring-sky-200">
             <ul className="list-disc space-y-0.5 pl-4">
               <li>
-                <b>홀 카드·현금</b> — 포스 마감(일계) 화면의 카드 매출·현금 매출
+                <b>홀 카드·현금</b> — 포스 <b>마감정산서</b>의 “결제수단별 매출내역”: 신용카드 → 카드, 일반현금+현금영수증 → 홀 현금, 간편결제 → 간편결제(카드사별로 나눴을 때). 할인을 뺀 <b>실매출</b> 기준이에요
+              </li>
+              <li>
+                <b>카드사별로 나눴으면</b> — 마감정산서 맨 아래 “카드사별 매출내역”의 숫자를 카드사 칸에 그대로. 합계가 “카드매출”과 맞으면 돼요
               </li>
               <li>
                 <b>배달앱</b> — 각 앱 사장님 앱의 오늘 주문금액(손님 결제 금액, 수수료 빼기 전)
@@ -156,16 +161,35 @@ export default function TodayPage() {
 
         <div>
           <p className="mb-1 text-xs font-semibold text-stone-500">매출 (주문일 기준)</p>
-          <div className="grid grid-cols-2 gap-2">
-            {active.map((c) => (
-              <label key={c.id} className="space-y-1 text-[11px] text-stone-500">
-                {c.name}
-                <MoneyInput label={`${c.name} 매출`} value={amounts[c.id] ?? 0} onChange={(n) => { setAmounts((a) => ({ ...a, [c.id]: n ?? 0 })); setSaved(false); }} />
-              </label>
-            ))}
-          </div>
+          {(
+            [
+              { title: "카드", list: groups.card, total: groups.cardTotal, showTotal: groups.card.length > 1 },
+              { title: "현금", list: groups.cash, total: groups.cashTotal, showTotal: false },
+              { title: "배달앱", list: groups.delivery, total: groups.deliveryTotal, showTotal: groups.delivery.length > 1 },
+            ] as const
+          ).map((g) =>
+            g.list.length === 0 ? null : (
+              <div key={g.title} className="mb-2 rounded-xl bg-stone-50 p-2">
+                <p className="mb-1 text-[11px] font-semibold text-stone-500">{g.title}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {g.list.map((c) => (
+                    <label key={c.id} className="space-y-1 text-[11px] text-stone-500">
+                      {c.name}
+                      <MoneyInput label={`${c.name} 매출`} value={amounts[c.id] ?? 0} onChange={(n) => { setAmounts((a) => ({ ...a, [c.id]: n ?? 0 })); setSaved(false); }} />
+                    </label>
+                  ))}
+                </div>
+                {g.showTotal && (
+                  <p className="num mt-1 text-right text-xs text-stone-600">
+                    {g.title} 합계 <b>{won(g.total)}</b>
+                  </p>
+                )}
+              </div>
+            ),
+          )}
           <p className="num mt-1 text-right text-sm">
             오늘 매출 <b>{won(dayTotal)}</b>
+            {groups.card.length > 1 && <span className="ml-2 text-[11px] text-stone-500">(카드 {num(groups.cardTotal)} · 현금 {num(groups.cashTotal)} · 배달 {num(groups.deliveryTotal)})</span>}
           </p>
         </div>
 
@@ -350,6 +374,29 @@ function SettingsDialog({ daily, onClose }: { daily: ReturnType<typeof useDaily>
     await daily.reload();
   }
 
+  // 카드사별로 나누기 (선택): 카드사를 켜면 채널 + 정산 규칙(+2영업일) + 통장 입금 분류 규칙이 같이 만들어진다
+  const cardSplit = channels.some((c) => CARD_PRESETS.some((p) => p.id === c.id) && c.active);
+  async function toggleCard(preset: (typeof CARD_PRESETS)[number], on: boolean) {
+    const store = getStore();
+    let next = channels.some((c) => c.id === preset.id)
+      ? channels.map((c) => (c.id === preset.id ? { ...c, active: on } : c))
+      : [...channels, { id: preset.id, name: preset.name, kind: "card" as const, active: true }];
+    // 카드사를 하나라도 켜면 "홀 카드"는 "기타 카드"가 된다 (목록에 없는 카드용)
+    const anyCard = next.some((c) => CARD_PRESETS.some((p) => p.id === c.id) && c.active);
+    next = next.map((c) => (c.id === "hall_card" ? { ...c, name: anyCard ? "기타 카드" : "홀 카드" } : c));
+    await saveChannels(next);
+    if (on) {
+      const rules = (await store.getSetting<SettlementRule[]>(SETTLEMENT_RULES_KEY)) ?? [];
+      if (!rules.some((r) => r.channel === preset.id)) await store.saveSetting(SETTLEMENT_RULES_KEY, [...rules, { channel: preset.id, mode: "days", days: 2, weekday: 0 }]);
+      const bankRules = await store.listRules();
+      for (const k of preset.keywords) {
+        if (!bankRules.some((r) => r.keyword === k && r.direction === "in")) {
+          await store.saveRule({ id: newId(), keyword: k, direction: "in", major: "수입", minor: "매출액", channel: preset.id, ambiguous: false });
+        }
+      }
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="직원·채널 설정">
       <div className="card max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto">
@@ -381,6 +428,23 @@ function SettingsDialog({ daily, onClose }: { daily: ReturnType<typeof useDaily>
               추가
             </button>
           </div>
+        </section>
+
+        <section className="space-y-2">
+          <p className="text-sm font-semibold">카드사별로 나누기 <span className="text-[11px] font-normal text-stone-500">(선택) 카드사마다 입금일이 다를 때</span></p>
+          <p className="text-[11px] text-stone-500">체크한 카드사는 오늘 탭에 따로 칸이 생기고 아래에 카드 합계가 나와요. 정산 규칙(+2영업일)과 통장 입금 분류 규칙도 같이 만들어져요. 목록에 없는 카드는 “기타 카드”에 넣어요.</p>
+          <div className="grid grid-cols-3 gap-1">
+            {CARD_PRESETS.map((p) => {
+              const on = channels.some((c) => c.id === p.id && c.active);
+              return (
+                <label key={p.id} className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs ${on ? "bg-orange-50 font-semibold text-orange-900" : "bg-stone-50 text-stone-600"}`}>
+                  <input type="checkbox" className="h-3.5 w-3.5 accent-orange-600" checked={on} onChange={(e) => toggleCard(p, e.target.checked)} />
+                  {p.name}
+                </label>
+              );
+            })}
+          </div>
+          {cardSplit && <p className="text-[11px] text-stone-500">포스 마감 화면의 카드사(매입사)별 매출을 각 칸에 넣으세요. 정산 탭에서 카드사별 입금·수수료율이 나와요.</p>}
         </section>
 
         <section className="space-y-2">

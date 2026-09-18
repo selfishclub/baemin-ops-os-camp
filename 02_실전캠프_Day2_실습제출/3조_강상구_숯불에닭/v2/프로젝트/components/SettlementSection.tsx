@@ -52,6 +52,19 @@ export default function SettlementSection({
   const totalPending = results.reduce((a, r) => a + r.pending, 0);
   const totalMissing = results.reduce((a, r) => a + r.missing, 0);
   const unmatched = results.flatMap((r) => r.unmatchedDeposits.map((d) => ({ ...d, channel: r.channel })));
+  // 카드사별로 나눴을 때 카드 합계 줄
+  const cardRows = results.filter((r) => daily.channels.find((c) => c.id === r.channel)?.kind === "card");
+  const cardSum = cardRows.reduce(
+    (a, r) => ({
+      sales: a.sales + r.sales,
+      deposited: a.deposited + r.deposited,
+      fee: a.fee + r.fee,
+      pending: a.pending + r.pending,
+      missing: a.missing + r.missing,
+      salesDeposited: a.salesDeposited + r.settlements.filter((x) => x.deposit > 0).reduce((y, x) => y + x.sales, 0),
+    }),
+    { sales: 0, deposited: 0, fee: 0, pending: 0, missing: 0, salesDeposited: 0 },
+  );
 
   return (
     <>
@@ -193,6 +206,19 @@ export default function SettlementSection({
                     </tr>
                   </thead>
                   <tbody className="num divide-y divide-stone-100">
+                    {cardRows.length > 1 && (
+                      <tr className="bg-stone-50 font-semibold">
+                        <td className="py-2">
+                          카드 합계 <span className="text-[10px] font-normal text-stone-400">{cardRows.length}개 카드사</span>
+                        </td>
+                        <td className="text-right">{num(cardSum.sales)}</td>
+                        <td className="text-right">{num(cardSum.deposited)}</td>
+                        <td className="text-right">{num(cardSum.fee)}</td>
+                        <td className="text-right font-bold">{pctText(cardSum.salesDeposited > 0 ? Math.round((cardSum.fee / cardSum.salesDeposited) * 1000) / 10 : null)}</td>
+                        <td className="text-right text-stone-500">{num(cardSum.pending)}</td>
+                        <td className={`text-right font-bold ${cardSum.missing > 0 ? "text-red-600" : "text-stone-400"}`}>{num(cardSum.missing)}</td>
+                      </tr>
+                    )}
                     {results.map((r) => (
                       <tr key={r.channel} className="cursor-pointer hover:bg-stone-50" onClick={() => setOpen(open === r.channel ? null : r.channel)}>
                         <td className="py-2 font-semibold">
