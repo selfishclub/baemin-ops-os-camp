@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, MoneyInput, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
-import { DEFAULT_CHANNELS } from "@/lib/categories";
+import { useDaily } from "@/components/useDaily";
+import { monthChannelTotals } from "@/lib/daily";
+import { channelKind } from "@/lib/categories";
 import { channelFees, type ChannelFee } from "@/lib/channels";
 import { num, pctText, won } from "@/lib/format";
 import { isClosed, monthLabel, nextMonth, prevMonth } from "@/lib/month";
@@ -16,7 +18,9 @@ import { checkChannelSale, type Issue } from "@/lib/validate";
 export default function ChannelsPage() {
   const { month } = useMonth();
   const ledger = useLedger(month);
+  const daily = useDaily(month);
   const [form, setForm] = useState<ChannelSale[]>([]);
+  const [fromDaily, setFromDaily] = useState<string[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [asking, setAsking] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -24,19 +28,27 @@ export default function ChannelsPage() {
   const nextNo = Number(nextMonth(month).slice(5));
 
   // 저장된 값이 있으면 그걸로, 없으면 지난달 채널 이름을 이어받아 빈 칸으로
+  // 채널 목록은 오늘 탭의 설정을 따른다. v1 때 저장한 "hall"(홀 전체) 줄은 있으면 같이 보여 준다.
+  // 저장된 월 합계가 없으면 일별 입력의 합계로 미리 채운다.
   useEffect(() => {
-    if (ledger.loading) return;
+    if (ledger.loading || daily.loading) return;
+    const totals = monthChannelTotals(month, daily.sales, daily.channels);
+    const list = daily.channels.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name }));
+    for (const s of ledger.sales) if (!list.some((c) => c.id === s.channel)) list.push({ id: s.channel, name: s.name });
+    const filled: string[] = [];
     setForm(
-      DEFAULT_CHANNELS.map((c) => {
+      list.map((c) => {
         const now = ledger.sales.find((s) => s.channel === c.id);
+        if (now) return { ...now, unsettled: now.unsettled ?? null };
         const prev = ledger.prevSales.find((s) => s.channel === c.id);
-        return now
-          ? { ...now, unsettled: now.unsettled ?? null }
-          : { month, channel: c.id, name: prev?.name ?? c.name, orders: 0, deposit: 0, count: 0, unsettled: null };
+        const orders = totals[c.id] ?? 0;
+        if (orders > 0) filled.push(c.id);
+        return { month, channel: c.id, name: prev?.name ?? c.name, orders, deposit: 0, count: 0, unsettled: null };
       }),
     );
+    setFromDaily(filled);
     setSaved(false);
-  }, [ledger.loading, ledger.sales, ledger.prevSales, month]);
+  }, [ledger.loading, daily.loading, ledger.sales, ledger.prevSales, daily.sales, daily.channels, month]);
 
   const patch = (i: number, p: Partial<ChannelSale>) => {
     setForm((f) => f.map((s, j) => (j === i ? { ...s, ...p } : s)));
@@ -99,21 +111,26 @@ export default function ChannelsPage() {
               <input aria-label={`${s.channel} 채널 이름`} className="mb-2 w-full bg-transparent text-sm font-bold outline-none" value={s.name} onChange={(e) => patch(i, { name: e.target.value })} />
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <label className="space-y-1 text-[11px] text-stone-500">
-                  {s.channel === "hall" ? "포스 매출 (주문금액)" : "주문금액"}
+                  {channelKind(s.channel, daily.channels) !== "delivery" ? "포스 매출 (주문금액)" : "주문금액"}
+                  {fromDaily.includes(s.channel) && <span className="ml-1 rounded bg-emerald-100 px-1 text-[10px] text-emerald-800">일별 합계</span>}
                   <MoneyInput label={`${s.name} 주문금액`} value={s.orders} onChange={(n) => patch(i, { orders: n ?? 0 })} />
                 </label>
+                {channelKind(s.channel, daily.channels) === "cash" ? null : (
                 <label className="space-y-1 text-[11px] text-stone-500">
-                  {s.channel === "hall" ? "카드 정산금액" : "정산금액"}
+                  {channelKind(s.channel, daily.channels) === "card" ? "카드 정산금액" : "정산금액"}
                   <MoneyInput label={`${s.name} 정산금액`} value={s.deposit} onChange={(n) => patch(i, { deposit: n ?? 0 })} />
                 </label>
+                )}
                 <label className="space-y-1 text-[11px] text-stone-500">
                   건수
                   <MoneyInput label={`${s.name} 건수`} value={s.count} onChange={(n) => patch(i, { count: n ?? 0 })} />
                 </label>
+                {channelKind(s.channel, daily.channels) === "cash" ? null : (
                 <label className="space-y-1 text-[11px] text-stone-500">
                   월말 미입금액 (선택)
                   <MoneyInput label={`${s.name} 월말 미입금액`} allowEmpty placeholder="모르면 비워 두기" value={s.unsettled ?? null} onChange={(n) => patch(i, { unsettled: n })} />
                 </label>
+                )}
               </div>
             </div>
           ))}

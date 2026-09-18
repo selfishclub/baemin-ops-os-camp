@@ -73,3 +73,39 @@ create policy "demo anon all" on rules for all to anon using (true) with check (
 create policy "demo anon all" on channel_sales for all to anon using (true) with check (true);
 create policy "demo anon all" on month_closings for all to anon using (true) with check (true);
 create policy "demo anon all" on uploads for all to anon using (true) with check (true);
+
+-- v2: 오늘 마감 입력
+create table if not exists daily_sales (
+  date date not null,
+  channel text not null,
+  amount bigint not null default 0,
+  primary key (date, channel)
+);
+create table if not exists staff (
+  id text primary key,
+  alias text not null,                       -- 별칭만 (실명 금지)
+  wage integer not null default 0,           -- 시급
+  active boolean not null default true
+);
+create table if not exists shifts (
+  date date not null,
+  staff_id text not null,
+  hours numeric(4,1) not null default 0,
+  primary key (date, staff_id)
+);
+create table if not exists settings (
+  key text primary key,
+  value jsonb not null
+);
+alter table daily_sales enable row level security;
+alter table staff enable row level security;
+alter table shifts enable row level security;
+alter table settings enable row level security;
+drop policy if exists "demo anon all" on daily_sales;
+drop policy if exists "demo anon all" on staff;
+drop policy if exists "demo anon all" on shifts;
+drop policy if exists "demo anon all" on settings;
+create policy "demo anon all" on daily_sales for all to anon using (true) with check (true);
+create policy "demo anon all" on staff for all to anon using (true) with check (true);
+create policy "demo anon all" on shifts for all to anon using (true) with check (true);
+create policy "demo anon all" on settings for all to anon using (true) with check (true);

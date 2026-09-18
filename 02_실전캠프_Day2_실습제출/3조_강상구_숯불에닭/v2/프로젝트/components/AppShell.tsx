@@ -23,9 +23,9 @@ export const useMonth = () => useContext(MonthContext);
 
 const TABS = [
   { href: "/", label: "손익", icon: "📊" },
+  { href: "/today", label: "오늘", icon: "📝" },
   { href: "/upload", label: "올리기", icon: "📥" },
-  { href: "/channels", label: "배달앱", icon: "🛵" },
-  { href: "/expenses", label: "지출추가", icon: "✍️" },
+  { href: "/channels", label: "정산", icon: "🛵" },
   { href: "/rules", label: "규칙", icon: "⚙️" },
 ];
 

@@ -1,4 +1,4 @@
-import { EXPENSE_MAJORS, OWNER_DRAW, type Major } from "./categories";
+import { EXPENSE_MAJORS, OWNER_DRAW, isHall, type Major } from "./categories";
 import { feeOf, round1 } from "./channels";
 import type { ChannelSale, Transaction } from "./types";
 
@@ -41,8 +41,8 @@ export function computePnl(txs: Transaction[], sales: ChannelSale[]): Pnl {
     else otherIncome += t.in;
   }
 
-  const hallRevenue = sales.filter((s) => s.channel === "hall").reduce((a, s) => a + s.orders, 0);
-  const deliveryRevenue = sales.filter((s) => s.channel !== "hall").reduce((a, s) => a + s.orders, 0);
+  const hallRevenue = sales.filter((s) => isHall(s.channel)).reduce((a, s) => a + s.orders, 0);
+  const deliveryRevenue = sales.filter((s) => !isHall(s.channel)).reduce((a, s) => a + s.orders, 0);
   const revenue = hasSales ? hallRevenue + deliveryRevenue + otherIncome : bankChannelIn + otherIncome;
   const deliveryFee = hasSales ? sales.reduce((a, s) => a + feeOf(s), 0) : 0;
 

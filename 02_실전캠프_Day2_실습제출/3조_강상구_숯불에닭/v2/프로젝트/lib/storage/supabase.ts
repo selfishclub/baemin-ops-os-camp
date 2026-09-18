@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { ChannelId, Major } from "../categories";
 import { seedRules } from "../seed";
-import type { ChannelSale, Month, MonthClosing, Rule, Transaction, UploadRecord } from "../types";
+import type { ChannelSale, DailySale, Month, MonthClosing, Rule, Shift, Staff, Transaction, UploadRecord } from "../types";
 import type { Store } from "./index";
 
 // 시연 모드 전용. anon 공개 열쇠만 쓴다(service_role 금지). 테이블은 supabase/schema.sql.
@@ -144,5 +144,40 @@ export class SupabaseStore implements Store {
     for (const table of ["transactions", "channel_sales", "month_closings", "uploads"]) {
       await this.run(this.db.from(table).delete().eq("month", month));
     }
+    for (const table of ["daily_sales", "shifts"]) {
+      await this.run(this.db.from(table).delete().gte("date", month + "-01").lte("date", month + "-31"));
+    }
+  }
+  async listDailySales(month: Month) {
+    const rows = await this.run<Row[]>(this.db.from("daily_sales").select("*").gte("date", month + "-01").lte("date", month + "-31"));
+    return (rows ?? []).map((r): DailySale => ({ date: r.date as string, channel: r.channel as string, amount: Number(r.amount) }));
+  }
+  async saveDailySales(date: string, sales: DailySale[]) {
+    await this.run(this.db.from("daily_sales").delete().eq("date", date));
+    const rows = sales.filter((s) => s.date === date).map((s) => ({ date: s.date, channel: s.channel, amount: s.amount }));
+    if (rows.length) await this.run(this.db.from("daily_sales").insert(rows));
+  }
+  async listShifts(month: Month) {
+    const rows = await this.run<Row[]>(this.db.from("shifts").select("*").gte("date", month + "-01").lte("date", month + "-31"));
+    return (rows ?? []).map((r): Shift => ({ date: r.date as string, staffId: r.staff_id as string, hours: Number(r.hours) }));
+  }
+  async saveShifts(date: string, shifts: Shift[]) {
+    await this.run(this.db.from("shifts").delete().eq("date", date));
+    const rows = shifts.filter((s) => s.date === date).map((s) => ({ date: s.date, staff_id: s.staffId, hours: s.hours }));
+    if (rows.length) await this.run(this.db.from("shifts").insert(rows));
+  }
+  async listStaff() {
+    const rows = await this.run<Row[]>(this.db.from("staff").select("*").order("alias"));
+    return (rows ?? []).map((r): Staff => ({ id: r.id as string, alias: r.alias as string, wage: Number(r.wage), active: !!r.active }));
+  }
+  async saveStaff(staff: Staff) {
+    await this.run(this.db.from("staff").upsert({ id: staff.id, alias: staff.alias, wage: staff.wage, active: staff.active }));
+  }
+  async getSetting<T>(key: string) {
+    const rows = await this.run<Row[]>(this.db.from("settings").select("*").eq("key", key));
+    return rows?.[0] ? (rows[0].value as T) : null;
+  }
+  async saveSetting<T>(key: string, value: T) {
+    await this.run(this.db.from("settings").upsert({ key, value }));
   }
 }

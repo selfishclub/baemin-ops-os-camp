@@ -1,4 +1,4 @@
-import type { ChannelSale, Month, MonthClosing, Rule, Transaction, UploadRecord } from "../types";
+import type { ChannelSale, DailySale, Month, MonthClosing, Rule, Setting, Shift, Staff, Transaction, UploadRecord } from "../types";
 import { LocalStore } from "./local";
 import { SupabaseStore } from "./supabase";
 
@@ -20,6 +20,15 @@ export interface Store {
   listUploads(): Promise<UploadRecord[]>;
   saveUpload(u: UploadRecord): Promise<void>;
   deleteMonth(month: Month): Promise<void>;
+  // v2 — 오늘 마감 입력
+  listDailySales(month: Month): Promise<DailySale[]>;
+  saveDailySales(date: string, sales: DailySale[]): Promise<void>; // 그날 것을 통째로 바꿈
+  listShifts(month: Month): Promise<Shift[]>;
+  saveShifts(date: string, shifts: Shift[]): Promise<void>; // 그날 것을 통째로 바꿈
+  listStaff(): Promise<Staff[]>;
+  saveStaff(staff: Staff): Promise<void>;
+  getSetting<T>(key: string): Promise<T | null>;
+  saveSetting<T>(key: string, value: T): Promise<void>;
 }
 
 // 열쇠가 있어도 NEXT_PUBLIC_STORAGE=supabase 가 아니면 절대 Supabase로 보내지 않는다.

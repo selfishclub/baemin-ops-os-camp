@@ -43,13 +43,33 @@ export function isValidCategory(major: string, minor: string): boolean {
   return (MAJORS as readonly string[]).includes(major) && MINORS[major as Major].includes(minor);
 }
 
-// 주문 채널. 이름은 화면에서 고칠 수 있고, id는 고정.
-export const DEFAULT_CHANNELS = [
-  { id: "hall", name: "홀(포스)", isDelivery: false },
-  { id: "baemin", name: "배달의민족", isDelivery: true },
-  { id: "coupang", name: "쿠팡이츠", isDelivery: true },
-  { id: "yogiyo", name: "요기요", isDelivery: true },
-  { id: "etc", name: "땡겨요·기타", isDelivery: true },
-] as const;
+// 주문 채널. 종류(kind)에 따라 정산 방식이 다르다:
+//  - card: 홀 카드. 카드사가 며칠 뒤에 수수료를 떼고 입금 (정산 규칙 대상)
+//  - cash: 홀 현금. 통장 입금 없음, 수수료 없음
+//  - delivery: 배달앱. 앱이 수수료를 떼고 정산 주기대로 입금 (정산 규칙 대상)
+export type ChannelKind = "card" | "cash" | "delivery";
+export type ChannelId = string;
 
-export type ChannelId = (typeof DEFAULT_CHANNELS)[number]["id"];
+export interface Channel {
+  id: ChannelId;
+  name: string;
+  kind: ChannelKind;
+  active: boolean;
+}
+
+export const DEFAULT_CHANNELS: Channel[] = [
+  { id: "hall_card", name: "홀 카드", kind: "card", active: true },
+  { id: "hall_cash", name: "홀 현금", kind: "cash", active: true },
+  { id: "baemin", name: "배달의민족", kind: "delivery", active: true },
+  { id: "coupang", name: "쿠팡이츠", kind: "delivery", active: true },
+  { id: "yogiyo", name: "요기요", kind: "delivery", active: true },
+  { id: "etc", name: "땡겨요·기타", kind: "delivery", active: true },
+];
+
+// v1에서 쓰던 "hall"(홀 전체)은 카드로 본다
+export function channelKind(id: ChannelId, channels: Channel[] = DEFAULT_CHANNELS): ChannelKind {
+  if (id === "hall") return "card";
+  return channels.find((c) => c.id === id)?.kind ?? "delivery";
+}
+
+export const isHall = (id: ChannelId, channels: Channel[] = DEFAULT_CHANNELS) => id === "hall" || channelKind(id, channels) !== "delivery";

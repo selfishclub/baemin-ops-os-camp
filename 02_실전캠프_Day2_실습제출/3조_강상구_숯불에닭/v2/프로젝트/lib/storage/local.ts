@@ -1,5 +1,5 @@
 import { seedRules } from "../seed";
-import type { ChannelSale, Month, MonthClosing, Rule, Transaction, UploadRecord } from "../types";
+import type { ChannelSale, DailySale, Month, MonthClosing, Rule, Setting, Shift, Staff, Transaction, UploadRecord } from "../types";
 import type { Store } from "./index";
 
 export const LOCAL_KEY = "sootdak-ledger-v1";
@@ -10,6 +10,10 @@ export interface LocalData {
   channelSales: ChannelSale[];
   closings: MonthClosing[];
   uploads: UploadRecord[];
+  dailySales: DailySale[];
+  shifts: Shift[];
+  staff: Staff[];
+  settings: Setting[];
 }
 
 export const emptyData = (): LocalData => ({
@@ -18,6 +22,10 @@ export const emptyData = (): LocalData => ({
   channelSales: [],
   closings: [],
   uploads: [],
+  dailySales: [],
+  shifts: [],
+  staff: [],
+  settings: [],
 });
 
 export function readLocal(): LocalData {
@@ -96,6 +104,32 @@ export class LocalStore implements Store {
       channelSales: d.channelSales.filter((s) => s.month !== month),
       closings: d.closings.filter((c) => c.month !== month),
       uploads: d.uploads.filter((u) => u.month !== month),
+      dailySales: d.dailySales.filter((s) => !s.date.startsWith(month)),
+      shifts: d.shifts.filter((s) => !s.date.startsWith(month)),
     }));
+  }
+  async listDailySales(month: Month) {
+    return readLocal().dailySales.filter((s) => s.date.startsWith(month));
+  }
+  async saveDailySales(date: string, sales: DailySale[]) {
+    this.update((d) => ({ ...d, dailySales: [...d.dailySales.filter((s) => s.date !== date), ...sales.filter((s) => s.date === date)] }));
+  }
+  async listShifts(month: Month) {
+    return readLocal().shifts.filter((s) => s.date.startsWith(month));
+  }
+  async saveShifts(date: string, shifts: Shift[]) {
+    this.update((d) => ({ ...d, shifts: [...d.shifts.filter((s) => s.date !== date), ...shifts.filter((s) => s.date === date)] }));
+  }
+  async listStaff() {
+    return readLocal().staff;
+  }
+  async saveStaff(staff: Staff) {
+    this.update((d) => ({ ...d, staff: upsert(d.staff, staff, (a, b) => a.id === b.id) }));
+  }
+  async getSetting<T>(key: string) {
+    return (readLocal().settings.find((s) => s.key === key)?.value as T | undefined) ?? null;
+  }
+  async saveSetting<T>(key: string, value: T) {
+    this.update((d) => ({ ...d, settings: upsert(d.settings, { key, value }, (a, b) => a.key === b.key) }));
   }
 }

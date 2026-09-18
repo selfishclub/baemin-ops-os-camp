@@ -1,4 +1,5 @@
 import type { ChannelId, Major } from "./categories";
+export type { Channel, ChannelKind } from "./categories";
 
 export type Month = string; // "2026-08"
 
@@ -62,4 +63,33 @@ export interface UploadRecord {
   to: string;
   rowCount: number;
   uploadedAt: string;
+}
+
+// ── v2: 오늘 마감 입력 ──────────────────────────────────────────
+// 일별 채널 매출 (주문일 기준). 같은 날·같은 채널은 한 줄.
+export interface DailySale {
+  date: string; // "2026-09-17"
+  channel: ChannelId;
+  amount: number;
+}
+
+// 시급제 직원. 실명 대신 별칭(화덕A·홀A)만 쓴다.
+export interface Staff {
+  id: string;
+  alias: string;
+  wage: number; // 시급
+  active: boolean;
+}
+
+// 그날 한 사람의 근무시간
+export interface Shift {
+  date: string;
+  staffId: string;
+  hours: number;
+}
+
+// 화면 설정 (채널 목록 등). key별로 JSON 하나.
+export interface Setting<T = unknown> {
+  key: string;
+  value: T;
 }

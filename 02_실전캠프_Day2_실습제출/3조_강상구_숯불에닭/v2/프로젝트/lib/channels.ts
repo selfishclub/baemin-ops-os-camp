@@ -1,4 +1,4 @@
-import type { ChannelId } from "./categories";
+import { isHall, type ChannelId } from "./categories";
 import type { ChannelSale, Transaction } from "./types";
 
 // 기준: 매출·수수료는 "주문이 발생한 달"로 본다.
@@ -36,7 +36,7 @@ export function bankDepositsByChannel(txs: Transaction[]): Partial<Record<Channe
 // 수수료는 배달앱만 계산한다. 홀의 카드수수료는 통장 출금(영업비 > 카드수수료)으로 잡힌다.
 // 정산금액을 아직 안 넣은 채널은 수수료를 0으로 둔다(주문금액 전체가 수수료로 잡히는 걸 막음).
 export function feeOf(s: Pick<ChannelSale, "channel" | "orders" | "deposit">): number {
-  if (s.channel === "hall" || s.deposit <= 0) return 0;
+  if (isHall(s.channel) || s.deposit <= 0) return 0;
   return s.orders - s.deposit;
 }
 
@@ -44,7 +44,7 @@ export function channelFees(sales: ChannelSale[], txs: Transaction[], prevSales:
   const bank = bankDepositsByChannel(txs);
   return sales.map((s) => {
     const fee = feeOf(s);
-    const hasFee = s.channel !== "hall" && s.deposit > 0 && s.orders > 0;
+    const hasFee = !isHall(s.channel) && s.deposit > 0 && s.orders > 0;
     const bankDeposit = bank[s.channel] ?? 0;
     const carriedIn = prevSales.find((p) => p.channel === s.channel)?.unsettled ?? 0;
     const unsettled = s.unsettled ?? null;

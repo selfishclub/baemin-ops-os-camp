@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { CategorySelect, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
+import ExpenseSection from "@/components/ExpenseSection";
 import { BankParseError, parseBankSheet } from "@/lib/bank/parse";
 import { DEFAULT_CHANNELS, type ChannelId, type Major } from "@/lib/categories";
 import { classifyRows, findRule, newId, ruleFromChoice, usualAmounts } from "@/lib/classify";
@@ -123,6 +124,8 @@ export default function UploadPage() {
           <ReviewCard key={t.id} tx={t} ledger={ledger} />
         ))}
       </section>
+
+      <ExpenseSection month={month} ledger={ledger} />
 
       {bankTxs.length > 0 && (
         <section className="card">
