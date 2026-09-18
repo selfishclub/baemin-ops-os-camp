@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { ChannelId, Major } from "../categories";
 import { seedRules } from "../seed";
-import type { ChannelSale, DailySale, Month, MonthClosing, Rule, Shift, Staff, Transaction, UploadRecord } from "../types";
+import type { ChannelSale, DailySale, DailyWeather, Month, MonthClosing, Rule, Shift, Staff, Transaction, UploadRecord } from "../types";
 import type { Store } from "./index";
 import { nextMonth } from "../month";
 
@@ -176,6 +176,24 @@ export class SupabaseStore implements Store {
   }
   async saveStaff(staff: Staff) {
     await this.run(this.db.from("staff").upsert({ id: staff.id, alias: staff.alias, wage: staff.wage, active: staff.active }));
+  }
+  async listAllDailySales() {
+    const rows = await this.run<Row[]>(this.db.from("daily_sales").select("*").order("date"));
+    return (rows ?? []).map((r): DailySale => ({ date: r.date as string, channel: r.channel as string, amount: Number(r.amount) }));
+  }
+  async listAllShifts() {
+    const rows = await this.run<Row[]>(this.db.from("shifts").select("*"));
+    return (rows ?? []).map((r): Shift => ({ date: r.date as string, staffId: r.staff_id as string, hours: Number(r.hours) }));
+  }
+  async listWeather(from: string, to: string) {
+    const rows = await this.run<Row[]>(this.db.from("daily_weather").select("*").gte("date", from).lte("date", to));
+    return (rows ?? []).map(
+      (r): DailyWeather => ({ date: r.date as string, kind: r.kind as DailyWeather["kind"], tempMax: Number(r.temp_max), tempMin: Number(r.temp_min), rainMm: Number(r.rain_mm), source: r.source as DailyWeather["source"] }),
+    );
+  }
+  async saveWeather(records: DailyWeather[]) {
+    if (!records.length) return;
+    await this.run(this.db.from("daily_weather").upsert(records.map((w) => ({ date: w.date, kind: w.kind, temp_max: w.tempMax, temp_min: w.tempMin, rain_mm: w.rainMm, source: w.source }))));
   }
   async getSetting<T>(key: string) {
     const rows = await this.run<Row[]>(this.db.from("settings").select("*").eq("key", key));

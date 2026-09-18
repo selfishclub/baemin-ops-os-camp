@@ -1,5 +1,5 @@
 import { seedRules } from "../seed";
-import type { ChannelSale, DailySale, Month, MonthClosing, Rule, Setting, Shift, Staff, Transaction, UploadRecord } from "../types";
+import type { ChannelSale, DailySale, DailyWeather, Month, MonthClosing, Rule, Setting, Shift, Staff, Transaction, UploadRecord } from "../types";
 import type { Store } from "./index";
 
 export const LOCAL_KEY = "sootdak-ledger-v1";
@@ -14,6 +14,7 @@ export interface LocalData {
   shifts: Shift[];
   staff: Staff[];
   settings: Setting[];
+  weather: DailyWeather[];
 }
 
 export const emptyData = (): LocalData => ({
@@ -26,6 +27,7 @@ export const emptyData = (): LocalData => ({
   shifts: [],
   staff: [],
   settings: [],
+  weather: [],
 });
 
 export function readLocal(): LocalData {
@@ -125,6 +127,18 @@ export class LocalStore implements Store {
   }
   async saveStaff(staff: Staff) {
     this.update((d) => ({ ...d, staff: upsert(d.staff, staff, (a, b) => a.id === b.id) }));
+  }
+  async listAllDailySales() {
+    return readLocal().dailySales;
+  }
+  async listAllShifts() {
+    return readLocal().shifts;
+  }
+  async listWeather(from: string, to: string) {
+    return readLocal().weather.filter((w) => w.date >= from && w.date <= to);
+  }
+  async saveWeather(records: DailyWeather[]) {
+    this.update((d) => ({ ...d, weather: records.reduce((acc, w) => upsert(acc, w, (a, b) => a.date === b.date), d.weather) }));
   }
   async getSetting<T>(key: string) {
     return (readLocal().settings.find((s) => s.key === key)?.value as T | undefined) ?? null;

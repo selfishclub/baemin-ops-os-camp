@@ -109,3 +109,16 @@ create policy "demo anon all" on daily_sales for all to anon using (true) with c
 create policy "demo anon all" on staff for all to anon using (true) with check (true);
 create policy "demo anon all" on shifts for all to anon using (true) with check (true);
 create policy "demo anon all" on settings for all to anon using (true) with check (true);
+
+-- v2: 일별 날씨 (Open-Meteo)
+create table if not exists daily_weather (
+  date date primary key,
+  kind text not null,                        -- 맑음 | 흐림 | 비 | 눈
+  temp_max numeric(4,1) not null default 0,
+  temp_min numeric(4,1) not null default 0,
+  rain_mm numeric(6,1) not null default 0,
+  source text not null default 'open-meteo'
+);
+alter table daily_weather enable row level security;
+drop policy if exists "demo anon all" on daily_weather;
+create policy "demo anon all" on daily_weather for all to anon using (true) with check (true);

@@ -93,3 +93,6 @@ export interface Setting<T = unknown> {
   key: string;
   value: T;
 }
+
+// 일별 날씨 (Open-Meteo 또는 시연용 가짜)
+export type { DailyWeather } from "./weather";

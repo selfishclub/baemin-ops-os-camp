@@ -1,4 +1,4 @@
-import type { ChannelSale, DailySale, Month, MonthClosing, Rule, Setting, Shift, Staff, Transaction, UploadRecord } from "../types";
+import type { ChannelSale, DailySale, DailyWeather, Month, MonthClosing, Rule, Setting, Shift, Staff, Transaction, UploadRecord } from "../types";
 import { LocalStore } from "./local";
 import { SupabaseStore } from "./supabase";
 
@@ -27,6 +27,10 @@ export interface Store {
   saveShifts(date: string, shifts: Shift[]): Promise<void>; // 그날 것을 통째로 바꿈
   listStaff(): Promise<Staff[]>;
   saveStaff(staff: Staff): Promise<void>;
+  listAllDailySales(): Promise<DailySale[]>; // 날씨 분석용 (전체 기간)
+  listAllShifts(): Promise<Shift[]>;
+  listWeather(from: string, to: string): Promise<DailyWeather[]>;
+  saveWeather(records: DailyWeather[]): Promise<void>;
   getSetting<T>(key: string): Promise<T | null>;
   saveSetting<T>(key: string, value: T): Promise<void>;
 }

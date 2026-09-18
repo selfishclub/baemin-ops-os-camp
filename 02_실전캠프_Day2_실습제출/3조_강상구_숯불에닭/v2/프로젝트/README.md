@@ -9,6 +9,7 @@ v1(월 정산 손익 한 장)에 **오늘 마감 입력 · 정산 주기 규칙�
 | 올리기 | 은행 엑셀 자동 분류, 확인 필요 줄, 지출 직접 추가 |
 | 정산 | 정산 규칙(+N영업일 / 주 단위) → 입금 짝 맞추기 → 채널별 수수료율. 규칙 없는 채널은 직접 입력 |
 | 원가율 | 포스 상품ABC분석 엑셀 → 이론 원가율 vs 통장 원가율, 메뉴별 원가율·마진. 품목·레시피 설정 |
+| 날씨 (/weather) | 일별 매출에 청주 날씨를 자동으로 붙여 날씨별·요일별 평균, 비 오는 날 효과, 예보별 예상 매출. 오늘 탭 카드에서 들어감 |
 | 규칙 | 분류 규칙, 백업, 사용법 페이지 |
 
 ## 열어 보기
@@ -40,11 +41,11 @@ npm run dev      # http://localhost:3200
 ## 구조
 
 ```
-app/          손익(/) · 오늘(/today) · 올리기(/upload) · 정산(/channels) · 원가율(/costing) · 규칙(/rules) · 사용법(/guide)
+app/          손익(/) · 오늘(/today) · 올리기(/upload) · 정산(/channels) · 원가율(/costing) · 규칙(/rules) · 사용법(/guide) · 날씨(/weather)
 components/   AppShell(모드 띠·달 선택·아래 탭) · useLedger(한 달 데이터) · ui
 lib/          categories(8개 대분류) · bank/parse(은행 엑셀 읽기) · classify(자동 분류)
               pnl(손익) · channels(수수료·입금 대조) · validate(이상 숫자) · month(마감·중복)
-              daily(일별 매출·근무) · settlement(정산 규칙·입금 짝 맞추기) · effective(손익용 실매출)
+              daily(일별 매출·근무) · settlement(정산 규칙·입금 짝 맞추기) · effective(손익용 실매출) · weather(Open-Meteo·날씨별 분석)
               costing/(포스 ABC 파서 · 레시피 원가 · 원가율 리포트 · 가짜 시드)
               storage/(local · supabase · backup) · seed(가짜 거래처 규칙·예시 실매출)
 scripts/      make-sample-xlsx.mjs(8월 은행) · make-sample-daily.mjs(9월 일별+은행) · make-sample-pos.mjs(9월 포스)
@@ -64,7 +65,7 @@ supabase/     schema.sql — 시연 모드 테이블과 잠금(RLS)
 ## 테스트
 
 ```
-npm test          # 계산 로직 38개 (가짜 엑셀 한 바퀴 포함)
+npm test          # 계산 로직 42개 (가짜 엑셀 한 바퀴 포함)
 npm run typecheck
 npm run build
 ```

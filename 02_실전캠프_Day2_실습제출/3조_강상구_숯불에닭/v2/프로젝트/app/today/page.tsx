@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, MoneyInput, Notice } from "@/components/ui";
@@ -12,6 +13,8 @@ import { monthLabel } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 import type { DailySale, Shift, Staff } from "@/lib/types";
 import sample from "@/lib/sampleDaily.json";
+import { useWeather } from "@/components/useWeather";
+import { KIND_ICON, expectedSales } from "@/lib/weather";
 
 const DOW = ["월", "화", "수", "목", "금", "토", "일"];
 
@@ -27,6 +30,15 @@ export default function TodayPage() {
   const [saved, setSaved] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [help, setHelp] = useState(false);
+  const weather = useWeather();
+  const todayWeather = weather.weather.find((w) => w.date === date) ?? weather.forecast.find((w) => w.date === date);
+
+  // 저장한 날 중 날씨가 빠진 날은 조용히 채운다 (실패해도 그냥 둔다)
+  useEffect(() => {
+    if (weather.loading || weather.fetching) return;
+    weather.fillMissing().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weather.loading, weather.sales.length]);
 
   // 날짜가 다른 달로 넘어가면 달 선택도 따라간다
   useEffect(() => {
@@ -79,6 +91,7 @@ export default function TodayPage() {
     await store.saveShifts(date, shifts);
     await daily.reload();
     setSaved(true);
+    weather.fillMissing().catch(() => {});
   }
 
   const dow = DOW[(new Date(date + "T00:00:00Z").getUTCDay() + 6) % 7];
@@ -109,6 +122,11 @@ export default function TodayPage() {
             <input aria-label="날짜" type="date" className="num bg-transparent text-center text-base font-bold outline-none" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} />
             <p className="text-[11px] text-stone-500">
               {dow}요일 · {date === today ? "오늘" : existing.entered ? "입력됨" : "아직 안 넣음"}
+              {todayWeather && (
+                <span className="num ml-1">
+                  · {KIND_ICON[todayWeather.kind]} {todayWeather.kind} {todayWeather.tempMin}~{todayWeather.tempMax}℃
+                </span>
+              )}
             </p>
           </div>
           <button className="btn-ghost px-2.5 py-1.5" aria-label="다음날" disabled={date >= today} onClick={() => setDate(shiftDate(date, 1))}>
@@ -258,6 +276,34 @@ export default function TodayPage() {
           </div>
         </div>
       </section>
+
+      <Link href="/weather" className="card block space-y-1">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold">날씨 × 매출</h2>
+          <span className="text-xs font-semibold text-orange-700">자세히 →</span>
+        </div>
+        {weather.analysis.days === 0 ? (
+          <p className="text-sm text-stone-500">매출을 넣으면 그날 날씨가 자동으로 붙고, 비 오는 날 배달이 얼마나 느는지 보여 줘요.</p>
+        ) : (
+          <p className="num text-sm text-stone-700">
+            {weather.analysis.rainEffect.delivery !== null ? (
+              <>
+                비 오는 날 배달 <b>{weather.analysis.rainEffect.delivery > 0 ? "+" : ""}{weather.analysis.rainEffect.delivery}%</b>, 홀 <b>{(weather.analysis.rainEffect.hall ?? 0) > 0 ? "+" : ""}{weather.analysis.rainEffect.hall ?? "–"}%</b> (맑은 날 대비 · {weather.analysis.days}일 기준)
+              </>
+            ) : (
+              <>날씨와 매출이 같이 있는 날 {weather.analysis.days}일. 비 오는 날이 쌓이면 비교가 나와요.</>
+            )}
+          </p>
+        )}
+        {weather.forecast.length > 0 && (
+          <p className="num text-xs text-stone-500">
+            {weather.forecast.slice(0, 3).map((f) => {
+              const e = expectedSales(weather.analysis, f.date, f.kind);
+              return `${f.date.slice(5)} ${KIND_ICON[f.kind]}${e ? " " + num(e.amount) : ""}`;
+            }).join(" · ")}
+          </p>
+        )}
+      </Link>
 
       {showSettings && <SettingsDialog daily={daily} onClose={() => setShowSettings(false)} />}
 
