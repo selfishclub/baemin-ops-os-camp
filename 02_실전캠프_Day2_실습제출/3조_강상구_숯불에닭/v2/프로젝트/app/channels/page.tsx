@@ -88,9 +88,14 @@ export default function ChannelsPage() {
 
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-base font-bold">{autoChannels.length ? "직접 입력 (규칙이 없는 채널)" : "채널별 실매출 입력"}</h2>
+          <h2 className="text-base font-bold">{autoChannels.length ? "직접 입력 (규칙이 없는 채널)" : "직접 입력 — 규칙이 없을 때만 쓰는 예비 칸"}</h2>
           <span className="text-xs text-stone-500">{monthLabel(month)} 주문분</span>
         </div>
+
+        <Notice tone="warn">
+          <b>통장에 들어온 돈을 넣는 곳이 아니에요.</b> 통장 입금은 올리기 탭에서 은행 엑셀을 올리면 자동으로 읽어요. 여기는 정산 규칙이 없는 채널만, 각 앱 사장님 사이트의 <b>월 합계</b>(주문금액·정산금액)를 손으로 넣는 예비 칸이에요.
+          {autoChannels.length === 0 && " 위 “정산 규칙”에서 기본 규칙을 넣으면 이 칸은 거의 사라져요."}
+        </Notice>
 
         <div className="space-y-1 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-950 ring-1 ring-sky-200">
           <p className="font-bold">기준: {monthNo}월에 “주문된” 것만 넣어요 (입금된 날 기준이 아니에요)</p>
