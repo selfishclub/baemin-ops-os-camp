@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Geist } from "next/font/google";
 import "./globals.css";
+import { SecurityFooter, rightsHolder } from "./security-notice";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -23,6 +24,10 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase,
     title: "빈숲 레시피OS | 카페 표준 레시피",
+    creator: rightsHolder,
+    publisher: rightsHolder,
+    other: { copyright: `© ${rightsHolder}. All rights reserved. 무단 복제·반출 금지` },
+    robots: { index: false, follow: false },
     description: "빈숲의 메뉴 사진, 정량, 제조 순서와 주의사항을 휴대폰에서 빠르게 확인하는 레시피 시스템",
     openGraph: {
       title: "빈숲 레시피OS",
@@ -47,7 +52,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className={geist.variable}>{children}</body>
+      <body className={geist.variable}>{children}<SecurityFooter /></body>
     </html>
   );
 }

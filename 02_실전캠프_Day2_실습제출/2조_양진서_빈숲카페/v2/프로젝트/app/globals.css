@@ -1164,3 +1164,17 @@ input:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* 인쇄물 하단 대외비 표시 */
+@media print {
+  body::after {
+    content: "대외비 — 빈숲카페(대표 양진서). 이 레시피와 자료의 모든 권리는 빈숲카페에 있습니다. 매장 밖 반출·복사·촬영 금지. 위반 시 민·형사상 책임을 물을 수 있습니다.";
+    display: block;
+    margin-top: 24px;
+    padding-top: 10px;
+    border-top: 2px solid #b3261e;
+    color: #7d1a14;
+    font-size: 11px;
+    font-weight: 700;
+  }
+}

@@ -1,0 +1,65 @@
+.badge {
+  display: inline-block;
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: #b3261e;
+  color: white;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+/* 첫 화면 위쪽 띠 */
+.banner {
+  margin-top: 14px;
+  border: 1px solid #e0a9a3;
+  border-left: 5px solid #b3261e;
+  border-radius: 12px;
+  background: #fff5f3;
+  color: #4a1b16;
+}
+.banner summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.banner summary::-webkit-details-marker { display: none; }
+.summaryText { flex: 1; min-width: 220px; }
+.summaryText b { color: #b3261e; }
+.more { flex: none; padding: 4px 10px; border: 1px solid #b3261e; border-radius: 999px; color: #b3261e; font-size: 11px; font-weight: 800; }
+.banner[open] .more { visibility: hidden; }
+
+.rules { display: grid; gap: 10px; margin: 0; padding: 4px 16px 16px 34px; font-size: 13px; line-height: 1.65; }
+.rules li strong { display: block; color: #7d1a14; }
+.rules li span { color: #4a1b16; }
+
+/* 로그인 화면 */
+.card {
+  width: min(420px, 100%);
+  margin-top: 16px;
+  border: 1px solid #e0a9a3;
+  border-left: 5px solid #b3261e;
+  border-radius: 14px;
+  background: #fff5f3;
+}
+.card h2 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 14px 16px 8px; font-size: 15px; color: #7d1a14; }
+.agree { margin: 0; padding: 0 16px 14px; color: #7d1a14; font-size: 12px; font-weight: 800; }
+
+/* 바닥글 */
+.footer {
+  margin: 32px auto 0;
+  padding: 18px 16px 28px;
+  max-width: 1260px;
+  border-top: 1px solid #d9d8cf;
+  color: #6b4a46;
+  font-size: 11px;
+  line-height: 1.7;
+  text-align: center;
+}
