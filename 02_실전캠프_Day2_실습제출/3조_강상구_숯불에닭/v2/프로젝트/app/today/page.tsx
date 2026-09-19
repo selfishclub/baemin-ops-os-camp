@@ -8,6 +8,7 @@ import { CHANNELS_KEY, useDaily } from "@/components/useDaily";
 import { CARD_PRESETS, groupChannels, type Channel, type ChannelKind } from "@/lib/categories";
 import { CARD_RULE_DAYS, DEFAULT_CARD_DAYS, SETTLEMENT_RULES_KEY, type SettlementRule } from "@/lib/settlement";
 import { newId } from "@/lib/classify";
+import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
 import { CardApprovalError, parseCardApproval, type ParsedCardApproval } from "@/lib/cardApproval";
 import { DeliveryStatementError, parseBaeminStatement, type ParsedDeliveryStatement } from "@/lib/deliveryStatement";
 import { checkDay, dayTotals, daysInMonth, hoursBetween, monthSummary, normalizeTime, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
@@ -635,6 +636,23 @@ function SettingsDialog({ daily, onClose }: { daily: ReturnType<typeof useDaily>
   const [channels, setChannels] = useState<Channel[]>(daily.channels);
   const [newName, setNewName] = useState("");
   const [newKind, setNewKind] = useState<ChannelKind>("card");
+  const [fixed, setFixed] = useState<FixedLabor>(EMPTY_FIXED_LABOR);
+  const [fixedSaved, setFixedSaved] = useState<FixedLabor>(EMPTY_FIXED_LABOR);
+  useEffect(() => {
+    getStore()
+      .getSetting<FixedLabor>(FIXED_LABOR_KEY)
+      .then((v) => {
+        if (v) {
+          setFixed(v);
+          setFixedSaved(v);
+        }
+      })
+      .catch(() => {});
+  }, []);
+  async function saveFixed() {
+    await getStore().saveSetting(FIXED_LABOR_KEY, fixed);
+    setFixedSaved(fixed);
+  }
 
   async function addStaff() {
     if (!alias.trim() || wage <= 0) return;
@@ -685,6 +703,24 @@ function SettingsDialog({ daily, onClose }: { daily: ReturnType<typeof useDaily>
               추가
             </button>
           </div>
+        </section>
+
+        <section className="space-y-2">
+          <p className="text-sm font-semibold">월 고정 인건비 <span className="text-[11px] font-normal text-stone-500">손익 어림용</span></p>
+          <p className="text-[11px] text-stone-500">급여는 다음 달에 나가서 이번 달 손익엔 아직 없어요. 그동안 손익 탭 노무관리비를 “알바 근무 × 시급 + 아래 금액”으로 임시 채워요. 급여가 통장에서 나가면 실제 금액으로 바뀌어요.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="space-y-1 text-[11px] text-stone-500">
+              월급제 급여 합계 (주방 등)
+              <MoneyInput label="월급제 급여 합계" value={fixed.salary} onChange={(n) => setFixed({ ...fixed, salary: n ?? 0 })} />
+            </label>
+            <label className="space-y-1 text-[11px] text-stone-500">
+              4대보험 사업주 부담 (월)
+              <MoneyInput label="4대보험 사업주 부담" value={fixed.insurance} onChange={(n) => setFixed({ ...fixed, insurance: n ?? 0 })} />
+            </label>
+          </div>
+          <button className="btn-primary w-full py-1.5 text-xs" disabled={fixed.salary === fixedSaved.salary && fixed.insurance === fixedSaved.insurance} onClick={saveFixed}>
+            고정 인건비 저장
+          </button>
         </section>
 
         <section className="space-y-2">

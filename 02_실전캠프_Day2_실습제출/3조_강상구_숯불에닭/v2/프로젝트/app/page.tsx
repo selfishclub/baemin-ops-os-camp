@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
@@ -11,6 +11,8 @@ import { num, pctText, signed, won } from "@/lib/format";
 import { closeMonth, isClosed, monthLabel } from "@/lib/month";
 import { compareLines, computePnl, type PnlLine } from "@/lib/pnl";
 import { getStore } from "@/lib/storage";
+import { monthSummary } from "@/lib/daily";
+import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
 
 export default function PnlPage() {
   const { month } = useMonth();
@@ -19,11 +21,19 @@ export default function PnlPage() {
   const settlement = useSettlement(month, ledger, daily);
   const [open, setOpen] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const [fixedLabor, setFixedLabor] = useState<FixedLabor>(EMPTY_FIXED_LABOR);
+  useEffect(() => {
+    getStore()
+      .getSetting<FixedLabor>(FIXED_LABOR_KEY)
+      .then((v) => v && setFixedLabor(v))
+      .catch(() => {});
+  }, []);
 
   if (ledger.loading || daily.loading || !settlement.loaded) return <p className="py-10 text-center text-sm text-stone-500">불러오는 중…</p>;
   if (ledger.error) return <Notice tone="error">{ledger.error}</Notice>;
 
-  const pnl = computePnl(ledger.txs, settlement.effectiveSales);
+  const hourlyLabor = monthSummary(month, daily.sales, daily.shifts, daily.staff).labor;
+  const pnl = computePnl(ledger.txs, settlement.effectiveSales, { hourly: hourlyLabor, salary: fixedLabor.salary, insurance: fixedLabor.insurance });
   const hasPrev = ledger.prevTxs.length > 0 || ledger.prevSales.length > 0;
   const diff = compareLines(pnl, hasPrev ? computePnl(ledger.prevTxs, ledger.prevSales) : null);
   const closed = isClosed(ledger.closing);
@@ -105,9 +115,14 @@ export default function PnlPage() {
         <p className="mb-1 rounded-lg bg-stone-50 px-2 py-1.5 text-[11px] text-stone-600">
           기준 — <b>매출·배달앱 수수료</b>: 주문이 발생한 달 · <b>비용</b>: 통장에서 돈이 나간 날. 다른 달에 결제한 비용은 지출추가 탭에서 날짜를 맞춰 넣을 수 있어요.
         </p>
+        {pnl.laborEstimated && (
+          <p className="mb-1 rounded-lg bg-violet-50 px-2 py-1.5 text-[11px] text-violet-900">
+            <b>노무관리비는 어림값</b>이에요 — 급여가 아직 통장에서 안 나가서 오늘 탭 근무(시간 × 시급)와 월 고정 인건비(월급·4대보험, 오늘 탭 “직원·채널 설정”)로 채웠어요. 급여가 나가 통장을 올리면 실제 금액으로 바뀌어요.
+          </p>
+        )}
         <ul className="divide-y divide-stone-100">
           {pnl.lines.map((line) => (
-            <PnlRow key={line.label} line={line} diff={diff[line.label] ?? null} open={open === line.label} onToggle={() => setOpen(open === line.label ? null : line.label)} />
+            <PnlRow key={line.label} line={line} diff={diff[line.label] ?? null} open={open === line.label} onToggle={() => setOpen(open === line.label ? null : line.label)} estimated={line.label === "노무관리비" && pnl.laborEstimated} />
           ))}
         </ul>
       </section>
@@ -148,7 +163,7 @@ export default function PnlPage() {
   );
 }
 
-function PnlRow({ line, diff, open, onToggle }: { line: PnlLine; diff: number | null; open: boolean; onToggle: () => void }) {
+function PnlRow({ line, diff, open, onToggle, estimated = false }: { line: PnlLine; diff: number | null; open: boolean; onToggle: () => void; estimated?: boolean }) {
   const strong = line.kind !== "cost";
   const canOpen = line.kind === "cost" && (line.minors?.length ?? 0) > 0;
   return (
@@ -162,6 +177,7 @@ function PnlRow({ line, diff, open, onToggle }: { line: PnlLine; diff: number | 
           {line.kind === "cost" && "− "}
           {line.label}
           {line.label === "임대료" && <span className="ml-1 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-700">월세+관리비</span>}
+          {estimated && <span className="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-900">어림</span>}
           {canOpen && <span className="ml-1 text-[10px] text-stone-400">{open ? "▲" : "▼"}</span>}
         </span>
         <span className="num flex items-baseline gap-2 text-right">

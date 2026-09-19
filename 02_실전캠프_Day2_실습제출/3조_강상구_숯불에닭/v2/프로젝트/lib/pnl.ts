@@ -1,6 +1,7 @@
 import { EXCLUDED_MAJOR, EXPENSE_MAJORS, OWNER_DRAW, isHall, type Major } from "./categories";
 import { feeOf, round1 } from "./channels";
 import type { ChannelSale, Transaction } from "./types";
+import type { LaborEstimate } from "./labor";
 
 export interface PnlLine {
   label: string;
@@ -22,6 +23,7 @@ export interface Pnl {
   ownerDraw: number; // 내가 가져간 돈(생활비) — 가게 비용 아님
   excluded: { in: number; out: number }; // "제외"로 분류한 돈(내 계좌 이체 등) — 손익에 안 넣음
   deliveryFee: number; // 배달앱 수수료 = 주문금액 − 입금액
+  laborEstimated: boolean; // 노무관리비를 어림값(오늘 탭 근무 + 월 고정 인건비)으로 채웠나 — 급여가 통장에서 나가면 false
   unclassified: number; // 아직 분류 안 된 줄 수
   needsReview: number; // 확인 필요 표시가 남은 줄 수
 }
@@ -30,7 +32,7 @@ const pct = (amount: number, revenue: number) => (revenue > 0 ? round1((amount /
 
 // 손익 순서는 사장님 엑셀의 손익계산서 그대로, 단 임대료를 빠뜨리지 않는다.
 // 매출액 → 매출원가 → 매출총이익 → 가맹수수료 → 경영주수입 → 영업비·임대료·세금과공과·노무관리비·기타 → 영업이익
-export function computePnl(txs: Transaction[], sales: ChannelSale[]): Pnl {
+export function computePnl(txs: Transaction[], sales: ChannelSale[], estimate?: LaborEstimate): Pnl {
   const hasSales = sales.some((s) => s.orders > 0);
 
   // 통장 입금: 채널이 붙은 줄은 대조용. 채널 입력이 있으면 매출로 다시 더하지 않는다(중복 방지).
@@ -69,6 +71,16 @@ export function computePnl(txs: Transaction[], sales: ChannelSale[]): Pnl {
     const m = byMajor.get(t.major) ?? new Map<string, number>();
     m.set(minor, (m.get(minor) ?? 0) + amount);
     byMajor.set(t.major, m);
+  }
+  // 급여가 아직 통장에서 안 나갔으면(다음 달 10일 지급) 어림 인건비로 임시 채운다. 실제 급여 줄이 생기면 어림값은 빠진다.
+  const hasPayroll = txs.some((t) => t.major === "노무관리비" && t.minor === "노무관리비급여" && t.out > 0);
+  const laborEstimated = !!estimate && !hasPayroll && estimate.hourly + estimate.salary + estimate.insurance > 0;
+  if (laborEstimated && estimate) {
+    const m = byMajor.get("노무관리비") ?? new Map<string, number>();
+    if (estimate.hourly > 0) m.set("알바 인건비 (어림)", (m.get("알바 인건비 (어림)") ?? 0) + estimate.hourly);
+    if (estimate.salary > 0) m.set("월급 (어림)", (m.get("월급 (어림)") ?? 0) + estimate.salary);
+    if (estimate.insurance > 0) m.set("4대보험 (어림)", (m.get("4대보험 (어림)") ?? 0) + estimate.insurance);
+    byMajor.set("노무관리비", m);
   }
   if (deliveryFee !== 0) {
     const m = byMajor.get("영업비") ?? new Map<string, number>();
@@ -113,6 +125,7 @@ export function computePnl(txs: Transaction[], sales: ChannelSale[]): Pnl {
     operatingMargin: pct(operatingProfit, revenue),
     ownerDraw,
     excluded,
+    laborEstimated,
     deliveryFee,
     unclassified: txs.filter((t) => !t.major).length,
     needsReview: txs.filter((t) => t.review).length,

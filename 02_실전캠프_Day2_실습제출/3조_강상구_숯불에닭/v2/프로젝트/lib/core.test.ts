@@ -249,3 +249,24 @@ describe("지난달 비용 규칙", () => {
     expect(seedRules().find((r) => r.keyword === "급여")?.prev_month).toBe(true);
   });
 });
+
+describe("어림 인건비", () => {
+  const tx = (o: Partial<Transaction>): Transaction => ({ id: "x", date: "2026-09-10", payee: "p", out: 0, in: 0, month: "2026-09", source: "bank", major: null, minor: null, channel: null, review: null, ...o });
+  const est = { hourly: 1_000_000, salary: 2_500_000, insurance: 300_000 };
+  it("급여가 아직 안 나간 달은 어림값으로 노무관리비를 채운다", () => {
+    const pnl = computePnl([tx({ payee: "가짜 월세", out: 1_000_000, major: "임대료", minor: "임대료" })], [], est);
+    expect(pnl.laborEstimated).toBe(true);
+    const labor = pnl.lines.find((l) => l.label === "노무관리비")!;
+    expect(labor.amount).toBe(3_800_000);
+    expect(labor.minors!.map((m) => m.label)).toEqual(["월급 (어림)", "알바 인건비 (어림)", "4대보험 (어림)"]);
+    expect(pnl.operatingProfit).toBe(-4_800_000);
+  });
+  it("급여가 통장에서 나갔으면 어림값은 빠진다", () => {
+    const pnl = computePnl([tx({ payee: "가짜급여", out: 3_000_000, major: "노무관리비", minor: "노무관리비급여" })], [], est);
+    expect(pnl.laborEstimated).toBe(false);
+    expect(pnl.lines.find((l) => l.label === "노무관리비")!.amount).toBe(3_000_000);
+  });
+  it("어림값이 없으면 그대로", () => {
+    expect(computePnl([], []).laborEstimated).toBe(false);
+  });
+});
