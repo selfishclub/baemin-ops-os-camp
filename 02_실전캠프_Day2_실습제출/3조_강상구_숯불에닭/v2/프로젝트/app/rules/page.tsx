@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { CategorySelect, ConfirmDialog, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
@@ -10,6 +10,7 @@ import { monthLabel } from "@/lib/month";
 import { getStore, storageMode } from "@/lib/storage";
 import { exportBackup, importBackup } from "@/lib/storage/backup";
 import type { Rule } from "@/lib/types";
+import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, parsePayDays } from "@/lib/paydays";
 
 export default function RulesPage() {
   const { month } = useMonth();
@@ -19,6 +20,25 @@ export default function RulesPage() {
   const [note, setNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const local = storageMode() === "local";
+  const [payDaysText, setPayDaysText] = useState("");
+  const [payDaysSaved, setPayDaysSaved] = useState<number[] | null>(null);
+  useEffect(() => {
+    getStore()
+      .getSetting<number[]>(PAY_DAYS_KEY)
+      .then((v) => {
+        const days = v ?? DEFAULT_PAY_DAYS;
+        setPayDaysSaved(days);
+        setPayDaysText(days.join(", "));
+      })
+      .catch(() => setPayDaysSaved(DEFAULT_PAY_DAYS));
+  }, []);
+  async function savePayDays() {
+    const days = parsePayDays(payDaysText);
+    await getStore().saveSetting(PAY_DAYS_KEY, days);
+    setPayDaysSaved(days);
+    setPayDaysText(days.join(", "));
+    setNote({ tone: "ok", text: days.length ? `지급일을 매달 ${days.join("·")}일로 저장했어요. 이 날 나가는 인건비·재료비는 “지난달 비용으로”가 미리 체크돼요.` : "지급일을 비웠어요. 지난달 비용은 줄마다 직접 체크해요." });
+  }
 
   const channelName = (id: string | null) => DEFAULT_CHANNELS.find((c) => c.id === id)?.name;
 
@@ -69,6 +89,23 @@ export default function RulesPage() {
         <span>📖 처음이세요? 사용법 — 어디에 무엇을 넣나</span>
         <span>→</span>
       </Link>
+
+      <section className="card space-y-2">
+        <h2 className="text-base font-bold">
+          지급일 설정 <span className="text-[11px] font-normal text-stone-500">처음 한 번 — 가게마다 달라요</span>
+        </h2>
+        <p className="text-xs text-stone-600">
+          급여·거래처 대금을 <b>다음 달에 몰아서 내는 날</b>이 있으면 적어 두세요(예: 10 또는 10, 25). 그날 통장에서 나간 <b>노무관리비·매출원가</b>는 “지난달 비용으로”가 미리 체크돼서 지난달 손익에 들어가요. 그날 내지 않는 가게는 비워 두면 돼요.
+        </p>
+        <div className="flex items-center gap-2">
+          <span className="text-sm">매달</span>
+          <input aria-label="지급일" className="field w-32" inputMode="numeric" placeholder="10, 25" value={payDaysText} onChange={(e) => setPayDaysText(e.target.value)} />
+          <span className="text-sm">일</span>
+          <button className="btn-primary px-3 py-1.5 text-xs" disabled={payDaysSaved === null || payDaysText === payDaysSaved.join(", ")} onClick={savePayDays}>
+            저장
+          </button>
+        </div>
+      </section>
 
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { CategorySelect, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
@@ -12,6 +12,7 @@ import { num, won } from "@/lib/format";
 import { findOverlap, monthLabel, prevMonth } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 import type { Transaction } from "@/lib/types";
+import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, isPrevMonthDefault } from "@/lib/paydays";
 
 const SAMPLES = [
   { label: "8월", file: "/sample/가짜_거래내역_2026-08.xlsx" },
@@ -26,6 +27,13 @@ export default function UploadPage() {
   const [busy, setBusy] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [payDays, setPayDays] = useState<number[]>(DEFAULT_PAY_DAYS);
+  useEffect(() => {
+    getStore()
+      .getSetting<number[]>(PAY_DAYS_KEY)
+      .then((v) => v && setPayDays(v))
+      .catch(() => {});
+  }, []);
   const [filter, setFilter] = useState("");
 
   async function handleFile(file: File | Blob, name: string) {
@@ -128,7 +136,7 @@ export default function UploadPage() {
         {!ledger.loading && bankTxs.length === 0 && <Notice tone="info">이 달에 올린 거래내역이 아직 없어요.</Notice>}
         {bankTxs.length > 0 && review.length === 0 && <Notice tone="ok">확인할 줄이 없어요. 손익 탭에서 결과를 보세요.</Notice>}
         {review.map((t) => (
-          <ReviewCard key={t.id} tx={t} ledger={ledger} />
+          <ReviewCard key={t.id} tx={t} ledger={ledger} payDays={payDays} />
         ))}
       </section>
 
@@ -175,7 +183,7 @@ export default function UploadPage() {
                           {editingId === t.id && (
                             <tr>
                               <td colSpan={6} className="py-2">
-                                <ReviewCard tx={t} ledger={ledger} editing onDone={() => setEditingId(null)} />
+                                <ReviewCard tx={t} ledger={ledger} payDays={payDays} editing onDone={() => setEditingId(null)} />
                               </td>
                             </tr>
                           )}
@@ -192,7 +200,7 @@ export default function UploadPage() {
   );
 }
 
-function ReviewCard({ tx, ledger, editing = false, onDone }: { tx: Transaction; ledger: ReturnType<typeof useLedger>; editing?: boolean; onDone?: () => void }) {
+function ReviewCard({ tx, ledger, payDays, editing = false, onDone }: { tx: Transaction; ledger: ReturnType<typeof useLedger>; payDays: number[]; editing?: boolean; onDone?: () => void }) {
   const isIncome = tx.in > 0;
   const [major, setMajor] = useState<Major | "">(tx.major ?? (isIncome ? "수입" : ""));
   const [minor, setMinor] = useState(tx.minor ?? (isIncome ? "매출액" : ""));
@@ -202,7 +210,17 @@ function ReviewCard({ tx, ledger, editing = false, onDone }: { tx: Transaction; 
   // 처음 보는 거래처는 기억하는 게 기본. 애매한 곳(마트)·큰 금액은 이번 줄만. 고치기 모드에서는 "규칙도 바꾸기"가 기본 꺼짐.
   const [remember, setRemember] = useState(!hasRule && !editing);
   // 급여·거래처 대금처럼 다음 달 10일에 내는 돈 → 지난달 비용. 이미 옮겨진 줄이면 체크된 채로 시작.
-  const [lastMonth, setLastMonth] = useState(tx.month !== tx.date.slice(0, 7));
+  const [lastMonth, setLastMonthState] = useState(tx.month !== tx.date.slice(0, 7));
+  const [lastMonthTouched, setLastMonthTouched] = useState(tx.month !== tx.date.slice(0, 7));
+  const setLastMonth = (v: boolean) => {
+    setLastMonthTouched(true);
+    setLastMonthState(v);
+  };
+  // 지급일(규칙 탭 설정)에 나간 인건비·재료비는 지난달 비용이 기본. 사장님이 직접 건드렸으면 그대로 둔다.
+  useEffect(() => {
+    if (!lastMonthTouched && !isIncome) setLastMonthState(isPrevMonthDefault(tx.date, major, payDays));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [major, payDays]);
   const [saving, setSaving] = useState(false);
 
   async function confirm() {
