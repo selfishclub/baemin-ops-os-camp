@@ -53,6 +53,10 @@ export default function SettlementSection({
   const totalPending = results.reduce((a, r) => a + r.pending, 0);
   const totalMissing = results.reduce((a, r) => a + r.missing, 0);
   const unmatched = results.flatMap((r) => r.unmatchedDeposits.map((d) => ({ ...d, channel: r.channel })));
+  // 통장엔 입금이 있는데 오늘 탭에 그 채널 매출이 하나도 없는 채널 — 짝을 맞출 수가 없어 0으로 보인다
+  const strayOf = (r: (typeof results)[number]) => r.unmatchedDeposits.reduce((a, d) => a + d.amount, 0);
+  const noSales = results.filter((r) => r.sales === 0 && strayOf(r) > 0);
+  const unmatchedShown = unmatched.filter((d) => !noSales.some((r) => r.channel === d.channel));
   // 카드사별로 나눴을 때 카드 합계 줄
   const cardRows = results.filter((r) => daily.channels.find((c) => c.id === r.channel)?.kind === "card");
   const cardSum = cardRows.reduce(
@@ -238,12 +242,27 @@ export default function SettlementSection({
                         <td className="py-2 font-semibold">
                           {name(r.channel)} <span className="text-[10px] text-stone-400">{open === r.channel ? "▲" : "▼"}</span>
                         </td>
-                        <td className="text-right">{num(r.sales)}</td>
-                        <td className="text-right">{num(r.deposited)}</td>
-                        <td className="text-right">{num(r.fee)}</td>
-                        <td className="text-right font-bold">{pctText(r.feeRate)}</td>
-                        <td className="text-right text-stone-500">{num(r.pending)}</td>
-                        <td className={`text-right font-bold ${r.missing > 0 ? "text-red-600" : "text-stone-400"}`}>{num(r.missing)}</td>
+                        {r.sales === 0 && strayOf(r) > 0 ? (
+                          <>
+                            <td className="text-right text-xs font-semibold text-orange-600">매출 미입력</td>
+                            <td className="text-right text-stone-500" title="오늘 탭에 매출이 없어 짝을 못 맞춘 입금">
+                              {num(strayOf(r))}
+                            </td>
+                            <td className="text-right text-stone-400">–</td>
+                            <td className="text-right text-stone-400">–</td>
+                            <td className="text-right text-stone-400">–</td>
+                            <td className="text-right text-stone-400">–</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="text-right">{num(r.sales)}</td>
+                            <td className="text-right">{num(r.deposited)}</td>
+                            <td className="text-right">{num(r.fee)}</td>
+                            <td className="text-right font-bold">{pctText(r.feeRate)}</td>
+                            <td className="text-right text-stone-500">{num(r.pending)}</td>
+                            <td className={`text-right font-bold ${r.missing > 0 ? "text-red-600" : "text-stone-400"}`}>{num(r.missing)}</td>
+                          </>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -283,9 +302,14 @@ export default function SettlementSection({
                   </table>
                 </div>
               )}
-              {unmatched.length > 0 && (
+              {noSales.length > 0 && (
                 <Notice tone="warn">
-                  매출 묶음과 짝이 안 맞는 입금 {unmatched.length}건: {unmatched.map((d) => `${d.date.slice(5)} ${name(d.channel)} ${num(d.amount)}`).join(" · ")} — 지난달 말 주문분이거나 정산 규칙이 실제와 다를 수 있어요.
+                  {noSales.map((r) => `${name(r.channel)} ${num(strayOf(r))}원`).join(" · ")} — 통장 입금은 있는데 <b>오늘 탭에 이 채널 주문금액이 하나도 없어요</b>. 각 앱 사장님 사이트의 날짜별 주문금액(수수료 빼기 전)을 오늘 탭에 넣으면 입금과 짝이 맞춰지고 수수료율이 나와요.
+                </Notice>
+              )}
+              {unmatchedShown.length > 0 && (
+                <Notice tone="warn">
+                  매출 묶음과 짝이 안 맞는 입금 {unmatchedShown.length}건: {unmatchedShown.map((d) => `${d.date.slice(5)} ${name(d.channel)} ${num(d.amount)}`).join(" · ")} — 지난달 말 주문분이거나 정산 규칙이 실제와 다를 수 있어요.
                 </Notice>
               )}
               <p className="text-xs text-stone-500">
