@@ -8,6 +8,7 @@ export const MAJORS = [
   "세금과공과",
   "노무관리비",
   "기타",
+  "제외", // 수입도 비용도 아닌 돈. 손익에서 뺀다
 ] as const;
 
 export type Major = (typeof MAJORS)[number];
@@ -31,10 +32,14 @@ export const MINORS: Record<Major, string[]> = {
   세금과공과: ["소득세", "부가세", "공과금", "면허세"],
   노무관리비: ["노무관리비급여", "노무관리비 기타"],
   기타: ["생활비", "기타"],
+  제외: ["내 계좌 이체", "대출·상환", "보증금·예치금", "손익에 안 넣음"],
 };
 
-// 손익에 비용으로 잡히는 대분류 (수입 제외)
-export const EXPENSE_MAJORS = MAJORS.filter((m) => m !== "수입") as Exclude<Major, "수입">[];
+// 손익에 넣지 않는 대분류 (내 통장끼리 옮긴 돈 등)
+export const EXCLUDED_MAJOR: Major = "제외";
+
+// 손익에 비용으로 잡히는 대분류 (수입·제외 빼고)
+export const EXPENSE_MAJORS = MAJORS.filter((m) => m !== "수입" && m !== "제외") as Exclude<Major, "수입" | "제외">[];
 
 // 가게 비용이 아니라 "내가 가져간 돈"으로 따로 보여 주는 소분류
 export const OWNER_DRAW = { major: "기타" as Major, minor: "생활비" };

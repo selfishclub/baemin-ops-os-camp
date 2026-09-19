@@ -219,3 +219,19 @@ describe("환급·결제 취소 입금", () => {
     expect(pnl.operatingProfit).toBe(-1_200_000);
   });
 });
+
+describe("제외 — 내 계좌 이체", () => {
+  const tx = (o: Partial<Transaction>): Transaction => ({ id: "x", date: "2026-09-10", payee: "p", out: 0, in: 0, month: "2026-09", source: "bank", major: null, minor: null, channel: null, review: null, ...o });
+  it("제외로 분류한 입출금은 손익에 들어가지 않는다", () => {
+    const txs = [
+      tx({ payee: "가짜 월세", out: 1_000_000, major: "임대료", minor: "임대료" }),
+      tx({ payee: "내 적금 통장", out: 2_000_000, major: "제외", minor: "내 계좌 이체" }),
+      tx({ payee: "내 개인 통장", in: 500_000, major: "제외", minor: "내 계좌 이체" }),
+    ];
+    const pnl = computePnl(txs, []);
+    expect(pnl.revenue).toBe(0);
+    expect(pnl.operatingProfit).toBe(-1_000_000);
+    expect(pnl.excluded).toEqual({ in: 500_000, out: 2_000_000 });
+    expect(pnl.lines.some((l) => l.label === "제외")).toBe(false);
+  });
+});

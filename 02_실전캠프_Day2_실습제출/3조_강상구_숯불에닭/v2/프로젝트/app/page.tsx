@@ -72,6 +72,11 @@ export default function PnlPage() {
           <p className="text-xs font-semibold text-stone-500">내가 가져간 돈 (생활비)</p>
           <p className="num mt-1 text-lg font-bold">{won(pnl.ownerDraw)}</p>
           <p className="mt-1 text-[11px] text-stone-500">가게 비용에는 안 넣었어요</p>
+          {(pnl.excluded.in > 0 || pnl.excluded.out > 0) && (
+            <p className="num mt-1 text-[11px] text-stone-500">
+              손익에서 뺀 이체(제외): 나간 돈 {num(pnl.excluded.out)} · 들어온 돈 {num(pnl.excluded.in)}
+            </p>
+          )}
         </div>
       </section>
 

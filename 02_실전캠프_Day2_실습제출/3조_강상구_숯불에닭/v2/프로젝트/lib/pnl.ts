@@ -1,4 +1,4 @@
-import { EXPENSE_MAJORS, OWNER_DRAW, isHall, type Major } from "./categories";
+import { EXCLUDED_MAJOR, EXPENSE_MAJORS, OWNER_DRAW, isHall, type Major } from "./categories";
 import { feeOf, round1 } from "./channels";
 import type { ChannelSale, Transaction } from "./types";
 
@@ -20,6 +20,7 @@ export interface Pnl {
   operatingProfit: number;
   operatingMargin: number | null;
   ownerDraw: number; // 내가 가져간 돈(생활비) — 가게 비용 아님
+  excluded: { in: number; out: number }; // "제외"로 분류한 돈(내 계좌 이체 등) — 손익에 안 넣음
   deliveryFee: number; // 배달앱 수수료 = 주문금액 − 입금액
   unclassified: number; // 아직 분류 안 된 줄 수
   needsReview: number; // 확인 필요 표시가 남은 줄 수
@@ -35,6 +36,13 @@ export function computePnl(txs: Transaction[], sales: ChannelSale[]): Pnl {
   // 통장 입금: 채널이 붙은 줄은 대조용. 채널 입력이 있으면 매출로 다시 더하지 않는다(중복 방지).
   let bankChannelIn = 0;
   let otherIncome = 0;
+  const excluded = { in: 0, out: 0 };
+  for (const t of txs) {
+    if (t.major === EXCLUDED_MAJOR) {
+      excluded.in += t.in;
+      excluded.out += t.out;
+    }
+  }
   for (const t of txs) {
     if (t.in <= 0 || t.major !== "수입") continue;
     if (t.channel) bankChannelIn += t.in;
@@ -50,7 +58,7 @@ export function computePnl(txs: Transaction[], sales: ChannelSale[]): Pnl {
   const byMajor = new Map<Major, Map<string, number>>();
   let ownerDraw = 0;
   for (const t of txs) {
-    if (!t.major || t.major === "수입") continue;
+    if (!t.major || t.major === "수입" || t.major === EXCLUDED_MAJOR) continue;
     const amount = t.out - t.in;
     if (amount === 0) continue;
     const minor = t.minor ?? "기타";
@@ -104,6 +112,7 @@ export function computePnl(txs: Transaction[], sales: ChannelSale[]): Pnl {
     operatingProfit,
     operatingMargin: pct(operatingProfit, revenue),
     ownerDraw,
+    excluded,
     deliveryFee,
     unclassified: txs.filter((t) => !t.major).length,
     needsReview: txs.filter((t) => t.review).length,
