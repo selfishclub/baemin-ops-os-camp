@@ -62,3 +62,34 @@ describe("입금 짝 맞추기", () => {
 });
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+
+describe("직접 출금 신청하는 앱 (쿠팡이츠)", () => {
+  const rule: SettlementRule = { channel: "coupang", mode: "days", days: 4, weekday: 0, manual: true };
+  const daily: DailySale[] = [
+    { date: "2026-09-08", channel: "coupang", amount: 54_000 }, // 화 → 9/14 정산
+    { date: "2026-09-09", channel: "coupang", amount: 70_500 }, // 수 → 9/15 정산
+    { date: "2026-09-14", channel: "coupang", amount: 79_000 }, // 월 → 9/18 정산
+    { date: "2026-09-16", channel: "coupang", amount: 20_000 }, // 수 → 9/22 정산 (예정)
+  ];
+  it("하루 늦게 두 날치를 한 번에 출금해도 순서대로 짝이 맞는다", () => {
+    const txs = [tx("2026-09-03", "coupang", 132_853), tx("2026-09-15", "coupang", 89_662)];
+    const r = settleChannel("coupang", "2026-09", rule, daily, txs, "2026-09-19");
+    const merged = r.settlements.find((s) => s.from === "2026-09-08")!;
+    expect(merged.to).toBe("2026-09-09");
+    expect(merged.sales).toBe(124_500);
+    expect(merged.deposit).toBe(89_662);
+    expect(merged.payout).toBe("2026-09-15");
+    expect(merged.status).toBe("일치");
+    expect(r.unmatchedDeposits).toEqual([{ date: "2026-09-03", amount: 132_853 }]); // 지난달 주문분
+    expect(r.settlements.find((s) => s.from === "2026-09-14")!.status).toBe("미입금"); // 9/18 정산인데 아직 출금 안 함
+    expect(r.settlements.find((s) => s.from === "2026-09-16")!.status).toBe("예정");
+    expect(r.missing).toBe(79_000);
+    expect(r.pending).toBe(20_000);
+  });
+  it("같은 자료를 일반 규칙으로 보면 차이·미입금으로 보인다", () => {
+    const txs = [tx("2026-09-15", "coupang", 89_662)];
+    const r = settleChannel("coupang", "2026-09", { ...rule, manual: false }, daily, txs, "2026-09-19");
+    expect(r.settlements.find((s) => s.from === "2026-09-08")!.status).toBe("미입금");
+    expect(r.settlements.find((s) => s.from === "2026-09-09")!.status).toBe("차이");
+  });
+});

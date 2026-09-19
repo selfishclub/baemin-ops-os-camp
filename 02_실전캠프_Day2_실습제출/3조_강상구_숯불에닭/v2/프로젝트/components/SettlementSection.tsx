@@ -120,6 +120,7 @@ export default function SettlementSection({
                     <span className="font-semibold">{c.name}</span>
                     <span className="text-stone-600">
                       {!r ? <span className="text-stone-400">규칙 없음 (직접 입력)</span> : r.mode === "days" ? `매출일 + ${r.days}영업일` : `매주 ${DOW[r.weekday]}요일에 지난주분`}
+                      {r?.manual && <span className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-900">직접 출금</span>}
                     </span>
                   </div>
                   {RULE_NOTES[c.id] && (
@@ -168,6 +169,12 @@ export default function SettlementSection({
                     <span />
                   )}
                   <span className="text-[11px] text-stone-500">{has && r.mode === "days" ? "영업일" : ""}</span>
+                  {has && c.kind === "delivery" && (
+                    <label className="col-span-4 -mt-1 flex items-center gap-2 text-[11px] text-stone-600">
+                      <input type="checkbox" className="h-3.5 w-3.5 accent-orange-600" checked={!!r.manual} onChange={(e) => setRule(c.id, { ...r, manual: e.target.checked })} />
+                      직접 출금 신청하는 앱 — 늦게 들어오거나 며칠치가 한 번에 들어와도 순서대로 짝 맞춰요 (쿠팡이츠)
+                    </label>
+                  )}
                 </div>
               );
             })}
@@ -274,7 +281,7 @@ export default function SettlementSection({
                     <thead className="text-left text-stone-500">
                       <tr>
                         <th className="py-1">매출 기간</th>
-                        <th>입금 예정일</th>
+                        <th>{rules.find((x) => x.channel === open)?.manual ? "입금일(예정일)" : "입금 예정일"}</th>
                         <th className="text-right">매출</th>
                         <th className="text-right">통장 입금</th>
                         <th className="text-right">수수료</th>
@@ -313,7 +320,7 @@ export default function SettlementSection({
                 </Notice>
               )}
               <p className="text-xs text-stone-500">
-                수수료 = 매출 − 그 매출분의 통장 입금. “차이”는 입금이 매출의 70% 미만이거나 매출보다 많을 때(추가 공제·누락·다른 돈이 섞임). “예정”은 입금일이 아직 안 온 것, “미입금”은 입금일이 지났는데 통장에 없는 것.
+                수수료 = 매출 − 그 매출분의 통장 입금. “차이”는 입금이 매출의 70% 미만이거나 매출보다 많을 때(추가 공제·누락·다른 돈이 섞임). “예정”은 입금일이 아직 안 온 것, “미입금”은 입금일이 지났는데 통장에 없는 것. 직접 출금 앱의 “미입금”은 아직 출금 신청을 안 한 것일 수 있어요.
               </p>
             </>
           )}
