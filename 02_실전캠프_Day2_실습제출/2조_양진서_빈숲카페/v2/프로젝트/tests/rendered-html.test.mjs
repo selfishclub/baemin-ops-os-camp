@@ -4,16 +4,20 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("opens the standalone Recipe OS at the root route", async () => {
-  const source = await read("../app/page.tsx");
-  assert.match(source, /export \{ default \} from "\.\/recipes\/page"/);
+test("opens the Beansoop OS portal at the root and keeps recipes as one section", async () => {
+  const [home, sections, recipesRoute] = await Promise.all([read("../app/page.tsx"), read("../app/portal-sections.ts"), read("../app/recipes/page.tsx")]);
+  assert.match(home, /빈숲 OS/);
+  assert.match(home, /requireActiveViewer\("\/"\)/);
+  assert.match(sections, /href: "\/recipes"/);
+  assert.match(sections, /status: "soon"/);
+  assert.match(recipesRoute, /requireActiveViewer\("\/recipes"\)/);
 });
 
 test("ships ten clearly labeled demo recipes", async () => {
   const source = await read("../app/recipes/recipe-data.ts");
   assert.match(source, /const demoMenus = \[/);
   assert.equal((source.match(/\["demo-/g) ?? []).length, 10);
-  assert.match(source, /recipes: [...demoRecipes, demoBakeryRecipe]/);
+  assert.match(source, /recipes: \[\.\.\.demoRecipes, demoBakeryRecipe\]/);
   assert.match(source, /sharedStandards: \[\]/);
   assert.match(source, /sharedGuides: \[\]/);
   assert.match(source, /value: "10g"/);

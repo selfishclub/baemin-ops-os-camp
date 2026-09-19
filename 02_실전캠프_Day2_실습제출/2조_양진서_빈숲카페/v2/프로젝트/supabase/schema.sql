@@ -279,6 +279,28 @@ drop policy if exists "quiz_insert_self" on public.quiz_results;
 create policy "quiz_insert_self" on public.quiz_results
   for insert to authenticated with check (user_id = auth.uid() and public.is_active_user());
 
+-- 3-3) 영역 잠금 (빈숲 OS 홈에서 사장이 영역을 평상시에 잠가 둔다) -----------------------
+create table if not exists public.portal_locks (
+  section_id text primary key,
+  locked boolean not null default false,
+  updated_by text not null default '',
+  updated_at timestamptz not null default now()
+);
+grant select, insert, update, delete on public.portal_locks to authenticated;
+alter table public.portal_locks enable row level security;
+
+drop policy if exists "locks_select_active" on public.portal_locks;
+create policy "locks_select_active" on public.portal_locks
+  for select to authenticated using (public.is_active_user());
+
+drop policy if exists "locks_insert_owner" on public.portal_locks;
+create policy "locks_insert_owner" on public.portal_locks
+  for insert to authenticated with check (public.is_owner());
+
+drop policy if exists "locks_update_owner" on public.portal_locks;
+create policy "locks_update_owner" on public.portal_locks
+  for update to authenticated using (public.is_owner()) with check (public.is_owner());
+
 -- 4) 사진 파일함 (비공개) -------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('recipe-media', 'recipe-media', false)

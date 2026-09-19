@@ -1,6 +1,7 @@
 import { getViewerSession } from "../../auth";
 import { readPublishedContent } from "../../../db/recipe-store";
 import { answerFromRecipes } from "../../recipes/chat-engine";
+import { checkSectionAccess, lockedResponse } from "../../../db/portal-store";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
     if (!session.viewer) return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
     if (!session.viewer.active) return Response.json({ error: "사용이 중지된 계정입니다." }, { status: 403 });
   }
+  if (!(await checkSectionAccess(session, "recipes")).allowed) return lockedResponse();
   const body = await request.json().catch(() => ({})) as { question?: string };
   const question = String(body.question ?? "").slice(0, 300);
   if (!question.trim()) return Response.json({ error: "질문을 입력해 주세요." }, { status: 400 });

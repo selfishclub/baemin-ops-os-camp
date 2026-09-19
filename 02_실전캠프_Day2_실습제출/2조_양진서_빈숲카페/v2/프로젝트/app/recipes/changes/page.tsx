@@ -13,7 +13,7 @@ export default async function ChangesPage() {
       <main style={{ padding: 32, fontFamily: "system-ui", lineHeight: 1.7 }}>
         <h1>확인 현황</h1>
         <p>데이터 창고(Supabase)가 연결되지 않아 시연 모드로 도는 중입니다. 열쇠를 넣고 사장 계정으로 로그인하면 확인 현황이 보입니다.</p>
-        <p><Link href="/">← 레시피 홈</Link></p>
+        <p><Link href="/recipes">← 레시피</Link></p>
       </main>
     );
   }

@@ -28,6 +28,7 @@ import {
   PromptGuide,
 } from "./recipe-data";
 import styles from "./recipes.module.css";
+import Link from "next/link";
 import ChatPanel from "./chat-panel";
 import HistoryPanel from "./history-panel";
 
@@ -128,7 +129,7 @@ type ChangeNoticeItem = {
   acked: boolean;
 };
 
-export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | null; demo: boolean }) {
+export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: { viewer: RecipeViewer | null; demo: boolean; lockedForStaff?: boolean }) {
   const canEdit = viewer?.role === "owner";
   const [content, setContent] = useState<RecipeContent>(defaultRecipeContent);
   const [contentError, setContentError] = useState(false);
@@ -499,9 +500,9 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
-        <a className={styles.backLink} href="#recipe-search-title">
-          <span aria-hidden="true">⌂</span> 레시피 홈
-        </a>
+        <Link className={styles.backLink} href="/">
+          <span aria-hidden="true">⌂</span> 빈숲 OS 홈
+        </Link>
         <div className={styles.brand}>
           <span className={styles.brandMark} aria-hidden="true">B</span>
           <div>
@@ -527,6 +528,8 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
           )}
         </div>
       </header>
+
+      {lockedForStaff && <p className={styles.dataWarning} role="status">지금 레시피 영역은 직원에게 잠겨 있어요. 사장님만 보이는 상태예요. 빈숲 OS 홈에서 열어 줄 수 있어요.</p>}
 
       <ChatPanel onOpenRecipe={(recipeId, trigger) => { const target = recipes.find((recipe) => recipe.id === recipeId); if (target) openRecipe(target, trigger); }} />
 

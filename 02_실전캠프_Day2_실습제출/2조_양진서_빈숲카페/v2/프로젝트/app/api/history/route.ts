@@ -1,6 +1,7 @@
 import { getViewerSession } from "../../auth";
 import { buildRecipeHistory } from "../../recipes/history";
 import type { RecipeContent } from "../../recipes/recipe-data";
+import { checkSectionAccess, lockedResponse } from "../../../db/portal-store";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export async function GET(request: Request) {
   const recipeId = new URL(request.url).searchParams.get("recipe") ?? "";
   if (!recipeId) return Response.json({ error: "어떤 메뉴인지 없습니다." }, { status: 400 });
   const session = await getViewerSession();
+  if (!(await checkSectionAccess(session, "recipes")).allowed) return lockedResponse();
   if (session.mode === "demo") return Response.json({ history: [], demo: true });
   if (!session.viewer) return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
   if (!session.viewer.active) return Response.json({ error: "사용이 중지된 계정입니다." }, { status: 403 });

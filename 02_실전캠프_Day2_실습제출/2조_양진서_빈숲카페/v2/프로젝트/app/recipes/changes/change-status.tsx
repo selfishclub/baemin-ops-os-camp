@@ -54,7 +54,7 @@ export default function ChangeStatus() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link href="/">← 레시피 홈</Link>
+        <Link href="/recipes">← 레시피</Link>
         <h1>바뀐 레시피 확인 현황</h1>
         <p>
           레시피를 고쳐 게시하면 바뀐 메뉴마다 알림이 생기고, 직원이 ‘확인했어요’를 누르면 여기 표시돼요.

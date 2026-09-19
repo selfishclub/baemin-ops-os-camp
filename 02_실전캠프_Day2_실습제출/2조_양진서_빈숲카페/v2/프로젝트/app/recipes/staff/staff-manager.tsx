@@ -55,7 +55,7 @@ export default function StaffManager() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link href="/">← 레시피 홈</Link>
+        <Link href="/recipes">← 레시피</Link>
         <h1>직원 계정 관리</h1>
         <p>퇴사한 직원은 <strong>중지</strong>로 바꾸면 그 순간부터 로그인이 막힙니다. 사장 역할은 레시피를 편집할 수 있습니다.</p>
       </header>

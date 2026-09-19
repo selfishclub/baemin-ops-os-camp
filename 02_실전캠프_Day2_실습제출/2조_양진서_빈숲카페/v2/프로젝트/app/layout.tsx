@@ -23,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     metadataBase,
-    title: "빈숲 레시피OS | 카페 표준 레시피",
+    title: "빈숲 OS | 카페 운영 매뉴얼",
     creator: rightsHolder,
     publisher: rightsHolder,
     other: { copyright: `© ${rightsHolder}. All rights reserved. 무단 복제·반출 금지` },

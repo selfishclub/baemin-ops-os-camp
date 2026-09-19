@@ -1,5 +1,6 @@
-import { requireViewerApi } from "../../auth";
 import { mediaBucket } from "../../../lib/supabase/env";
+import { getViewerSession, requireViewerApi } from "../../auth";
+import { checkSectionAccess, lockedResponse } from "../../../db/portal-store";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export async function GET(request: Request) {
   if (!validKey(key)) return Response.json({ error: "올바르지 않은 이미지 주소입니다." }, { status: 400 });
   const ctx = await requireViewerApi();
   if ("error" in ctx) return ctx.error;
+  if (!(await checkSectionAccess(await getViewerSession(), "recipes")).allowed) return lockedResponse();
   const { data, error } = await ctx.db.storage.from(mediaBucket).download(key);
   if (error || !data) return Response.json({ error: "이미지를 찾을 수 없습니다." }, { status: 404 });
   return new Response(data, {

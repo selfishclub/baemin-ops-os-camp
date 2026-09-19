@@ -159,7 +159,7 @@ export default function TrainingPage({ viewer }: { viewer: Viewer }) {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link href="/">← 레시피 홈</Link>
+        <Link href="/">← 빈숲 OS 홈</Link>
         <h1>{isOwner && !selectedStaff ? "직원 교육 현황" : selectedStaff ? `${selectedStaff.name} 메뉴 체크리스트` : "내 메뉴 체크리스트"}</h1>
         <p>
           {isOwner
@@ -239,6 +239,7 @@ export default function TrainingPage({ viewer }: { viewer: Viewer }) {
               <p>RECIPE QUIZ</p>
               <h2 id="quiz-title">레시피 퀴즈</h2>
               <span>레시피 정량·순서로 문제 10개를 자동으로 만들어요. 신입 교육 마무리용.</span>
+              {!content && <span> · 레시피 영역이 잠겨 있으면 퀴즈를 만들 수 없어요.</span>}
             </div>
             {quiz.length === 0 || quizDone ? (
               <button type="button" className={styles.primary} disabled={!content} onClick={startQuiz}>{quizDone ? "다시 풀기" : "퀴즈 시작"}</button>

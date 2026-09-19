@@ -1,5 +1,6 @@
 import { getViewerSession } from "../../auth";
 import { readPublishedContent } from "../../../db/recipe-store";
+import { checkSectionAccess, lockedResponse } from "../../../db/portal-store";
 
 export const dynamic = "force-dynamic";
 
@@ -7,6 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const session = await getViewerSession();
+    if (!(await checkSectionAccess(session, "recipes")).allowed) return lockedResponse();
     if (session.mode === "demo") {
       return Response.json({ content: await readPublishedContent(null), source: "demo" });
     }
