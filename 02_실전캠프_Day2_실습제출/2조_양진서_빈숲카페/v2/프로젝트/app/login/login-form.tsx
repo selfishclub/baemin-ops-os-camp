@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "../../lib/supabase/client";
 import { loginIdToEmail } from "../../lib/supabase/env";
 import styles from "./login.module.css";
-import { SecurityNoticeCard } from "../security-notice";
 
 export default function LoginForm({ next, reason }: { next: string; reason: string }) {
   const router = useRouter();
@@ -75,7 +74,6 @@ export default function LoginForm({ next, reason }: { next: string; reason: stri
         )}
         <p className={styles.note}>레시피는 가게 영업 비밀입니다. 화면을 밖으로 공유하지 마세요.</p>
       </form>
-      <SecurityNoticeCard />
     </main>
   );
 }

@@ -29,7 +29,6 @@ import {
 } from "./recipe-data";
 import styles from "./recipes.module.css";
 import ChatPanel from "./chat-panel";
-import { SecurityBanner } from "../security-notice";
 import HistoryPanel from "./history-panel";
 
 const favoriteKey = "beansoop-recipe-favorites-v1";
@@ -528,8 +527,6 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
           )}
         </div>
       </header>
-
-      <SecurityBanner />
 
       <ChatPanel onOpenRecipe={(recipeId, trigger) => { const target = recipes.find((recipe) => recipe.id === recipeId); if (target) openRecipe(target, trigger); }} />
 

@@ -1,9 +1,10 @@
 import styles from "./security.module.css";
 
-// 대외비 · 유출 금지 안내. 로그인 화면, 첫 화면 위쪽 띠, 모든 페이지 바닥글에서 같은 문구를 쓴다.
+// 레시피 등 카페 정보 유출 금지 안내.
+// 화면에는 버튼 하나만 보이고, 누르면 전문이 펼쳐진다 (모든 페이지 바닥글 · 로그인 화면).
 // 문구를 바꿀 때는 여기 한 곳만 고치면 된다. (법적 효력·표현은 전문가 확인 필요)
 
-export const rightsHolder = "빈숲카페(대표 양진서)";
+export const rightsHolder = "빈숲카페";
 
 export const securityRules: { title: string; body: string }[] = [
   {
@@ -24,7 +25,7 @@ export const securityRules: { title: string; body: string }[] = [
   },
   {
     title: "유출을 알게 되면",
-    body: "레시피나 화면이 밖에 돌아다니는 것을 보면 바로 대표에게 알려 주세요.",
+    body: "레시피나 화면이 밖에 돌아다니는 것을 보면 바로 매장 책임자에게 알려 주세요.",
   },
 ];
 
@@ -41,30 +42,13 @@ export function SecurityNoticeFull() {
   );
 }
 
-// 첫 화면 위쪽 띠: 한 줄은 항상 보이고, 누르면 전문이 펼쳐진다 (JS 없이 동작)
-export function SecurityBanner() {
+// 버튼 하나. 누르면 전문이 펼쳐진다 (JS 없이 동작)
+export function SecurityNoticeButton() {
   return (
-    <details className={styles.banner}>
-      <summary>
-        <span className={styles.badge}>대외비</span>
-        <span className={styles.summaryText}>
-          레시피·사진·영상·화면 전부 <b>무단 촬영·복사·반출 금지</b>. 모든 권리는 {rightsHolder}에 있으며, 유출 시 민·형사상 책임을 물을 수 있습니다.
-        </span>
-        <span className={styles.more}>전문 보기</span>
-      </summary>
+    <details className={styles.notice}>
+      <summary><span>레시피 등 카페 정보 유출 금지</span></summary>
       <SecurityNoticeFull />
     </details>
-  );
-}
-
-// 로그인 화면용: 펼친 상태로 보여 준다
-export function SecurityNoticeCard() {
-  return (
-    <section className={styles.card} aria-labelledby="security-title">
-      <h2 id="security-title"><span className={styles.badge}>대외비</span> 레시피·자료 유출 금지 안내</h2>
-      <SecurityNoticeFull />
-      <p className={styles.agree}>로그인하면 위 내용을 확인하고 지키는 데 동의한 것으로 봅니다.</p>
-    </section>
   );
 }
 
@@ -72,7 +56,8 @@ export function SecurityNoticeCard() {
 export function SecurityFooter() {
   return (
     <footer className={styles.footer}>
-      © {rightsHolder} · 대외비 · 이 사이트의 레시피·사진·영상·화면·프로그램에 대한 모든 권리는 {rightsHolder}에 있습니다. 무단 복제·촬영·반출·배포를 금지하며, 위반 시 관련 법령에 따라 민·형사상 책임을 물을 수 있습니다.
+      <SecurityNoticeButton />
+      <p>© {rightsHolder}</p>
     </footer>
   );
 }
