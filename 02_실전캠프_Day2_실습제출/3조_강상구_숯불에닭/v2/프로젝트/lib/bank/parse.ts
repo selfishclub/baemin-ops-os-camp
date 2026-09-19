@@ -5,6 +5,9 @@ const DATE_NAMES = ["거래일시", "거래일자", "거래일", "날짜", "일�
 const PAYEE_NAMES = ["기재내용", "거래내용", "내용", "받는분", "보낸분", "상대", "적요", "메모"];
 const OUT_NAMES = ["출금액", "출금금액", "출금", "찾으신금액", "지급금액", "지급"];
 const IN_NAMES = ["입금액", "입금금액", "입금", "맡기신금액"];
+// 농협처럼 "거래내용"(PC우리은행·PC신한은행…)만으로는 누가 보냈는지 모르고, 옆 칸 "거래기록사항"(현281…, 쿠팡페이…)에 진짜 이름이 있는 은행이 있다.
+// 그래서 두 칸을 붙여 하나의 거래처 글로 만든다. 규칙은 긴 키워드가 이기니 "우리은행 현"처럼 두 칸에 걸친 키워드도 된다.
+const EXTRA_NAMES = ["거래기록사항", "기록사항", "받는분", "보낸분", "메모", "비고"];
 
 export class BankParseError extends Error {}
 
@@ -75,6 +78,14 @@ export function parseBankSheet(grid: Cell[][]): ParsedBank {
 
   // "내용"이 비어 있으면 "적요"로 대신한다
   const fallbackPayee = findCol(grid[headerIdx], ["적요"]);
+  // 보조 칸(거래기록사항 등)은 내용 뒤에 붙인다
+  const extraCol = (() => {
+    for (const name of EXTRA_NAMES) {
+      const i = grid[headerIdx].findIndex((h, j) => j !== cols.payee && norm(h).includes(name));
+      if (i >= 0) return i;
+    }
+    return -1;
+  })();
 
   const rows: BankRow[] = [];
   for (const r of grid.slice(headerIdx + 1)) {
@@ -85,6 +96,8 @@ export function parseBankSheet(grid: Cell[][]): ParsedBank {
     if (out === 0 && inn === 0) continue;
     let payee = String(r[cols.payee] ?? "").trim();
     if (!payee && fallbackPayee >= 0) payee = String(r[fallbackPayee] ?? "").trim();
+    const extra = extraCol >= 0 ? String(r[extraCol] ?? "").trim() : "";
+    if (extra && extra !== payee) payee = payee ? `${payee} ${extra}` : extra;
     rows.push({ date, payee: payee || "(내용 없음)", out, in: inn });
   }
   if (rows.length === 0) {
