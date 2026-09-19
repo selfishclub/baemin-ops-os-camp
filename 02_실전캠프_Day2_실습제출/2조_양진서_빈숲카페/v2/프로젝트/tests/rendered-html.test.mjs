@@ -107,6 +107,22 @@ test("loads a video prompt guide per kind (drink, bakery, etc)", async () => {
   assert.match(studio, /영상 프롬프트 지침서/);
 });
 
+test("lets the owner lock or open each big menu from an admin screen", async () => {
+  const [store, page, api, recipesRoute, chat] = await Promise.all([
+    read("../db/portal-store.ts"),
+    read("../app/manage/menus/menu-locks.tsx"),
+    read("../app/api/admin/portal/route.ts"),
+    read("../app/recipes/page.tsx"),
+    read("../app/api/chat/route.ts"),
+  ]);
+  assert.match(store, /export async function checkSectionAccess/);
+  assert.match(store, /LOCKED_SECTIONS/);
+  assert.match(page, /메뉴 잠금 설정/);
+  assert.match(api, /requireOwnerApi/);
+  assert.match(recipesRoute, /checkSectionAccess\(session, "recipes"\)/);
+  assert.match(chat, /lockedResponse\(\)/);
+});
+
 test("keeps image and video authoring without bundled cafe media", async () => {
   const studio = await read("../app/recipes/admin/studio.tsx");
   assert.match(studio, /사진 올리기/);

@@ -98,12 +98,6 @@
 }
 
 /* 영역 잠금 */
-.cell { display: grid; align-content: start; gap: 6px; }
 .tileStatus[data-status="locked"] { background: #7d1a14; color: white; }
 .tile[data-status="locked"] { border-color: #e0a9a3; background: #fff8f6; }
 .tile[data-status="locked"][aria-disabled="true"] strong { color: #8a8f88; }
-.lockRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; color: #9a3b2c; }
-.lockButton { min-height: 32px; padding: 0 12px; border: 1px solid #c9c2b2; border-radius: 999px; background: white; color: #4d5a50; font-size: 11px; font-weight: 800; cursor: pointer; }
-.lockButton[data-locked="true"] { border-color: #7d1a14; color: #7d1a14; }
-.lockButton:disabled { opacity: .5; }
-.lockNote { margin: 0; color: #8a8f88; font-size: 11px; }

@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { requireActiveViewer } from "./auth";
 import { portalSections, type PortalSection } from "./portal-sections";
-import { lockableSections, readLockedSections } from "../db/portal-store";
-import LockToggle from "./lock-toggle";
+import { readLockedSections } from "../db/portal-store";
 import styles from "./portal.module.css";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +14,6 @@ export default async function PortalHome() {
   const demo = session.mode === "demo";
   const isOwner = viewer?.role === "owner";
   const locked = await readLockedSections(session.mode === "auth" ? session.db : null);
-  const envLocked = new Set((process.env.LOCKED_SECTIONS ?? "").split(",").map((item) => item.trim()).filter(Boolean));
   const visible = portalSections.filter((section) => !section.ownerOnly || isOwner || demo);
   const groups = [...new Set(visible.map((section) => section.group))];
 
@@ -54,14 +52,7 @@ export default async function PortalHome() {
           <h3 id={`group-${group}`}>{group}</h3>
           <div className={styles.grid}>
             {visible.filter((section) => section.group === group).map((section) => {
-              const isLocked = locked.has(section.id);
-              const canLock = isOwner && (lockableSections as readonly string[]).includes(section.id);
-              return (
-                <div key={section.id} className={styles.cell}>
-                  <Tile section={section} locked={isLocked} bypass={Boolean(isOwner)} />
-                  {canLock && <LockToggle sectionId={section.id} locked={isLocked} fixed={envLocked.has(section.id)} />}
-                </div>
-              );
+              return <Tile key={section.id} section={section} locked={locked.has(section.id)} bypass={Boolean(isOwner)} />;
             })}
           </div>
         </section>
@@ -72,7 +63,7 @@ export default async function PortalHome() {
 
 function Tile({ section, locked, bypass }: { section: PortalSection; locked: boolean; bypass: boolean }) {
   const state = section.status === "soon" ? "soon" : locked ? "locked" : "open";
-  const label = state === "soon" ? "준비 중" : state === "locked" ? (bypass ? "잠김 · 사장만 열림" : "잠김") : "열기";
+  const label = state === "soon" ? (locked && bypass ? "준비 중 · 잠금 예약" : "준비 중") : state === "locked" ? (bypass ? "잠김 · 사장만 열림" : "잠김") : "열기";
   const body = (
     <>
       <span className={styles.tileStatus} data-status={state}>{label}</span>

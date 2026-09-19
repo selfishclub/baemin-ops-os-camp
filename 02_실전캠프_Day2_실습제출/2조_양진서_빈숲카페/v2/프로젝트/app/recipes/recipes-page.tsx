@@ -529,7 +529,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
         </div>
       </header>
 
-      {lockedForStaff && <p className={styles.dataWarning} role="status">지금 레시피 영역은 직원에게 잠겨 있어요. 사장님만 보이는 상태예요. 빈숲 OS 홈에서 열어 줄 수 있어요.</p>}
+      {lockedForStaff && <p className={styles.dataWarning} role="status">지금 레시피 영역은 직원에게 잠겨 있어요. 사장님만 보이는 상태예요. 관리의 ‘메뉴 잠금 설정’에서 열어 줄 수 있어요.</p>}
 
       <ChatPanel onOpenRecipe={(recipeId, trigger) => { const target = recipes.find((recipe) => recipe.id === recipeId); if (target) openRecipe(target, trigger); }} />
 
