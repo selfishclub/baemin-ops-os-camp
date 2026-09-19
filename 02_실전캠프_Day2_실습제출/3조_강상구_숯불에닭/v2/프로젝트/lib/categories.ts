@@ -97,7 +97,7 @@ export const CARD_PRESETS: CardPreset[] = [
   { id: "card_hana", name: "하나카드(구외환)", keywords: ["하나카드", "외환", "하나은행 하나"] },
   { id: "card_nh", name: "NH카드", keywords: ["NH카드", "농협카드", "NH농협"] },
   { id: "card_woori", name: "우리카드", keywords: ["우리카드", "우리은행 우"] },
-  { id: "card_easy", name: "간편결제", keywords: ["카카오페이", "네이버페이", "페이코", "간편"] }, // 카카오페이·네이버페이 등. 카드와 따로 입금
+  { id: "card_easy", name: "간편결제", keywords: ["카카오페이", "네이버페이", "페이코", "토스페이", "토스_", "간편"] }, // 카카오페이·네이버페이 등. 카드와 따로 입금
 ];
 
 // 채널을 종류별로 묶고 합계를 낸다 (오늘 탭·정산 탭의 "카드 합계"·"배달 합계")

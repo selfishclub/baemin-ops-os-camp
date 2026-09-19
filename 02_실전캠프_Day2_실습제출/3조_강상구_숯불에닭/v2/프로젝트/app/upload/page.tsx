@@ -226,6 +226,11 @@ function ReviewCard({ tx, ledger }: { tx: Transaction; ledger: ReturnType<typeof
         }}
       />
 
+      {isIncome && major && major !== "수입" && (
+        <Notice tone="info">
+          환급·결제 취소로 처리해요. 매출에 더하지 않고 <b>{major} › {minor}</b> 비용에서 빼요. 원래 결제와 같은 항목을 고르면 돼요.
+        </Notice>
+      )}
       {isIncome && major === "수입" && (
         <select aria-label={`${tx.payee} 채널`} className="field" value={channel} onChange={(e) => setChannel(e.target.value as ChannelId | "")}>
           <option value="">어느 채널의 입금인가요? (없으면 그대로)</option>

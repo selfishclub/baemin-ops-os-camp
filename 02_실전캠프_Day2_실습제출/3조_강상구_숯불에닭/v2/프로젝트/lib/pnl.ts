@@ -46,18 +46,20 @@ export function computePnl(txs: Transaction[], sales: ChannelSale[]): Pnl {
   const revenue = hasSales ? hallRevenue + deliveryRevenue + otherIncome : bankChannelIn + otherIncome;
   const deliveryFee = hasSales ? sales.reduce((a, s) => a + feeOf(s), 0) : 0;
 
-  // 대분류·소분류별 출금 합계
+  // 대분류·소분류별 비용 = 출금 − 같은 항목으로 분류한 입금(환급·결제 취소). 환급은 매출이 아니라 원래 비용에서 빠진다.
   const byMajor = new Map<Major, Map<string, number>>();
   let ownerDraw = 0;
   for (const t of txs) {
-    if (t.out <= 0 || !t.major || t.major === "수입") continue;
+    if (!t.major || t.major === "수입") continue;
+    const amount = t.out - t.in;
+    if (amount === 0) continue;
     const minor = t.minor ?? "기타";
     if (t.major === OWNER_DRAW.major && minor === OWNER_DRAW.minor) {
-      ownerDraw += t.out;
+      ownerDraw += amount;
       continue;
     }
     const m = byMajor.get(t.major) ?? new Map<string, number>();
-    m.set(minor, (m.get(minor) ?? 0) + t.out);
+    m.set(minor, (m.get(minor) ?? 0) + amount);
     byMajor.set(t.major, m);
   }
   if (deliveryFee !== 0) {

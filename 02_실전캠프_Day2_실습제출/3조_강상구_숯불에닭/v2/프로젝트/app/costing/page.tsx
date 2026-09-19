@@ -51,7 +51,7 @@ export default function CostingPage() {
   }, [month]);
 
   // 통장의 실제 재료비 = 매출원가 대분류 출금 합계
-  const actualCost = useMemo(() => ledger.txs.filter((t) => t.major === "매출원가" && t.out > 0).reduce((a, t) => a + t.out, 0), [ledger.txs]);
+  const actualCost = useMemo(() => ledger.txs.filter((t) => t.major === "매출원가").reduce((a, t) => a + t.out - t.in, 0), [ledger.txs]); // 환급 입금은 뺀다
   const report = useMemo(() => (pos && menus.length ? buildCostRateReport(pos, menus, recipes, items, actualCost) : null), [pos, menus, recipes, items, actualCost]);
 
   async function handleFile(file: Blob, name: string) {

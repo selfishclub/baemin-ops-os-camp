@@ -204,3 +204,18 @@ describe("농협 형식 — 거래내용 + 거래기록사항", () => {
     expect(p.rows[3].out).toBe(10600);
   });
 });
+
+describe("환급·결제 취소 입금", () => {
+  const tx = (o: Partial<Transaction>): Transaction => ({ id: "x", date: "2026-09-10", payee: "p", out: 0, in: 0, month: "2026-09", source: "bank", major: null, minor: null, channel: null, review: null, ...o });
+  it("비용 항목으로 분류한 입금은 매출이 아니라 그 비용에서 뺀다", () => {
+    const txs = [
+      tx({ payee: "가짜마트", out: 300_000, major: "매출원가", minor: "원재료비" }),
+      tx({ payee: "카드대금 매출취소", in: 100_000, major: "매출원가", minor: "원재료비" }),
+      tx({ payee: "가짜 월세", out: 1_000_000, major: "임대료", minor: "임대료" }),
+    ];
+    const pnl = computePnl(txs, []);
+    expect(pnl.revenue).toBe(0);
+    expect(pnl.lines.find((l) => l.label === "매출원가")!.amount).toBe(200_000);
+    expect(pnl.operatingProfit).toBe(-1_200_000);
+  });
+});
