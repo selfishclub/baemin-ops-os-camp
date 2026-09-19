@@ -9,6 +9,7 @@ import { CARD_PRESETS, groupChannels, type Channel, type ChannelKind } from "@/l
 import { CARD_RULE_DAYS, DEFAULT_CARD_DAYS, SETTLEMENT_RULES_KEY, type SettlementRule } from "@/lib/settlement";
 import { newId } from "@/lib/classify";
 import { CardApprovalError, parseCardApproval, type ParsedCardApproval } from "@/lib/cardApproval";
+import { DeliveryStatementError, parseBaeminStatement, type ParsedDeliveryStatement } from "@/lib/deliveryStatement";
 import { checkDay, dayTotals, daysInMonth, hoursBetween, monthSummary, normalizeTime, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
@@ -61,6 +62,9 @@ export default function TodayPage() {
   const [cardFile, setCardFile] = useState<{ parsed: ParsedCardApproval; name: string } | null>(null);
   const [cardFileMsg, setCardFileMsg] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const cardFileRef = useRef<HTMLInputElement>(null);
+  const [deliveryFile, setDeliveryFile] = useState<{ parsed: ParsedDeliveryStatement; name: string } | null>(null);
+  const [deliveryMsg, setDeliveryMsg] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const deliveryFileRef = useRef<HTMLInputElement>(null);
   const weather = useWeather();
   const todayWeather = weather.weather.find((w) => w.date === date) ?? weather.forecast.find((w) => w.date === date);
 
@@ -162,6 +166,42 @@ export default function TodayPage() {
     } finally {
       if (cardFileRef.current) cardFileRef.current.value = "";
     }
+  }
+
+  // 배달앱 정산명세서 → 매출일별 주문금액. 지금은 배민 파일만.
+  async function readDeliveryFile(file: File) {
+    setDeliveryMsg(null);
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const sheets: Record<string, never[][]> = {};
+      for (const n of wb.SheetNames) sheets[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: null }) as never[][];
+      setDeliveryFile({ parsed: parseBaeminStatement(sheets), name: file.name });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setDeliveryMsg({
+        tone: "error",
+        text: e instanceof DeliveryStatementError ? msg : /password/i.test(msg) ? "암호가 걸린 파일이에요. 바탕화면의 ‘엑셀 암호 풀기’로 암호 없는 사본을 만든 뒤 올려 주세요." : `파일을 읽지 못했어요. 배민 정산명세서(.xlsx)가 맞나요? (${msg})`,
+      });
+    } finally {
+      if (deliveryFileRef.current) deliveryFileRef.current.value = "";
+    }
+  }
+
+  // 파일의 매출일마다 그 채널 줄만 파일 값으로 바꾼다 (카드·현금·다른 배달앱은 그대로)
+  async function applyDeliveryFile() {
+    if (!deliveryFile) return;
+    const { parsed } = deliveryFile;
+    const store = getStore();
+    for (const d of parsed.days) {
+      const keep = daily.sales.filter((s) => s.date === d.date && s.channel !== parsed.channel);
+      const mine: DailySale[] = d.orders > 0 ? [{ date: d.date, channel: parsed.channel, amount: d.orders }] : [];
+      await store.saveDailySales(d.date, [...keep, ...mine]);
+    }
+    setDeliveryFile(null);
+    await daily.reload();
+    if (!date.startsWith(parsed.to.slice(0, 7))) setDate(parsed.to);
+    setDeliveryMsg({ tone: "ok", text: `${parsed.channelName} ${parsed.from.slice(5).replace("-", "/")}~${parsed.to.slice(5).replace("-", "/")} ${parsed.days.length}일치 주문금액을 넣었어요. 아직 정산 안 된 날은 다음 달 명세서로 채워져요.` });
   }
 
   // 파일의 날짜마다: 그날 카드 줄은 파일 값으로 바꾸고, 현금·배달앱은 그대로 둔다
@@ -338,6 +378,22 @@ export default function TodayPage() {
                   <p className="num mt-1 text-right text-xs text-stone-600">
                     {g.title} 합계 <b>{won(g.total)}</b>
                   </p>
+                )}
+                {g.title === "배달앱" && (
+                  <>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border-t border-stone-200 pt-2">
+                      <p className="text-[11px] text-stone-500">여러 날을 한 번에: 배민 사장님 사이트 → 정산 → 정산명세서(암호 푼 것)</p>
+                      <input ref={deliveryFileRef} type="file" accept=".xlsx,.xls" aria-label="배달앱 정산명세서 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readDeliveryFile(e.target.files[0])} />
+                      <button className="btn-ghost px-3 py-1.5 text-xs" onClick={() => deliveryFileRef.current?.click()}>
+                        배민 정산명세서 올리기
+                      </button>
+                    </div>
+                    {deliveryMsg && (
+                      <div className="mt-2">
+                        <Notice tone={deliveryMsg.tone}>{deliveryMsg.text}</Notice>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ),
@@ -518,6 +574,19 @@ export default function TodayPage() {
 
       {showSettings && <SettingsDialog daily={daily} onClose={() => setShowSettings(false)} />}
 
+      {deliveryFile && (
+        <ConfirmDialog title={`${deliveryFile.parsed.channelName} 정산명세서 — 이대로 넣을까요?`} confirmLabel={`${deliveryFile.parsed.days.length}일치 넣기`} onConfirm={applyDeliveryFile} onCancel={() => setDeliveryFile(null)}>
+          <p>
+            매출일 <b>{deliveryFile.parsed.from}</b> ~ <b>{deliveryFile.parsed.to}</b> · {deliveryFile.parsed.days.length}일
+          </p>
+          <p className="num">
+            앱 결제 주문금액 <b>{won(deliveryFile.parsed.orders)}</b> · 입금 완료 {won(deliveryFile.parsed.deposit)}
+            {deliveryFile.parsed.feeRate !== null && <span className="text-stone-500"> · 입금 완료분 수수료율 {pctText(deliveryFile.parsed.feeRate)}</span>}
+          </p>
+          {deliveryFile.parsed.meetPay > 0 && <p className="num text-xs text-stone-500">만나서결제 {won(deliveryFile.parsed.meetPay)}는 가게에서 카드·현금으로 받은 돈이라 포스 매출에 이미 있어요. 배민 매출엔 안 넣어요.</p>}
+          <p className="text-xs text-stone-500">이 날짜들의 {deliveryFile.parsed.channelName} 주문금액만 파일 값으로 바뀌어요. 카드·현금·다른 배달앱·근무는 그대로예요. 통장 입금과 짝 맞추기는 정산 탭에서 규칙(매출일 + 3영업일)으로 해요.</p>
+        </ConfirmDialog>
+      )}
       {cardFile && (
         <ConfirmDialog title="카드승인현황 파일 — 이대로 넣을까요?" confirmLabel={`${cardFile.parsed.days.length}일치 넣기`} onConfirm={applyCardFile} onCancel={() => setCardFile(null)}>
           <p>
