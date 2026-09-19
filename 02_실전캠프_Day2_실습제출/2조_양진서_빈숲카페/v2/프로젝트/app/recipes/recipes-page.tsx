@@ -511,7 +511,7 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
         </div>
         <div className={styles.headerActions}>
           {demo ? (
-            <p className={styles.headerNote}>시연 모드 · 데이터 창고 미연결 · 가짜 레시피</p>
+            <p className={styles.headerNote}>{process.env.NEXT_PUBLIC_LOGIN_OFF === "1" ? "둘러보기 모드 · 로그인 꺼 둠 · 가짜 레시피" : "시연 모드 · 데이터 창고 미연결 · 가짜 레시피"}</p>
           ) : (
             <p className={styles.headerNote}>{viewer ? `${viewer.displayName}님 · ${viewer.role === "owner" ? "사장" : "직원"}` : "공식 제조 기준"}</p>
           )}
