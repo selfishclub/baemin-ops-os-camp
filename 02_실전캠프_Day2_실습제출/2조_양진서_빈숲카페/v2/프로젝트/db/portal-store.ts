@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ViewerSession } from "../app/auth";
 import { portalSections } from "../app/portal-sections";
+import { cookies } from "next/headers";
 
 // 메뉴(영역) 잠금: 사장이 관리자 화면 "메뉴 잠금 설정"에서 큰 메뉴마다 열림/잠김을 정한다.
 // 잠긴 메뉴는 직원에게 "잠김"으로만 보이고, 주소를 직접 열거나 챗봇으로 물어도 열리지 않는다. 사장은 항상 들어갈 수 있다.
@@ -17,9 +18,24 @@ export function envLockedSections(): string[] {
   return (process.env.LOCKED_SECTIONS ?? "").split(",").map((item) => item.trim()).filter(Boolean);
 }
 
+export const previewLockCookie = "bs_preview_locks";
+
+// 시연·둘러보기 모드(로그인 없음)에서만: 이 브라우저의 쿠키에 적어 둔 미리보기 잠금. 다른 사람에게는 영향이 없다.
+async function previewLocks(): Promise<string[]> {
+  try {
+    const value = (await cookies()).get(previewLockCookie)?.value ?? "";
+    return decodeURIComponent(value).split(",").map((item) => item.trim()).filter((item) => lockableSections.includes(item));
+  } catch {
+    return [];
+  }
+}
+
 export async function readLockedSections(db: SupabaseClient | null): Promise<Set<string>> {
   const locked = new Set(envLockedSections());
-  if (!db) return locked;
+  if (!db) {
+    for (const id of await previewLocks()) locked.add(id);
+    return locked;
+  }
   const { data, error } = await db.from("portal_locks").select("section_id, locked");
   if (error) {
     // 표를 읽지 못하면 환경변수 잠금만 적용한다 (화면이 죽지 않게)
@@ -58,6 +74,15 @@ export async function readMenuLockTable(db: SupabaseClient) {
         updatedAt: (row?.updated_at as string | undefined) ?? "",
       };
     });
+}
+
+// 미리보기용 표: 데이터 창고 없이 메뉴 목록과 지금(쿠키+서버 설정) 잠금 상태
+export async function readPreviewMenuTable() {
+  const locked = await readLockedSections(null);
+  const fixed = new Set(envLockedSections());
+  return portalSections
+    .filter((section) => !section.ownerOnly)
+    .map((section) => ({ id: section.id, title: section.title, group: section.group, status: section.status, locked: locked.has(section.id), fixed: fixed.has(section.id), updatedBy: "", updatedAt: "" }));
 }
 
 export type SectionAccess = { locked: boolean; allowed: boolean; envLocked: boolean };

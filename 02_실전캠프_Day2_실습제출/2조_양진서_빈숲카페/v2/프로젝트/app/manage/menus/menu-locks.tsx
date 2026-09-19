@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import styles from "./menus.module.css";
+import PreviewBanner from "../../preview/preview-banner";
 
 type MenuRow = {
   id: string;
@@ -15,20 +16,26 @@ type MenuRow = {
   updatedAt: string;
 };
 
+// 미리보기 잠금은 이 브라우저의 쿠키에만 적는다 (서버·다른 사람 화면은 바뀌지 않는다)
+function writePreviewLockCookie(name: string, ids: string) {
+  document.cookie = `${name}=${encodeURIComponent(ids)}; path=/; max-age=${60 * 60 * 24 * 30}; samesite=lax`;
+}
+
 function when(value: string) {
   if (!value) return "";
   const date = new Date(value);
   return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-export default function MenuLocks() {
-  const [menus, setMenus] = useState<MenuRow[]>([]);
-  const [message, setMessage] = useState("메뉴 목록을 불러오는 중입니다.");
+export default function MenuLocks({ preview = false, previewCookie = "", initialMenus = [] }: { preview?: boolean; previewCookie?: string; initialMenus?: MenuRow[] }) {
+  const [menus, setMenus] = useState<MenuRow[]>(initialMenus);
+  const [message, setMessage] = useState(preview ? "" : "메뉴 목록을 불러오는 중입니다.");
   const [busyId, setBusyId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     Promise.resolve().then(async () => {
+      if (preview) return;
       const response = await fetch("/api/admin/portal", { cache: "no-store" });
       const body = await response.json();
       if (cancelled) return;
@@ -42,10 +49,19 @@ export default function MenuLocks() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [preview]);
 
   async function setLock(menu: MenuRow, locked: boolean) {
     if (menu.locked === locked) return;
+    if (preview) {
+      // 미리보기: 이 브라우저의 쿠키에만 적는다. 서버와 다른 사람 화면은 바뀌지 않는다.
+      const next = menus.map((item) => (item.id === menu.id ? { ...item, locked } : item));
+      const ids = next.filter((item) => item.locked && !item.fixed).map((item) => item.id).join(",");
+      writePreviewLockCookie(previewCookie, ids);
+      setMenus(next);
+      setMessage(`(미리보기) ‘${menu.title}’ 메뉴를 ${locked ? "잠갔어요" : "열었어요"}. 홈으로 가면 이 브라우저에서만 그렇게 보여요.`);
+      return;
+    }
     setBusyId(menu.id);
     try {
       const response = await fetch("/api/admin/portal", {
@@ -82,6 +98,7 @@ export default function MenuLocks() {
         {!message && <p className={styles.summary}>지금 잠긴 메뉴 <strong>{lockedCount}개</strong> · 열린 메뉴 {menus.length - lockedCount}개</p>}
       </header>
 
+      {preview && <PreviewBanner what="메뉴 잠금 설정" />}
       {message && <p className={styles.message} role="status">{message}</p>}
 
       {groups.map((group) => (

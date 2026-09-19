@@ -23,6 +23,8 @@ import {
 } from "../recipe-data";
 import { cascadeSharedStandards, validateRecipeContent } from "../content-model";
 import styles from "./studio.module.css";
+import { apiFetch } from "../../preview/preview-api";
+import PreviewBanner from "../../preview/preview-banner";
 
 type AdminPayload = {
   content: RecipeContent;
@@ -130,7 +132,7 @@ function newRecipe(index: number): Recipe {
   };
 }
 
-export default function AdminStudio({ userName }: { userName: string }) {
+export default function AdminStudio({ userName, preview = false }: { userName: string; preview?: boolean }) {
   const [payload, setPayload] = useState<AdminPayload | null>(null);
   const [content, setContent] = useState<RecipeContent | null>(null);
   const [tab, setTab] = useState<Tab>("recipes");
@@ -148,7 +150,7 @@ export default function AdminStudio({ userName }: { userName: string }) {
   const load = async () => {
     setBusy(true);
     try {
-      const response = await fetch("/api/admin/content", { cache: "no-store" });
+      const response = await apiFetch(preview, "/api/admin/content", { cache: "no-store" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "관리 데이터를 불러오지 못했습니다.");
       setPayload(body);
@@ -200,7 +202,7 @@ export default function AdminStudio({ userName }: { userName: string }) {
       const form = new FormData();
       form.set("file", optimized);
       form.set("recipeId", selected.id);
-      const response = await fetch("/api/admin/media", { method: "POST", body: form });
+      const response = await apiFetch(preview, "/api/admin/media", { method: "POST", body: form });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "사진을 올리지 못했습니다.");
       updateRecipe({ ...selected, images: [...(selected.images ?? []), body.image as RecipeImage] });
@@ -217,7 +219,7 @@ export default function AdminStudio({ userName }: { userName: string }) {
     if (!content || !payload) return null;
     setBusy(true);
     try {
-      const response = await fetch("/api/admin/content", {
+      const response = await apiFetch(preview, "/api/admin/content", {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ content, revision: payload.revision }),
@@ -252,7 +254,7 @@ export default function AdminStudio({ userName }: { userName: string }) {
     if (revision === null) return;
     setBusy(true);
     try {
-      const response = await fetch("/api/admin/publish", {
+      const response = await apiFetch(preview, "/api/admin/publish", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ revision, changeReason, effectiveAt, notifyStaff }),
@@ -276,7 +278,7 @@ export default function AdminStudio({ userName }: { userName: string }) {
     if (!payload || !window.confirm(`공식 버전 ${version}의 내용을 새 초안으로 불러올까요? 현재 초안은 교체됩니다.`)) return;
     setBusy(true);
     try {
-      const response = await fetch("/api/admin/restore", {
+      const response = await apiFetch(preview, "/api/admin/restore", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ version, revision: payload.revision }),
@@ -324,6 +326,7 @@ export default function AdminStudio({ userName }: { userName: string }) {
         </div>
       </header>
 
+      {preview && <PreviewBanner what="관리자 편집 · 영상 프롬프트 지침 · 공식 게시 · 버전 복구" />}
       <section className={styles.statusbar} data-dirty={dirty}>
         <span>{dirty ? "저장하지 않은 변경 있음" : "초안 저장됨"}</span>
         <p>{message}</p>

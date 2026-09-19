@@ -28,7 +28,7 @@ test("ships ten clearly labeled demo recipes", async () => {
 test("keeps discovery and administrator entry points", async () => {
   const page = await read("../app/recipes/recipes-page.tsx");
   assert.match(page, /5초 안에 찾고, 같은 품질로 만드세요/);
-  assert.match(page, /fetch\("\/api\/content"/);
+  assert.match(page, /apiFetch\(demo, "\/api\/content"/);
   assert.match(page, /href="\/recipes\/admin"/);
   assert.match(page, /name: "search_recipes"/);
   assert.match(page, /일치하는 레시피가 없습니다/);
@@ -121,6 +121,23 @@ test("lets the owner lock or open each big menu from an admin screen", async () 
   assert.match(api, /requireOwnerApi/);
   assert.match(recipesRoute, /checkSectionAccess\(session, "recipes"\)/);
   assert.match(chat, /lockedResponse\(\)/);
+});
+
+test("previews owner screens in the browser only, never against real data", async () => {
+  const [adapter, adminPage, menusPage, store] = await Promise.all([
+    read("../app/preview/preview-api.ts"),
+    read("../app/recipes/admin/page.tsx"),
+    read("../app/manage/menus/page.tsx"),
+    read("../db/portal-store.ts"),
+  ]);
+  // 미리보기는 서버가 시연·둘러보기 모드라고 판단했을 때만 켜진다
+  assert.match(adminPage, /session\.mode === "demo"\) return <AdminStudio[^>]* preview/);
+  assert.match(menusPage, /session\.mode === "demo"\) return <MenuLocks preview/);
+  // 고친 내용은 브라우저 저장소에만, 데이터 창고로 가는 길은 없다
+  assert.match(adapter, /localStorage\.setItem/);
+  assert.doesNotMatch(adapter, /supabase/i);
+  // 미리보기 잠금 쿠키는 데이터 창고가 없을 때(로그인 꺼짐)만 읽는다
+  assert.match(store, /if \(!db\) \{\s+for \(const id of await previewLocks\(\)\)/);
 });
 
 test("keeps image and video authoring without bundled cafe media", async () => {

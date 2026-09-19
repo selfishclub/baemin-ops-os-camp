@@ -31,6 +31,7 @@ import styles from "./recipes.module.css";
 import Link from "next/link";
 import ChatPanel from "./chat-panel";
 import HistoryPanel from "./history-panel";
+import { apiFetch } from "../preview/preview-api";
 
 const favoriteKey = "beansoop-recipe-favorites-v1";
 const recentKey = "beansoop-recipe-recent-v1";
@@ -130,7 +131,8 @@ type ChangeNoticeItem = {
 };
 
 export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: { viewer: RecipeViewer | null; demo: boolean; lockedForStaff?: boolean }) {
-  const canEdit = viewer?.role === "owner";
+  // 시연·둘러보기 모드에서는 미리보기로 편집을 체험할 수 있다 (이 브라우저에만 저장)
+  const canEdit = viewer?.role === "owner" || demo;
   const [content, setContent] = useState<RecipeContent>(defaultRecipeContent);
   const [contentError, setContentError] = useState(false);
   const { recipes, sharedStandards, sharedGuides, standards, categories, announcement } = content;
@@ -200,7 +202,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/content", { signal: controller.signal, cache: "no-store" })
+    apiFetch(demo, "/api/content", { signal: controller.signal, cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error("content unavailable");
         return response.json() as Promise<{ content: RecipeContent }>;
@@ -408,7 +410,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
     setEditBusy(true);
     setEditMessage("관리자 권한과 최신 초안을 확인하는 중입니다.");
     try {
-      const response = await fetch("/api/admin/content", { cache: "no-store" });
+      const response = await apiFetch(demo, "/api/admin/content", { cache: "no-store" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "인라인 편집을 시작하지 못했습니다.");
       const draftRecipe = (body.content as RecipeContent).recipes.find((recipe) => recipe.id === selectedId);
@@ -429,7 +431,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
     setEditBusy(true);
     setEditMessage("초안을 저장하는 중입니다.");
     try {
-      const response = await fetch("/api/admin/content", {
+      const response = await apiFetch(demo, "/api/admin/content", {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ content: nextContent, revision: inlineAdmin.revision }),
@@ -462,7 +464,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
     const notifyStaff = window.confirm("직원들에게 '바뀐 레시피'로 알리고 확인을 받을까요?\n(오타만 고쳤으면 '취소' → 알림 없이 게시)");
     setEditBusy(true);
     try {
-      const response = await fetch("/api/admin/publish", {
+      const response = await apiFetch(demo, "/api/admin/publish", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ revision: saved.revision, changeReason: reason.trim(), effectiveAt, notifyStaff }),
@@ -518,9 +520,9 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
           )}
           {viewer && pendingNotices.length > 0 && <a className={styles.noticeBadge} href="#changes-title">바뀐 레시피 {pendingNotices.length}</a>}
           {viewer && <a href="/recipes/training">{canEdit ? "교육 현황" : "교육 체크"}</a>}
-          {canEdit && <a href="/recipes/changes">확인 현황</a>}
-          {canEdit && <a href="/recipes/staff">직원 관리</a>}
-          {(canEdit || demo) && <a href="/recipes/admin">관리자 편집</a>}
+          {canEdit && !demo && <a href="/recipes/changes">확인 현황</a>}
+          {canEdit && !demo && <a href="/recipes/staff">직원 관리</a>}
+          {canEdit && <a href="/recipes/admin">{demo ? "관리자 편집 (미리보기)" : "관리자 편집"}</a>}
           {viewer && (
             <form action="/api/auth/logout" method="post">
               <button type="submit">로그아웃</button>

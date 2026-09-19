@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { RecipeHistoryEntry } from "./history";
 import styles from "./recipes.module.css";
+import { apiFetch } from "../preview/preview-api";
 
 // 레시피 상세의 "변경 이력": 버전마다 이전 값 → 지금 값. 눌렀을 때만 불러온다.
 export default function HistoryPanel({ recipeId, demo }: { recipeId: string; demo: boolean }) {
@@ -14,7 +15,7 @@ export default function HistoryPanel({ recipeId, demo }: { recipeId: string; dem
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/history?recipe=${encodeURIComponent(recipeId)}`, { cache: "no-store" });
+      const response = await apiFetch(demo, `/api/history?recipe=${encodeURIComponent(recipeId)}`, { cache: "no-store" });
       const body = await response.json();
       if (!response.ok) {
         setMessage(body.error ?? "변경 이력을 불러오지 못했습니다.");

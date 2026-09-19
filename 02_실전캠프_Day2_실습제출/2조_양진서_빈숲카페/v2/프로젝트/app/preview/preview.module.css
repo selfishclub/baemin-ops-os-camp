@@ -1,0 +1,17 @@
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 10px 14px;
+  border: 1px dashed #b8a25a;
+  border-radius: 12px;
+  background: #fffbe8;
+  color: #5c4a10;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.banner p { flex: 1; min-width: 220px; margin: 0; }
+.badge { flex: none; padding: 3px 9px; border-radius: 6px; background: #8a6d12; color: white; font-size: 11px; font-weight: 900; letter-spacing: .06em; }
+.banner button { flex: none; min-height: 32px; padding: 0 12px; border: 1px solid #8a6d12; border-radius: 999px; background: white; color: #8a6d12; font-size: 11px; font-weight: 800; cursor: pointer; }
