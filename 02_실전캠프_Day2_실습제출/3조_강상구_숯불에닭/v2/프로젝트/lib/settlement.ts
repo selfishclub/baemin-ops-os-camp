@@ -267,7 +267,7 @@ export const DEFAULT_RULES: SettlementRule[] = [
   { channel: "baemin", mode: "days", days: 3, weekday: 0 }, // 배민: 주문(구매확정)일 + 3영업일 (2022.2~)
   { channel: "coupang", mode: "days", days: 4, weekday: 0, manual: true }, // 쿠팡이츠: 매출 발생일 + 4영업일에 정산되지만 사장님이 직접 출금 신청해야 통장에 들어온다 (2026-09-19)
   { channel: "yogiyo", mode: "days", days: 5, weekday: 0 }, // 요기요: 결제일 + 5영업일 (2024.8~ 일 단위)
-  { channel: "etc", mode: "days", days: 1, weekday: 0 }, // 땡겨요: 당일~익영업일 (카드결제는 익영업일)
+  { channel: "etc", mode: "days", days: 1, weekday: 0, manual: true }, // 땡겨요: 당일~익영업일 (카드결제는 익영업일)
 ];
 
 // 카드사별 기본 (매출일 + N영업일). 간편결제(카카오페이 등)는 정산기준일 + 1영업일
@@ -290,5 +290,5 @@ export const RULE_NOTES: Record<string, { source: "official" | "general" | "unkn
   baemin: { source: "official", text: "배민 안내: 주문일 + 3영업일 (주말·공휴일 제외)" },
   coupang: { source: "official", text: "쿠팡이츠 사장님 사이트 안내: 매출 발생일 + 4영업일. 직접 출금 신청해야 통장에 들어와서 늦거나 몰아서 들어올 수 있음" },
   yogiyo: { source: "official", text: "요기요 안내: 결제일 + 5영업일 (2024.8부터 일 단위)" },
-  etc: { source: "official", text: "땡겨요 안내: 당일~익영업일 입금 (카드결제는 익영업일)" },
+  etc: { source: "official", text: "땡겨요 안내: 당일~익영업일 입금 (카드결제는 익영업일). 실제로는 며칠 늦게 오기도 해서 순서대로 짝 맞춤" },
 };

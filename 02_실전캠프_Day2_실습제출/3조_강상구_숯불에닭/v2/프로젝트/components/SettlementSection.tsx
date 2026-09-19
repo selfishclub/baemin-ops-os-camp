@@ -128,7 +128,7 @@ export default function SettlementSection({
                     <span className="font-semibold">{c.name}</span>
                     <span className="text-stone-600">
                       {!r ? <span className="text-stone-400">규칙 없음 (직접 입력)</span> : r.mode === "days" ? `매출일 + ${r.days}영업일` : `매주 ${DOW[r.weekday]}요일에 지난주분`}
-                      {r?.manual && <span className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-900">직접 출금</span>}
+                      {r?.manual && <span className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-900">순서대로 짝</span>}
                     </span>
                   </div>
                   {RULE_NOTES[c.id] && (
@@ -180,7 +180,7 @@ export default function SettlementSection({
                   {has && c.kind === "delivery" && (
                     <label className="col-span-4 -mt-1 flex items-center gap-2 text-[11px] text-stone-600">
                       <input type="checkbox" className="h-3.5 w-3.5 accent-orange-600" checked={!!r.manual} onChange={(e) => setRule(c.id, { ...r, manual: e.target.checked })} />
-                      직접 출금 신청하는 앱 — 늦게 들어오거나 며칠치가 한 번에 들어와도 순서대로 짝 맞춰요 (쿠팡이츠)
+                      입금일이 들쭉날쭉한 앱 — 직접 출금 신청하거나(쿠팡이츠) 정산이 불규칙한 곳(땡겨요). 늦게 들어오거나 며칠치가 한 번에 들어와도 순서대로 짝 맞춰요
                     </label>
                   )}
                 </div>
