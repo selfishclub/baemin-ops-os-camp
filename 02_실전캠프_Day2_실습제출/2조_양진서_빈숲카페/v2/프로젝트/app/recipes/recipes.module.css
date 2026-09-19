@@ -1343,3 +1343,20 @@
 .mistakes input { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid #e6b3a8; border-radius: 8px; font-size: 13px; background: white; }
 .mistakes li button { width: 30px; border: 1px solid #e6b3a8; border-radius: 8px; background: white; color: #8f2b1c; cursor: pointer; }
 .mistakes > .inlineAddButton { width: 100%; margin-top: 10px; }
+
+/* 변경 이력 */
+.historySection { margin-top: 18px; padding: 18px 20px; border: 1px solid #d9d8cf; border-radius: 13px; background: #fbfaf5; }
+.historyHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.historyHead small { color: #697269; font-size: 10px; font-weight: 900; letter-spacing: .12em; }
+.historyHead h3 { margin: 4px 0 0; font-size: 16px; }
+.historyHead button { padding: 9px 14px; border: 1px solid #173f31; border-radius: 999px; background: white; color: #173f31; font-size: 12px; font-weight: 800; cursor: pointer; }
+.historySection > p { margin: 12px 0 0; color: #697269; font-size: 13px; }
+.historyEntry { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #d9d8cf; }
+.historyEntry header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.historyEntry header strong { font-size: 14px; color: #173f31; }
+.historyEntry header span { color: #697269; font-size: 11px; }
+.historyEntry ul { display: grid; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.historyEntry li { display: flex; flex-wrap: wrap; gap: 8px; }
+.historyEntry em { min-width: 120px; color: #697269; font-size: 12px; font-style: normal; }
+.historyEntry del { color: #9a3b2c; }
+.historyEntry b { color: #2f6b47; }

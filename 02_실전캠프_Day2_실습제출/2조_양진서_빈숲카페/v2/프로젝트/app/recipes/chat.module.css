@@ -1,0 +1,58 @@
+.launcher {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: #173f31;
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 12px 28px rgba(23, 63, 49, .35);
+  cursor: pointer;
+}
+
+.panel {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  width: min(380px, calc(100vw - 24px));
+  height: min(560px, calc(100dvh - 36px));
+  overflow: hidden;
+  border: 1px solid #cfd8cf;
+  border-radius: 18px;
+  background: #fffdf8;
+  box-shadow: 0 24px 60px rgba(20, 40, 30, .28);
+}
+
+.panel header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #173f31; color: white; }
+.panel header strong { display: block; font-size: 15px; }
+.panel header small { color: rgba(255, 255, 255, .75); font-size: 11px; }
+.panel header button { width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .16); color: white; font-size: 18px; cursor: pointer; }
+
+.messages { display: grid; align-content: start; gap: 10px; padding: 14px; overflow-y: auto; }
+.message { max-width: 88%; padding: 10px 12px; border-radius: 14px; font-size: 13px; line-height: 1.6; }
+.message p { margin: 0; }
+.message[data-role="bot"] { justify-self: start; border: 1px solid #e1d9c8; background: white; color: #29332c; }
+.message[data-role="me"] { justify-self: end; background: #2f6b47; color: white; }
+
+.meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #d9d2c3; }
+.meta small { color: #7a8078; font-size: 11px; }
+.meta button { padding: 6px 12px; border: 1px solid #2f6b47; border-radius: 999px; background: white; color: #2f6b47; font-size: 12px; font-weight: 800; cursor: pointer; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; }
+.message .chips { padding: 8px 0 0; }
+.chips button { padding: 7px 11px; border: 1px solid #c9c2b2; border-radius: 999px; background: #f6f1e6; color: #29332c; font-size: 12px; cursor: pointer; }
+
+.panel form { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px 14px; border-top: 1px solid #e7e1d4; background: #faf7f0; }
+.panel form input { min-width: 0; padding: 11px 12px; border: 1px solid #c9c2b2; border-radius: 12px; background: white; font-size: 14px; }
+.panel form button { padding: 0 16px; border: 0; border-radius: 12px; background: #173f31; color: white; font-size: 13px; font-weight: 800; cursor: pointer; }
+.panel form button:disabled { opacity: .5; cursor: default; }
+
+@media print { .launcher, .panel { display: none; } }

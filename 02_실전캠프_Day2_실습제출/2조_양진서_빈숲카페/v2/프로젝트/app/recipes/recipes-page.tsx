@@ -24,6 +24,8 @@ import {
   customToneId,
 } from "./recipe-data";
 import styles from "./recipes.module.css";
+import ChatPanel from "./chat-panel";
+import HistoryPanel from "./history-panel";
 
 const favoriteKey = "beansoop-recipe-favorites-v1";
 const recentKey = "beansoop-recipe-recent-v1";
@@ -522,6 +524,8 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
         </div>
       </header>
 
+      <ChatPanel onOpenRecipe={(recipeId, trigger) => { const target = recipes.find((recipe) => recipe.id === recipeId); if (target) openRecipe(target, trigger); }} />
+
       {contentError && (
         <p className={styles.dataWarning} role="status">
           관리 서버에 연결하지 못해 검증된 기본 레시피를 표시하고 있습니다.
@@ -973,6 +977,8 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
             {!inlineAdmin && (
               <VideoPromptPanel key={`${selectedRecipe.id}-${mode}`} recipe={selectedRecipe} mode={mode} variant={selectedVariant} />
             )}
+
+            {!inlineAdmin && <HistoryPanel key={selectedRecipe.id} recipeId={selectedRecipe.id} demo={demo} />}
 
             {(selectedRecipe.sourceRef || selectedRecipe.reviewNotes?.length) && (
               <section className={styles.sourceSection} aria-label="원본 자료 및 검수 상태">
