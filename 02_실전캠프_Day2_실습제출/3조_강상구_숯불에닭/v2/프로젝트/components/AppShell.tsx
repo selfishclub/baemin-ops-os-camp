@@ -9,10 +9,18 @@ import type { Month } from "@/lib/types";
 
 const MONTH_KEY = "sootdak-ledger-month";
 
-// 정산은 보통 "지난달"을 하니까, 처음 열면 지난달을 보여 준다.
+// 처음 열면 이번 달. (전에는 "지난달 정산"이라 지난달을 보여 줬는데, 오늘 탭에 넣은 이번 달 매출이 안 보여 헷갈렸다.)
+// 지난달 정산은 ◀ 한 번이면 된다. 고른 달은 브라우저에 남겨 새 탭에서도 같은 달이 열린다.
 function defaultMonth(): Month {
   const now = new Date();
-  return prevMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+function readMonth(): Month | null {
+  try {
+    return window.localStorage.getItem(MONTH_KEY);
+  } catch {
+    return null;
+  }
 }
 
 const MonthContext = createContext<{ month: Month; setMonth: (m: Month) => void }>({
@@ -36,11 +44,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const mode = storageMode();
 
   useEffect(() => {
-    setMonthState(window.sessionStorage.getItem(MONTH_KEY) ?? defaultMonth());
+    setMonthState(readMonth() ?? defaultMonth());
   }, []);
 
   const setMonth = (m: Month) => {
-    window.sessionStorage.setItem(MONTH_KEY, m);
+    try {
+      window.localStorage.setItem(MONTH_KEY, m);
+    } catch {}
     setMonthState(m);
   };
 
