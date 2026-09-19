@@ -15,12 +15,14 @@ export type ChatAnswer = {
   source: "rule" | "ai";
 };
 
-const modeLabels: Record<RecipeMode, string> = { HOT: "HOT", ICE: "ICE", UP: "SIZE UP" };
+const modeLabels: Record<RecipeMode, string> = { HOT: "HOT", ICE: "ICE", UP: "SIZE UP", DINE: "매장·플레이팅", TOGO: "포장" };
 
 const modeWords: Record<RecipeMode, string[]> = {
   HOT: ["hot", "핫", "뜨거", "따뜻", "따듯"],
   ICE: ["ice", "아이스", "차가", "시원"],
   UP: ["sizeup", "사이즈업", "라지", "큰컵", "큰사이즈", "업사이즈"],
+  DINE: ["매장", "플레이팅", "접시", "세팅", "먹고가"],
+  TOGO: ["포장", "테이크아웃", "가져가", "togo"],
 };
 
 const intentWords = {
@@ -59,7 +61,7 @@ function findRecipe(content: RecipeContent, question: string): Recipe | null {
 
 function pickMode(recipe: Recipe, question: string): RecipeMode {
   const available = (Object.keys(recipe.variants) as RecipeMode[]).filter((mode) => recipe.variants[mode]);
-  for (const mode of ["UP", "HOT", "ICE"] as RecipeMode[]) {
+  for (const mode of ["UP", "HOT", "ICE", "TOGO", "DINE"] as RecipeMode[]) {
     if (available.includes(mode) && modeWords[mode].some((word) => question.includes(word))) return mode;
   }
   return available.includes("ICE") ? "ICE" : available[0];

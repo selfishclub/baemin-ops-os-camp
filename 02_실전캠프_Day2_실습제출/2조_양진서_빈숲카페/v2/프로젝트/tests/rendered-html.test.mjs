@@ -13,7 +13,7 @@ test("ships ten clearly labeled demo recipes", async () => {
   const source = await read("../app/recipes/recipe-data.ts");
   assert.match(source, /const demoMenus = \[/);
   assert.equal((source.match(/\["demo-/g) ?? []).length, 10);
-  assert.match(source, /recipes: demoRecipes/);
+  assert.match(source, /recipes: [...demoRecipes, demoBakeryRecipe]/);
   assert.match(source, /sharedStandards: \[\]/);
   assert.match(source, /sharedGuides: \[\]/);
   assert.match(source, /value: "10g"/);
@@ -91,6 +91,16 @@ test("answers from recipes without any external AI and keeps the AI hook last", 
   assert.match(history, /export function buildRecipeHistory/);
   assert.match(page, /<ChatPanel/);
   assert.match(page, /<HistoryPanel/);
+});
+
+test("loads a video prompt guide per kind (drink, bakery, etc)", async () => {
+  const [data, page, studio] = await Promise.all([read("../app/recipes/recipe-data.ts"), read("../app/recipes/recipes-page.tsx"), read("../app/recipes/admin/studio.tsx")]);
+  assert.match(data, /export const defaultPromptGuides/);
+  assert.match(data, /id: "bakery"/);
+  assert.match(data, /커팅·포장·매장 제공/);
+  assert.match(data, /export function fillPromptGuide/);
+  assert.match(page, /pickPromptGuide\(guides, recipe\)/);
+  assert.match(studio, /영상 프롬프트 지침서/);
 });
 
 test("keeps image and video authoring without bundled cafe media", async () => {

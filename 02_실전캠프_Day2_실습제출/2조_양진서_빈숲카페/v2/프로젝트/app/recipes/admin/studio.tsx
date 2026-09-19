@@ -14,6 +14,10 @@ import {
   findLayerPalette,
   suggestLayerTone,
   customToneId,
+  getPromptGuides,
+  defaultPromptGuides,
+  promptPlaceholders,
+  PromptGuide,
   recipeModes,
   recipeModeLabels,
 } from "../recipe-data";
@@ -37,7 +41,7 @@ type AdminPayload = {
   actor: { email: string; role: string };
 };
 
-type Tab = "recipes" | "shared" | "announcement" | "history";
+type Tab = "recipes" | "shared" | "prompts" | "announcement" | "history";
 const hexColor = /^#[0-9a-f]{6}$/i;
 
 function splitLines(value: string) {
@@ -327,9 +331,9 @@ export default function AdminStudio({ userName }: { userName: string }) {
       </section>
 
       <nav className={styles.tabs} aria-label="관리 영역">
-        {(["recipes", "shared", "announcement", "history"] as Tab[]).map((item) => (
+        {(["recipes", "shared", "prompts", "announcement", "history"] as Tab[]).map((item) => (
           <button key={item} type="button" aria-pressed={tab === item} onClick={() => setTab(item)}>
-            {{ recipes: `메뉴 ${content.recipes.length}`, shared: "공통 기준", announcement: "공지", history: "버전 기록" }[item]}
+            {{ recipes: `메뉴 ${content.recipes.length}`, shared: "공통 기준", prompts: "영상 프롬프트 지침", announcement: "공지", history: "버전 기록" }[item]}
           </button>
         ))}
       </nav>
@@ -412,6 +416,7 @@ export default function AdminStudio({ userName }: { userName: string }) {
                 setSelectedId(e.target.value);
               }} /></Field>
               <Field label="카테고리"><select value={selected.category} onChange={(e) => updateRecipe({ ...selected, category: e.target.value })}>{content.categories.filter((item) => item !== "전체").map((item) => <option key={item}>{item}</option>)}</select></Field>
+              <Field label="영상 프롬프트 지침"><select value={selected.promptGuideId ?? ""} onChange={(e) => updateRecipe({ ...selected, promptGuideId: e.target.value || undefined })}><option value="">자동 (카테고리로 고름)</option>{getPromptGuides(content).map((guide) => <option key={guide.id} value={guide.id}>{guide.name}</option>)}</select></Field>
               <Field label="표시 버전"><input value={selected.version} onChange={(e) => updateRecipe({ ...selected, version: e.target.value })} /></Field>
               <Field label="시행일"><input value={selected.updatedAt} onChange={(e) => updateRecipe({ ...selected, updatedAt: e.target.value })} /></Field>
               <Field label="변경 요약"><input value={selected.change} onChange={(e) => updateRecipe({ ...selected, change: e.target.value })} /></Field>
@@ -502,6 +507,32 @@ export default function AdminStudio({ userName }: { userName: string }) {
           </article>
         </section>
       )}
+
+      {tab === "prompts" && (() => {
+        const guides = getPromptGuides(content);
+        const setGuides = (next: PromptGuide[]) => changeContent({ ...content, promptGuides: next });
+        const patchGuide = (index: number, patch: Partial<PromptGuide>) => setGuides(guides.map((guide, itemIndex) => itemIndex === index ? { ...guide, ...patch } : guide));
+        return (
+          <section className={styles.wideEditor}>
+            <div className={styles.sectionTitle}><div><small>VIDEO PROMPT GUIDES</small><h2>영상 프롬프트 지침서</h2></div><span>종류마다 다른 문장 틀입니다. 레시피 상세의 ‘프롬프트 생성’ 버튼이 이 지침서를 불러와 빈칸을 채웁니다.</span></div>
+            <p className={styles.promptLegend}>쓸 수 있는 자리표시: {promptPlaceholders.map((item) => <code key={item}>{item}</code>)}</p>
+            {guides.map((guide, index) => (
+              <article key={guide.id} className={styles.promptGuideCard}>
+                <div className={styles.fieldGrid}>
+                  <Field label="지침 이름"><input value={guide.name} onChange={(e) => patchGuide(index, { name: e.target.value })} /></Field>
+                  <Field label="자동으로 쓰일 카테고리 · 쉼표로 구분 (비우면 메뉴에서 직접 고를 때만)"><input value={guide.categories.join(", ")} onChange={(e) => patchGuide(index, { categories: e.target.value.split(",").map((item) => item.trim()).filter(Boolean) })} /></Field>
+                </div>
+                <Field label="지침 내용"><textarea rows={12} value={guide.body} onChange={(e) => patchGuide(index, { body: e.target.value })} /></Field>
+                <button type="button" disabled={guides.length <= 1} onClick={() => { if (window.confirm("‘" + guide.name + "’ 지침을 지울까요? 공식 게시 전까지는 초안에서만 지워집니다.")) setGuides(guides.filter((_, itemIndex) => itemIndex !== index)); }}>이 지침 삭제</button>
+              </article>
+            ))}
+            <div className={styles.promptGuideActions}>
+              <button type="button" onClick={() => setGuides([...guides, { id: "guide-" + Date.now(), name: "새 지침", categories: [], body: "항목: {메뉴명} ({구분})\n분량·규격: {정량}\n작업 순서:\n{제조순서}\n주의사항: {주의사항}" }])}>+ 새 지침 추가</button>
+              <button type="button" onClick={() => { if (window.confirm("지침서를 처음 상태(음료·베이커리·기타)로 되돌릴까요?")) setGuides(structuredClone(defaultPromptGuides)); }}>기본 지침으로 되돌리기</button>
+            </div>
+          </section>
+        );
+      })()}
 
       {tab === "history" && (
         <section className={styles.wideEditor}>

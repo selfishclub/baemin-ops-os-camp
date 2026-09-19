@@ -22,6 +22,10 @@ import {
   findLayerPalette,
   suggestLayerTone,
   customToneId,
+  getPromptGuides,
+  pickPromptGuide,
+  fillPromptGuide,
+  PromptGuide,
 } from "./recipe-data";
 import styles from "./recipes.module.css";
 import ChatPanel from "./chat-panel";
@@ -810,7 +814,7 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
               </div>
             </section>
 
-            <div className={styles.modeTabs} role="group" aria-label="음료 옵션">
+            <div className={styles.modeTabs} role="group" aria-label="옵션">
               {recipeModes.map((recipeMode) => {
                 const supported = Boolean(selectedRecipe.variants[recipeMode]);
                 return (
@@ -847,8 +851,8 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
               </div>
             </section>
 
-            <div className={styles.detailColumns}>
-              <section className={styles.cupSection} aria-labelledby="cup-title">
+            <div className={styles.detailColumns} data-single={selectedVariant.layers.length === 0 && !inlineAdmin}>
+              {(selectedVariant.layers.length > 0 || inlineAdmin) && (<section className={styles.cupSection} aria-labelledby="cup-title">
                 <div className={styles.detailSectionHeading}>
                   <div><p>DRINK STRUCTURE</p><h3 id="cup-title">음료 단면</h3></div>
                   <span>잔 아래(1층)부터 넣는 순서대로 쌓임</span>
@@ -874,7 +878,7 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
                   })}
                 </div>
                 {inlineAdmin && <button className={styles.inlineAddButton} type="button" onClick={() => updateInlineRecipe((recipe) => ({ ...recipe, variants: { ...recipe.variants, [mode]: { ...recipe.variants[mode]!, layers: [...recipe.variants[mode]!.layers, { label: "재료층", value: "계량", tone: "milk" }] } } }))}>+ 맨 위에 층 쌓기</button>}
-              </section>
+              </section>)}
 
               <section className={styles.stepsSection} aria-labelledby="steps-title">
                 <div className={styles.detailSectionHeading}>
@@ -975,7 +979,7 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
             )}
 
             {!inlineAdmin && (
-              <VideoPromptPanel key={`${selectedRecipe.id}-${mode}`} recipe={selectedRecipe} mode={mode} variant={selectedVariant} />
+              <VideoPromptPanel key={`${selectedRecipe.id}-${mode}`} recipe={selectedRecipe} mode={mode} variant={selectedVariant} guides={getPromptGuides(content)} />
             )}
 
             {!inlineAdmin && <HistoryPanel key={selectedRecipe.id} recipeId={selectedRecipe.id} demo={demo} />}
@@ -1019,39 +1023,23 @@ type RecipeCardProps = {
   onFavorite: (id: string) => void;
 };
 
-// v1 기능 3 — AI 영상 프롬프트 생성 (외부 API 없음, 정해진 문장 틀에 레시피 내용을 끼워 넣음)
-function buildVideoPrompt(recipe: Recipe, mode: RecipeMode, variant: RecipeVariant) {
-  const measures = [...variant.quick, ...variant.layers]
-    .filter((item) => item.label.trim() && item.value.trim())
-    .map((item) => `${item.label} ${item.value}`);
-  const steps = variant.steps.map((step) => step.trim()).filter(Boolean);
-  if (measures.length === 0 && steps.length === 0) return null;
-  const cautions = (variant.cautions ?? []).map((item) => item.trim()).filter(Boolean);
-  return [
-    "빈숲카페 직원 교육용 레시피 영상을 만들어 주세요.",
-    `메뉴: ${recipe.name} (${recipeModeLabels[mode]})`,
-    measures.length ? `정량: ${measures.join(", ")}` : null,
-    steps.length ? ["제조 순서:", ...steps.map((step, index) => `${index + 1}. ${step}`)].join("\n") : null,
-    cautions.length ? `주의사항: ${cautions.join(" / ")}` : null,
-    recipe.commonMistakes?.length ? `자주 틀리는 포인트(영상에서 '이렇게 하면 안 됨'으로 짧게 보여 주기): ${recipe.commonMistakes.join(" / ")}` : null,
-    "화면 구성: 세로 9:16, 60초 이내. 각 단계마다 정량을 자막으로 크게 보여 주고, 바리스타의 손과 컵을 클로즈업합니다. 마지막에 완성된 컵을 3초간 보여 줍니다.",
-    "말투: 신입 직원에게 설명하듯 짧고 친절하게. 레시피에 없는 재료나 순서는 추가하지 않습니다.",
-  ].filter(Boolean).join("\n");
-}
-
-function VideoPromptPanel({ recipe, mode, variant }: { recipe: Recipe; mode: RecipeMode; variant: RecipeVariant }) {
+// 영상 프롬프트 만들기 — 종류(음료·베이커리·기타)에 맞는 지침서를 불러와 {자리표시}를 레시피 내용으로 채운다. 외부 API 없음.
+function VideoPromptPanel({ recipe, mode, variant, guides }: { recipe: Recipe; mode: RecipeMode; variant: RecipeVariant; guides: PromptGuide[] }) {
+  const autoGuide = pickPromptGuide(guides, recipe);
+  const [guideId, setGuideId] = useState(autoGuide.id);
   const [prompt, setPrompt] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const guide = guides.find((item) => item.id === guideId) ?? autoGuide;
 
-  function generate() {
-    const next = buildVideoPrompt(recipe, mode, variant);
+  function generate(target: PromptGuide) {
+    const next = fillPromptGuide(target, recipe, mode, variant);
     if (!next) {
       setPrompt(null);
       setNotice("레시피 정량·순서가 비어 있어 프롬프트를 만들 수 없습니다. 먼저 레시피를 채워 주세요.");
       return;
     }
     setPrompt(next);
-    setNotice("");
+    setNotice("‘" + target.name + "’ 지침으로 만들었습니다.");
   }
 
   async function copy() {
@@ -1069,14 +1057,20 @@ function VideoPromptPanel({ recipe, mode, variant }: { recipe: Recipe; mode: Rec
       <div>
         <small>AI VIDEO PROMPT</small>
         <h3 id="video-prompt-title">영상 프롬프트 만들기</h3>
-        <p>이 레시피의 정량·순서를 문장 틀에 넣어 교육 영상용 프롬프트를 만듭니다. 영상은 사장님이 직접 생성·검수합니다.</p>
+        <p>이 레시피 내용을 종류에 맞는 지침서에 넣어 교육 영상용 프롬프트를 만듭니다. 영상은 사장님이 직접 생성·검수합니다.</p>
+        <label className={styles.promptGuidePick}>
+          지침서
+          <select value={guide.id} onChange={(event) => { setGuideId(event.target.value); if (prompt) { const target = guides.find((item) => item.id === event.target.value); if (target) generate(target); } }}>
+            {guides.map((item) => <option key={item.id} value={item.id}>{item.name}{item.id === autoGuide.id ? " (자동)" : ""}</option>)}
+          </select>
+        </label>
         <div className={styles.promptActions}>
-          <button type="button" onClick={generate}>{prompt ? "다시 만들기" : "프롬프트 생성"}</button>
+          <button type="button" onClick={() => generate(guide)}>{prompt ? "다시 만들기" : "프롬프트 생성"}</button>
           {prompt && <button type="button" onClick={() => void copy()}>복사</button>}
         </div>
         {notice && <p role="status">{notice}</p>}
       </div>
-      {prompt && <textarea readOnly rows={10} value={prompt} aria-label="생성된 영상 프롬프트" onFocus={(event) => event.currentTarget.select()} />}
+      {prompt && <textarea readOnly rows={12} value={prompt} aria-label="생성된 영상 프롬프트" onFocus={(event) => event.currentTarget.select()} />}
     </section>
   );
 }
@@ -1125,7 +1119,7 @@ function RecipeCard({ recipe, favorite, onOpen, onFavorite }: RecipeCardProps) {
         aria-label={`${recipe.name} 레시피 보기`}
       >
         <span className={styles.cardVisual} data-category={recipe.category} data-has-image={Boolean(primaryImage)}>
-          {primaryImage ? <img className={styles.cardImage} src={primaryImage.url} alt="" /> : (
+          {primaryImage ? <img className={styles.cardImage} src={primaryImage.url} alt="" /> : visualLayers.length === 0 ? <span className={styles.miniPlate} aria-hidden="true"><i /></span> : (
             <span className={styles.miniCup} aria-hidden="true">
               {[...visualLayers].reverse().map((layer, index) => <i key={`${layer.label}-${index}`} data-tone={layer.tone} style={{ background: layerColors(layer).background }} />)}
             </span>

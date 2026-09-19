@@ -4,7 +4,7 @@ import type { Recipe, RecipeMode } from "./recipe-data";
 
 export type ChangeLine = { where: string; label: string; before: string; after: string };
 
-const modeLabels: Record<RecipeMode, string> = { HOT: "HOT", ICE: "ICE", UP: "SIZE UP" };
+const modeLabels: Record<RecipeMode, string> = { HOT: "HOT", ICE: "ICE", UP: "SIZE UP", DINE: "매장·플레이팅", TOGO: "포장" };
 
 function listDiff(where: string, label: string, before: string[] = [], after: string[] = []): ChangeLine[] {
   if (JSON.stringify(before) === JSON.stringify(after)) return [];

@@ -136,5 +136,14 @@ export function validateRecipeContent(content: RecipeContent): string[] {
       }
     }
   }
+  const promptGuideIds = new Set<string>();
+  for (const guide of content.promptGuides ?? []) {
+    if (!guide.id.trim() || promptGuideIds.has(guide.id)) errors.push(`영상 프롬프트 지침 ‘${guide.name || guide.id}’: ID가 비었거나 중복됩니다.`);
+    promptGuideIds.add(guide.id);
+    if (!guide.name.trim() || !guide.body.trim()) errors.push(`영상 프롬프트 지침 ‘${guide.name || guide.id}’: 이름과 내용이 필요합니다.`);
+  }
+  for (const recipe of content.recipes) {
+    if (recipe.promptGuideId && content.promptGuides?.length && !promptGuideIds.has(recipe.promptGuideId)) errors.push(`${recipe.name}: 지정한 영상 프롬프트 지침이 없습니다.`);
+  }
   return [...new Set(errors)];
 }

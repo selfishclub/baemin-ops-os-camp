@@ -1360,3 +1360,13 @@
 .historyEntry em { min-width: 120px; color: #697269; font-size: 12px; font-style: normal; }
 .historyEntry del { color: #9a3b2c; }
 .historyEntry b { color: #2f6b47; }
+
+/* 단면도가 없는 메뉴(베이커리): 제조 방법을 한 칸으로 */
+.detailColumns[data-single="true"] { grid-template-columns: 1fr; }
+/* 카드: 컵 대신 접시 */
+.miniPlate { position: relative; display: grid; width: 74px; height: 74px; place-items: center; border-radius: 50%; border: 2px solid rgba(23, 63, 49, .5); background: #fffdf8; box-shadow: 8px 10px 22px rgba(28, 54, 42, .12); }
+.miniPlate::before { content: ""; position: absolute; inset: 9px; border-radius: 50%; border: 1px solid rgba(23, 63, 49, .22); }
+.miniPlate i { width: 30px; height: 22px; border-radius: 12px 12px 8px 8px; background: #d9a766; box-shadow: inset 0 -5px 0 rgba(120, 70, 20, .25); }
+/* 프롬프트 지침 고르기 */
+.promptGuidePick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; color: #2f6b47; font-size: 12px; font-weight: 800; }
+.promptGuidePick select { min-width: 0; padding: 8px 10px; border: 1px solid #bcd3c4; border-radius: 10px; background: white; font-size: 13px; }
