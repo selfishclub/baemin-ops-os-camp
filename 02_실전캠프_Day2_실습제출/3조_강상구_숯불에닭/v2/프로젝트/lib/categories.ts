@@ -86,15 +86,17 @@ export interface CardPreset {
 
 // 이름은 포스 마감정산서의 "카드사별 매출내역"과 같게 둔다
 export const CARD_PRESETS: CardPreset[] = [
-  { id: "card_bc", name: "BC카드", keywords: ["BC", "비씨"] },
-  { id: "card_kb", name: "국민카드", keywords: ["KB", "국민"] },
-  { id: "card_shinhan", name: "신한카드", keywords: ["신한"] },
-  { id: "card_samsung", name: "삼성카드", keywords: ["삼성"] },
-  { id: "card_hyundai", name: "현대카드", keywords: ["현대"] },
-  { id: "card_lotte", name: "롯데카드", keywords: ["롯데"] },
-  { id: "card_hana", name: "하나카드(구외환)", keywords: ["하나", "외환"] },
-  { id: "card_nh", name: "NH카드", keywords: ["NH", "농협"] },
-  { id: "card_woori", name: "우리카드", keywords: ["우리"] },
+  // 키워드는 "카드사 정산 입금"에만 걸리게 좁게 둔다. "신한"처럼 짧으면 손님이 신한은행 앱으로 보낸 계좌이체까지 카드 매출로 잡힌다.
+  // 농협 통장은 "거래내용 거래기록사항"이 붙어 오므로 "우리은행 현"(현대카드), "SC제일"(BC카드) 같은 두 칸짜리 키워드도 있다.
+  { id: "card_bc", name: "BC카드", keywords: ["BC카드", "비씨카드", "SC제일"] },
+  { id: "card_kb", name: "국민카드", keywords: ["KB카드", "국민카드", "KB국민"] },
+  { id: "card_shinhan", name: "신한카드", keywords: ["신한카드", "신한가맹점"] },
+  { id: "card_samsung", name: "삼성카드", keywords: ["삼성카드"] },
+  { id: "card_hyundai", name: "현대카드", keywords: ["현대카드", "우리은행 현"] },
+  { id: "card_lotte", name: "롯데카드", keywords: ["롯데카드", "SC제일 롯데"] },
+  { id: "card_hana", name: "하나카드(구외환)", keywords: ["하나카드", "외환", "하나은행 하나"] },
+  { id: "card_nh", name: "NH카드", keywords: ["NH카드", "농협카드", "NH농협"] },
+  { id: "card_woori", name: "우리카드", keywords: ["우리카드", "우리은행 우"] },
   { id: "card_easy", name: "간편결제", keywords: ["카카오페이", "네이버페이", "페이코", "간편"] }, // 카카오페이·네이버페이 등. 카드와 따로 입금
 ];
 
