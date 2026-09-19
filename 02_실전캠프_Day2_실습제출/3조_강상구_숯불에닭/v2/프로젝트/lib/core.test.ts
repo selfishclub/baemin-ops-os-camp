@@ -258,11 +258,16 @@ describe("어림 인건비", () => {
     expect(pnl.laborEstimated).toBe(true);
     const labor = pnl.lines.find((l) => l.label === "노무관리비")!;
     expect(labor.amount).toBe(3_800_000);
-    expect(labor.minors!.map((m) => m.label)).toEqual(["월급 (어림)", "알바 인건비 (어림)", "4대보험 (어림)"]);
+    expect(labor.minors!.map((m) => m.label)).toEqual(["아직 안 나간 인건비 (어림)"]);
     expect(pnl.operatingProfit).toBe(-4_800_000);
   });
-  it("급여가 통장에서 나갔으면 어림값은 빠진다", () => {
-    const pnl = computePnl([tx({ payee: "가짜급여", out: 3_000_000, major: "노무관리비", minor: "노무관리비급여" })], [], est);
+  it("이 달에 일부 급여가 나갔으면 모자란 만큼만 어림으로 더한다", () => {
+    const pnl = computePnl([tx({ payee: "가짜 일당", out: 300_000, major: "노무관리비", minor: "노무관리비급여" })], [], est);
+    expect(pnl.laborEstimated).toBe(true);
+    expect(pnl.lines.find((l) => l.label === "노무관리비")!.amount).toBe(3_800_000);
+  });
+  it("다음 달 지급일에 나간 급여가 이 달 귀속으로 들어오면 어림값은 빠진다", () => {
+    const pnl = computePnl([tx({ date: "2026-10-10", month: "2026-09", payee: "가짜급여", out: 3_000_000, major: "노무관리비", minor: "노무관리비급여" })], [], est);
     expect(pnl.laborEstimated).toBe(false);
     expect(pnl.lines.find((l) => l.label === "노무관리비")!.amount).toBe(3_000_000);
   });

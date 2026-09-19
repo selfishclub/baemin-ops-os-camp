@@ -72,14 +72,18 @@ export function computePnl(txs: Transaction[], sales: ChannelSale[], estimate?: 
     m.set(minor, (m.get(minor) ?? 0) + amount);
     byMajor.set(t.major, m);
   }
-  // 급여가 아직 통장에서 안 나갔으면(다음 달 10일 지급) 어림 인건비로 임시 채운다. 실제 급여 줄이 생기면 어림값은 빠진다.
-  const hasPayroll = txs.some((t) => t.major === "노무관리비" && t.minor === "노무관리비급여" && t.out > 0);
-  const laborEstimated = !!estimate && !hasPayroll && estimate.hourly + estimate.salary + estimate.insurance > 0;
-  if (laborEstimated && estimate) {
+  // 급여가 아직 통장에서 안 나갔으면(다음 달 10일 지급) 어림 인건비로 임시 채운다.
+  //  - 어림 = (알바 근무×시급 + 월급 + 4대보험) − 이 달 귀속으로 이미 나간 급여. 모자란 만큼만 "아직 안 나간 인건비"로 더한다.
+  //  - 다음 달 날짜로 나간 급여가 이 달 귀속으로 들어오면(지급일 규칙) 급여가 다 나온 것이니 어림값은 빠진다.
+  const wageLines = txs.filter((t) => t.major === "노무관리비" && t.minor === "노무관리비급여");
+  const paidWages = wageLines.reduce((a, t) => a + t.out - t.in, 0);
+  const payrollDone = wageLines.some((t) => t.date.slice(0, 7) > t.month);
+  const estTotal = estimate ? estimate.hourly + estimate.salary + estimate.insurance : 0;
+  const laborGap = !payrollDone ? Math.max(0, estTotal - paidWages) : 0;
+  const laborEstimated = laborGap > 0;
+  if (laborEstimated) {
     const m = byMajor.get("노무관리비") ?? new Map<string, number>();
-    if (estimate.hourly > 0) m.set("알바 인건비 (어림)", (m.get("알바 인건비 (어림)") ?? 0) + estimate.hourly);
-    if (estimate.salary > 0) m.set("월급 (어림)", (m.get("월급 (어림)") ?? 0) + estimate.salary);
-    if (estimate.insurance > 0) m.set("4대보험 (어림)", (m.get("4대보험 (어림)") ?? 0) + estimate.insurance);
+    m.set("아직 안 나간 인건비 (어림)", (m.get("아직 안 나간 인건비 (어림)") ?? 0) + laborGap);
     byMajor.set("노무관리비", m);
   }
   if (deliveryFee !== 0) {
