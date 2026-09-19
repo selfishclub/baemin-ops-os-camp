@@ -119,3 +119,13 @@ describe("환급 포함 표시 · 늦은 입금 합치기", () => {
     expect(r.missing).toBe(0);
   });
 });
+
+describe("배달앱 판정 기준", () => {
+  it("배달앱은 입금이 매출의 50%만 넘으면 일치, 카드는 70%", () => {
+    const daily: DailySale[] = [{ date: "2026-09-07", channel: "coupang", amount: 19_000 }]; // 월 → 9/11
+    const r = settleChannel("coupang", "2026-09", { channel: "coupang", mode: "days", days: 4, weekday: 0 }, daily, [tx("2026-09-11", "coupang", 12_398)], "2026-09-19");
+    expect(r.settlements[0].status).toBe("일치"); // 배달비·광고비 빠져 65%
+    const c = settleChannel("card_kb", "2026-09", { channel: "card_kb", mode: "days", days: 2, weekday: 0 }, [{ date: "2026-09-07", channel: "card_kb", amount: 19_000 }], [tx("2026-09-09", "card_kb", 12_398)], "2026-09-19");
+    expect(c.settlements[0].status).toBe("차이");
+  });
+});

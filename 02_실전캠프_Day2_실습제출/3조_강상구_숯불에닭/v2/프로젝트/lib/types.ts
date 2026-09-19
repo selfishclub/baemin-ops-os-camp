@@ -72,6 +72,7 @@ export interface DailySale {
   date: string; // "2026-09-17"
   channel: ChannelId;
   amount: number;
+  source?: "pos_easy"; // 포스 간편결제승인현황에서 온 줄(토스페이카드 → 카드사). 그 파일을 다시 올리면 이것만 바꾼다
 }
 
 // 시급제 직원. 실명 대신 별칭(화덕A·홀A)만 쓴다.

@@ -213,10 +213,14 @@ export default function TodayPage() {
     const isCard = (id: string) => id === "hall_card" || id === "hall" || CARD_PRESETS.some((p) => p.id === id);
     const used = new Set<string>();
     for (const d of parsed.days) {
-      const keep = daily.sales.filter((s) => s.date === d.date && !isCard(s.channel));
+      // 카드승인현황: 그날 카드 줄(간편결제 파일에서 온 줄은 빼고)을 바꾼다 / 간편결제승인현황: 간편결제 줄과 간편결제 파일에서 온 카드사 줄만 바꾼다
+      const keep =
+        parsed.kind === "easy"
+          ? daily.sales.filter((s) => s.date === d.date && s.channel !== "card_easy" && s.source !== "pos_easy")
+          : daily.sales.filter((s) => s.date === d.date && (!isCard(s.channel) || s.source === "pos_easy"));
       const cards: DailySale[] = Object.entries(d.byCard)
         .filter(([, amt]) => amt > 0)
-        .map(([channel, amount]) => ({ date: d.date, channel, amount }));
+        .map(([channel, amount]) => (parsed.kind === "easy" && channel !== "card_easy" ? { date: d.date, channel, amount, source: "pos_easy" as const } : { date: d.date, channel, amount }));
       for (const c of cards) used.add(c.channel);
       await store.saveDailySales(d.date, [...keep, ...cards]);
     }
@@ -227,7 +231,13 @@ export default function TodayPage() {
     setCardFile(null);
     await daily.reload();
     if (!date.startsWith(parsed.from.slice(0, 7))) setDate(parsed.to);
-    setCardFileMsg({ tone: "ok", text: `${parsed.from.slice(5).replace("-", "/")}~${parsed.to.slice(5).replace("-", "/")} ${parsed.days.length}일치 카드 매출을 넣었어요. 현금·배달앱은 날마다 따로 넣어 주세요.` });
+    setCardFileMsg({
+      tone: "ok",
+      text:
+        parsed.kind === "easy"
+          ? `${parsed.from.slice(5).replace("-", "/")}~${parsed.to.slice(5).replace("-", "/")} ${parsed.days.length}일치 간편결제 매출을 넣었어요. 토스페이카드는 카드사 매출에 더했고, 토스페이머니·계좌는 간편결제로 넣었어요.`
+          : `${parsed.from.slice(5).replace("-", "/")}~${parsed.to.slice(5).replace("-", "/")} ${parsed.days.length}일치 카드 매출을 넣었어요. 현금·배달앱은 날마다 따로 넣어 주세요.`,
+    });
     weather.fillMissing().catch(() => {});
   }
 
@@ -346,10 +356,10 @@ export default function TodayPage() {
               카드 합계 <b>{won(cardTotal)}</b>
             </p>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border-t border-stone-200 pt-2">
-              <p className="text-[11px] text-stone-500">여러 날을 한 번에: 포스 ASP → 매출관리 → 승인현황(카드승인현황) 엑셀</p>
+              <p className="text-[11px] text-stone-500">여러 날을 한 번에: 포스 ASP → 매출관리 → 승인현황의 카드승인현황·간편결제승인현황 엑셀 (둘 다 올리세요)</p>
               <input ref={cardFileRef} type="file" accept=".xls,.xlsx" aria-label="포스 카드승인현황 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readCardFile(e.target.files[0])} />
               <button className="btn-ghost px-3 py-1.5 text-xs" onClick={() => cardFileRef.current?.click()}>
-                카드승인현황 파일 올리기
+                카드·간편결제 승인현황 올리기
               </button>
             </div>
             {cardFileMsg && (
@@ -589,7 +599,8 @@ export default function TodayPage() {
         </ConfirmDialog>
       )}
       {cardFile && (
-        <ConfirmDialog title="카드승인현황 파일 — 이대로 넣을까요?" confirmLabel={`${cardFile.parsed.days.length}일치 넣기`} onConfirm={applyCardFile} onCancel={() => setCardFile(null)}>
+        <ConfirmDialog title={`${cardFile.parsed.kind === "easy" ? "간편결제승인현황" : "카드승인현황"} 파일 — 이대로 넣을까요?`} confirmLabel={`${cardFile.parsed.days.length}일치 넣기`} onConfirm={applyCardFile} onCancel={() => setCardFile(null)}>
+          {cardFile.parsed.kind === "easy" && <Notice tone="info">토스페이카드는 돈이 카드사에서 들어오니 그 카드사 매출에 더하고, 토스페이머니·토스페이계좌만 간편결제로 넣어요. 카드승인현황을 먼저 올리고 이 파일을 올려도, 반대로 해도 돼요.</Notice>}
           <p>
             <b>{cardFile.parsed.from}</b> ~ <b>{cardFile.parsed.to}</b> · {cardFile.parsed.days.length}일 · 승인 {num(cardFile.parsed.days.reduce((a, d) => a + d.count, 0))}건
           </p>

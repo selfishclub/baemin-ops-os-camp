@@ -55,3 +55,26 @@ describe("parseCardApproval", () => {
     expect(() => parseCardApproval([["날짜", "내용", "입금"], ["2026-09-01", "a", 1]] as never[][])).toThrow(/승인현황/);
   });
 });
+
+describe("간편결제승인현황", () => {
+  const H = ["No.", "영업일자", "포스\n번호", "영수증\n번호", "승인", "승인", "매입사", "발급사", "카드번호", "승인요청금액", "승인요청금액", "승인요청금액", "할부", "할부", "유효기간", "승인일자", "승인시각", "승인번호", "승인금액"];
+  const row = (no: number, date: number, issuer: string, bank: string, amount: number) => [no, date, "01", String(no), "승인", "포스승인", issuer, bank, "****", amount, 0, 0, "일시불", "0", "****", date, "20:00:00", "1", amount];
+  const grid = [
+    ["간편결제승인현황"],
+    H,
+    row(1, 46266, "토스페이머니", "토스페이", 70000),
+    row(2, 46266, "토스페이계좌", "토스페이", 59000),
+    row(3, 46267, "토스페이카드", "KB국민체크", 49000),
+    row(4, 46267, "토스페이카드", "신한프리미엄", 211000),
+  ];
+  const p = parseCardApproval(grid as never[][]);
+  it("토스페이머니·계좌는 간편결제, 토스페이카드는 발급 카드사로", () => {
+    expect(p.kind).toBe("easy");
+    expect(p.days[0].byCard).toEqual({ card_easy: 129000 });
+    expect(p.days[1].byCard).toEqual({ card_kb: 49000, card_shinhan: 211000 });
+    expect(p.unknownIssuers).toEqual([]);
+  });
+  it("카드승인현황은 kind가 card", () => {
+    expect(parseCardApproval([H.filter((h) => h !== "발급사"), [1, 46266, "01", "1", "승인", "포스승인", "신한카드", "****", 1000, 0, 0, "일시불", "0", "****", 46266, "20:00:00", "1", 1000]] as never[][]).kind).toBe("card");
+  });
+});

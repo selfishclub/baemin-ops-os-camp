@@ -1,4 +1,4 @@
-import type { ChannelId } from "./categories";
+import { channelKind, type ChannelId } from "./categories";
 import { shiftDate } from "./daily";
 import type { DailySale, Month, Transaction } from "./types";
 
@@ -71,9 +71,11 @@ export interface Settlement {
   note?: string;
 }
 
-function judge(sales: number, deposit: number): Settlement["status"] {
-  // 입금이 매출의 70% 미만이거나 매출보다 많으면 "차이"(추가 공제·누락·다른 돈이 섞임), 그 안이면 수수료만 뗀 정상 입금으로 본다
-  return deposit < sales * 0.7 || deposit > sales * (1 + MISMATCH_TOLERANCE) ? "차이" : "일치";
+// 입금이 매출의 floor 미만이거나 매출보다 많으면 "차이"(추가 공제·누락·다른 돈이 섞임), 그 안이면 수수료만 뗀 정상 입금으로 본다.
+// 카드는 수수료 1~3%라 70%, 배달앱은 배달비·광고비·부가세까지 빠져 작은 주문은 60%대도 흔하니 50%.
+export const floorOf = (channel: ChannelId) => (channelKind(channel) === "delivery" ? 0.5 : 0.7);
+function judge(sales: number, deposit: number, floor = 0.7): Settlement["status"] {
+  return deposit < sales * floor || deposit > sales * (1 + MISMATCH_TOLERANCE) ? "차이" : "일치";
 }
 
 export interface ChannelSettlementSummary {
@@ -115,6 +117,7 @@ export function settleChannel(
 ): ChannelSettlementSummary {
   const deposits = depositsByDate(txs, channel);
   const adj = new Map(adjustments.filter((a) => a.channel === channel).map((a) => [a.date, a]));
+  const floor = floorOf(channel);
   const daily = dailySales.filter((s) => s.channel === channel && s.date.startsWith(month));
 
   // 묶음 만들기
@@ -140,7 +143,7 @@ export function settleChannel(
       const deposit = a ? raw - a.amount : raw;
       let status: Settlement["status"];
       if (g.sales === 0) status = "매출없음";
-      else if (raw > 0) status = judge(g.sales, deposit);
+      else if (raw > 0) status = judge(g.sales, deposit, floor);
       else status = payout > lastBankDate ? "예정" : "미입금";
       const fee = raw > 0 ? g.sales - deposit : 0;
       return {
@@ -164,7 +167,7 @@ export function settleChannel(
     const b = settlements[i + 1];
     if (!b || b.status !== "차이" || b.deposit <= b.sales || b.payout > addBusinessDays(a.payout, 3, holidays)) continue;
     const sales = a.sales + b.sales;
-    const merged: Settlement = { ...b, from: a.from, to: b.to, sales, fee: sales - b.deposit, feeRate: round1(((sales - b.deposit) / sales) * 100), status: judge(sales, b.deposit) };
+    const merged: Settlement = { ...b, from: a.from, to: b.to, sales, fee: sales - b.deposit, feeRate: round1(((sales - b.deposit) / sales) * 100), status: judge(sales, b.deposit, floor) };
     if (merged.status !== "일치") continue;
     settlements.splice(i, 2, merged);
   }
@@ -207,6 +210,7 @@ function settleManual(
   lastBankDate: string,
   adj: Map<string, SettlementAdjustment> = new Map(),
 ): ChannelSettlementSummary {
+  const floor = floorOf(channel);
   const bundles = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([payout, g]) => ({ payout, ...g, claimed: false }));
   const settlements: Settlement[] = [];
   const unmatchedDeposits: { date: string; amount: number }[] = [];
@@ -225,7 +229,7 @@ function settleManual(
     const a = adj.get(date);
     const amount = a ? raw - a.amount : raw;
     const fee = sales - amount;
-    const status: Settlement["status"] = sales === 0 ? "매출없음" : judge(sales, amount);
+    const status: Settlement["status"] = sales === 0 ? "매출없음" : judge(sales, amount, floor);
     settlements.push({ channel, from, to, sales, payout: date, deposit: amount, fee, feeRate: sales > 0 ? round1((fee / sales) * 100) : null, status, ...(a ? { extra: a.amount, note: a.note } : {}) });
   }
   for (const b of bundles) {
@@ -267,7 +271,7 @@ export const DEFAULT_RULES: SettlementRule[] = [
   { channel: "baemin", mode: "days", days: 3, weekday: 0 }, // 배민: 주문(구매확정)일 + 3영업일 (2022.2~)
   { channel: "coupang", mode: "days", days: 4, weekday: 0, manual: true }, // 쿠팡이츠: 매출 발생일 + 4영업일에 정산되지만 사장님이 직접 출금 신청해야 통장에 들어온다 (2026-09-19)
   { channel: "yogiyo", mode: "days", days: 5, weekday: 0 }, // 요기요: 결제일 + 5영업일 (2024.8~ 일 단위)
-  { channel: "etc", mode: "days", days: 1, weekday: 0 }, // 땡겨요: 당일~익영업일 (카드결제는 익영업일)
+  { channel: "etc", mode: "days", days: 3, weekday: 0 }, // 땡겨요: 카드결제 D+3 오전 10시 (즉시출금 요청 시 D+1, 계좌이체는 D~D+1). 사장님 사이트 이용안내, 실제 입금으로 확인 2026-09-19
 ];
 
 // 카드사별 기본 (매출일 + N영업일). 간편결제(카카오페이 등)는 정산기준일 + 1영업일
@@ -290,5 +294,5 @@ export const RULE_NOTES: Record<string, { source: "official" | "general" | "unkn
   baemin: { source: "official", text: "배민 안내: 주문일 + 3영업일 (주말·공휴일 제외)" },
   coupang: { source: "official", text: "쿠팡이츠 사장님 사이트 안내: 매출 발생일 + 4영업일. 직접 출금 신청해야 통장에 들어와서 늦거나 몰아서 들어올 수 있음" },
   yogiyo: { source: "official", text: "요기요 안내: 결제일 + 5영업일 (2024.8부터 일 단위)" },
-  etc: { source: "official", text: "땡겨요 안내: 당일~익영업일 입금 (카드결제는 익영업일)" },
+  etc: { source: "official", text: "땡겨요 이용안내: 카드결제 D+3 오전 10시 (즉시출금 요청 시 D+1). 계좌이체는 당일~D+1" },
 };
