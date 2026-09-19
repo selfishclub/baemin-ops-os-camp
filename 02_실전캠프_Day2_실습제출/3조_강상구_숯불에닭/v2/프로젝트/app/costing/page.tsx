@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { MoneyInput, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
+import PurchaseSection from "@/components/PurchaseSection";
 import { newId } from "@/lib/classify";
 import { buildCostRateReport, recipeUnitCost } from "@/lib/costing/costRate";
 import { parsePosAbcGrid, PosParseError } from "@/lib/costing/okpos";
@@ -26,7 +27,7 @@ export default function CostingPage() {
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
-  const [view, setView] = useState<"report" | "setup">("report");
+  const [view, setView] = useState<"report" | "purchases" | "setup">("report");
   const [help, setHelp] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -93,6 +94,9 @@ export default function CostingPage() {
           <div className="flex gap-1 text-[11px]">
             <button className={`rounded-lg px-2 py-1 ${view === "report" ? "bg-orange-100 text-orange-800" : "text-stone-500"}`} onClick={() => setView("report")}>
               결과
+            </button>
+            <button className={`rounded-lg px-2 py-1 ${view === "purchases" ? "bg-orange-100 text-orange-800" : "text-stone-500"}`} onClick={() => setView("purchases")}>
+              매입 영수증
             </button>
             <button className={`rounded-lg px-2 py-1 ${view === "setup" ? "bg-orange-100 text-orange-800" : "text-stone-500"}`} onClick={() => setView("setup")}>
               품목·레시피 설정
@@ -225,6 +229,7 @@ export default function CostingPage() {
         </>
       )}
 
+      {view === "purchases" && <PurchaseSection month={month} items={items} onItemsChange={load} />}
       {view === "setup" && <Setup items={items} menus={menus} recipes={recipes} onChange={load} />}
     </>
   );
