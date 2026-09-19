@@ -15,6 +15,16 @@ export interface SettlementRule {
 }
 
 export const SETTLEMENT_RULES_KEY = "settlement_rules";
+export const SETTLEMENT_ADJUSTMENTS_KEY = "settlement_adjustments";
+
+// 입금에 정산금이 아닌 돈이 섞였을 때(쿠팡이츠 상생 요금제 월 환급 등) 그만큼을 빼고 짝을 맞추기 위한 표시.
+// 환급은 수수료를 돌려받은 것이니 그 달 수수료 합계에서 뺀다.
+export interface SettlementAdjustment {
+  channel: ChannelId;
+  date: string; // 통장 입금일
+  amount: number; // 입금 중 정산금이 아닌 부분
+  note: string; // "상생 요금제 월 환급" 등
+}
 export const HOLIDAYS_KEY = "holidays"; // "2026-10-03" 같은 날짜 목록
 
 const dow = (date: string) => (new Date(date + "T00:00:00Z").getUTCDay() + 6) % 7; // 월=0
@@ -57,6 +67,13 @@ export interface Settlement {
   fee: number; // sales − deposit (입금이 있을 때만)
   feeRate: number | null; // %
   status: "일치" | "차이" | "미입금" | "예정" | "매출없음";
+  extra?: number; // 입금에 섞인 환급 등 (표시용). fee·status는 이걸 뺀 입금으로 계산
+  note?: string;
+}
+
+function judge(sales: number, deposit: number): Settlement["status"] {
+  // 입금이 매출의 70% 미만이거나 매출보다 많으면 "차이"(추가 공제·누락·다른 돈이 섞임), 그 안이면 수수료만 뗀 정상 입금으로 본다
+  return deposit < sales * 0.7 || deposit > sales * (1 + MISMATCH_TOLERANCE) ? "차이" : "일치";
 }
 
 export interface ChannelSettlementSummary {
@@ -94,8 +111,10 @@ export function settleChannel(
   txs: Transaction[],
   lastBankDate: string,
   holidays: string[] = [],
+  adjustments: SettlementAdjustment[] = [],
 ): ChannelSettlementSummary {
   const deposits = depositsByDate(txs, channel);
+  const adj = new Map(adjustments.filter((a) => a.channel === channel).map((a) => [a.date, a]));
   const daily = dailySales.filter((s) => s.channel === channel && s.date.startsWith(month));
 
   // 묶음 만들기
@@ -109,20 +128,21 @@ export function settleChannel(
     groups.set(payout, g);
   }
 
-  if (rule.manual) return settleManual(channel, month, groups, deposits, daily, lastBankDate);
+  if (rule.manual) return settleManual(channel, month, groups, deposits, daily, lastBankDate, adj);
 
   const used = new Set<string>();
   const settlements: Settlement[] = [...groups.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([payout, g]) => {
-      const deposit = deposits.get(payout) ?? 0;
-      if (deposit > 0) used.add(payout);
-      // 입금이 매출의 70% 미만이거나 매출보다 많으면 "차이"(추가 공제·누락·다른 돈이 섞임), 그 안이면 수수료만 뗀 정상 입금으로 본다
+      const raw = deposits.get(payout) ?? 0;
+      if (raw > 0) used.add(payout);
+      const a = adj.get(payout);
+      const deposit = a ? raw - a.amount : raw;
       let status: Settlement["status"];
       if (g.sales === 0) status = "매출없음";
-      else if (deposit > 0) status = deposit < g.sales * 0.7 || deposit > g.sales * (1 + MISMATCH_TOLERANCE) ? "차이" : "일치";
+      else if (raw > 0) status = judge(g.sales, deposit);
       else status = payout > lastBankDate ? "예정" : "미입금";
-      const fee = deposit > 0 ? g.sales - deposit : 0;
+      const fee = raw > 0 ? g.sales - deposit : 0;
       return {
         channel,
         from: g.from,
@@ -131,14 +151,28 @@ export function settleChannel(
         payout,
         deposit,
         fee,
-        feeRate: deposit > 0 && g.sales > 0 ? round1((fee / g.sales) * 100) : null,
+        feeRate: raw > 0 && g.sales > 0 ? round1((fee / g.sales) * 100) : null,
         status,
+        ...(a ? { extra: a.amount, note: a.note } : {}),
       };
     });
 
-  const deposited = settlements.filter((s) => s.deposit > 0);
+  // 하루 이틀 늦게 들어온 입금: "미입금" 묶음 바로 뒤(3영업일 안)의 묶음이 "입금이 매출보다 많은 차이"면, 두 묶음이 한 번에 들어온 것으로 보고 합친다
+  for (let i = 0; i < settlements.length; i++) {
+    const a = settlements[i];
+    if (a.status !== "미입금") continue;
+    const b = settlements[i + 1];
+    if (!b || b.status !== "차이" || b.deposit <= b.sales || b.payout > addBusinessDays(a.payout, 3, holidays)) continue;
+    const sales = a.sales + b.sales;
+    const merged: Settlement = { ...b, from: a.from, to: b.to, sales, fee: sales - b.deposit, feeRate: round1(((sales - b.deposit) / sales) * 100), status: judge(sales, b.deposit) };
+    if (merged.status !== "일치") continue;
+    settlements.splice(i, 2, merged);
+  }
+
+  const deposited = settlements.filter((s) => s.status === "일치" || s.status === "차이");
   const salesDeposited = deposited.reduce((a, s) => a + s.sales, 0);
-  const fee = deposited.reduce((a, s) => a + s.fee, 0);
+  const refunds = [...adj.values()].reduce((a, x) => a + x.amount, 0);
+  const fee = deposited.reduce((a, s) => a + s.fee, 0) - refunds; // 환급은 수수료를 돌려받은 것
 
   // 이 달 입금 중 어느 묶음에도 안 붙은 것 (지난달 주문분 정산은 제외: 지난달 묶음의 payout일에 해당)
   const monthStart = month + "-01";
@@ -150,7 +184,7 @@ export function settleChannel(
   return {
     channel,
     sales: daily.reduce((a, s) => a + s.amount, 0),
-    deposited: deposited.reduce((a, s) => a + s.deposit, 0),
+    deposited: deposited.reduce((a, s) => a + s.deposit, 0) + refunds,
     fee,
     feeRate: salesDeposited > 0 ? round1((fee / salesDeposited) * 100) : null,
     pending: settlements.filter((s) => s.status === "예정").reduce((a, s) => a + s.sales, 0),
@@ -171,38 +205,42 @@ function settleManual(
   deposits: Map<string, number>,
   daily: DailySale[],
   lastBankDate: string,
+  adj: Map<string, SettlementAdjustment> = new Map(),
 ): ChannelSettlementSummary {
   const bundles = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([payout, g]) => ({ payout, ...g, claimed: false }));
   const settlements: Settlement[] = [];
   const unmatchedDeposits: { date: string; amount: number }[] = [];
   const monthStart = month + "-01";
-  for (const [date, amount] of [...deposits.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    if (amount <= 0) continue;
+  for (const [date, raw] of [...deposits.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    if (raw <= 0) continue;
     const eligible = bundles.filter((b) => !b.claimed && b.payout <= date);
     if (eligible.length === 0) {
-      if (date >= monthStart && date <= lastBankDate) unmatchedDeposits.push({ date, amount });
+      if (date >= monthStart && date <= lastBankDate) unmatchedDeposits.push({ date, amount: raw });
       continue;
     }
     for (const b of eligible) b.claimed = true;
     const sales = eligible.reduce((a, b) => a + b.sales, 0);
     const from = eligible[0].from;
     const to = eligible[eligible.length - 1].to;
+    const a = adj.get(date);
+    const amount = a ? raw - a.amount : raw;
     const fee = sales - amount;
-    const status: Settlement["status"] = sales === 0 ? "매출없음" : amount < sales * 0.7 || amount > sales * (1 + MISMATCH_TOLERANCE) ? "차이" : "일치";
-    settlements.push({ channel, from, to, sales, payout: date, deposit: amount, fee, feeRate: sales > 0 ? round1((fee / sales) * 100) : null, status });
+    const status: Settlement["status"] = sales === 0 ? "매출없음" : judge(sales, amount);
+    settlements.push({ channel, from, to, sales, payout: date, deposit: amount, fee, feeRate: sales > 0 ? round1((fee / sales) * 100) : null, status, ...(a ? { extra: a.amount, note: a.note } : {}) });
   }
   for (const b of bundles) {
     if (b.claimed) continue;
     settlements.push({ channel, from: b.from, to: b.to, sales: b.sales, payout: b.payout, deposit: 0, fee: 0, feeRate: null, status: b.sales === 0 ? "매출없음" : b.payout > lastBankDate ? "예정" : "미입금" });
   }
   settlements.sort((a, b) => a.from.localeCompare(b.from));
-  const deposited = settlements.filter((s) => s.deposit > 0);
+  const deposited = settlements.filter((s) => s.status === "일치" || s.status === "차이");
   const salesDeposited = deposited.reduce((a, s) => a + s.sales, 0);
-  const fee = deposited.reduce((a, s) => a + s.fee, 0);
+  const refunds = [...adj.values()].reduce((a, x) => a + x.amount, 0);
+  const fee = deposited.reduce((a, s) => a + s.fee, 0) - refunds;
   return {
     channel,
     sales: daily.reduce((a, s) => a + s.amount, 0),
-    deposited: deposited.reduce((a, s) => a + s.deposit, 0),
+    deposited: deposited.reduce((a, s) => a + s.deposit, 0) + refunds,
     fee,
     feeRate: salesDeposited > 0 ? round1((fee / salesDeposited) * 100) : null,
     pending: settlements.filter((s) => s.status === "예정").reduce((a, s) => a + s.sales, 0),

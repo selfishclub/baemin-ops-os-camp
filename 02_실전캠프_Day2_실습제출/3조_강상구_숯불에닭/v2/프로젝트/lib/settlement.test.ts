@@ -86,10 +86,36 @@ describe("직접 출금 신청하는 앱 (쿠팡이츠)", () => {
     expect(r.missing).toBe(79_000);
     expect(r.pending).toBe(20_000);
   });
-  it("같은 자료를 일반 규칙으로 보면 차이·미입금으로 보인다", () => {
+  it("일반 규칙이라도 하루 늦게 두 날치가 같이 들어오면 앞 묶음과 합친다", () => {
     const txs = [tx("2026-09-15", "coupang", 89_662)];
     const r = settleChannel("coupang", "2026-09", { ...rule, manual: false }, daily, txs, "2026-09-19");
-    expect(r.settlements.find((s) => s.from === "2026-09-08")!.status).toBe("미입금");
-    expect(r.settlements.find((s) => s.from === "2026-09-09")!.status).toBe("차이");
+    const merged = r.settlements.find((s) => s.from === "2026-09-08")!;
+    expect(merged).toMatchObject({ to: "2026-09-09", sales: 124_500, status: "일치" });
+  });
+});
+
+describe("환급 포함 표시 · 늦은 입금 합치기", () => {
+  it("입금에 섞인 환급을 표시하면 일치가 되고 그 달 수수료에서 빠진다", () => {
+    const rule: SettlementRule = { channel: "coupang", mode: "days", days: 4, weekday: 0, manual: true };
+    const daily: DailySale[] = [{ date: "2026-09-01", channel: "coupang", amount: 31_000 }]; // 화 → 9/7
+    const txs = [tx("2026-09-07", "coupang", 55_710)]; // 정산 24,017 + 월 환급 31,693
+    const before = settleChannel("coupang", "2026-09", rule, daily, txs, "2026-09-19");
+    expect(before.settlements[0].status).toBe("차이");
+    const after = settleChannel("coupang", "2026-09", rule, daily, txs, "2026-09-19", [], [{ channel: "coupang", date: "2026-09-07", amount: 31_693, note: "상생 요금제 월 환급" }]);
+    expect(after.settlements[0]).toMatchObject({ status: "일치", deposit: 24_017, fee: 6_983, extra: 31_693 });
+    expect(after.fee).toBe(6_983 - 31_693); // 환급만큼 수수료가 준다
+    expect(after.deposited).toBe(55_710);
+  });
+  it("카드 입금이 하루 늦게 앞날 것과 같이 들어오면 두 묶음을 합친다", () => {
+    const rule: SettlementRule = { channel: "card_hyundai", mode: "days", days: 2, weekday: 0 };
+    const daily: DailySale[] = [
+      { date: "2026-09-02", channel: "card_hyundai", amount: 219_000 }, // 수 → 9/4(금) 예정인데 안 옴
+      { date: "2026-09-03", channel: "card_hyundai", amount: 55_000 }, // 목 → 9/7(월)
+    ];
+    const txs = [tx("2026-09-07", "card_hyundai", 271_260)]; // 두 날치 99%
+    const r = settleChannel("card_hyundai", "2026-09", rule, daily, txs, "2026-09-19");
+    expect(r.settlements).toHaveLength(1);
+    expect(r.settlements[0]).toMatchObject({ from: "2026-09-02", to: "2026-09-03", sales: 274_000, deposit: 271_260, status: "일치", feeRate: 1 });
+    expect(r.missing).toBe(0);
   });
 });
