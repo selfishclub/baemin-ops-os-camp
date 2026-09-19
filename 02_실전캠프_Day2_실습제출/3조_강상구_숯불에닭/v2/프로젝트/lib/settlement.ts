@@ -275,7 +275,7 @@ export const DEFAULT_RULES: SettlementRule[] = [
 ];
 
 // 카드사별 기본 (매출일 + N영업일). 간편결제(카카오페이 등)는 정산기준일 + 1영업일
-export const CARD_RULE_DAYS: Record<string, number> = { card_easy: 1 };
+export const CARD_RULE_DAYS: Record<string, number> = { card_easy: 1, card_zeropay: 1 };
 export const DEFAULT_CARD_DAYS = 2;
 
 // 규칙의 근거 — 화면에 "공식 안내 기준 / 확인 필요"로 보여 준다
@@ -291,6 +291,7 @@ export const RULE_NOTES: Record<string, { source: "official" | "general" | "unkn
   card_nh: { source: "general", text: "카드사 일반 관행 D+2영업일" },
   card_woori: { source: "general", text: "카드사 일반 관행 D+2영업일" },
   card_easy: { source: "official", text: "카카오페이 안내: 정산기준일 + 1영업일 (네이버페이 등은 다를 수 있음)" },
+  card_zeropay: { source: "general", text: "제로페이는 보통 결제 다음 영업일 정산. 통장 입금으로 확인해서 고쳐 주세요" },
   baemin: { source: "official", text: "배민 안내: 주문일 + 3영업일 (주말·공휴일 제외)" },
   coupang: { source: "official", text: "쿠팡이츠 사장님 사이트 안내: 매출 발생일 + 4영업일. 직접 출금 신청해야 통장에 들어와서 늦거나 몰아서 들어올 수 있음" },
   yogiyo: { source: "official", text: "요기요 안내: 결제일 + 5영업일 (2024.8부터 일 단위)" },

@@ -154,7 +154,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
                 <li key={r.itemId} className="flex justify-between py-0.5">
                   <span>{itemName(r.itemId)}</span>
                   <span>
-                    {num(r.qty)}
+                    {fmtQty(r.qty)}
                     {unitLabel(itemUnit(r.itemId))} · {won(r.net)} · {num(Math.round(r.net / r.qty))}원/{unitLabel(itemUnit(r.itemId))}
                   </span>
                 </li>
@@ -282,6 +282,9 @@ function PurchaseEditor({ purchase, items, onChange, onSave, onCancel }: { purch
     </div>
   );
 }
+
+// 10.4kg·0.2kg처럼 소수점이 있으면 한 자리까지
+const fmtQty = (q: number) => (Number.isInteger(q) ? num(q) : q.toFixed(1));
 
 function itemUnitOf(items: Item[], id: string) {
   return items.find((i) => i.id === id)?.baseUnit ?? "ea";
