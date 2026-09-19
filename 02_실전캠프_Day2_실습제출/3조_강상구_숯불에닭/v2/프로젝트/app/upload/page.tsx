@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { CategorySelect, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
@@ -25,6 +25,8 @@ export default function UploadPage() {
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "warn"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
 
   async function handleFile(file: File | Blob, name: string) {
     setBusy(true);
@@ -138,29 +140,50 @@ export default function UploadPage() {
             전체 거래 보기 ({ledger.txs.length}줄)<span>{showAll ? "▲" : "▼"}</span>
           </button>
           {showAll && (
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[32rem] text-xs">
-                <thead className="text-left text-stone-500">
-                  <tr>
-                    <th className="py-1">날짜</th>
-                    <th>거래처</th>
-                    <th>분류</th>
-                    <th className="text-right">출금</th>
-                    <th className="text-right">입금</th>
-                  </tr>
-                </thead>
-                <tbody className="num divide-y divide-stone-100">
-                  {ledger.txs.map((t) => (
-                    <tr key={t.id}>
-                      <td className="py-1">{t.date.slice(5)}</td>
-                      <td>{t.payee}</td>
-                      <td className={t.major ? "" : "text-orange-600"}>{t.major ? `${t.major} › ${t.minor}` : "미분류"}</td>
-                      <td className="text-right">{t.out ? num(t.out) : ""}</td>
-                      <td className="text-right">{t.in ? num(t.in) : ""}</td>
+            <div className="mt-3 space-y-2">
+              <p className="text-[11px] text-stone-500">이미 확인한 줄을 바꾸려면 그 줄의 “고치기”를 누르세요. 규칙까지 바꿀지는 거기서 고를 수 있어요.</p>
+              <input aria-label="거래 찾기" className="field" placeholder="거래처·분류로 찾기 (예: 마트, 임대료)" value={filter} onChange={(e) => setFilter(e.target.value)} />
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[32rem] text-xs">
+                  <thead className="text-left text-stone-500">
+                    <tr>
+                      <th className="py-1">날짜</th>
+                      <th>거래처</th>
+                      <th>분류</th>
+                      <th className="text-right">출금</th>
+                      <th className="text-right">입금</th>
+                      <th />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="num divide-y divide-stone-100">
+                    {ledger.txs
+                      .filter((t) => !filter.trim() || `${t.payee} ${t.major ?? ""} ${t.minor ?? ""}`.replace(/\s/g, "").includes(filter.replace(/\s/g, "")))
+                      .map((t) => (
+                        <Fragment key={t.id}>
+                          <tr className={editingId === t.id ? "bg-orange-50" : ""}>
+                            <td className="py-1">{t.date.slice(5)}</td>
+                            <td>{t.payee}</td>
+                            <td className={t.major ? "" : "text-orange-600"}>{t.major ? `${t.major} › ${t.minor}` : "미분류"}</td>
+                            <td className="text-right">{t.out ? num(t.out) : ""}</td>
+                            <td className="text-right">{t.in ? num(t.in) : ""}</td>
+                            <td className="text-right">
+                              <button className="text-[11px] font-semibold text-orange-700 underline" onClick={() => setEditingId(editingId === t.id ? null : t.id)}>
+                                {editingId === t.id ? "닫기" : "고치기"}
+                              </button>
+                            </td>
+                          </tr>
+                          {editingId === t.id && (
+                            <tr>
+                              <td colSpan={6} className="py-2">
+                                <ReviewCard tx={t} ledger={ledger} editing onDone={() => setEditingId(null)} />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </section>
@@ -169,14 +192,15 @@ export default function UploadPage() {
   );
 }
 
-function ReviewCard({ tx, ledger }: { tx: Transaction; ledger: ReturnType<typeof useLedger> }) {
+function ReviewCard({ tx, ledger, editing = false, onDone }: { tx: Transaction; ledger: ReturnType<typeof useLedger>; editing?: boolean; onDone?: () => void }) {
   const isIncome = tx.in > 0;
   const [major, setMajor] = useState<Major | "">(tx.major ?? (isIncome ? "수입" : ""));
   const [minor, setMinor] = useState(tx.minor ?? (isIncome ? "매출액" : ""));
   const [channel, setChannel] = useState<ChannelId | "">(tx.channel ?? "");
-  const hasRule = !!findRule(tx, ledger.rules);
-  // 처음 보는 거래처는 기억하는 게 기본. 애매한 곳(마트)·큰 금액은 이번 줄만.
-  const [remember, setRemember] = useState(!hasRule);
+  const rule = findRule(tx, ledger.rules);
+  const hasRule = !!rule;
+  // 처음 보는 거래처는 기억하는 게 기본. 애매한 곳(마트)·큰 금액은 이번 줄만. 고치기 모드에서는 "규칙도 바꾸기"가 기본 꺼짐.
+  const [remember, setRemember] = useState(!hasRule && !editing);
   const [saving, setSaving] = useState(false);
 
   async function confirm() {
@@ -194,10 +218,20 @@ function ReviewCard({ tx, ledger }: { tx: Transaction; ledger: ReturnType<typeof
           updated.push({ ...other, major, minor, channel: ch, review: null });
         }
       }
+    } else if (remember && rule) {
+      // 고치기: 규칙도 바꾸고, 그 규칙으로 분류됐던 이 달의 다른 줄도 같이 바꾼다
+      await store.saveRule({ ...rule, major, minor, channel: ch });
+      for (const other of ledger.txs) {
+        if (other.id !== tx.id && other.in > 0 === isIncome && other.major === rule.major && other.minor === rule.minor && findRule(other, ledger.rules)?.id === rule.id) {
+          updated.push({ ...other, major, minor, channel: ch, review: null });
+        }
+      }
     }
     await store.saveTransactions(updated);
     await ledger.recordEdit(`${tx.payee} ${won(tx.out || tx.in)} → ${major} › ${minor}`);
     await ledger.reload();
+    setSaving(false);
+    onDone?.();
   }
 
   return (
@@ -243,7 +277,12 @@ function ReviewCard({ tx, ledger }: { tx: Transaction; ledger: ReturnType<typeof
       )}
 
       <div className="flex items-center justify-between gap-3">
-        {hasRule ? (
+        {hasRule && editing ? (
+          <label className="flex items-center gap-2 text-xs text-stone-700">
+            <input type="checkbox" className="h-4 w-4 accent-orange-600" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+            “{rule.keyword}” 규칙도 이렇게 바꾸기 (같은 규칙으로 분류된 이 달 줄도 함께)
+          </label>
+        ) : hasRule ? (
           <span className="text-xs text-stone-500">규칙은 그대로 두고 이번 줄만 확인해요</span>
         ) : (
           <label className="flex items-center gap-2 text-xs text-stone-700">
@@ -252,7 +291,7 @@ function ReviewCard({ tx, ledger }: { tx: Transaction; ledger: ReturnType<typeof
           </label>
         )}
         <button className="btn-primary" disabled={!major || saving} onClick={confirm}>
-          확인
+          {editing ? "이렇게 바꾸기" : "확인"}
         </button>
       </div>
     </article>
