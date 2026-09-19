@@ -118,6 +118,8 @@ export type Recipe = {
   featured?: boolean;
   customerGuide: string;
   drinkingTip: string;
+  // 자주 틀리는 포인트: 실제로 발견한 실수를 적어 두면 모든 직원이 본다
+  commonMistakes?: string[];
   standardIds?: string[];
   guideIds?: string[];
   sourceRef?: string;
@@ -213,6 +215,7 @@ const demoRecipes: Recipe[] = demoMenus.map(([id, name, category, accent], index
   featured: index < 3,
   customerGuide: "실제 판매 메뉴가 아닌 화면 확인용 테스트 항목입니다.",
   drinkingTip: "관리자 화면에서 실제 안내 문구로 교체해 주세요.",
+  commonMistakes: ["(예시) 토핑을 액체보다 먼저 넣으면 안 돼요", "(예시) 계량 없이 눈대중으로 붓지 않기"],
   sourceRef: "테스트 데이터",
   reviewNotes: ["배포 전 실제 메뉴 정보로 교체"],
   images: [],

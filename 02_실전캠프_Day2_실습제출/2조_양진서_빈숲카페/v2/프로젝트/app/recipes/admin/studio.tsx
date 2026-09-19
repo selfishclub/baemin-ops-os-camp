@@ -418,6 +418,7 @@ export default function AdminStudio({ userName }: { userName: string }) {
             </div>
             <Field label="메뉴 설명"><textarea rows={2} value={selected.description} onChange={(e) => updateRecipe({ ...selected, description: e.target.value })} /></Field>
             <Field label="손님 안내"><textarea rows={2} value={selected.customerGuide} onChange={(e) => updateRecipe({ ...selected, customerGuide: e.target.value })} /></Field>
+            <Field label="자주 틀리는 포인트 · 한 줄에 하나 (직원 상세 화면 위쪽에 눈에 띄게 보임)"><textarea rows={3} value={(selected.commonMistakes ?? []).join("\n")} onChange={(e) => updateRecipe({ ...selected, commonMistakes: e.target.value.split("\n").map((line) => line.trim()).filter(Boolean) })} /></Field>
             <Field label="추천 음용법"><textarea rows={2} value={selected.drinkingTip} onChange={(e) => updateRecipe({ ...selected, drinkingTip: e.target.value })} /></Field>
             <div className={styles.fieldGrid}>
               <Field label="원본 위치"><input value={selected.sourceRef ?? ""} onChange={(e) => updateRecipe({ ...selected, sourceRef: e.target.value })} /></Field>

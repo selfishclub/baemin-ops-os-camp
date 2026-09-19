@@ -1301,3 +1301,45 @@
 @media (prefers-reduced-motion: reduce) {
   .recipeCard { transition: none; }
 }
+
+/* 워터마크 층: 사진·영상 위에 반투명으로 깔린다. 클릭은 통과 */
+.watermark {
+  position: absolute;
+  inset: -20%;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-content: space-around;
+  justify-items: center;
+  gap: 28px 12px;
+  transform: rotate(-24deg);
+  pointer-events: none;
+  user-select: none;
+}
+.watermark span {
+  color: rgba(255, 255, 255, .42);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  text-shadow: 0 0 2px rgba(0, 0, 0, .55);
+}
+.videoStage { position: relative; }
+.galleryHero img, .galleryThumbs img, .cardImage { -webkit-user-drag: none; user-select: none; -webkit-touch-callout: none; }
+
+/* 자주 틀리는 포인트 */
+.mistakes {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid #e6b3a8;
+  border-radius: 13px;
+  background: #fff1ed;
+}
+.mistakes > div { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+.mistakes > div > span { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 50%; background: #c2402c; color: white; font-size: 13px; font-weight: 900; }
+.mistakes h3 { margin: 0; font-size: 15px; color: #8f2b1c; }
+.mistakes ul { display: grid; gap: 6px; margin: 0; padding-left: 20px; color: #5d261c; font-size: 13px; line-height: 1.6; }
+.mistakes li:has(input) { display: flex; gap: 6px; list-style: none; margin-left: -20px; }
+.mistakes input { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid #e6b3a8; border-radius: 8px; font-size: 13px; background: white; }
+.mistakes li button { width: 30px; border: 1px solid #e6b3a8; border-radius: 8px; background: white; color: #8f2b1c; cursor: pointer; }
+.mistakes > .inlineAddButton { width: 100%; margin-top: 10px; }

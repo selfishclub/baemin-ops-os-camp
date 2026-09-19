@@ -144,6 +144,8 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
   const [notices, setNotices] = useState<ChangeNoticeItem[]>([]);
   const [noticeBusy, setNoticeBusy] = useState<number | null>(null);
   const pendingNotices = notices.filter((notice) => !notice.acked);
+  // 사진·영상 위에 얹는 워터마크 문구: 누가 언제 봤는지 남는다 (스크린샷 유출 억제)
+  const watermarkLabel = useMemo(() => `빈숲카페 · ${viewer?.displayName ?? "시연"} · ${new Date().toISOString().slice(0, 10)}`, [viewer?.displayName]);
 
   // 바뀐 레시피 알림 (로그인한 직원만)
   const loadNotices = async () => {
@@ -757,13 +759,31 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
               </div>}
             </section>}
 
+            {((selectedRecipe.commonMistakes?.length ?? 0) > 0 || inlineAdmin) && (
+              <section className={styles.mistakes} aria-labelledby="mistakes-title">
+                <div><span aria-hidden="true">✕</span><h3 id="mistakes-title">자주 틀리는 포인트</h3></div>
+                <ul>
+                  {(selectedRecipe.commonMistakes ?? []).map((item, index) => (
+                    <li key={`${item}-${index}`}>
+                      {inlineAdmin ? <>
+                        <input aria-label={`자주 틀리는 포인트 ${index + 1}`} value={item} onChange={(event) => updateInlineRecipe((recipe) => ({ ...recipe, commonMistakes: (recipe.commonMistakes ?? []).map((value, itemIndex) => itemIndex === index ? event.target.value : value) }))} />
+                        <button type="button" aria-label={`자주 틀리는 포인트 ${index + 1} 삭제`} onClick={() => updateInlineRecipe((recipe) => ({ ...recipe, commonMistakes: (recipe.commonMistakes ?? []).filter((_, itemIndex) => itemIndex !== index) }))}>×</button>
+                      </> : item}
+                    </li>
+                  ))}
+                </ul>
+                {inlineAdmin && <button className={styles.inlineAddButton} type="button" onClick={() => updateInlineRecipe((recipe) => ({ ...recipe, commonMistakes: [...(recipe.commonMistakes ?? []), "이렇게 하면 안 돼요"] }))}>+ 틀리는 포인트 추가</button>}
+              </section>
+            )}
+
             <section className={styles.recipeMedia} aria-label={`${selectedRecipe.name} 사진과 영상`}>
               <div className={styles.galleryPanel}>
                 <div className={styles.mediaHeading}><div><p>REAL DRINK</p><h3>실제 음료 갤러리</h3></div><span>{selectedRecipe.images?.length ?? 0}장</span></div>
                 {activeImage ? (
                   <>
                     <figure className={styles.galleryHero}>
-                      <img src={activeImage.url} alt={activeImage.alt || selectedRecipe.name} />
+                      <img src={activeImage.url} alt={activeImage.alt || selectedRecipe.name} draggable={false} onContextMenu={(event) => event.preventDefault()} />
+                      <Watermark label={watermarkLabel} />
                       {activeImage.caption && <figcaption>{activeImage.caption}</figcaption>}
                     </figure>
                     {(selectedRecipe.images?.length ?? 0) > 1 && (
@@ -782,7 +802,7 @@ export default function RecipeCenter({ viewer, demo }: { viewer: RecipeViewer | 
               </div>
               <div className={styles.videoPanel}>
                 <div className={styles.mediaHeading}><div><p>WATCH & MAKE</p><h3>영상 레시피</h3></div><span>외부 영상</span></div>
-                {selectedRecipe.videos?.length ? selectedRecipe.videos.map((video) => <VideoRecipeCard key={video.id} video={video} />) : <div className={styles.mediaEmpty}><span aria-hidden="true">▶</span><strong>영상 레시피 준비 중</strong><p>유튜브나 네이버 영상 주소를 등록하면 바로 재생됩니다.</p></div>}
+                {selectedRecipe.videos?.length ? selectedRecipe.videos.map((video) => <VideoRecipeCard key={video.id} video={video} watermark={watermarkLabel} />) : <div className={styles.mediaEmpty}><span aria-hidden="true">▶</span><strong>영상 레시피 준비 중</strong><p>유튜브나 네이버 영상 주소를 등록하면 바로 재생됩니다.</p></div>}
               </div>
             </section>
 
@@ -1007,6 +1027,7 @@ function buildVideoPrompt(recipe: Recipe, mode: RecipeMode, variant: RecipeVaria
     measures.length ? `정량: ${measures.join(", ")}` : null,
     steps.length ? ["제조 순서:", ...steps.map((step, index) => `${index + 1}. ${step}`)].join("\n") : null,
     cautions.length ? `주의사항: ${cautions.join(" / ")}` : null,
+    recipe.commonMistakes?.length ? `자주 틀리는 포인트(영상에서 '이렇게 하면 안 됨'으로 짧게 보여 주기): ${recipe.commonMistakes.join(" / ")}` : null,
     "화면 구성: 세로 9:16, 60초 이내. 각 단계마다 정량을 자막으로 크게 보여 주고, 바리스타의 손과 컵을 클로즈업합니다. 마지막에 완성된 컵을 3초간 보여 줍니다.",
     "말투: 신입 직원에게 설명하듯 짧고 친절하게. 레시피에 없는 재료나 순서는 추가하지 않습니다.",
   ].filter(Boolean).join("\n");
@@ -1054,7 +1075,16 @@ function VideoPromptPanel({ recipe, mode, variant }: { recipe: Recipe; mode: Rec
   );
 }
 
-function VideoRecipeCard({ video }: { video: RecipeVideo }) {
+// 사진·영상 위에 반투명으로 깔리는 워터마크 층. 클릭은 통과시킨다.
+function Watermark({ label }: { label: string }) {
+  return (
+    <div className={styles.watermark} aria-hidden="true">
+      {Array.from({ length: 12 }, (_, index) => <span key={index}>{label}</span>)}
+    </div>
+  );
+}
+
+function VideoRecipeCard({ video, watermark }: { video: RecipeVideo; watermark: string }) {
   const embedUrl = videoEmbedUrl(video.url);
   const directUrl = directVideoUrl(video.url);
   const externalUrl = safeExternalUrl(video.url);
@@ -1066,9 +1096,10 @@ function VideoRecipeCard({ video }: { video: RecipeVideo }) {
   return (
     <article className={styles.videoCard} data-orientation={orientation}>
       <div className={styles.videoStage}>
-        {embedUrl ? <iframe src={embedUrl} title={video.title} loading="lazy" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" /> : directUrl ? <video src={directUrl} controls playsInline preload="metadata" onLoadedMetadata={(event) => setDetectedPortrait(event.currentTarget.videoHeight > event.currentTarget.videoWidth)}>이 브라우저에서는 영상을 재생할 수 없습니다.</video> : <div className={styles.videoFallback}>이 플랫폼은 새 창에서 재생됩니다.</div>}
+        <Watermark label={watermark} />
+        {embedUrl ? <iframe src={embedUrl} title={video.title} loading="lazy" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" /> : directUrl ? <video src={directUrl} controls controlsList="nodownload noremoteplayback" disablePictureInPicture onContextMenu={(event) => event.preventDefault()} playsInline preload="metadata" onLoadedMetadata={(event) => setDetectedPortrait(event.currentTarget.videoHeight > event.currentTarget.videoWidth)}>이 브라우저에서는 영상을 재생할 수 없습니다.</video> : <div className={styles.videoFallback}>이 플랫폼은 새 창에서 재생됩니다.</div>}
       </div>
-      <div className={styles.videoMeta}><strong>{video.title}</strong>{video.description && <p>{video.description}</p>}{externalUrl && <a href={externalUrl.toString()} target="_blank" rel="noreferrer">외부에서 보기 ↗</a>}</div>
+      <div className={styles.videoMeta}><strong>{video.title}</strong>{video.description && <p>{video.description}</p>}{externalUrl && !directUrl && <a href={externalUrl.toString()} target="_blank" rel="noreferrer">외부에서 보기 ↗</a>}</div>
     </article>
   );
 }
