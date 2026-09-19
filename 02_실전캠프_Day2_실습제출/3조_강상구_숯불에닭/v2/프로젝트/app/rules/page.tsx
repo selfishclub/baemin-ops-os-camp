@@ -95,6 +95,12 @@ export default function RulesPage() {
                     <input type="checkbox" className="h-4 w-4 accent-orange-600" checked={!!editing.ambiguous} onChange={(e) => setEditing({ ...editing, ambiguous: e.target.checked })} />
                     매번 확인하기 (마트처럼 재료비/생활비가 섞이는 곳)
                   </label>
+                  {editing.direction === "out" && (
+                    <label className="flex items-center gap-2 text-xs text-stone-700">
+                      <input type="checkbox" className="h-4 w-4 accent-orange-600" checked={!!editing.prev_month} onChange={(e) => setEditing({ ...editing, prev_month: e.target.checked })} />
+                      지난달 비용으로 (급여·거래처 대금처럼 다음 달 10일에 내는 돈)
+                    </label>
+                  )}
                   <div className="flex gap-2">
                     <button className="btn-ghost flex-1" onClick={() => setEditing(null)}>
                       취소
@@ -113,6 +119,7 @@ export default function RulesPage() {
                         {r.direction === "in" ? "입금" : "출금"}
                       </span>
                       {r.ambiguous && <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">매번 확인</span>}
+                      {r.prev_month && <span className="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-900">지난달 비용</span>}
                     </p>
                     <p className="text-xs text-stone-500">
                       {r.major} › {r.minor}

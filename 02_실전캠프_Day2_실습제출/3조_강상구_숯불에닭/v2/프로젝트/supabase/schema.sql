@@ -126,3 +126,6 @@ create policy "demo anon all" on daily_weather for all to anon using (true) with
 -- v2: 출퇴근 시각 (근무시간 자동 계산용)
 alter table shifts add column if not exists start_time text;
 alter table shifts add column if not exists end_time text;
+
+-- 지난달 비용 표시 (급여·거래처 대금)
+alter table rules add column if not exists prev_month boolean not null default false;

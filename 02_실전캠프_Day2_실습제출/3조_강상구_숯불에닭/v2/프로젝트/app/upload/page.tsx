@@ -9,7 +9,7 @@ import { BankParseError, parseBankSheet } from "@/lib/bank/parse";
 import { DEFAULT_CHANNELS, type ChannelId, type Major } from "@/lib/categories";
 import { classifyRows, findRule, newId, ruleFromChoice, usualAmounts } from "@/lib/classify";
 import { num, won } from "@/lib/format";
-import { findOverlap, monthLabel } from "@/lib/month";
+import { findOverlap, monthLabel, prevMonth } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 import type { Transaction } from "@/lib/types";
 
@@ -201,6 +201,8 @@ function ReviewCard({ tx, ledger, editing = false, onDone }: { tx: Transaction; 
   const hasRule = !!rule;
   // 처음 보는 거래처는 기억하는 게 기본. 애매한 곳(마트)·큰 금액은 이번 줄만. 고치기 모드에서는 "규칙도 바꾸기"가 기본 꺼짐.
   const [remember, setRemember] = useState(!hasRule && !editing);
+  // 급여·거래처 대금처럼 다음 달 10일에 내는 돈 → 지난달 비용. 이미 옮겨진 줄이면 체크된 채로 시작.
+  const [lastMonth, setLastMonth] = useState(tx.month !== tx.date.slice(0, 7));
   const [saving, setSaving] = useState(false);
 
   async function confirm() {
@@ -208,27 +210,28 @@ function ReviewCard({ tx, ledger, editing = false, onDone }: { tx: Transaction; 
     setSaving(true);
     const store = getStore();
     const ch = isIncome && channel ? channel : null;
-    const updated: Transaction[] = [{ ...tx, major, minor, channel: ch, review: null }];
+    const monthOf = (t: Transaction) => (lastMonth ? prevMonth(t.date.slice(0, 7)) : t.date.slice(0, 7));
+    const updated: Transaction[] = [{ ...tx, month: monthOf(tx), major, minor, channel: ch, review: null }];
 
     if (remember && !hasRule) {
-      await store.saveRule(ruleFromChoice(tx, major, minor, ch));
+      await store.saveRule(ruleFromChoice(tx, major, minor, ch, false, lastMonth));
       // 같은 거래처의 다른 "처음 보는" 줄도 함께 정리한다
       for (const other of ledger.txs) {
         if (other.id !== tx.id && other.review === "처음 보는 거래처" && other.payee === tx.payee && other.in > 0 === isIncome) {
-          updated.push({ ...other, major, minor, channel: ch, review: null });
+          updated.push({ ...other, month: monthOf(other), major, minor, channel: ch, review: null });
         }
       }
     } else if (remember && rule) {
       // 고치기: 규칙도 바꾸고, 그 규칙으로 분류됐던 이 달의 다른 줄도 같이 바꾼다
-      await store.saveRule({ ...rule, major, minor, channel: ch });
+      await store.saveRule({ ...rule, major, minor, channel: ch, prev_month: lastMonth });
       for (const other of ledger.txs) {
         if (other.id !== tx.id && other.in > 0 === isIncome && other.major === rule.major && other.minor === rule.minor && findRule(other, ledger.rules)?.id === rule.id) {
-          updated.push({ ...other, major, minor, channel: ch, review: null });
+          updated.push({ ...other, month: monthOf(other), major, minor, channel: ch, review: null });
         }
       }
     }
     await store.saveTransactions(updated);
-    await ledger.recordEdit(`${tx.payee} ${won(tx.out || tx.in)} → ${major} › ${minor}`);
+    await ledger.recordEdit(`${tx.payee} ${won(tx.out || tx.in)} → ${major} › ${minor}${lastMonth ? " (지난달 비용)" : ""}`);
     await ledger.reload();
     setSaving(false);
     onDone?.();
@@ -277,6 +280,14 @@ function ReviewCard({ tx, ledger, editing = false, onDone }: { tx: Transaction; 
         </select>
       )}
 
+      {!isIncome && (
+        <label className="flex items-center gap-2 text-xs text-stone-700">
+          <input type="checkbox" className="h-4 w-4 accent-orange-600" checked={lastMonth} onChange={(e) => setLastMonth(e.target.checked)} />
+          <span>
+            <b>지난달 비용으로</b> — 급여·거래처 대금처럼 다음 달 10일에 내는 돈. {monthLabel(prevMonth(tx.date.slice(0, 7)))} 손익으로 옮겨요{remember ? ", 규칙에도 남겨요" : ""}
+          </span>
+        </label>
+      )}
       <div className="flex items-center justify-between gap-3">
         {hasRule && editing ? (
           <label className="flex items-center gap-2 text-xs text-stone-700">

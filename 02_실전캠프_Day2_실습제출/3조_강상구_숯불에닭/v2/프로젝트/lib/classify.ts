@@ -1,3 +1,4 @@
+import { prevMonth } from "./month";
 import type { ChannelId, Major } from "./categories";
 import type { BankRow, Rule, Transaction } from "./types";
 
@@ -48,7 +49,7 @@ export function classifyRows(
     else if (row.out >= LARGE_AMOUNT) review = "금액이 큼";
     else if (usualAmount && amount >= usualAmount * UNUSUAL_TIMES) review = "금액이 큼";
 
-    return { ...base, major: rule.major, minor: rule.minor, channel: rule.channel, review };
+    return { ...base, month: rule.prev_month ? prevMonth(base.month) : base.month, major: rule.major, minor: rule.minor, channel: rule.channel, review };
   });
 }
 
@@ -59,6 +60,7 @@ export function ruleFromChoice(
   minor: string,
   channel: ChannelId | null = null,
   ambiguous = false,
+  prev_month = false,
 ): Rule {
   return {
     id: newId(),
@@ -68,6 +70,7 @@ export function ruleFromChoice(
     minor,
     channel,
     ambiguous,
+    prev_month,
   };
 }
 

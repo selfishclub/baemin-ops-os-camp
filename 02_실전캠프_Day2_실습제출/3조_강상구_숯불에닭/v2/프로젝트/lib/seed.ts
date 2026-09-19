@@ -51,6 +51,7 @@ export function seedRules(): Rule[] {
     minor,
     channel,
     ambiguous,
+    prev_month: keyword === "급여", // 급여는 다음 달 10일에 나가니 지난달 비용
   }));
 }
 

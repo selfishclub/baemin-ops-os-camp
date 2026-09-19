@@ -235,3 +235,17 @@ describe("제외 — 내 계좌 이체", () => {
     expect(pnl.lines.some((l) => l.label === "제외")).toBe(false);
   });
 });
+
+describe("지난달 비용 규칙", () => {
+  it("prev_month 규칙에 걸린 출금은 귀속 달이 한 달 앞", () => {
+    const rule = { id: "r", keyword: "가짜급여", direction: "out" as const, major: "노무관리비" as const, minor: "노무관리비급여", channel: null, ambiguous: false, prev_month: true };
+    const [t] = classifyRows([{ date: "2026-09-10", payee: "가짜급여", out: 1_000_000, in: 0 }], [rule]);
+    expect(t.month).toBe("2026-08");
+    expect(t.date).toBe("2026-09-10");
+    const [u] = classifyRows([{ date: "2026-09-10", payee: "가짜급여", out: 1_000_000, in: 0 }], [{ ...rule, prev_month: false }]);
+    expect(u.month).toBe("2026-09");
+  });
+  it("기본 규칙의 급여는 지난달 비용", () => {
+    expect(seedRules().find((r) => r.keyword === "급여")?.prev_month).toBe(true);
+  });
+});
