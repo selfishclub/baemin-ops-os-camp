@@ -7,7 +7,9 @@ import { getTrainingPath, manualCheckPrefix } from "../manual/training-path";
 // 미리보기용 "사람" 데이터: 가짜 직원, 메뉴 체크리스트, 퀴즈 점수, 바뀐 레시피 알림과 확인 기록.
 // 전부 이 브라우저(localStorage)에만 있고 서버·데이터 창고로 가는 길은 없다. 실제 직원 이름은 쓰지 않는다.
 
-const storageKey = "beansoop-preview-people-v1";
+// 예시 기록의 모양이 바뀌면 숫자를 올린다 — 예전 버전을 눌러 본 브라우저에 남은 옛 예시가 새 화면을 가리지 않게
+const storageKey = "beansoop-preview-people-v2";
+const oldStorageKeys = ["beansoop-preview-people-v1"];
 const roleCookie = "bs_preview_role";
 
 const ownerId = "preview-owner";
@@ -79,6 +81,7 @@ export function hasPeopleEdits() {
 export function resetPeople() {
   try {
     window.localStorage.removeItem(storageKey);
+    for (const key of oldStorageKeys) window.localStorage.removeItem(key);
   } catch {
     // 무시
   }
