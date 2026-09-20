@@ -6,7 +6,7 @@ import styles from "./chat.module.css";
 
 type Message = { id: number; role: "me" | "bot"; text: string[]; answer?: ChatAnswer };
 
-const examples = ["카페라떼 핫 액체 얼마야?", "아메리카노 만드는 순서", "마감 순서 알려줘", "기기 고장 나면 누구한테 보고해?"];
+const examples = ["카페라떼 핫 액체 얼마야?", "아메리카노 만드는 순서", "마감 순서 알려줘", "손님이 환불해 달라고 하면 뭐라고 해?"];
 
 // onOpenRecipe 가 없는 화면(홈·매뉴얼)에서는 레시피 답변에 ‘레시피 화면으로’ 링크를 보여 준다
 export default function ChatPanel({ onOpenRecipe }: { onOpenRecipe?: (recipeId: string, trigger: HTMLElement) => void }) {

@@ -191,6 +191,27 @@ test("opens the operation manual sections on one document frame with fake exampl
   assert.match(editor, /manuals: next/);
 });
 
+test("keeps a response-card book for customer service and lets the chatbot find cards by everyday words", async () => {
+  const [data, chat, screen, editor] = await Promise.all([
+    read("../app/manual/manual-data.ts"),
+    read("../app/manual/manual-chat.ts"),
+    read("../app/manual/[section]/manual-section.tsx"),
+    read("../app/recipes/admin/manual-editor.tsx"),
+  ]);
+  // 응대 카드 틀: 같은 칸을 응대용 이름으로
+  for (const label of ["이렇게 말해요", "이렇게는 말하지 않아요", "직원이 혼자 해도 되는 범위", "이럴 땐 책임자를 불러요"]) assert.match(data, new RegExp(label));
+  // 묶음 7개, 예시 카드는 전부 고객응대 영역의 가짜 예시
+  for (const group of ["기본 흐름", "주문 상황", "결제", "불만", "매장 이용 안내", "어려운 상황"]) assert.match(data, new RegExp(`"${group}"`));
+  assert.ok((data.match(/^  card\(/gm) ?? []).length >= 15);
+  // 환불·보상처럼 판단이 필요한 기준은 적지 않고 확인 필요로 남긴다
+  assert.match(data, /환불·보상을 혼자 약속하지 않는다/);
+  assert.match(data, /확인 필요/);
+  // 챗봇은 카드의 ‘알아듣는 낱말’로도 찾는다
+  assert.match(chat, /doc\.keywords/);
+  assert.match(screen, /data-kind=\{isCard \? "response" : "procedure"\}/);
+  assert.match(editor, /\+ 새 응대 카드/);
+});
+
 test("keeps image and video authoring without bundled cafe media", async () => {
   const studio = await read("../app/recipes/admin/studio.tsx");
   assert.match(studio, /사진 올리기/);

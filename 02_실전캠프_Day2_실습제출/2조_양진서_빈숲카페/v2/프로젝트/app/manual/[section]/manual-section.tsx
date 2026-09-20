@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../preview/preview-api";
 import PreviewRoleSwitch from "../../preview/preview-role-switch";
 import ChatPanel from "../../recipes/chat-panel";
-import { manualFieldLabels, type ManualDoc } from "../manual-data";
+import { manualLabels, responseGroups, type ManualDoc } from "../manual-data";
 import styles from "../manual.module.css";
 
 type Props = { sectionId: string; title: string; description: string; role: "owner" | "staff"; demo: boolean; lockedForStaff: boolean };
@@ -41,7 +41,22 @@ export default function ManualSection({ sectionId, title, description, role, dem
     };
   }, [demo, sectionId]);
 
+  // 폰처럼 좁은 화면에서는 목록 아래에 문서가 있으므로, 고르면 문서로 내려가 준다
+  function choose(id: string) {
+    setSelectedId(id);
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      window.requestAnimationFrame(() => document.getElementById("manual-doc-title")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
+  }
+
   const selected = docs.find((doc) => doc.id === selectedId) ?? null;
+  const labels = manualLabels(selected?.kind);
+  const isCard = selected?.kind === "response";
+  // 응대북은 묶음(기본 흐름, 주문 상황 …)별로 보여 준다. 묶음이 없는 문서는 맨 위에 그냥 나열
+  const groupNames = [...new Set(docs.map((doc) => doc.group ?? ""))].sort((a, b) => {
+    const order = (name: string) => (name === "" ? -1 : (responseGroups as readonly string[]).indexOf(name) === -1 ? 99 : (responseGroups as readonly string[]).indexOf(name));
+    return order(a) - order(b);
+  });
 
   return (
     <main className={styles.page}>
@@ -67,52 +82,62 @@ export default function ManualSection({ sectionId, title, description, role, dem
       {docs.length > 0 && (
         <div className={styles.layout}>
           <nav className={styles.list} aria-label={`${title} 문서 목록`}>
-            {docs.map((doc) => (
-              <button key={doc.id} type="button" aria-pressed={doc.id === selectedId} onClick={() => setSelectedId(doc.id)}>
-                <strong>{doc.title}</strong>
-                <small>{doc.summary}</small>
-              </button>
+            {groupNames.map((group) => (
+              <div key={group || "none"} className={styles.listGroup}>
+                {group && <h2>{group}</h2>}
+                <div className={styles.listRow}>
+                  {docs.filter((doc) => (doc.group ?? "") === group).map((doc) => (
+                    <button key={doc.id} type="button" aria-pressed={doc.id === selectedId} onClick={() => choose(doc.id)}>
+                      <strong>{doc.title}</strong>
+                      <small>{doc.summary}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
 
           {selected && (
-            <article className={styles.doc} aria-labelledby="manual-doc-title">
+            <article className={styles.doc} data-kind={isCard ? "response" : "procedure"} aria-labelledby="manual-doc-title">
               <header>
+                {isCard && <p className={styles.cardTag}>응대 카드{selected.group ? ` · ${selected.group}` : ""}</p>}
                 <h2 id="manual-doc-title">{selected.title}</h2>
                 <small>최종 수정 {selected.updatedAt}{selected.change ? ` · ${selected.change}` : ""}</small>
               </header>
 
               {selected.purpose && (
                 <section>
-                  <h3>{manualFieldLabels.purpose}</h3>
+                  <h3>{labels.purpose}</h3>
                   <p>{selected.purpose}</p>
                 </section>
               )}
-              {selected.materials.length > 0 && (
+              {!isCard && selected.materials.length > 0 && (
                 <section>
-                  <h3>{manualFieldLabels.materials}</h3>
+                  <h3>{labels.materials}</h3>
                   <ul>{selected.materials.map((item, index) => <li key={index}>{item}</li>)}</ul>
                 </section>
               )}
               <section>
-                <h3>{manualFieldLabels.steps}</h3>
-                <ol className={styles.steps}>{selected.steps.map((item, index) => <li key={index}>{item}</li>)}</ol>
+                <h3>{labels.steps}</h3>
+                {isCard
+                  ? <ul className={styles.say}>{selected.steps.map((item, index) => <li key={index}>{item}</li>)}</ul>
+                  : <ol className={styles.steps}>{selected.steps.map((item, index) => <li key={index}>{item}</li>)}</ol>}
               </section>
               {selected.doneCriteria.length > 0 && (
                 <section>
-                  <h3>{manualFieldLabels.doneCriteria}</h3>
+                  <h3>{labels.doneCriteria}</h3>
                   <ul className={styles.done}>{selected.doneCriteria.map((item, index) => <li key={index}>{item}</li>)}</ul>
                 </section>
               )}
               {selected.donts.length > 0 && (
                 <section className={styles.donts}>
-                  <h3>{manualFieldLabels.donts}</h3>
+                  <h3>{labels.donts}</h3>
                   <ul>{selected.donts.map((item, index) => <li key={index}>{item}</li>)}</ul>
                 </section>
               )}
               {selected.reportWhen.length > 0 && (
                 <section className={styles.report}>
-                  <h3>{manualFieldLabels.reportWhen}</h3>
+                  <h3>{labels.reportWhen}</h3>
                   <ul>{selected.reportWhen.map((item, index) => <li key={index}>{item}</li>)}</ul>
                 </section>
               )}

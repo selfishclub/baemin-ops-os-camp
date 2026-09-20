@@ -21,7 +21,7 @@ export const portalSections: PortalSection[] = [
   { id: "open", group: "운영 매뉴얼", status: "open", href: "/manual/open", title: "오픈", description: "출근부터 영업 시작 승인까지" },
   { id: "middle", group: "운영 매뉴얼", status: "open", href: "/manual/middle", title: "미들", description: "피크 준비 · 피크 대응 · 회복 · 한가한 시간 업무" },
   { id: "close", group: "운영 매뉴얼", status: "open", href: "/manual/close", title: "마감", description: "고객 · 식품/장비 · 정산 · 시설/보안 마감" },
-  { id: "service", group: "운영 매뉴얼", status: "open", href: "/manual/service", title: "고객응대 · 주문 · 결제", description: "입점부터 퇴점까지, 불만·환불·예외 상황" },
+  { id: "service", group: "운영 매뉴얼", status: "open", href: "/manual/service", title: "고객응대 · 주문 · 결제", description: "응대북 — 상황별 ‘이렇게 말해요’ 카드. 입점부터 퇴점까지, 불만·환불·배달·어려운 상황" },
   { id: "hygiene", group: "운영 매뉴얼", status: "open", href: "/manual/hygiene", title: "위생 · 안전", description: "식품안전, 청소, 사고·비상 대응" },
   { id: "barista", group: "운영 매뉴얼", status: "open", href: "/manual/barista", title: "바리스타 기초", description: "원두, 분쇄도, 에스프레소 추출, 우유 스티밍" },
   { id: "equipment", group: "운영 매뉴얼", status: "open", href: "/manual/equipment", title: "기기 · 시설", description: "사용법, 세척, 고장 났을 때" },
