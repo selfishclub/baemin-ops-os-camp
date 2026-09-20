@@ -4,6 +4,7 @@ import { portalSections, type PortalSection } from "./portal-sections";
 import { envLockedSections, readLockedSections } from "../db/portal-store";
 import { readPreviewRole } from "./preview/preview-role";
 import PreviewRoleSwitch from "./preview/preview-role-switch";
+import ChatPanel from "./recipes/chat-panel";
 import styles from "./portal.module.css";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +64,8 @@ export default async function PortalHome() {
           </div>
         </section>
       ))}
+
+      <ChatPanel />
     </main>
   );
 }

@@ -44,7 +44,7 @@
 
 .meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #d9d2c3; }
 .meta small { color: #7a8078; font-size: 11px; }
-.meta button { padding: 6px 12px; border: 1px solid #2f6b47; border-radius: 999px; background: white; color: #2f6b47; font-size: 12px; font-weight: 800; cursor: pointer; }
+.meta button, .meta a { padding: 6px 12px; text-decoration: none; border: 1px solid #2f6b47; border-radius: 999px; background: white; color: #2f6b47; font-size: 12px; font-weight: 800; cursor: pointer; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; }
 .message .chips { padding: 8px 0 0; }

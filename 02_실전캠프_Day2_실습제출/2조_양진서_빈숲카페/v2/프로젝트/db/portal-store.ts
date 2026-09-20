@@ -99,6 +99,15 @@ export async function checkSectionAccess(session: ViewerSession, sectionId: stri
   return { locked: isLocked, allowed: !isLocked || isOwner || previewOwner, envLocked };
 }
 
+// 여러 영역을 한 번에: 이 사람이 들어갈 수 있는 영역만 돌려준다 (챗봇이 답해도 되는 범위를 정할 때)
+export async function allowedSections(session: ViewerSession, sectionIds: string[]): Promise<Set<string>> {
+  const locked = await readLockedSections(session.mode === "auth" ? session.db : null);
+  const fixed = new Set(envLockedSections());
+  const isOwner = session.mode === "auth" && session.viewer?.role === "owner";
+  const previewOwner = session.mode === "demo" && (await readPreviewRole()) === "owner";
+  return new Set(sectionIds.filter((id) => !locked.has(id) || isOwner || (previewOwner && !fixed.has(id))));
+}
+
 export function lockedResponse() {
   return Response.json({ error: "이 메뉴는 지금 잠겨 있습니다. 필요하면 매장 책임자에게 열어 달라고 요청해 주세요.", locked: true }, { status: 423 });
 }

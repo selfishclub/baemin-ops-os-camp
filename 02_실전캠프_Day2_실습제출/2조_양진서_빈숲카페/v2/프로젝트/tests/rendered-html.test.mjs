@@ -165,6 +165,32 @@ test("switches the preview between staff and owner eyes without touching real ro
   assert.doesNotMatch(people, /supabase|fetch\(/i);
 });
 
+test("opens the operation manual sections on one document frame with fake examples only", async () => {
+  const [data, sections, page, api, chat, editor] = await Promise.all([
+    read("../app/manual/manual-data.ts"),
+    read("../app/portal-sections.ts"),
+    read("../app/manual/[section]/page.tsx"),
+    read("../app/api/manuals/route.ts"),
+    read("../app/api/chat/route.ts"),
+    read("../app/recipes/admin/manual-editor.tsx"),
+  ]);
+  // 같은 문서 틀: 목적·준비물·순서·완료 기준·하면 안 되는 것·보고 기준
+  for (const field of ["purpose", "materials", "steps", "doneCriteria", "donts", "reportWhen"]) assert.match(data, new RegExp(`${field}:`));
+  // 문서형 영역 8개가 열리고, 시험·공지는 아직 준비 중
+  for (const id of ["standard", "open", "middle", "close", "service", "hygiene", "barista", "equipment"]) assert.match(sections, new RegExp(`id: "${id}"[^}]*status: "open", href: "/manual/${id}"`));
+  assert.match(sections, /id: "exam"[^}]*status: "soon"/);
+  // 공개용 버전: 예시 문서는 전부 (예시)·○○ 빈 양식
+  const exampleLines = data.match(/\"\(예시\)[^\"]*\"/g) ?? [];
+  assert.ok(exampleLines.length > 40);
+  assert.match(data, /○○/);
+  // 영역 잠금은 화면·문서 API·챗봇 모두에 적용
+  assert.match(page, /checkSectionAccess\(session, section\)/);
+  assert.match(api, /checkSectionAccess\(session, section\)/);
+  assert.match(chat, /allowed\.has\(doc\.sectionId\)/);
+  assert.doesNotMatch(chat, /fetch\(|openai|anthropic/i);
+  assert.match(editor, /manuals: next/);
+});
+
 test("keeps image and video authoring without bundled cafe media", async () => {
   const studio = await read("../app/recipes/admin/studio.tsx");
   assert.match(studio, /사진 올리기/);

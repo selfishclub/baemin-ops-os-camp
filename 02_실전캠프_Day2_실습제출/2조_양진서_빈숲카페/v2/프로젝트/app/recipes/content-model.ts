@@ -3,6 +3,7 @@ import {
   RecipeContent,
   RecipeMode,
 } from "./recipe-data";
+import { isManualSection } from "../manual/manual-data";
 
 export function cloneDefaultContent(): RecipeContent {
   return structuredClone(defaultRecipeContent);
@@ -86,6 +87,16 @@ export function validateRecipeContent(content: RecipeContent): string[] {
     if (guide.sections.some((section) => !section.title.trim() || !section.items.length || section.items.some((item) => !item.trim()))) {
       errors.push(`${guide.title || guide.id}: 공통 가이드 구역의 제목과 내용을 확인해 주세요.`);
     }
+  }
+
+  const manualIds = new Set<string>();
+  for (const doc of content.manuals ?? []) {
+    const prefix = `매뉴얼 ‘${doc.title || doc.id}’`;
+    if (!doc.id.trim() || manualIds.has(doc.id)) errors.push(`${prefix}: 문서 ID가 비었거나 중복됩니다.`);
+    manualIds.add(doc.id);
+    if (!isManualSection(doc.sectionId)) errors.push(`${prefix}: 어느 영역의 문서인지 골라 주세요.`);
+    if (!doc.title.trim()) errors.push(`${prefix}: 문서 제목이 필요합니다.`);
+    if (!doc.steps.some((step) => step.trim())) errors.push(`${prefix}: 순서를 한 줄 이상 적어 주세요.`);
   }
 
   const ids = new Set<string>();

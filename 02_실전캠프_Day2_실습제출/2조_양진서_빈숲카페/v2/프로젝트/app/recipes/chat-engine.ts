@@ -12,6 +12,10 @@ export type ChatAnswer = {
   mode?: RecipeMode;
   updatedAt?: string;
   suggestions?: string[];
+  // 매뉴얼 문서에서 찾은 답일 때
+  manualId?: string;
+  manualTitle?: string;
+  href?: string;
   source: "rule" | "ai";
 };
 
@@ -30,6 +34,10 @@ const intentWords = {
   measures: ["비율", "얼마", "몇", "정량", "계량", "양", "ml", "그램", "g"],
   cautions: ["주의", "틀리", "실수", "조심", "하면안"],
 };
+
+export function normalizeQuestion(value: string) {
+  return normalize(value);
+}
 
 function normalize(value: string) {
   return value.toLocaleLowerCase("ko-KR").replace(/[\s·.,!?~'"“”‘’()[\]{}:;\-_/]+/g, "");
@@ -69,6 +77,11 @@ function pickMode(recipe: Recipe, question: string): RecipeMode {
 
 function hasIntent(question: string, words: string[]) {
   return words.some((word) => question.includes(normalize(word)));
+}
+
+// 질문에 레시피북의 메뉴 이름이 들어 있나 (챗봇이 레시피 쪽으로 답할지 매뉴얼 쪽으로 답할지 고를 때)
+export function mentionsRecipe(content: RecipeContent, rawQuestion: string) {
+  return Boolean(findRecipe(content, normalize(rawQuestion)));
 }
 
 export function answerFromRecipes(content: RecipeContent, rawQuestion: string): ChatAnswer {

@@ -1,3 +1,5 @@
+import type { ManualDoc } from "../manual/manual-data";
+
 export type RecipeMode = "HOT" | "ICE" | "UP" | "DINE" | "TOGO";
 
 export const recipeModes: RecipeMode[] = ["ICE", "HOT", "UP", "DINE", "TOGO"];
@@ -170,6 +172,8 @@ export type RecipeContent = {
   categories: string[];
   // 영상 프롬프트 지침서 (없으면 기본 지침서를 쓴다)
   promptGuides?: PromptGuide[];
+  // 운영 매뉴얼 문서 (없으면 예시 문서를 쓴다) — 레시피와 같은 초안·게시·버전 흐름을 탄다
+  manuals?: ManualDoc[];
   announcement: RecipeAnnouncement;
 };
 

@@ -4,6 +4,7 @@ import { cascadeSharedStandards, validateRecipeContent } from "../recipes/conten
 import { buildRecipeHistory } from "../recipes/history";
 import { defaultRecipeContent, type RecipeContent } from "../recipes/recipe-data";
 import { addPreviewNotices, handlePeople, hasPeopleEdits, resetPeople } from "./preview-people";
+import { readableManuals } from "../manual/manual-data";
 
 // 미리보기 모드: 로그인이 꺼진(둘러보기·시연) 상태에서도 관리자 편집·지침서·게시·변경 이력,
 // 그리고 교육 체크·퀴즈·바뀐 레시피 확인·직원 관리(preview-people.ts)를 직접 눌러 볼 수 있게 한다.
@@ -177,6 +178,12 @@ async function handlePreview(url: string, init?: RequestInit): Promise<Response 
   // 직원 화면: 미리보기에서 게시한 적이 있으면 그 공식본을 보여 준다
   if (path === "/api/content" && method === "GET" && hasWorkspaceEdits()) {
     return json({ content: load().published, source: "preview" });
+  }
+
+  // 운영 매뉴얼: 미리보기에서 게시한 적이 있으면 그 공식본의 문서를 보여 준다
+  if (path === "/api/manuals" && method === "GET" && hasWorkspaceEdits()) {
+    const section = new URL(url, window.location.origin).searchParams.get("section") ?? "";
+    return json({ docs: readableManuals(load().published).filter((doc) => doc.sectionId === section), source: "preview" });
   }
 
   if (path === "/api/history" && method === "GET" && hasWorkspaceEdits()) {
