@@ -5,6 +5,7 @@ import { envLockedSections, readLockedSections } from "../db/portal-store";
 import { readPreviewRole } from "./preview/preview-role";
 import PreviewRoleSwitch from "./preview/preview-role-switch";
 import ChatPanel from "./recipes/chat-panel";
+import NoticeCount from "./notices/notice-count";
 import styles from "./portal.module.css";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +60,7 @@ export default async function PortalHome() {
           <h3 id={`group-${group}`}>{group}</h3>
           <div className={styles.grid}>
             {visible.filter((section) => section.group === group).map((section) => {
-              return <Tile key={section.id} section={section} locked={locked.has(section.id)} bypass={Boolean(isOwner) && !fixedLocks.has(section.id)} />;
+              return <Tile key={section.id} section={section} locked={locked.has(section.id)} bypass={Boolean(isOwner) && !fixedLocks.has(section.id)} demo={demo} />;
             })}
           </div>
         </section>
@@ -70,13 +71,13 @@ export default async function PortalHome() {
   );
 }
 
-function Tile({ section, locked, bypass }: { section: PortalSection; locked: boolean; bypass: boolean }) {
+function Tile({ section, locked, bypass, demo }: { section: PortalSection; locked: boolean; bypass: boolean; demo: boolean }) {
   const state = section.status === "soon" ? "soon" : locked ? "locked" : "open";
   const label = state === "soon" ? (locked && bypass ? "준비 중 · 잠금 예약" : "준비 중") : state === "locked" ? (bypass ? "잠김 · 사장만 열림" : "잠김") : "열기";
   const body = (
     <>
       <span className={styles.tileStatus} data-status={state}>{label}</span>
-      <strong>{section.title}</strong>
+      <strong>{section.title}{section.id === "notice" && state !== "locked" && <NoticeCount demo={demo} />}</strong>
       <span className={styles.tileDesc}>{section.description}</span>
     </>
   );

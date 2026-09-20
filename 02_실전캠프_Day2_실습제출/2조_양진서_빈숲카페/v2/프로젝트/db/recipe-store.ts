@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { changedManuals, manualNoticePrefix } from "../app/manual/manual-data";
 import { defaultRecipeContent, RecipeContent } from "../app/recipes/recipe-data";
 import {
   cascadeSharedStandards,
@@ -177,13 +178,19 @@ export async function publishDraft(
   if (error) throw new Error(`버전 기록을 남기지 못했습니다: ${error.message}`);
 
   // 직원 확인이 필요한 변경이면, 바뀐 메뉴마다 알림을 남긴다 (직원이 "확인했어요"를 누르는 단위)
-  const changed = notifyStaff ? changedRecipes(previous, cascaded.content) : [];
+  // 매뉴얼 문서·응대 카드도 같은 표에 남긴다 — recipe_id 칸에 "manual:<문서 id>", recipe_name 칸에 문서 제목
+  const changed = notifyStaff
+    ? [
+        ...changedRecipes(previous, cascaded.content).map((recipe) => ({ id: recipe.id, name: recipe.name })),
+        ...changedManuals(previous, cascaded.content).map((doc) => ({ id: `${manualNoticePrefix}${doc.id}`, name: doc.title })),
+      ]
+    : [];
   if (changed.length) {
     const { error: noticeError } = await db.from("recipe_change_notices").insert(
-      changed.map((recipe) => ({
+      changed.map((item) => ({
         version: nextVersion,
-        recipe_id: recipe.id,
-        recipe_name: recipe.name,
+        recipe_id: item.id,
+        recipe_name: item.name,
         change_reason: changeReason.trim(),
         published_by: actor.email,
         created_at: now,
@@ -193,7 +200,7 @@ export async function publishDraft(
     if (noticeError) console.error("[publish] 바뀐 레시피 알림을 남기지 못했습니다:", noticeError.message);
   }
 
-  await audit(db, actor, "published", { version: nextVersion, changeReason, effectiveAt, impactedRecipeIds: cascaded.impactedRecipeIds, notified: changed.map((recipe) => recipe.id) });
+  await audit(db, actor, "published", { version: nextVersion, changeReason, effectiveAt, impactedRecipeIds: cascaded.impactedRecipeIds, notified: changed.map((item) => item.id) });
   return { version: nextVersion, revision: expectedRevision + 1, publishedAt: now, content: cascaded.content, notified: changed.length };
 }
 

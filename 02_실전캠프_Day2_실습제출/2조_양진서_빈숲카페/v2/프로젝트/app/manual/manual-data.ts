@@ -223,6 +223,15 @@ export function getManuals(content: { manuals?: ManualDoc[] } | null | undefined
   return content?.manuals ?? defaultManuals;
 }
 
+// 바뀐 문서 알림: 알림 표(recipe_change_notices.recipe_id)에 매뉴얼 문서를 적을 때 쓰는 열쇠. 레시피는 레시피 id 그대로.
+export const manualNoticePrefix = "manual:";
+
+// 이전 공식본과 비교해 내용이 바뀌었거나 새로 생긴 문서 (게시할 때 직원에게 "확인했어요"를 받을 단위)
+export function changedManuals(previous: { manuals?: ManualDoc[] } | null | undefined, next: { manuals?: ManualDoc[] } | null | undefined): ManualDoc[] {
+  const before = new Map(readableManuals(previous).map((doc) => [doc.id, JSON.stringify(doc)]));
+  return readableManuals(next).filter((doc) => before.get(doc.id) !== JSON.stringify(doc));
+}
+
 // 직원 화면·챗봇용: 편집하다 남은 빈 줄을 뺀 문서
 export function readableManuals(content: { manuals?: ManualDoc[] } | null | undefined): ManualDoc[] {
   const clean = (items: string[]) => items.map((item) => item.trim()).filter(Boolean);

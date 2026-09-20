@@ -131,6 +131,11 @@ type ChangeNoticeItem = {
   acked: boolean;
 };
 
+// 알림 표에는 매뉴얼 문서("manual:" 로 시작)도 같이 들어 있다. 이 화면은 레시피 것만 보여 준다
+function recipeNoticesOnly(items: ChangeNoticeItem[] | undefined) {
+  return (items ?? []).filter((item) => !item.recipe_id.startsWith("manual:"));
+}
+
 export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: { viewer: RecipeViewer | null; demo: boolean; lockedForStaff?: boolean }) {
   // 시연·둘러보기 모드에서는 미리보기로 편집을 체험할 수 있다 (이 브라우저에만 저장)
   // 그때 viewer 는 가짜 사람(미리보기 사장 / 직원 A)이라, "직원 눈으로" 보면 편집 단추가 사라진다
@@ -165,7 +170,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
       const response = await apiFetch(demo, "/api/changes", { cache: "no-store" });
       if (!response.ok) return;
       const body = await response.json();
-      setNotices(body.notices ?? []);
+      setNotices(recipeNoticesOnly(body.notices));
     } catch {
       // 알림은 부가 기능이라 실패해도 레시피 화면은 그대로 둔다
     }
@@ -181,7 +186,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
       });
       if (response.ok) {
         const body = await response.json();
-        setNotices(body.notices ?? []);
+        setNotices(recipeNoticesOnly(body.notices));
       }
     } finally {
       setNoticeBusy(null);

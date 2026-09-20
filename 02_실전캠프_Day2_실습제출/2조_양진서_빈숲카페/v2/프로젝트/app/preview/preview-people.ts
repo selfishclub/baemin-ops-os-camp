@@ -1,7 +1,7 @@
 "use client";
 
 import type { Recipe, RecipeContent } from "../recipes/recipe-data";
-import { readableManuals } from "../manual/manual-data";
+import { manualNoticePrefix, readableManuals } from "../manual/manual-data";
 import { getTrainingPath, manualCheckPrefix } from "../manual/training-path";
 
 // 미리보기용 "사람" 데이터: 가짜 직원, 메뉴 체크리스트, 퀴즈 점수, 바뀐 레시피 알림과 확인 기록.
@@ -43,7 +43,7 @@ function freshPeople(recipes: Recipe[]): PreviewPeople {
     ],
     quiz: [{ id: 1, user_id: "preview-staff-b", score: 8, total: 10, created_at: daysAgo(3) }],
     notices: third
-      ? [{ id: 1, version: 1, recipe_id: third.id, recipe_name: third.name, change_reason: "시연용 알림 · 정량 변경", published_by: "미리보기 사장", created_at: daysAgo(1), acks: [{ user_id: "preview-staff-b", acked_at: daysAgo(0.5) }] }]
+      ? [{ id: 2, version: 1, recipe_id: `${manualNoticePrefix}demo-close-closing`, recipe_name: "예시 · 마감 순서", change_reason: "시연용 알림 · 순서 변경", published_by: "미리보기 사장", created_at: daysAgo(2), acks: [] }, { id: 1, version: 1, recipe_id: third.id, recipe_name: third.name, change_reason: "시연용 알림 · 정량 변경", published_by: "미리보기 사장", created_at: daysAgo(1), acks: [{ user_id: "preview-staff-b", acked_at: daysAgo(0.5) }] }]
       : [],
   };
 }
@@ -149,19 +149,30 @@ function checkFor(people: PreviewPeople, userId: string, recipeId: string) {
   return row;
 }
 
-function myNotices(people: PreviewPeople, userId: string) {
-  const items = [...people.notices].reverse().map(({ acks, ...notice }) => ({ ...notice, acked: acks.some((ack) => ack.user_id === userId) }));
+// 서버의 db/notice-view.ts 와 같은 규칙: 레시피·매뉴얼 알림을 한 목록으로, 잠긴 영역·지워진 문서의 것은 뺀다
+function myNotices(people: PreviewPeople, content: RecipeContent, userId: string, lockedSections: string[]) {
+  const sectionOf = new Map(readableManuals(content).map((doc) => [doc.id, doc.sectionId]));
+  const items = [...people.notices]
+    .reverse()
+    .map(({ acks, ...notice }) => {
+      const acked = acks.some((ack) => ack.user_id === userId);
+      if (!notice.recipe_id.startsWith(manualNoticePrefix)) return lockedSections.includes("recipes") ? null : { ...notice, acked, kind: "recipe" as const, href: "/recipes" };
+      const docId = notice.recipe_id.slice(manualNoticePrefix.length);
+      const sectionId = sectionOf.get(docId);
+      return sectionId && !lockedSections.includes(sectionId) ? { ...notice, acked, kind: "manual" as const, href: `/manual/${sectionId}?doc=${encodeURIComponent(docId)}` } : null;
+    })
+    .filter((item) => item !== null);
   return { notices: items, pending: items.filter((item) => !item.acked).length };
 }
 
 // 미리보기에서 게시했을 때: 바뀐 메뉴마다 알림을 만든다 (실제 서버의 publishDraft 와 같은 규칙)
-export function addPreviewNotices(recipes: Recipe[], changed: Recipe[], version: number, reason: string, publishedBy: string) {
+export function addPreviewNotices(recipes: Recipe[], changed: { id: string; name: string }[], version: number, reason: string, publishedBy: string) {
   if (!changed.length) return;
   const people = load(recipes);
   let nextId = Math.max(0, ...people.notices.map((notice) => notice.id)) + 1;
   const now = new Date().toISOString();
-  for (const recipe of changed) {
-    people.notices.push({ id: nextId++, version, recipe_id: recipe.id, recipe_name: recipe.name, change_reason: reason, published_by: publishedBy, created_at: now, acks: [] });
+  for (const item of changed) {
+    people.notices.push({ id: nextId++, version, recipe_id: item.id, recipe_name: item.name, change_reason: reason, published_by: publishedBy, created_at: now, acks: [] });
   }
   save(people);
 }
@@ -172,7 +183,8 @@ export async function handlePeople(path: string, method: string, url: string, bo
   const me = role === "owner" ? ownerId : staffId;
 
   // 바뀐 레시피: 내 목록 / 확인했어요 / 사장용 확인 현황
-  if (path === "/api/changes" && method === "GET") return json(myNotices(load(recipes), me));
+  const lockedForMe = role === "staff" ? previewLockedSections() : [];
+  if (path === "/api/changes" && method === "GET") return json(myNotices(load(recipes), content, me, lockedForMe));
 
   if (path === "/api/changes/ack" && method === "POST") {
     const people = load(recipes);
@@ -180,7 +192,7 @@ export async function handlePeople(path: string, method: string, url: string, bo
     if (!notice) return json({ error: "어떤 알림인지 없습니다." }, 400);
     if (!notice.acks.some((ack) => ack.user_id === me)) notice.acks.push({ user_id: me, acked_at: new Date().toISOString() });
     save(people);
-    return json(myNotices(people, me));
+    return json(myNotices(people, content, me, lockedForMe));
   }
 
   if (path === "/api/admin/changes" && method === "GET") {

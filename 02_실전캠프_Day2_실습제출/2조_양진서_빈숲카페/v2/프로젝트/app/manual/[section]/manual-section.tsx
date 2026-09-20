@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../preview/preview-api";
 import PreviewRoleSwitch from "../../preview/preview-role-switch";
 import ChatPanel from "../../recipes/chat-panel";
-import { manualLabels, responseGroups, type ManualDoc } from "../manual-data";
+import { manualLabels, manualNoticePrefix, responseGroups, type ManualDoc } from "../manual-data";
 import styles from "../manual.module.css";
 
 type Props = { sectionId: string; title: string; description: string; role: "owner" | "staff"; demo: boolean; lockedForStaff: boolean };
@@ -15,6 +15,27 @@ export default function ManualSection({ sectionId, title, description, role, dem
   const [docs, setDocs] = useState<ManualDoc[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [message, setMessage] = useState("문서를 불러오는 중입니다.");
+  // 아직 확인하지 않은 "바뀐 문서" 알림 (문서 id → 알림)
+  const [changed, setChanged] = useState<Record<string, { id: number; change_reason: string; version: number }>>({});
+  const [ackBusy, setAckBusy] = useState(false);
+
+  function keepPending(items: { id: number; recipe_id: string; change_reason: string; version: number; acked: boolean }[] | undefined) {
+    const next: Record<string, { id: number; change_reason: string; version: number }> = {};
+    for (const item of items ?? []) {
+      if (!item.acked && item.recipe_id.startsWith(manualNoticePrefix)) next[item.recipe_id.slice(manualNoticePrefix.length)] ??= item;
+    }
+    setChanged(next);
+  }
+
+  async function ackChange(noticeId: number) {
+    setAckBusy(true);
+    try {
+      const response = await apiFetch(demo, "/api/changes/ack", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ noticeId }) });
+      if (response.ok) keepPending((await response.json()).notices);
+    } finally {
+      setAckBusy(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +53,11 @@ export default function ManualSection({ sectionId, title, description, role, dem
         setDocs(list);
         setSelectedId(list.find((doc) => doc.id === wanted)?.id ?? list[0]?.id ?? "");
         setMessage("");
+        // 바뀐 문서 표시는 못 읽어도 문서 보기는 그대로 된다
+        apiFetch(demo, "/api/changes", { cache: "no-store" })
+          .then((result) => (result.ok ? result.json() : null))
+          .then((data) => { if (!cancelled && data) keepPending(data.notices); })
+          .catch(() => {});
       } catch {
         if (!cancelled) setMessage("연결이 끊겼어요. 잠시 후 다시 열어 주세요.");
       }
@@ -88,7 +114,7 @@ export default function ManualSection({ sectionId, title, description, role, dem
                 <div className={styles.listRow}>
                   {docs.filter((doc) => (doc.group ?? "") === group).map((doc) => (
                     <button key={doc.id} type="button" aria-pressed={doc.id === selectedId} onClick={() => choose(doc.id)}>
-                      <strong>{doc.title}</strong>
+                      <strong>{doc.title}{changed[doc.id] && <span className={styles.changedDot}>바뀜</span>}</strong>
                       <small>{doc.summary}</small>
                     </button>
                   ))}
@@ -99,6 +125,12 @@ export default function ManualSection({ sectionId, title, description, role, dem
 
           {selected && (
             <article className={styles.doc} data-kind={isCard ? "response" : "procedure"} aria-labelledby="manual-doc-title">
+              {changed[selected.id] && (
+                <div className={styles.changedBar} role="status">
+                  <p><strong>이 문서가 바뀌었어요.</strong> {changed[selected.id].change_reason || "내용 변경"} · Ver {changed[selected.id].version}. 읽어 보고 눌러 주세요.</p>
+                  <button type="button" disabled={ackBusy} onClick={() => void ackChange(changed[selected.id].id)}>확인했어요</button>
+                </div>
+              )}
               <header>
                 {isCard && <p className={styles.cardTag}>응대 카드{selected.group ? ` · ${selected.group}` : ""}</p>}
                 <h2 id="manual-doc-title">{selected.title}</h2>

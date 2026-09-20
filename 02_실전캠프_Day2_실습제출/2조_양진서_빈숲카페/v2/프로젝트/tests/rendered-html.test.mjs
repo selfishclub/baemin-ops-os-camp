@@ -241,6 +241,31 @@ test("bundles manuals, cards and menus into a staged training path that the owne
   assert.match(editor, /trainingPath: next/);
 });
 
+test("asks staff to acknowledge changed manuals the same way as changed recipes", async () => {
+  const [data, store, view, listApi, ackApi, board, sections, screen] = await Promise.all([
+    read("../app/manual/manual-data.ts"),
+    read("../db/recipe-store.ts"),
+    read("../db/notice-view.ts"),
+    read("../app/api/changes/route.ts"),
+    read("../app/api/changes/ack/route.ts"),
+    read("../app/notices/notice-board.tsx"),
+    read("../app/portal-sections.ts"),
+    read("../app/manual/[section]/manual-section.tsx"),
+  ]);
+  // 게시할 때 실제로 바뀐 문서만 알림 (이전 공식본과 비교)
+  assert.match(data, /export function changedManuals/);
+  assert.match(store, /changedManuals\(previous, cascaded\.content\)/);
+  assert.match(store, /manualNoticePrefix/);
+  // 직원에게는 열려 있는 영역의 알림만 — 목록과 확인 응답이 같은 규칙을 쓴다
+  assert.match(view, /allowedSections\(/);
+  assert.match(listApi, /listVisibleNotices/);
+  assert.match(ackApi, /listVisibleNotices/);
+  // 확인은 사람이 직접 누른다
+  assert.match(board, /확인했어요/);
+  assert.match(screen, /이 문서가 바뀌었어요/);
+  assert.match(sections, /id: "notice"[^}]*status: "open", href: "\/notices"/);
+});
+
 test("keeps image and video authoring without bundled cafe media", async () => {
   const studio = await read("../app/recipes/admin/studio.tsx");
   assert.match(studio, /사진 올리기/);

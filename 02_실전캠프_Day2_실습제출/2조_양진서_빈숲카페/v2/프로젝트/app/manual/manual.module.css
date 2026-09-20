@@ -46,6 +46,13 @@
 .done { list-style: none; padding-left: 0 !important; }
 .done li::before { content: "✓"; display: inline-block; width: 20px; color: #2f6b47; font-weight: 900; }
 
+/* 바뀐 문서 표시 */
+.changedDot { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #b4462f; color: white; font-size: 10px; font-weight: 900; vertical-align: middle; }
+.changedBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; order: -1; margin: -6px 0 16px; padding: 12px 14px; border: 1px solid #e6c9bf; border-radius: 14px; background: #fdf1ec; }
+.changedBar p { margin: 0; font-size: 13px !important; color: #6e2f1f; }
+.changedBar button { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: #b4462f; color: white; font-size: 12px; font-weight: 800; cursor: pointer; }
+.changedBar button:disabled { opacity: .5; }
+
 /* 응대 카드는 말 → 말하지 않는 것 → 혼자 해도 되는 범위 → 책임자 순서로 보여 준다 */
 .doc[data-kind="response"] { display: flex; flex-direction: column; }
 .doc[data-kind="response"] .donts { order: 1; }

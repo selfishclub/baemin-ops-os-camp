@@ -57,9 +57,9 @@ export default function ChangeStatus({ preview = false }: { preview?: boolean })
     <main className={styles.page}>
       <header className={styles.header}>
         <Link href="/recipes">← 레시피</Link>
-        <h1>바뀐 레시피 확인 현황</h1>
+        <h1>바뀐 레시피 · 매뉴얼 확인 현황</h1>
         <p>
-          레시피를 고쳐 게시하면 바뀐 메뉴마다 알림이 생기고, 직원이 ‘확인했어요’를 누르면 여기 표시돼요.
+          레시피나 매뉴얼 문서·응대 카드를 고쳐 게시하면 바뀐 것마다 알림이 생기고, 직원이 ‘확인했어요’를 누르면 여기 표시돼요.
           재직 직원 {activeCount}명 기준. 최근 60일.
         </p>
       </header>
@@ -80,7 +80,7 @@ export default function ChangeStatus({ preview = false }: { preview?: boolean })
           <li key={notice.id} data-done={notice.pending.length === 0}>
             <div className={styles.noticeHead}>
               <div>
-                <strong>{notice.recipe_name}</strong>
+                <strong>{notice.recipe_id.startsWith("manual:") ? "[매뉴얼] " : ""}{notice.recipe_name}</strong>
                 <small>{notice.change_reason || "레시피 변경"} · Ver {notice.version} · {formatDate(notice.created_at)} · {notice.published_by}</small>
               </div>
               <span className={styles.count}>{notice.acked.length} / {notice.acked.length + notice.pending.length} 확인</span>

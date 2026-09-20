@@ -1,5 +1,6 @@
 import { requireViewerApi } from "../../../auth";
-import { ackChangeNotice, listMyChangeNotices } from "../../../../db/recipe-store";
+import { ackChangeNotice } from "../../../../db/recipe-store";
+import { listVisibleNotices } from "../../../../db/notice-view";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
   if (!Number.isInteger(body.noticeId)) return Response.json({ error: "어떤 알림인지 없습니다." }, { status: 400 });
   try {
     await ackChangeNotice(ctx.db, ctx.viewer.id, Number(body.noticeId));
-    return Response.json(await listMyChangeNotices(ctx.db, ctx.viewer.id));
+    return Response.json(await listVisibleNotices(ctx.db, ctx.viewer));
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "확인을 저장하지 못했습니다." }, { status: 503 });
   }
