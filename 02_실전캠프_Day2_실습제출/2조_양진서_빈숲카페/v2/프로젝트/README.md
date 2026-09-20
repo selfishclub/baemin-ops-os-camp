@@ -59,6 +59,7 @@ npm run dev
 - 문서 종류는 두 가지: 절차 문서(`procedure`)와 응대 카드(`response`, 응대북). 같은 칸을 종류에 따라 다른 이름으로 보여 준다(`manualLabels`). 응대 카드는 `group`(묶음)과 `keywords`(챗봇이 알아듣는 낱말)를 쓴다
 - 신입 교육 경로: `app/manual/training-path.ts` (단계·예시 경로·매뉴얼 퀴즈), 공식본 JSON 의 `trainingPath`. 문서 "읽었어요/확인함"은 기존 표 `training_checks` 의 `recipe_id` 칸에 `manual:<문서 id>` 로 적는다 (표 추가 없음)
 - 바뀐 내용 알림: 매뉴얼 문서도 기존 표 `recipe_change_notices` 에 `recipe_id = manual:<문서 id>` 로 남긴다. 직원에게 보여 줄 목록은 `db/notice-view.ts` 가 잠긴 영역·지워진 문서를 빼고 만든다
+- 엑셀·표에서 가져오기: `app/recipes/admin/import-parse.ts` (표 → 레시피·문서, 순수 함수) · `import-panel.tsx` (붙여넣기 → 미리보기 → 초안에 넣기). 저장·게시는 하지 않는다. `tests/import-parse.test.mjs` 가 가짜 표로 실제로 돌려 본다
 - `app/auth.ts` 로그인·역할 확인 · `proxy.ts` 로그인 안 한 요청을 `/login` 으로
 - `db/recipe-store.ts` 저장 층 (Supabase Postgres) · `supabase/schema.sql` 표와 잠금
 - `lib/supabase/` 열쇠 읽기와 클라이언트
