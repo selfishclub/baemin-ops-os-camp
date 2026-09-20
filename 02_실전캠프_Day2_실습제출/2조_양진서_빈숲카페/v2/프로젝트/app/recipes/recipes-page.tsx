@@ -32,6 +32,7 @@ import Link from "next/link";
 import ChatPanel from "./chat-panel";
 import HistoryPanel from "./history-panel";
 import { apiFetch } from "../preview/preview-api";
+import PreviewRoleSwitch from "../preview/preview-role-switch";
 
 const favoriteKey = "beansoop-recipe-favorites-v1";
 const recentKey = "beansoop-recipe-recent-v1";
@@ -132,7 +133,8 @@ type ChangeNoticeItem = {
 
 export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: { viewer: RecipeViewer | null; demo: boolean; lockedForStaff?: boolean }) {
   // 시연·둘러보기 모드에서는 미리보기로 편집을 체험할 수 있다 (이 브라우저에만 저장)
-  const canEdit = viewer?.role === "owner" || demo;
+  // 그때 viewer 는 가짜 사람(미리보기 사장 / 직원 A)이라, "직원 눈으로" 보면 편집 단추가 사라진다
+  const canEdit = viewer?.role === "owner";
   const [content, setContent] = useState<RecipeContent>(defaultRecipeContent);
   const [contentError, setContentError] = useState(false);
   const { recipes, sharedStandards, sharedGuides, standards, categories, announcement } = content;
@@ -160,7 +162,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
   const loadNotices = async () => {
     if (!viewer) return;
     try {
-      const response = await fetch("/api/changes", { cache: "no-store" });
+      const response = await apiFetch(demo, "/api/changes", { cache: "no-store" });
       if (!response.ok) return;
       const body = await response.json();
       setNotices(body.notices ?? []);
@@ -172,7 +174,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
   const ackNotice = async (noticeId: number) => {
     setNoticeBusy(noticeId);
     try {
-      const response = await fetch("/api/changes/ack", {
+      const response = await apiFetch(demo, "/api/changes/ack", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ noticeId }),
@@ -520,10 +522,11 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
           )}
           {viewer && pendingNotices.length > 0 && <a className={styles.noticeBadge} href="#changes-title">바뀐 레시피 {pendingNotices.length}</a>}
           {viewer && <a href="/recipes/training">{canEdit ? "교육 현황" : "교육 체크"}</a>}
-          {canEdit && !demo && <a href="/recipes/changes">확인 현황</a>}
-          {canEdit && !demo && <a href="/recipes/staff">직원 관리</a>}
+          {canEdit && <a href="/recipes/changes">확인 현황</a>}
+          {canEdit && <a href="/recipes/staff">직원 관리</a>}
           {canEdit && <a href="/recipes/admin">{demo ? "관리자 편집 (미리보기)" : "관리자 편집"}</a>}
-          {viewer && (
+          {demo && viewer && <PreviewRoleSwitch role={viewer.role} />}
+          {viewer && !demo && (
             <form action="/api/auth/logout" method="post">
               <button type="submit">로그아웃</button>
             </form>

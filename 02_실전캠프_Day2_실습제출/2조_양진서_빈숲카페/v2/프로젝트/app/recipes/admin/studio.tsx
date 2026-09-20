@@ -326,7 +326,7 @@ export default function AdminStudio({ userName, preview = false }: { userName: s
         </div>
       </header>
 
-      {preview && <PreviewBanner what="관리자 편집 · 영상 프롬프트 지침 · 공식 게시 · 버전 복구" />}
+      {preview && <PreviewBanner what="관리자 편집 · 영상 프롬프트 지침 · 공식 게시 · 버전 복구" role="owner" />}
       <section className={styles.statusbar} data-dirty={dirty}>
         <span>{dirty ? "저장하지 않은 변경 있음" : "초안 저장됨"}</span>
         <p>{message}</p>

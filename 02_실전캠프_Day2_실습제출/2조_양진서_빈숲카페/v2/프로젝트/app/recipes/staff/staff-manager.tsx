@@ -4,17 +4,19 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { loginEmailDomain } from "../../../lib/supabase/env";
 import styles from "./staff.module.css";
+import { apiFetch } from "../../preview/preview-api";
+import PreviewBanner from "../../preview/preview-banner";
 
 type StaffRow = { id: string; login_id: string; display_name: string; role: "owner" | "staff"; active: boolean; created_at: string };
 
-export default function StaffManager() {
+export default function StaffManager({ preview = false }: { preview?: boolean }) {
   const [rows, setRows] = useState<StaffRow[]>([]);
   const [me, setMe] = useState("");
   const [message, setMessage] = useState("직원 목록을 불러오는 중입니다.");
   const [busyId, setBusyId] = useState("");
 
   async function load() {
-    const response = await fetch("/api/admin/staff", { cache: "no-store" });
+    const response = await apiFetch(preview, "/api/admin/staff", { cache: "no-store" });
     const body = await response.json();
     if (!response.ok) {
       setMessage(body.error ?? "직원 목록을 불러오지 못했습니다.");
@@ -37,7 +39,7 @@ export default function StaffManager() {
 
   async function patch(id: string, changes: Partial<Pick<StaffRow, "active" | "role">> & { displayName?: string }) {
     setBusyId(id);
-    const response = await fetch("/api/admin/staff", {
+    const response = await apiFetch(preview, "/api/admin/staff", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id, ...changes }),
@@ -60,6 +62,7 @@ export default function StaffManager() {
         <p>퇴사한 직원은 <strong>중지</strong>로 바꾸면 그 순간부터 로그인이 막힙니다. 사장 역할은 레시피를 편집할 수 있습니다.</p>
       </header>
 
+      {preview && <PreviewBanner what="직원 계정 관리 (가짜 직원 · 이름 · 역할 · 재직/중지)" role="owner" />}
       {message && <p className={styles.message} role="status">{message}</p>}
 
       <table className={styles.table}>

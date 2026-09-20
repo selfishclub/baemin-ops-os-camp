@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requireActiveViewer } from "./auth";
 import { portalSections, type PortalSection } from "./portal-sections";
-import { readLockedSections } from "../db/portal-store";
+import { envLockedSections, readLockedSections } from "../db/portal-store";
+import { readPreviewRole } from "./preview/preview-role";
+import PreviewRoleSwitch from "./preview/preview-role-switch";
 import styles from "./portal.module.css";
 
 export const dynamic = "force-dynamic";
@@ -12,9 +14,12 @@ export default async function PortalHome() {
   const session = await requireActiveViewer("/");
   const viewer = session.viewer;
   const demo = session.mode === "demo";
-  const isOwner = viewer?.role === "owner";
+  // 미리보기(로그인 꺼짐)에서는 "직원 눈으로 / 사장 눈으로" 단추로 고른 쪽으로 보여 준다
+  const previewRole = demo ? await readPreviewRole() : null;
+  const isOwner = demo ? previewRole === "owner" : viewer?.role === "owner";
   const locked = await readLockedSections(session.mode === "auth" ? session.db : null);
-  const visible = portalSections.filter((section) => !section.ownerOnly || isOwner || demo);
+  const fixedLocks = new Set(demo ? envLockedSections() : []);
+  const visible = portalSections.filter((section) => !section.ownerOnly || isOwner);
   const groups = [...new Set(visible.map((section) => section.group))];
 
   return (
@@ -33,6 +38,7 @@ export default async function PortalHome() {
               ? process.env.NEXT_PUBLIC_LOGIN_OFF === "1" ? "둘러보기 모드 · 로그인 꺼 둠 · 가짜 데이터" : "시연 모드 · 가짜 데이터"
               : viewer ? `${viewer.displayName}님 · ${isOwner ? "사장" : "직원"}` : ""}
           </p>
+          {previewRole && <PreviewRoleSwitch role={previewRole} />}
           {viewer && (
             <form action="/api/auth/logout" method="post">
               <button type="submit">로그아웃</button>
@@ -52,7 +58,7 @@ export default async function PortalHome() {
           <h3 id={`group-${group}`}>{group}</h3>
           <div className={styles.grid}>
             {visible.filter((section) => section.group === group).map((section) => {
-              return <Tile key={section.id} section={section} locked={locked.has(section.id)} bypass={Boolean(isOwner)} />;
+              return <Tile key={section.id} section={section} locked={locked.has(section.id)} bypass={Boolean(isOwner) && !fixedLocks.has(section.id)} />;
             })}
           </div>
         </section>

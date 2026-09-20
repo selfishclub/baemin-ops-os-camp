@@ -140,6 +140,31 @@ test("previews owner screens in the browser only, never against real data", asyn
   assert.match(store, /if \(!db\) \{\s+for \(const id of await previewLocks\(\)\)/);
 });
 
+test("switches the preview between staff and owner eyes without touching real roles", async () => {
+  const [role, people, store, auth, training, changes, staff, admin] = await Promise.all([
+    read("../app/preview/preview-role.ts"),
+    read("../app/preview/preview-people.ts"),
+    read("../db/portal-store.ts"),
+    read("../app/auth.ts"),
+    read("../app/recipes/training/page.tsx"),
+    read("../app/recipes/changes/page.tsx"),
+    read("../app/recipes/staff/page.tsx"),
+    read("../app/recipes/admin/page.tsx"),
+  ]);
+  // 기본은 사장 눈, 쿠키가 staff 일 때만 직원 눈
+  assert.match(role, /=== "staff" \? "staff" : "owner"/);
+  // 로그인·권한 판단(auth.ts)은 미리보기 쿠키를 전혀 모른다
+  assert.doesNotMatch(auth, /preview/i);
+  // 미리보기 사장은 미리보기(쿠키) 잠금만 지나가고, 서버 설정 고정 잠금은 못 지나간다
+  assert.match(store, /session\.mode === "demo" && !envLocked && \(await readPreviewRole\(\)\) === "owner"/);
+  // 사장 전용 화면은 미리보기에서도 직원 눈으로는 안내문만
+  for (const page of [changes, staff, admin]) assert.match(page, /OwnerOnlyNotice/);
+  assert.match(training, /session\.mode === "demo"\) return <TrainingPage[^>]* preview/);
+  // 가짜 사람 데이터는 브라우저 저장소에만, 데이터 창고로 가는 길은 없다
+  assert.match(people, /localStorage\.setItem/);
+  assert.doesNotMatch(people, /supabase|fetch\(/i);
+});
+
 test("keeps image and video authoring without bundled cafe media", async () => {
   const studio = await read("../app/recipes/admin/studio.tsx");
   assert.match(studio, /사진 올리기/);

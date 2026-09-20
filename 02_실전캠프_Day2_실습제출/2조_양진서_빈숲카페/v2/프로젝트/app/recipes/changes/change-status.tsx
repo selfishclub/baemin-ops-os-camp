@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import styles from "./changes.module.css";
+import { apiFetch } from "../../preview/preview-api";
+import PreviewBanner from "../../preview/preview-banner";
 
 type Person = { id: string; name: string; at?: string };
 type NoticeStatus = {
@@ -24,7 +26,7 @@ function formatDate(value: string) {
   return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-export default function ChangeStatus() {
+export default function ChangeStatus({ preview = false }: { preview?: boolean }) {
   const [notices, setNotices] = useState<NoticeStatus[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [message, setMessage] = useState("확인 현황을 불러오는 중입니다.");
@@ -32,7 +34,7 @@ export default function ChangeStatus() {
   useEffect(() => {
     let cancelled = false;
     Promise.resolve().then(async () => {
-      const response = await fetch("/api/admin/changes", { cache: "no-store" });
+      const response = await apiFetch(preview, "/api/admin/changes", { cache: "no-store" });
       const body = await response.json();
       if (cancelled) return;
       if (!response.ok) {
@@ -46,7 +48,7 @@ export default function ChangeStatus() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [preview]);
 
   const activeCount = staff.filter((person) => person.active).length;
   const unfinished = notices.filter((notice) => notice.pending.length > 0);
@@ -62,6 +64,7 @@ export default function ChangeStatus() {
         </p>
       </header>
 
+      {preview && <PreviewBanner what="바뀐 레시피 확인 현황 (관리자 편집에서 게시 → ‘직원 눈으로’ 확인했어요 → 여기 표시)" role="owner" />}
       {message && <p className={styles.message} role="status">{message}</p>}
 
       {!message && notices.length === 0 && (

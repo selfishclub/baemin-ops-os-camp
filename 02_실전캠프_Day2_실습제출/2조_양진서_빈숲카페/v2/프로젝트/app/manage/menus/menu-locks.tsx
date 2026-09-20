@@ -59,7 +59,7 @@ export default function MenuLocks({ preview = false, previewCookie = "", initial
       const ids = next.filter((item) => item.locked && !item.fixed).map((item) => item.id).join(",");
       writePreviewLockCookie(previewCookie, ids);
       setMenus(next);
-      setMessage(`(미리보기) ‘${menu.title}’ 메뉴를 ${locked ? "잠갔어요" : "열었어요"}. 홈으로 가면 이 브라우저에서만 그렇게 보여요.`);
+      setMessage(`(미리보기) ‘${menu.title}’ 메뉴를 ${locked ? "잠갔어요" : "열었어요"}. ‘직원 눈으로’ 바꿔 홈에 가면 이 브라우저에서만 그렇게 보여요.`);
       return;
     }
     setBusyId(menu.id);
@@ -98,7 +98,7 @@ export default function MenuLocks({ preview = false, previewCookie = "", initial
         {!message && <p className={styles.summary}>지금 잠긴 메뉴 <strong>{lockedCount}개</strong> · 열린 메뉴 {menus.length - lockedCount}개</p>}
       </header>
 
-      {preview && <PreviewBanner what="메뉴 잠금 설정" />}
+      {preview && <PreviewBanner what="메뉴 잠금 설정 (잠근 뒤 ‘직원 눈으로’ 바꾸면 잠긴 모습이 보여요)" role="owner" />}
       {message && <p className={styles.message} role="status">{message}</p>}
 
       {groups.map((group) => (

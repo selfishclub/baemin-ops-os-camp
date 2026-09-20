@@ -2,6 +2,7 @@ import { requireActiveViewer } from "../auth";
 import { checkSectionAccess } from "../../db/portal-store";
 import LockedNotice from "../locked-notice";
 import RecipesPage from "./recipes-page";
+import { previewViewer, readPreviewRole } from "../preview/preview-role";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +11,8 @@ export default async function RecipesRoute() {
   const session = await requireActiveViewer("/recipes");
   const access = await checkSectionAccess(session, "recipes");
   if (!access.allowed) return <LockedNotice title="레시피" />;
-  const viewer = session.viewer
-    ? { displayName: session.viewer.displayName, role: session.viewer.role }
-    : null;
+  // 미리보기(로그인 꺼짐)에서는 가짜 사람(미리보기 사장 / 직원 A)으로 본다
+  const person = session.mode === "demo" ? previewViewer(await readPreviewRole()) : session.viewer;
+  const viewer = person ? { displayName: person.displayName, role: person.role } : null;
   return <RecipesPage viewer={viewer} demo={session.mode === "demo"} lockedForStaff={access.locked} />;
 }

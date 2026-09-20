@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ViewerSession } from "../app/auth";
 import { portalSections } from "../app/portal-sections";
 import { cookies } from "next/headers";
+import { readPreviewRole } from "../app/preview/preview-role";
 
 // 메뉴(영역) 잠금: 사장이 관리자 화면 "메뉴 잠금 설정"에서 큰 메뉴마다 열림/잠김을 정한다.
 // 잠긴 메뉴는 직원에게 "잠김"으로만 보이고, 주소를 직접 열거나 챗봇으로 물어도 열리지 않는다. 사장은 항상 들어갈 수 있다.
@@ -91,8 +92,11 @@ export type SectionAccess = { locked: boolean; allowed: boolean; envLocked: bool
 export async function checkSectionAccess(session: ViewerSession, sectionId: string): Promise<SectionAccess> {
   const locked = await readLockedSections(session.mode === "auth" ? session.db : null);
   const isLocked = locked.has(sectionId);
+  const envLocked = envLockedSections().includes(sectionId);
   const isOwner = session.mode === "auth" && session.viewer?.role === "owner";
-  return { locked: isLocked, allowed: !isLocked || isOwner, envLocked: envLockedSections().includes(sectionId) };
+  // 미리보기에서 "사장 눈으로" 보는 중이면 미리보기(쿠키) 잠금은 사장처럼 지나간다. 서버 설정 고정 잠금은 누구도 못 지나간다.
+  const previewOwner = session.mode === "demo" && !envLocked && (await readPreviewRole()) === "owner";
+  return { locked: isLocked, allowed: !isLocked || isOwner || previewOwner, envLocked };
 }
 
 export function lockedResponse() {

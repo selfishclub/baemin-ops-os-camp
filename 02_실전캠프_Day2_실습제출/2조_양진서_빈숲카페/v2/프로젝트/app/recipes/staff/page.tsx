@@ -1,21 +1,15 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireActiveViewer } from "../../auth";
+import OwnerOnlyNotice from "../../preview/owner-only-notice";
+import { readPreviewRole } from "../../preview/preview-role";
 import StaffManager from "./staff-manager";
 
 export const dynamic = "force-dynamic";
 
 export default async function StaffPage() {
   const session = await requireActiveViewer("/recipes/staff");
-  if (session.mode === "demo") {
-    return (
-      <main style={{ padding: 32, fontFamily: "system-ui" }}>
-        <h1>직원 계정 관리</h1>
-        <p>데이터 창고(Supabase)가 연결되지 않아 시연 모드로 도는 중입니다. `.env.local`에 열쇠를 넣으면 로그인·직원 관리가 켜집니다.</p>
-        <p><Link href="/recipes">← 레시피</Link></p>
-      </main>
-    );
-  }
+  // 로그인이 꺼진 시연·둘러보기 모드: 가짜 직원으로, 이 브라우저에만 저장되는 미리보기
+  if (session.mode === "demo") return (await readPreviewRole()) === "owner" ? <StaffManager preview /> : <OwnerOnlyNotice title="직원 계정 관리" />;
   if (session.viewer!.role !== "owner") redirect("/");
   return <StaffManager />;
 }

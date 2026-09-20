@@ -3,8 +3,10 @@
 import { cascadeSharedStandards, validateRecipeContent } from "../recipes/content-model";
 import { buildRecipeHistory } from "../recipes/history";
 import { defaultRecipeContent, type RecipeContent } from "../recipes/recipe-data";
+import { addPreviewNotices, handlePeople, hasPeopleEdits, resetPeople } from "./preview-people";
 
-// 미리보기 모드: 로그인이 꺼진(둘러보기·시연) 상태에서도 관리자 편집·지침서·게시·변경 이력을 직접 눌러 볼 수 있게 한다.
+// 미리보기 모드: 로그인이 꺼진(둘러보기·시연) 상태에서도 관리자 편집·지침서·게시·변경 이력,
+// 그리고 교육 체크·퀴즈·바뀐 레시피 확인·직원 관리(preview-people.ts)를 직접 눌러 볼 수 있게 한다.
 // 서버와 데이터 창고는 건드리지 않는다 — 고친 내용은 이 브라우저(localStorage)에만 저장되고 다른 사람에게는 보이지 않는다.
 // 로그인 모드에서는 이 파일이 아무 일도 하지 않고 진짜 서버로 그대로 보낸다.
 
@@ -57,12 +59,22 @@ function save(workspace: PreviewWorkspace) {
   }
 }
 
-export function hasPreviewEdits() {
+function hasWorkspaceEdits() {
   try {
     return Boolean(window.localStorage.getItem(storageKey));
   } catch {
     return false;
   }
+}
+
+export function hasPreviewEdits() {
+  const hasLocks = document.cookie.split("; ").some((item) => item.startsWith("bs_preview_locks=") && item.length > "bs_preview_locks=".length);
+  return hasWorkspaceEdits() || hasPeopleEdits() || hasLocks;
+}
+
+// 미리보기 잠금 쿠키 지우기 (컴포넌트 밖 헬퍼)
+function clearPreviewLockCookie() {
+  document.cookie = "bs_preview_locks=; path=/; max-age=0; samesite=lax";
 }
 
 export function resetPreview() {
@@ -71,6 +83,8 @@ export function resetPreview() {
   } catch {
     // 무시
   }
+  resetPeople();
+  clearPreviewLockCookie();
 }
 
 function json(body: unknown, status = 200) {
@@ -128,7 +142,8 @@ async function handlePreview(url: string, init?: RequestInit): Promise<Response 
     if (!effectiveAt) errors.unshift("게시 시행일이 필요합니다.");
     if (errors.length) return json({ error: "게시 전 확인이 필요합니다.", errors }, 422);
     const before = new Map(ws.published.recipes.map((recipe) => [recipe.id, JSON.stringify(recipe)]));
-    const notified = body.notifyStaff === false ? 0 : cascaded.content.recipes.filter((recipe) => before.get(recipe.id) !== JSON.stringify(recipe)).length;
+    const changed = cascaded.content.recipes.filter((recipe) => before.get(recipe.id) !== JSON.stringify(recipe));
+    const notified = body.notifyStaff === false ? 0 : changed.length;
     const now = new Date().toISOString();
     ws.publishedVersion += 1;
     ws.published = structuredClone(cascaded.content);
@@ -138,6 +153,7 @@ async function handlePreview(url: string, init?: RequestInit): Promise<Response 
     ws.revision += 1;
     ws.versions.push({ version: ws.publishedVersion, change_reason: reason, effective_at: effectiveAt, published_by: actorName, published_at: now, content: structuredClone(cascaded.content) });
     save(ws);
+    if (body.notifyStaff !== false) addPreviewNotices(ws.published.recipes, changed, ws.publishedVersion, reason, actorName);
     return json({ version: ws.publishedVersion, revision: ws.revision, publishedAt: now, content: ws.published, notified });
   }
 
@@ -159,17 +175,19 @@ async function handlePreview(url: string, init?: RequestInit): Promise<Response 
   }
 
   // 직원 화면: 미리보기에서 게시한 적이 있으면 그 공식본을 보여 준다
-  if (path === "/api/content" && method === "GET" && hasPreviewEdits()) {
+  if (path === "/api/content" && method === "GET" && hasWorkspaceEdits()) {
     return json({ content: load().published, source: "preview" });
   }
 
-  if (path === "/api/history" && method === "GET" && hasPreviewEdits()) {
+  if (path === "/api/history" && method === "GET" && hasWorkspaceEdits()) {
     const recipeId = new URL(url, window.location.origin).searchParams.get("recipe") ?? "";
     const versions = load().versions.map((item) => ({ version: item.version, published_at: item.published_at, change_reason: item.change_reason, published_by: item.published_by, recipes: item.content.recipes }));
     return json({ history: buildRecipeHistory(recipeId, versions) });
   }
 
-  return null;
+  // 교육 체크·퀴즈·바뀐 레시피 확인·직원 관리: 지금 공식본(미리보기에서 게시했으면 그것)의 메뉴 기준
+  const recipes = hasWorkspaceEdits() ? load().published.recipes : defaultRecipeContent.recipes;
+  return handlePeople(path, method, url, await readBody(init), recipes);
 }
 
 // preview=true 면 위 주소들은 브라우저 안에서 처리하고, 나머지는 서버로 보낸다. preview=false 면 항상 서버로.

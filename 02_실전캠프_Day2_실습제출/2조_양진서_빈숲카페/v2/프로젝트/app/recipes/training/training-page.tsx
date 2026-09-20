@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { RecipeContent } from "../recipe-data";
 import { buildQuiz, type QuizQuestion } from "../quiz";
 import styles from "./training.module.css";
+import { apiFetch } from "../../preview/preview-api";
+import PreviewBanner from "../../preview/preview-banner";
 
 type Viewer = { id: string; displayName: string; role: "owner" | "staff" };
 type Row = { recipe_id: string; recipe_name: string; category: string; practiced_at: string | null; confirmed_at: string | null; confirmed_by_name: string | null };
@@ -16,7 +18,7 @@ function day(value: string | null) {
   return value ? `${new Date(value).getMonth() + 1}/${new Date(value).getDate()}` : "";
 }
 
-export default function TrainingPage({ viewer }: { viewer: Viewer }) {
+export default function TrainingPage({ viewer, preview = false }: { viewer: Viewer; preview?: boolean }) {
   const isOwner = viewer.role === "owner";
   const [message, setMessage] = useState("불러오는 중입니다.");
   const [training, setTraining] = useState<Training | null>(null);
@@ -34,7 +36,7 @@ export default function TrainingPage({ viewer }: { viewer: Viewer }) {
   const [quizDone, setQuizDone] = useState(false);
 
   async function loadMine() {
-    const response = await fetch("/api/training", { cache: "no-store" });
+    const response = await apiFetch(preview, "/api/training", { cache: "no-store" });
     const body = await response.json();
     if (!response.ok) {
       setMessage(body.error ?? "불러오지 못했습니다.");
@@ -46,7 +48,7 @@ export default function TrainingPage({ viewer }: { viewer: Viewer }) {
   }
 
   async function loadOverview() {
-    const response = await fetch("/api/admin/training", { cache: "no-store" });
+    const response = await apiFetch(preview, "/api/admin/training", { cache: "no-store" });
     const body = await response.json();
     if (!response.ok) {
       setMessage(body.error ?? "불러오지 못했습니다.");
@@ -59,7 +61,7 @@ export default function TrainingPage({ viewer }: { viewer: Viewer }) {
   async function loadStaff(person: StaffSummary) {
     setSelectedStaff(person);
     setTraining(null);
-    const response = await fetch(`/api/admin/training?user=${encodeURIComponent(person.id)}`, { cache: "no-store" });
+    const response = await apiFetch(preview, `/api/admin/training?user=${encodeURIComponent(person.id)}`, { cache: "no-store" });
     const body = await response.json();
     if (!response.ok) {
       setMessage(body.error ?? "불러오지 못했습니다.");
@@ -73,7 +75,7 @@ export default function TrainingPage({ viewer }: { viewer: Viewer }) {
     Promise.resolve().then(() => {
       if (cancelled) return;
       void (isOwner ? loadOverview() : loadMine());
-      fetch("/api/content", { cache: "no-store" })
+      apiFetch(preview, "/api/content", { cache: "no-store" })
         .then((response) => (response.ok ? response.json() : null))
         .then((body) => {
           if (!cancelled && body?.content) setContent(body.content);
@@ -89,7 +91,7 @@ export default function TrainingPage({ viewer }: { viewer: Viewer }) {
   async function practiced(recipeId: string) {
     setBusyRecipe(recipeId);
     try {
-      const response = await fetch("/api/training", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ recipeId }) });
+      const response = await apiFetch(preview, "/api/training", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ recipeId }) });
       const body = await response.json();
       if (!response.ok) {
         setMessage(body.error ?? "기록하지 못했습니다.");
@@ -105,7 +107,7 @@ export default function TrainingPage({ viewer }: { viewer: Viewer }) {
     if (!selectedStaff) return;
     setBusyRecipe(recipeId);
     try {
-      const response = await fetch("/api/admin/training", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId: selectedStaff.id, recipeId }) });
+      const response = await apiFetch(preview, "/api/admin/training", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userId: selectedStaff.id, recipeId }) });
       const body = await response.json();
       if (!response.ok) {
         setMessage(body.error ?? "저장하지 못했습니다.");
@@ -141,7 +143,7 @@ export default function TrainingPage({ viewer }: { viewer: Viewer }) {
     }
     setQuizDone(true);
     const score = nextAnswers.filter((item) => item.correct).length;
-    const response = await fetch("/api/quiz", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ score, total: nextAnswers.length, detail: nextAnswers }) });
+    const response = await apiFetch(preview, "/api/quiz", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ score, total: nextAnswers.length, detail: nextAnswers }) });
     if (response.ok) {
       const body = await response.json();
       setQuizHistory(body.quiz ?? []);
@@ -168,6 +170,7 @@ export default function TrainingPage({ viewer }: { viewer: Viewer }) {
         </p>
       </header>
 
+      {preview && <PreviewBanner what={isOwner ? "직원 교육 현황 · 직원별 체크리스트 ‘확인함’ · 퀴즈" : "내 메뉴 체크리스트 ‘만들어 봤음’ · 퀴즈"} role={viewer.role} />}
       {message && <p className={styles.message} role="status">{message}</p>}
 
       {isOwner && !selectedStaff && overview && (

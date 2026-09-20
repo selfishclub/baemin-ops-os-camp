@@ -15,3 +15,9 @@
 .banner p { flex: 1; min-width: 220px; margin: 0; }
 .badge { flex: none; padding: 3px 9px; border-radius: 6px; background: #8a6d12; color: white; font-size: 11px; font-weight: 900; letter-spacing: .06em; }
 .banner button { flex: none; min-height: 32px; padding: 0 12px; border: 1px solid #8a6d12; border-radius: 999px; background: white; color: #8a6d12; font-size: 11px; font-weight: 800; cursor: pointer; }
+
+/* 미리보기: 직원 눈으로 / 사장 눈으로 */
+.roleSwitch { display: inline-flex; flex: none; align-items: center; gap: 2px; padding: 3px; border: 1px dashed #b8a25a; border-radius: 999px; background: #fffbe8; }
+.roleSwitch span { padding: 0 8px 0 9px; color: #8a6d12; font-size: 10px; font-weight: 900; letter-spacing: .06em; }
+.roleSwitch button, .banner .roleSwitch button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: #6f5a17; font-size: 11px; font-weight: 800; cursor: pointer; }
+.roleSwitch button[aria-pressed="true"], .banner .roleSwitch button[aria-pressed="true"] { background: #8a6d12; color: white; }

@@ -21,16 +21,8 @@ npm run dev
 
 - 끄기: 환경변수 `NEXT_PUBLIC_LOGIN_OFF=1` 을 넣고 다시 배포 (내 컴퓨터는 `.env.local` 에 한 줄 추가)
 - 켜기: 그 환경변수를 지우고 다시 배포
-- 꺼 둔 동안: 데이터 창고를 읽지 않고 가짜 레시피만 보입니다. 레시피 보기·검색·단면도·영상 프롬프트(종류별 지침서)·레시피 물어보기·워터마크는 그대로 되고, 읽음 확인·교육 기록처럼 저장이 필요한 기능은 안내 문구만 나옵니다
-- 꺼 둔 동안 **미리보기**: 관리자 편집(`/recipes/admin`)과 메뉴 잠금 설정(`/manage/menus`)은 로그인 없이 눌러 볼 수 있습니다. 고친 레시피·지침·게시·복구는 브라우저 저장소(`beansoop-preview-workspace-v1`)에, 잠금은 쿠키(`bs_preview_locks`)에만 남고 데이터 창고에는 쓰지 않습니다. 로그인 모드에서는 이 쿠키를 읽지 않으므로 실제 잠금을 풀 수 없습니다. 사진·영상 올리기는 미리보기에서 막혀 있습니다
-
-## 메뉴 잠금
-
-- 로그인 모드: 사장이 관리의 "메뉴 잠금 설정"(`/manage/menus`)에서 큰 메뉴마다 열림/잠김을 고른다 (데이터 창고 표 `portal_locks`)
-- 둘러보기 모드(로그인 꺼 둠): 서버 환경변수 `LOCKED_SECTIONS=recipes` (쉼표로 여러 개) 를 넣고 다시 배포하면 고정 잠금. 그 밖에 `/manage/menus` 에서 누르는 잠금은 그 브라우저에서만 보이는 미리보기
-- 잠글 수 있는 메뉴: 사장 전용 관리 메뉴를 뺀 전부 (`recipes`, `training`, `exam` 등 — `app/portal-sections.ts` 의 id). 기본은 전부 열림
-
-## 데이터 창고(Supabase) 연결 — 사장님만 한 번
+- 꺼 둔 동안: 데이터 창고를 읽지 않고 가짜 레시피만 보입니다. 레시피 보기·검색·단면도·영상 프롬프트(종류별 지침서)·레시피 물어보기·워터마크는 그대로 됩니다
+- 꺼 둔 동안 **미리보기**: 홈·레시피·각 화면의 노란 단추로 **직원 눈으로 / 사장 눈으로**를 바꿔 봅니다(쿠키 `bs_preview_role`). 사장 눈: 관리자 편집(`/recipes/admin`), 메뉴 잠금 설정(`/manage/menus`), 직원 교육 현황(`/recipes/training`), 확인 현황(`/recipes/changes`), 직원 관리(`/recipes/staff`). 직원 눈: 바뀐 레시피 확인했어요, 내 체크리스트, 퀴즈 — 사장 전용 주소는 안내문만 나옵니다. 고친 레시피·지침·게시·복구는 브라우저 저장소 `beansoop-preview-workspace-v1`, 가짜 직원·교육·퀴즈·확인 기록은 `beansoop-preview-people-v1`, 잠금은 쿠키 `bs_preview_locks` 에만 남고 데이터 창고에는 쓰지 않습니다. 로그인 모드에서는 이 쿠키들을 읽지 않으므로 실제 권한·잠금을 바꿀 수 없습니다. `LOCKED_SECTIONS` 고정 잠금은 "사장 눈으로"도 지나가지 못합니다. 사진·영상 올리기는 미리보기에서 막혀 있습니다
 
 1. Supabase 프로젝트를 만들고 **SQL Editor** 에 `supabase/schema.sql` 을 통째로 붙여넣어 실행 (표·잠금·사진 파일함이 만들어집니다)
 2. `.env.local.example` 을 복사해 `.env.local` 로 만들고, 대시보드 **Project Settings → API** 의 Project URL 과 anon 키를 붙여넣기 (`service_role` 은 절대 금지)
