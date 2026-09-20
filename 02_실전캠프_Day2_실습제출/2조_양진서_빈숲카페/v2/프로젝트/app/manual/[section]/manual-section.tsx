@@ -137,6 +137,7 @@ export default function ManualSection({ sectionId, title, description, role, dem
                 <small>최종 수정 {selected.updatedAt}{selected.change ? ` · ${selected.change}` : ""}</small>
               </header>
 
+              {selected.dailyCheck && !isCard && <p className={styles.dailyLink}><a href="/checks">✓ 매일 체크하는 문서예요 — 오늘 체크하러 가기</a></p>}
               {selected.purpose && (
                 <section>
                   <h3>{labels.purpose}</h3>

@@ -93,6 +93,12 @@ export default function ManualEditor({ content, onChange }: { content: RecipeCon
             )}
             <Field label="최종 수정일"><input value={selected.updatedAt} onChange={(event) => patch({ updatedAt: event.target.value })} /></Field>
           </div>
+          {!isCard && (
+            <label className={styles.dailyToggle}>
+              <input type="checkbox" checked={Boolean(selected.dailyCheck)} onChange={(event) => patch({ dailyCheck: event.target.checked || undefined })} />
+              <span><strong>매일 체크하는 문서</strong> — 켜면 아래 ‘순서’의 각 줄이 홈의 ‘오늘 체크’ 항목이 되고, 누가 언제 했는지 남아요 (오픈·마감 체크처럼)</span>
+            </label>
+          )}
           <Field label="챗봇이 알아듣는 낱말 · 쉼표로 구분 (제목에 없는 말로 물어도 찾게)">
             <input value={(selected.keywords ?? []).join(", ")} onChange={(event) => patch({ keywords: event.target.value.split(",").map((item) => item.trim()).filter(Boolean) })} />
           </Field>

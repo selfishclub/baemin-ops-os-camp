@@ -4,13 +4,14 @@ import type { Recipe, RecipeContent } from "../recipes/recipe-data";
 import { manualNoticePrefix, readableManuals } from "../manual/manual-data";
 import { getTrainingPath, manualCheckPrefix } from "../manual/training-path";
 import { buildExamStatus, examCheckKey, examCheckPrefix, getExams } from "../exam/exam-data";
+import { buildCheckDocs, buildDaySummaries, checkItemKey, isCheckDate, lastDates, signoffItemKey, todayInSeoul, type DailyRow } from "../checks/check-data";
 
 // 미리보기용 "사람" 데이터: 가짜 직원, 메뉴 체크리스트, 퀴즈 점수, 바뀐 레시피 알림과 확인 기록.
 // 전부 이 브라우저(localStorage)에만 있고 서버·데이터 창고로 가는 길은 없다. 실제 직원 이름은 쓰지 않는다.
 
 // 예시 기록의 모양이 바뀌면 숫자를 올린다 — 예전 버전을 눌러 본 브라우저에 남은 옛 예시가 새 화면을 가리지 않게
-const storageKey = "beansoop-preview-people-v3";
-const oldStorageKeys = ["beansoop-preview-people-v1", "beansoop-preview-people-v2"];
+const storageKey = "beansoop-preview-people-v4";
+const oldStorageKeys = ["beansoop-preview-people-v1", "beansoop-preview-people-v2", "beansoop-preview-people-v3"];
 const roleCookie = "bs_preview_role";
 
 const ownerId = "preview-owner";
@@ -21,10 +22,26 @@ type CheckRow = { user_id: string; recipe_id: string; practiced_at: string | nul
 // examId 가 있으면 시험 필기 결과, 없으면 연습 퀴즈
 type QuizRow = { id: number; user_id: string; score: number; total: number; created_at: string; examId?: string };
 type NoticeRow = { id: number; version: number; recipe_id: string; recipe_name: string; change_reason: string; published_by: string; created_at: string; acks: { user_id: string; acked_at: string }[] };
-type PreviewPeople = { staff: StaffRow[]; checks: CheckRow[]; quiz: QuizRow[]; notices: NoticeRow[] };
+type DailyCheckRow = DailyRow & { check_date: string };
+type PreviewPeople = { staff: StaffRow[]; checks: CheckRow[]; quiz: QuizRow[]; notices: NoticeRow[]; daily: DailyCheckRow[] };
 
 function daysAgo(days: number) {
   return new Date(Date.now() - days * 86_400_000).toISOString();
+}
+
+const openSteps = ["(예시) 출근 기록을 남긴다", "(예시) 전원·조명·기기 예열: ○○ 순서로", "(예시) 재료 상태 확인: ○○", "(예시) 진열·청결 확인", "(예시) 영업 시작 전 책임자에게 확인받는다"];
+
+function seedDaily(): DailyCheckRow[] {
+  const today = todayInSeoul();
+  const yesterday = lastDates(today, 2)[1];
+  const at = (date: string, time: string) => new Date(`${date}T${time}:00+09:00`).toISOString();
+  const row = (date: string, text: string, by: string, name: string, time: string, key = checkItemKey(text)): DailyCheckRow => ({ check_date: date, doc_id: "demo-open-prep", item_key: key, item_text: text, checked_by: by, checked_by_name: name, checked_at: at(date, time) });
+  return [
+    ...openSteps.map((text, index) => row(yesterday, text, staffId, "직원 A", `08:${String(10 + index * 7).padStart(2, "0")}`)),
+    row(yesterday, "확인함", ownerId, "미리보기 사장", "09:05", signoffItemKey),
+    row(today, openSteps[0], "preview-staff-b", "직원 B", "08:12"),
+    row(today, openSteps[1], "preview-staff-b", "직원 B", "08:20"),
+  ];
 }
 
 // 처음 열었을 때 화면이 비어 보이지 않게 넣어 두는 가짜 기록
@@ -54,6 +71,8 @@ function freshPeople(recipes: Recipe[]): PreviewPeople {
       { id: 2, user_id: "preview-staff-b", score: 9, total: 10, created_at: daysAgo(7), examId: "demo-exam-1" },
       { id: 3, user_id: staffId, score: 6, total: 10, created_at: daysAgo(4), examId: "demo-exam-1" },
     ],
+    // 오늘 체크 예시: 어제 오픈은 다 하고 사장 확인까지, 오늘 오픈은 직원 B가 두 개 해 둔 상태
+    daily: seedDaily(),
     notices: third
       ? [{ id: 2, version: 1, recipe_id: `${manualNoticePrefix}demo-close-closing`, recipe_name: "예시 · 마감 순서", change_reason: "시연용 알림 · 순서 변경", published_by: "미리보기 사장", created_at: daysAgo(2), acks: [] }, { id: 1, version: 1, recipe_id: third.id, recipe_name: third.name, change_reason: "시연용 알림 · 정량 변경", published_by: "미리보기 사장", created_at: daysAgo(1), acks: [{ user_id: "preview-staff-b", acked_at: daysAgo(0.5) }] }]
       : [],
@@ -74,6 +93,7 @@ function save(people: PreviewPeople) {
   try {
     people.notices = people.notices.slice(-30);
     people.quiz = people.quiz.slice(-40);
+    people.daily = (people.daily ?? []).slice(-400);
     window.localStorage.setItem(storageKey, JSON.stringify(people));
   } catch {
     // 공간이 모자라면 저장을 건너뛴다
@@ -286,6 +306,40 @@ export async function handlePeople(path: string, method: string, url: string, bo
     people.quiz.push({ id: Math.max(0, ...people.quiz.map((row) => row.id)) + 1, user_id: me, score: Number(body.score), total: Number(body.total), created_at: new Date().toISOString() });
     save(people);
     return json({ quiz: quizOf(people, me) });
+  }
+
+  // 오늘 체크 (서버의 app/api/checks 와 같은 규칙)
+  if (path === "/api/checks") {
+    if (lockedForMe.includes("checks")) return json({ error: "이 메뉴는 지금 잠겨 있습니다.", locked: true }, 423);
+    const people = load(recipes);
+    people.daily ??= [];
+    const today = todayInSeoul();
+    const docs = readableManuals(content).filter((doc) => !lockedForMe.includes(doc.sectionId));
+    const meName = nameOf(people, me) ?? "";
+    const viewOf = (requested: string | null) => {
+      const date = role === "owner" && isCheckDate(requested) ? requested : today;
+      const dates = lastDates(today, 14);
+      return { date, today, docs: buildCheckDocs(docs, people.daily.filter((row) => row.check_date === date), me), history: role === "owner" ? buildDaySummaries(docs, people.daily, dates) : [] };
+    };
+    if (method === "GET") return json(viewOf(new URL(url, window.location.origin).searchParams.get("date")));
+    if (method === "POST") {
+      const doc = docs.find((item) => item.id === body.docId && item.dailyCheck);
+      if (!doc) return json({ error: "어떤 문서인지 없습니다." }, 400);
+      const drop = (date: string, key: string, onlyMine: boolean) => { people.daily = people.daily.filter((row) => !(row.check_date === date && row.doc_id === doc.id && row.item_key === key && (!onlyMine || row.checked_by === me))); };
+      const add = (date: string, key: string, text: string) => { if (!people.daily.some((row) => row.check_date === date && row.doc_id === doc.id && row.item_key === key)) people.daily.push({ check_date: date, doc_id: doc.id, item_key: key, item_text: text, checked_by: me, checked_by_name: meName, checked_at: new Date().toISOString() }); };
+      if (typeof body.signoff === "boolean") {
+        if (role !== "owner") return json({ error: "확인함은 사장님만 누를 수 있습니다." }, 403);
+        const date = isCheckDate(String(body.date ?? "")) ? String(body.date) : today;
+        if (body.signoff) add(date, signoffItemKey, "확인함"); else drop(date, signoffItemKey, false);
+        save(people);
+        return json(viewOf(date));
+      }
+      const text = doc.steps.find((step) => checkItemKey(step) === body.itemKey);
+      if (!text) return json({ error: "어떤 항목인지 없습니다." }, 400);
+      if (body.checked === false) drop(today, String(body.itemKey), role !== "owner"); else add(today, String(body.itemKey), text);
+      save(people);
+      return json(viewOf(null));
+    }
   }
 
   // 시험 · 인증

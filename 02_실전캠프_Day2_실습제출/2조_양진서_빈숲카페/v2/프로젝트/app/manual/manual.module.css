@@ -46,6 +46,9 @@
 .done { list-style: none; padding-left: 0 !important; }
 .done li::before { content: "✓"; display: inline-block; width: 20px; color: #2f6b47; font-weight: 900; }
 
+.dailyLink { margin: 12px 0 0 !important; }
+.dailyLink a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; background: #173f31; color: white; font-size: 12px; font-weight: 800; text-decoration: none; }
+
 /* 바뀐 문서 표시 */
 .changedDot { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #b4462f; color: white; font-size: 10px; font-weight: 900; vertical-align: middle; }
 .changedBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; order: -1; margin: -6px 0 16px; padding: 12px 14px; border: 1px solid #e6c9bf; border-radius: 14px; background: #fdf1ec; }

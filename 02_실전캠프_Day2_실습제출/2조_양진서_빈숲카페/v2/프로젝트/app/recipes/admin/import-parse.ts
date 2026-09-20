@@ -211,6 +211,7 @@ export const manualColumns = {
   donts: ["하면안되는것", "금지", "이렇게는말하지않아요", "말하지않아요", "donts"],
   reportWhen: ["보고기준", "이럴땐바로보고", "책임자를부르는기준", "이럴땐책임자를불러요", "report"],
   keywords: ["챗봇낱말", "알아듣는낱말", "키워드", "keywords"],
+  daily: ["매일체크", "오늘체크", "체크리스트", "daily"],
 } as const;
 
 export const manualTemplate = [
@@ -266,6 +267,8 @@ export function parseManualTable(text: string, options: ManualImportOptions): Im
       kind: isCard ? "response" : "procedure",
       ...(cell(cells, "group") ? { group: cell(cells, "group") } : {}),
       keywords: cell(cells, "keywords").split(/[,;\n]/).map((item) => item.trim()).filter(Boolean),
+      // "예", "o", "y", "1", "✓" 처럼 적으면 매일 체크하는 문서 (응대 카드는 해당 없음)
+      ...(!isCard && /^(예|네|o|y|yes|1|true|v|✓|ㅇ)$/i.test(cell(cells, "daily")) ? { dailyCheck: true } : {}),
       sectionId: section.id,
       title,
       summary: cell(cells, "summary") || purpose,

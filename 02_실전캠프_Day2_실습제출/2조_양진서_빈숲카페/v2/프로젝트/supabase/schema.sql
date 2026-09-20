@@ -301,6 +301,45 @@ drop policy if exists "locks_update_owner" on public.portal_locks;
 create policy "locks_update_owner" on public.portal_locks
   for update to authenticated using (public.is_owner()) with check (public.is_owner());
 
+-- 3-5) 오늘 체크 기록 (오픈·마감 체크 등) -----------------------------------------
+-- 매뉴얼 문서의 "순서" 각 줄을 그날 누가 언제 했는지. 하루·문서·항목마다 한 줄 (먼저 누른 사람 이름이 남는다).
+-- item_key = '__signoff__' 인 줄은 사장이 그날 그 문서를 "확인함" 한 기록 — 사장만 넣고 지울 수 있다.
+create table if not exists public.daily_checks (
+  id bigserial primary key,
+  check_date date not null,
+  doc_id text not null,
+  item_key text not null,
+  item_text text not null default '',
+  checked_by uuid not null references public.profiles (id) on delete cascade,
+  checked_by_name text not null default '',
+  checked_at timestamptz not null default now(),
+  unique (check_date, doc_id, item_key)
+);
+create index if not exists idx_daily_checks_date on public.daily_checks (check_date desc);
+
+grant select, insert, delete on public.daily_checks to authenticated;
+grant usage, select on sequence public.daily_checks_id_seq to authenticated;
+alter table public.daily_checks enable row level security;
+
+-- 재직 직원은 모두 본다 (앞 근무자가 어디까지 했는지 알아야 하므로)
+drop policy if exists "daily_select_active" on public.daily_checks;
+create policy "daily_select_active" on public.daily_checks
+  for select to authenticated using (public.is_active_user());
+
+-- 직원은 자기 이름으로만, 확인함(__signoff__)은 사장만
+drop policy if exists "daily_insert_self_or_owner" on public.daily_checks;
+create policy "daily_insert_self_or_owner" on public.daily_checks
+  for insert to authenticated with check (
+    checked_by = auth.uid() and public.is_active_user() and (item_key <> '__signoff__' or public.is_owner())
+  );
+
+-- 체크 취소는 본인 것만, 사장은 모두
+drop policy if exists "daily_delete_self_or_owner" on public.daily_checks;
+create policy "daily_delete_self_or_owner" on public.daily_checks
+  for delete to authenticated using (
+    public.is_owner() or (checked_by = auth.uid() and public.is_active_user() and item_key <> '__signoff__')
+  );
+
 -- 4) 사진 파일함 (비공개) -------------------------------------------------------
 insert into storage.buckets (id, name, public)
 values ('recipe-media', 'recipe-media', false)

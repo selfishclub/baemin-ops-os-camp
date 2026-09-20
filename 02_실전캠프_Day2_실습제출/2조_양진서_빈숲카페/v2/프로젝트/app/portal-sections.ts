@@ -15,6 +15,7 @@ export type PortalSection = {
 
 export const portalSections: PortalSection[] = [
   { id: "recipes", group: "지금 쓰는 것", status: "open", href: "/recipes", title: "레시피", description: "메뉴별 정량·순서·주의사항, 사진·영상, 바뀐 레시피 확인, 레시피 물어보기" },
+  { id: "checks", group: "지금 쓰는 것", status: "open", href: "/checks", title: "오늘 체크", description: "오픈·마감처럼 매일 하는 일을 항목마다 누르기. 누가 언제 했는지 남고 사장이 확인" },
   { id: "training", group: "지금 쓰는 것", status: "open", href: "/recipes/training", title: "신입 교육 경로 · 퀴즈", description: "1일차·1주차·30일차 단계별로 문서 ‘읽었어요’, 메뉴 ‘만들어 봤음’ → 사장 ‘확인함’, 자동 퀴즈" },
 
   { id: "standard", group: "운영 매뉴얼", status: "open", href: "/manual/standard", title: "빈숲의 기준", description: "모토, 서비스 원칙, 해도 되는 판단과 하면 안 되는 행동" },

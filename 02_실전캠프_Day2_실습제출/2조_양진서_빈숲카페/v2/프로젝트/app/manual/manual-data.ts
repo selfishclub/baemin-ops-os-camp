@@ -14,6 +14,8 @@ export type ManualDoc = {
   group?: string;
   // 챗봇이 알아듣는 낱말 (제목에 없는 말로 물어도 찾게)
   keywords?: string[];
+  // 매일 체크하는 문서 (오픈·마감 체크처럼). 켜면 "순서"의 각 줄이 오늘 체크 항목이 되고, 누가 언제 했는지 남는다
+  dailyCheck?: boolean;
   // app/portal-sections.ts 의 영역 id (open, close …)
   sectionId: string;
   title: string;
@@ -153,8 +155,11 @@ const responseCards: ManualDoc[] = [
     ["(예시) 상태 확인, 분실물 보관·기록"], ["(예시) 다친 손님은 모두 즉시", "(예시) 귀중품 분실물"]),
 ];
 
+// 매일 체크하는 예시 문서
+const dailyExamples = new Set(["demo-open-prep", "demo-close-closing", "demo-hygiene-daily"]);
+
 function example(sectionId: ManualSectionId, slug: string, title: string, summary: string, purpose: string, parts: Pick<ManualDoc, "materials" | "steps" | "doneCriteria" | "donts" | "reportWhen">): ManualDoc {
-  return { id: `demo-${sectionId}-${slug}`, sectionId, title, summary, purpose, ...parts, updatedAt: "테스트", change: "기능 확인용 예시 문서" };
+  return { id: `demo-${sectionId}-${slug}`, ...(dailyExamples.has(`demo-${sectionId}-${slug}`) ? { dailyCheck: true } : {}), sectionId, title, summary, purpose, ...parts, updatedAt: "테스트", change: "기능 확인용 예시 문서" };
 }
 
 export const defaultManuals: ManualDoc[] = [
