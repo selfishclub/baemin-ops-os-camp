@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog, MoneyInput, Notice } from "@/components/ui";
 import { newId } from "@/lib/classify";
 import { ITEMS_KEY, type Item } from "@/lib/costing/types";
@@ -17,9 +17,11 @@ import {
   type PurchaseCategory,
   type PurchaseLine,
 } from "@/lib/costing/purchases";
+import { RECEIPT_PROMPT, matchItem, parseReceiptText, toPurchaseLine } from "@/lib/costing/receiptText";
 import { todayStr } from "@/lib/daily";
 import { num, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
+import { addPhoto, countPhotosByOwner, deletePhoto, deletePhotosOf, getPhotoBlob, listPhotos, photosAvailable, type PhotoMeta } from "@/lib/photos";
 import { getStore } from "@/lib/storage";
 
 // 매입 영수증 — 마트·거래처 영수증을 품목별로 적고, 품목에 연결하면 기준단가가 최근 매입가로 바뀐다.
@@ -29,6 +31,10 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState<Purchase | null>(null);
+  const [editingIsNew, setEditingIsNew] = useState(false);
+  const [pasting, setPasting] = useState(false);
+  const [viewing, setViewing] = useState<Purchase | null>(null);
+  const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
   const [confirmDelete, setConfirmDelete] = useState<Purchase | null>(null);
   const [note, setNote] = useState<{ tone: "ok" | "info" | "warn"; text: string } | null>(null);
   const key = PURCHASES_KEY_PREFIX + month;
@@ -36,7 +42,28 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
   async function load() {
     const list = (await getStore().getSetting<Purchase[]>(key)) ?? [];
     setPurchases(list.sort((a, b) => (a.date < b.date ? 1 : -1)));
+    setPhotoCounts(await countPhotosByOwner());
     setLoaded(true);
+  }
+
+  // 새 영수증을 만들다 취소하면 그 사이 붙인 사진도 같이 지운다 (주인 없는 사진이 남지 않게)
+  async function cancelEdit() {
+    if (editing && editingIsNew) await deletePhotosOf(editing.id);
+    setEditing(null);
+    setEditingIsNew(false);
+    await load();
+  }
+
+  function startNew(prefill?: Partial<Purchase>) {
+    setEditing({
+      id: `pu_${newId().slice(0, 8)}`,
+      date: month === todayStr().slice(0, 7) ? todayStr() : `${month}-01`,
+      vendor: "",
+      lines: [emptyLine(), emptyLine(), emptyLine()],
+      discount: 0,
+      ...prefill,
+    });
+    setEditingIsNew(true);
   }
   useEffect(() => {
     setLoaded(false);
@@ -59,6 +86,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
       await onItemsChange();
     }
     setEditing(null);
+    setEditingIsNew(false);
     await load();
     setNote({
       tone: "ok",
@@ -72,6 +100,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
       key,
       purchases.filter((x) => x.id !== p.id),
     );
+    await deletePhotosOf(p.id);
     await load();
   }
 
@@ -83,16 +112,24 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
   return (
     <>
       <section className="card space-y-3">
-        <div className="flex items-baseline justify-between">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-base font-bold">
             매입 영수증 <span className="text-[11px] font-normal text-stone-500">{monthLabel(month)} · 품목별 입고</span>
           </h2>
-          <button className="btn-primary px-3 py-1.5 text-xs" onClick={() => setEditing({ id: `pu_${newId().slice(0, 8)}`, date: month === todayStr().slice(0, 7) ? todayStr() : `${month}-01`, vendor: "", lines: [emptyLine(), emptyLine(), emptyLine()], discount: 0 })}>
-            + 영수증 추가
-          </button>
+          <div className="flex gap-1.5">
+            <button className="btn-ghost whitespace-nowrap px-3 py-1.5 text-xs" onClick={() => setPasting(true)}>
+              📋 텍스트로 붙여넣기
+            </button>
+            <button className="btn-primary whitespace-nowrap px-3 py-1.5 text-xs" onClick={() => startNew()}>
+              + 영수증 추가
+            </button>
+          </div>
         </div>
         <p className="text-xs text-stone-600">
           마트·거래처 영수증을 상품 줄 그대로 적어요. 줄을 <b>원가율 품목에 연결</b>하고 품목 단위 수량(특란 30구×5 = 150개)을 넣으면 그 품목의 <b>기준단가가 최근 매입가로 자동</b>으로 바뀌어요. 손익은 통장 기준이라 여기 금액은 손익에 따로 더하지 않아요.
+        </p>
+        <p className="text-xs text-stone-600">
+          손으로 치기 번거로우면 <b>폰 클로드·챗GPT 앱에 영수증 사진</b>을 올려 글자로 받은 다음, “텍스트로 붙여넣기”에 그대로 붙이세요. 줄과 품목 연결까지 자동으로 채워집니다. 실물 사진은 영수증마다 붙여 두면 나중에 숫자와 나란히 볼 수 있어요.
         </p>
         {note && <Notice tone={note.tone}>{note.text}</Notice>}
 
@@ -118,10 +155,11 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
           <ul className="divide-y divide-stone-100 text-sm">
             {purchases.map((p) => (
               <li key={p.id} className="py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
                     <p className="font-semibold">
                       {p.date.slice(5).replace("-", "/")} {p.vendor} <span className="num text-xs text-stone-500">{p.lines.length}줄</span>
+                      {photoCounts[p.id] > 0 && <span className="num ml-1 rounded bg-stone-100 px-1.5 py-0.5 text-[11px] text-stone-600">📷 {photoCounts[p.id]}</span>}
                     </p>
                     <p className="text-[11px] text-stone-500">
                       {p.lines
@@ -133,10 +171,21 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="num text-sm font-bold">{won(purchaseTotal(p))}</span>
-                    <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setEditing({ ...p, lines: p.lines.map((l) => ({ ...l })) })}>
+                    {photoCounts[p.id] > 0 && (
+                      <button className="btn-ghost whitespace-nowrap px-2 py-1 text-xs" onClick={() => setViewing(p)}>
+                        사진 보기
+                      </button>
+                    )}
+                    <button
+                      className="btn-ghost whitespace-nowrap px-2 py-1 text-xs"
+                      onClick={() => {
+                        setEditing({ ...p, lines: p.lines.map((l) => ({ ...l })) });
+                        setEditingIsNew(false);
+                      }}
+                    >
                       고치기
                     </button>
-                    <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setConfirmDelete(p)}>
+                    <button className="btn-ghost whitespace-nowrap px-2 py-1 text-xs" onClick={() => setConfirmDelete(p)}>
                       지우기
                     </button>
                   </div>
@@ -164,7 +213,19 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
         )}
       </section>
 
-      {editing && <PurchaseEditor purchase={editing} items={items} onChange={setEditing} onSave={() => save(editing)} onCancel={() => setEditing(null)} />}
+      {pasting && (
+        <PasteDialog
+          month={month}
+          items={items}
+          onCancel={() => setPasting(false)}
+          onUse={(p) => {
+            setPasting(false);
+            startNew(p);
+          }}
+        />
+      )}
+      {viewing && <PurchaseViewer purchase={viewing} items={items} onClose={() => setViewing(null)} />}
+      {editing && <PurchaseEditor purchase={editing} items={items} onChange={setEditing} onSave={() => save(editing)} onCancel={() => void cancelEdit()} />}
       {confirmDelete && (
         <ConfirmDialog title="영수증을 지울까요?" confirmLabel="지우기" cancelLabel="취소" danger onConfirm={() => remove(confirmDelete)} onCancel={() => setConfirmDelete(null)}>
           <p>
@@ -270,6 +331,9 @@ function PurchaseEditor({ purchase, items, onChange, onSave, onCancel }: { purch
             합계 <b>{won(purchaseTotal(p))}</b>
           </p>
         </div>
+
+        <PhotoStrip ownerId={p.id} />
+
         <div className="flex gap-2">
           <button className="btn-ghost flex-1" onClick={onCancel}>
             취소
@@ -288,4 +352,309 @@ const fmtQty = (q: number) => (Number.isInteger(q) ? num(q) : q.toFixed(1));
 
 function itemUnitOf(items: Item[], id: string) {
   return items.find((i) => i.id === id)?.baseUnit ?? "ea";
+}
+
+// 텍스트로 붙여넣기 — 폰 클로드·챗GPT 앱에 영수증 사진을 올려 받은 글자를 그대로 붙이면 줄로 바꿔 준다.
+function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: Item[]; onUse: (p: Partial<Purchase>) => void; onCancel: () => void }) {
+  const [text, setText] = useState("");
+  const [copied, setCopied] = useState(false);
+  const parsed = useMemo(() => (text.trim() ? parseReceiptText(text, month) : null), [text, month]);
+
+  const build = () => {
+    if (!parsed) return;
+    const lines: PurchaseLine[] = parsed.lines.map((l) => {
+      const line = toPurchaseLine(l);
+      const it = matchItem(l.name, items);
+      if (it) {
+        line.itemId = it.id;
+        line.itemQty = guessItemQty(l.name, l.qty, it.baseUnit) ?? 0;
+      }
+      return line;
+    });
+    onUse({ date: parsed.date || undefined, vendor: parsed.vendor || "", lines, discount: parsed.discount });
+  };
+
+  const linked = parsed ? parsed.lines.filter((l) => matchItem(l.name, items)).length : 0;
+  const sum = parsed ? parsed.lines.reduce((a, l) => a + l.amount, 0) - parsed.discount : 0;
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="텍스트로 영수증 붙여넣기">
+      <div className="card max-h-[92vh] w-full max-w-2xl space-y-3 overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold">텍스트로 붙여넣기</h2>
+          <button className="btn-ghost px-2 py-1 text-xs" onClick={onCancel}>
+            닫기
+          </button>
+        </div>
+
+        <details className="rounded-xl bg-stone-50 p-2 text-xs text-stone-600">
+          <summary className="cursor-pointer font-semibold text-stone-700">폰에서 하는 법 (누르면 펼쳐져요)</summary>
+          <ol className="mt-2 list-decimal space-y-1 pl-4">
+            <li>폰 클로드(또는 챗GPT) 앱을 열고 영수증 사진을 올려요.</li>
+            <li>아래 지시문을 같이 붙여 넣어요. (한 번 복사해 두면 계속 써요)</li>
+            <li>나온 글자를 복사해서 아래 칸에 붙여 넣어요.</li>
+          </ol>
+          <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-2 text-[11px] text-stone-700">{RECEIPT_PROMPT}</pre>
+          <button
+            className="btn-ghost mt-1 px-2 py-1 text-[11px]"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(RECEIPT_PROMPT);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              } catch {
+                setCopied(false);
+              }
+            }}
+          >
+            {copied ? "복사했어요" : "지시문 복사"}
+          </button>
+        </details>
+
+        <textarea
+          aria-label="영수증 텍스트"
+          className="field h-40 w-full font-mono text-xs"
+          placeholder={"거래처: 홈마트\n날짜: 2026-09-20\n특란 30구 | 5,800 | 2 | 11,600\n대파 1단 | 2,500 | 3 | 7,500\n할인: 600\n합계: 18,500"}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+
+        {parsed && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-stone-500">이렇게 읽었어요</p>
+            <div className="num grid grid-cols-3 gap-2 rounded-xl bg-stone-50 p-2 text-xs">
+              <div>
+                <p className="text-[11px] text-stone-500">거래처</p>
+                <p className="font-bold">{parsed.vendor || "못 읽음"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-stone-500">날짜</p>
+                <p className="font-bold">{parsed.date || "못 읽음"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-stone-500">합계</p>
+                <p className="font-bold">{won(sum)}</p>
+              </div>
+            </div>
+            {parsed.notes.map((n, i) => (
+              <Notice key={i} tone="warn">
+                {n}
+              </Notice>
+            ))}
+            {parsed.lines.length > 0 && (
+              <>
+                <ul className="divide-y divide-stone-100 text-xs">
+                  {parsed.lines.map((l, i) => {
+                    const it = matchItem(l.name, items);
+                    return (
+                      <li key={i} className="flex items-center justify-between gap-2 py-1">
+                        <span className="min-w-0 flex-1 truncate">
+                          {l.name}
+                          {it && <span className="ml-1 rounded bg-orange-50 px-1 py-0.5 text-[10px] text-orange-700">→ {it.name}</span>}
+                        </span>
+                        <span className="num whitespace-nowrap text-stone-500">
+                          {num(l.unitPrice)} × {fmtQty(l.qty)} ={" "}
+                        </span>
+                        <span className="num whitespace-nowrap font-semibold">{won(l.amount)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-[11px] text-stone-500">
+                  {parsed.lines.length}줄 · 품목 자동 연결 {linked}개{parsed.discount > 0 ? ` · 할인 ${won(parsed.discount)}` : ""}. 넣은 뒤에도 고칠 수 있어요.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button className="btn-ghost flex-1" onClick={onCancel}>
+            취소
+          </button>
+          <button className="btn-primary flex-1" disabled={!parsed || parsed.lines.length === 0} onClick={build}>
+            이대로 넣기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 영수증 사진 — 이 브라우저 안에만 저장한다 (다른 기기·시연 모드에서는 안 보임)
+function PhotoStrip({ ownerId, readOnly = false }: { ownerId: string; readOnly?: boolean }) {
+  const [photos, setPhotos] = useState<PhotoMeta[]>([]);
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const available = photosAvailable();
+
+  async function load() {
+    const list = await listPhotos(ownerId);
+    const next: Record<string, string> = {};
+    for (const p of list) {
+      const blob = await getPhotoBlob(p.id);
+      if (blob) next[p.id] = URL.createObjectURL(blob);
+    }
+    setPhotos(list);
+    setUrls((old) => {
+      Object.values(old).forEach((u) => URL.revokeObjectURL(u));
+      return next;
+    });
+  }
+  useEffect(() => {
+    if (available) void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownerId]);
+
+  if (!available) return null;
+
+  async function addFiles(files: FileList) {
+    setBusy(true);
+    for (const f of Array.from(files)) {
+      if (f.type.startsWith("image/")) await addPhoto(ownerId, f);
+    }
+    setBusy(false);
+    await load();
+  }
+
+  return (
+    <div className="space-y-1 rounded-xl bg-stone-50 p-2">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold text-stone-600">
+          영수증·명세표 사진 {photos.length > 0 && <span className="num text-stone-500">{photos.length}장</span>}
+        </p>
+        {!readOnly && (
+          <>
+            <button className="btn-ghost px-2 py-1 text-[11px]" disabled={busy} onClick={() => fileRef.current?.click()}>
+              {busy ? "넣는 중…" : "+ 사진 붙이기"}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" aria-label="영수증 사진" onChange={(e) => e.target.files?.length && addFiles(e.target.files)} />
+          </>
+        )}
+      </div>
+      {photos.length === 0 ? (
+        !readOnly && <p className="text-[11px] text-stone-500">폰으로 찍은 영수증 사진을 붙여 두면 나중에 숫자와 나란히 볼 수 있어요. 사진은 이 컴퓨터 브라우저에만 남아요.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {photos.map((p) => (
+            <div key={p.id} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={urls[p.id]} alt={p.name} className="h-20 w-20 cursor-zoom-in rounded-lg object-cover" onClick={() => urls[p.id] && window.open(urls[p.id], "_blank")} />
+              {!readOnly && (
+                <button
+                  className="absolute -right-1 -top-1 rounded-full bg-white px-1.5 text-[11px] text-stone-600 shadow"
+                  aria-label={`사진 지우기 ${p.name}`}
+                  onClick={async () => {
+                    await deletePhoto(p.id);
+                    await load();
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 사진 보기 — 실물 명세표와 입력한 숫자를 나란히 놓고 대조한다
+function PurchaseViewer({ purchase, items, onClose }: { purchase: Purchase; items: Item[]; onClose: () => void }) {
+  const p = purchase;
+  const [photos, setPhotos] = useState<PhotoMeta[]>([]);
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [current, setCurrent] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const made: string[] = [];
+    void (async () => {
+      const list = await listPhotos(p.id);
+      const next: Record<string, string> = {};
+      for (const ph of list) {
+        const blob = await getPhotoBlob(ph.id);
+        if (blob) {
+          next[ph.id] = URL.createObjectURL(blob);
+          made.push(next[ph.id]);
+        }
+      }
+      if (!alive) {
+        made.forEach((u) => URL.revokeObjectURL(u));
+        return;
+      }
+      setPhotos(list);
+      setUrls(next);
+      setCurrent(list[0]?.id ?? null);
+    })();
+    return () => {
+      alive = false;
+      made.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [p.id]);
+
+  const itemName = (id: string) => items.find((i) => i.id === id)?.name ?? id;
+  const currentUrl = current ? urls[current] : undefined;
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/50 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="영수증 사진과 입력한 숫자">
+      <div className="card max-h-[92vh] w-full max-w-4xl space-y-3 overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold">
+            {p.date.slice(5).replace("-", "/")} {p.vendor} <span className="num text-xs font-normal text-stone-500">{won(purchaseTotal(p))}</span>
+          </h2>
+          <button className="btn-ghost px-2 py-1 text-xs" onClick={onClose}>
+            닫기
+          </button>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
+            {currentUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={currentUrl} alt="영수증 사진" className="max-h-[60vh] w-full cursor-zoom-in rounded-xl object-contain" onClick={() => window.open(currentUrl, "_blank")} />
+            ) : (
+              <p className="text-xs text-stone-500">사진이 없어요.</p>
+            )}
+            {photos.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {photos.map((ph) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={ph.id} src={urls[ph.id]} alt={ph.name} className={`h-14 w-14 cursor-pointer rounded-lg object-cover ${current === ph.id ? "ring-2 ring-orange-500" : ""}`} onClick={() => setCurrent(ph.id)} />
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] text-stone-500">사진을 누르면 새 창에서 크게 봐요. 사진은 이 컴퓨터 브라우저에만 있어요.</p>
+          </div>
+          <div>
+            <ul className="divide-y divide-stone-100 text-xs">
+              {p.lines.map((l, i) => (
+                <li key={i} className="flex items-center justify-between gap-2 py-1">
+                  <span className="min-w-0 flex-1">
+                    {l.name}
+                    {l.itemId && <span className="ml-1 rounded bg-orange-50 px-1 py-0.5 text-[10px] text-orange-700">{itemName(l.itemId)}</span>}
+                  </span>
+                  <span className="num whitespace-nowrap text-stone-500">
+                    {num(l.unitPrice)} × {fmtQty(l.qty)}
+                  </span>
+                  <span className="num w-20 whitespace-nowrap text-right font-semibold">{won(l.amount)}</span>
+                </li>
+              ))}
+            </ul>
+            {p.discount > 0 && (
+              <p className="num mt-1 flex justify-between text-xs text-stone-500">
+                <span>할인</span>
+                <span>-{won(p.discount)}</span>
+              </p>
+            )}
+            <p className="num mt-1 flex justify-between border-t border-stone-200 pt-1 text-sm font-bold">
+              <span>합계</span>
+              <span>{won(purchaseTotal(p))}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
