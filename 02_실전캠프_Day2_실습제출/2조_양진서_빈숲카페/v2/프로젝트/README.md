@@ -22,7 +22,7 @@ npm run dev
 - 끄기: 환경변수 `NEXT_PUBLIC_LOGIN_OFF=1` 을 넣고 다시 배포 (내 컴퓨터는 `.env.local` 에 한 줄 추가)
 - 켜기: 그 환경변수를 지우고 다시 배포
 - 꺼 둔 동안: 데이터 창고를 읽지 않고 가짜 레시피만 보입니다. 레시피 보기·검색·단면도·영상 프롬프트(종류별 지침서)·레시피 물어보기·워터마크는 그대로 됩니다
-- 꺼 둔 동안 **미리보기**: 홈·레시피·각 화면의 노란 단추로 **직원 눈으로 / 사장 눈으로**를 바꿔 봅니다(쿠키 `bs_preview_role`). 사장 눈: 관리자 편집(`/recipes/admin`), 메뉴 잠금 설정(`/manage/menus`), 직원 교육 현황(`/recipes/training`), 확인 현황(`/recipes/changes`), 직원 관리(`/recipes/staff`). 직원 눈: 바뀐 레시피 확인했어요, 내 체크리스트, 퀴즈 — 사장 전용 주소는 안내문만 나옵니다. 고친 레시피·지침·게시·복구는 브라우저 저장소 `beansoop-preview-workspace-v1`, 가짜 직원·교육·퀴즈·확인 기록은 `beansoop-preview-people-v2`, 잠금은 쿠키 `bs_preview_locks` 에만 남고 데이터 창고에는 쓰지 않습니다. 로그인 모드에서는 이 쿠키들을 읽지 않으므로 실제 권한·잠금을 바꿀 수 없습니다. `LOCKED_SECTIONS` 고정 잠금은 "사장 눈으로"도 지나가지 못합니다. 사진·영상 올리기는 미리보기에서 막혀 있습니다
+- 꺼 둔 동안 **미리보기**: 홈·레시피·각 화면의 노란 단추로 **직원 눈으로 / 사장 눈으로**를 바꿔 봅니다(쿠키 `bs_preview_role`). 사장 눈: 관리자 편집(`/recipes/admin`), 메뉴 잠금 설정(`/manage/menus`), 직원 교육 현황(`/recipes/training`), 확인 현황(`/recipes/changes`), 직원 관리(`/recipes/staff`). 직원 눈: 바뀐 레시피 확인했어요, 내 체크리스트, 퀴즈 — 사장 전용 주소는 안내문만 나옵니다. 고친 레시피·지침·게시·복구는 브라우저 저장소 `beansoop-preview-workspace-v1`, 가짜 직원·교육·퀴즈·확인 기록은 `beansoop-preview-people-v3`, 잠금은 쿠키 `bs_preview_locks` 에만 남고 데이터 창고에는 쓰지 않습니다. 로그인 모드에서는 이 쿠키들을 읽지 않으므로 실제 권한·잠금을 바꿀 수 없습니다. `LOCKED_SECTIONS` 고정 잠금은 "사장 눈으로"도 지나가지 못합니다. 사진·영상 올리기는 미리보기에서 막혀 있습니다
 
 ## 메뉴 잠금
 
@@ -51,6 +51,7 @@ npm run dev
 | `/recipes/changes` | 사장 | 바뀐 레시피를 누가 확인했는지 |
 | `/recipes/training` | 재직 직원 · 사장 | 신입 교육 경로(단계별 문서 읽었어요 · 메뉴 만들어 봤음 → 사장 확인함) + 메뉴 전체 체크리스트 + 레시피·매뉴얼 퀴즈 |
 | `/notices` | 재직 직원 | 공지 · 변경 이력 — 바뀐 레시피·매뉴얼 목록, 확인했어요, 지난 변경 |
+| `/exam` | 재직 직원 · 사장 | 시험 · 인증 — 필기(자동 채점), 실기(볼 준비 됐어요 → 사장 합격), 사장은 직원×단계 현황 |
 
 ## 구조
 
@@ -60,6 +61,7 @@ npm run dev
 - 신입 교육 경로: `app/manual/training-path.ts` (단계·예시 경로·매뉴얼 퀴즈), 공식본 JSON 의 `trainingPath`. 문서 "읽었어요/확인함"은 기존 표 `training_checks` 의 `recipe_id` 칸에 `manual:<문서 id>` 로 적는다 (표 추가 없음)
 - 바뀐 내용 알림: 매뉴얼 문서도 기존 표 `recipe_change_notices` 에 `recipe_id = manual:<문서 id>` 로 남긴다. 직원에게 보여 줄 목록은 `db/notice-view.ts` 가 잠긴 영역·지워진 문서를 빼고 만든다
 - 엑셀·표에서 가져오기: `app/recipes/admin/import-parse.ts` (표 → 레시피·문서, 순수 함수) · `import-panel.tsx` (붙여넣기 → 미리보기 → 초안에 넣기). 저장·게시는 하지 않는다. `tests/import-parse.test.mjs` 가 가짜 표로 실제로 돌려 본다
+- 시험 · 인증: `app/exam/exam-data.ts` (단계·인증 규칙, 순수 함수) · `db/exam-store.ts`. 필기 결과는 기존 표 `quiz_results` 에 `detail_json = { examId, answers }`, 실기는 `training_checks` 에 `recipe_id = exam:<시험 id>:<항목 id>` (직원 = practiced_at "볼 준비", 사장 = confirmed_at "합격"). `tests/exam-status.test.mjs` 가 인증 규칙을 돌려 본다
 - `app/auth.ts` 로그인·역할 확인 · `proxy.ts` 로그인 안 한 요청을 `/login` 으로
 - `db/recipe-store.ts` 저장 층 (Supabase Postgres) · `supabase/schema.sql` 표와 잠금
 - `lib/supabase/` 열쇠 읽기와 클라이언트

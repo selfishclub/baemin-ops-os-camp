@@ -1220,6 +1220,13 @@
 .videoCard p { margin: 5px 0; color: #6b736c; font-size: 10px; line-height: 1.5; }
 .videoCard a { display: inline-block; margin-top: 7px; color: #315f47; font-size: 10px; font-weight: 900; }
 
+/* header-two-rows: 단추가 많아져서(교육·확인 현황·직원 관리·편집·미리보기 전환) 넓지 않은 화면에서는 단추를 둘째 줄로 내린다 */
+@media (max-width: 1240px) {
+  .header { grid-template-columns: auto 1fr; row-gap: 12px; }
+  .brand { justify-self: end; }
+  .headerActions { grid-column: 1 / -1; justify-self: stretch; justify-content: flex-end; gap: 8px; }
+}
+
 @media (max-width: 940px) {
   .recipeMedia { grid-template-columns: 1fr; }
   .recipeGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -1236,7 +1243,7 @@
   .backLink { font-size: 0; }
   .backLink span { font-size: 18px; }
   .headerNote { display: none; }
-  .headerActions { gap: 4px; }
+  .headerActions { gap: 4px; justify-content: flex-start; }
   .headerActions a { padding: 0 10px; }
   .announcement { grid-template-columns: auto 1fr; }
   .announcement button { grid-column: 1 / -1; width: 100%; }

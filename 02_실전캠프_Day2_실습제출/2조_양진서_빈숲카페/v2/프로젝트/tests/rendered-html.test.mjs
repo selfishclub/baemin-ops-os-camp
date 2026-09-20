@@ -9,7 +9,9 @@ test("opens the Beansoop OS portal at the root and keeps recipes as one section"
   assert.match(home, /빈숲 OS/);
   assert.match(home, /requireActiveViewer\("\/"\)/);
   assert.match(sections, /href: "\/recipes"/);
-  assert.match(sections, /status: "soon"/);
+  // 자리만 잡아 두는 "준비 중" 상태는 틀로 남아 있고(새 영역을 만들 때 씀), 지금은 모든 영역이 열려 있다
+  assert.match(sections, /status: "open" \| "soon"/);
+  assert.doesNotMatch(sections, /status: "soon",/);
   assert.match(recipesRoute, /requireActiveViewer\("\/recipes"\)/);
 });
 
@@ -178,7 +180,7 @@ test("opens the operation manual sections on one document frame with fake exampl
   for (const field of ["purpose", "materials", "steps", "doneCriteria", "donts", "reportWhen"]) assert.match(data, new RegExp(`${field}:`));
   // 문서형 영역 8개가 열리고, 시험·공지는 아직 준비 중
   for (const id of ["standard", "open", "middle", "close", "service", "hygiene", "barista", "equipment"]) assert.match(sections, new RegExp(`id: "${id}"[^}]*status: "open", href: "/manual/${id}"`));
-  assert.match(sections, /id: "exam"[^}]*status: "soon"/);
+  assert.match(sections, /id: "exam"[^}]*status: "open", href: "\/exam"/);
   // 공개용 버전: 예시 문서는 전부 (예시)·○○ 빈 양식
   const exampleLines = data.match(/\"\(예시\)[^\"]*\"/g) ?? [];
   assert.ok(exampleLines.length > 40);

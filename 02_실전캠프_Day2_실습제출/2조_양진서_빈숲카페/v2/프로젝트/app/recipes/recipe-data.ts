@@ -1,5 +1,6 @@
 import type { ManualDoc } from "../manual/manual-data";
 import type { TrainingStage } from "../manual/training-path";
+import type { ExamDef } from "../exam/exam-data";
 
 export type RecipeMode = "HOT" | "ICE" | "UP" | "DINE" | "TOGO";
 
@@ -177,6 +178,8 @@ export type RecipeContent = {
   manuals?: ManualDoc[];
   // 신입 교육 경로 (없으면 예시 경로를 쓴다)
   trainingPath?: TrainingStage[];
+  // 시험 · 인증 단계 (없으면 예시 단계를 쓴다)
+  exams?: ExamDef[];
   announcement: RecipeAnnouncement;
 };
 

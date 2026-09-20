@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { readPublishedContent } from "./recipe-store";
 import { readableManuals } from "../app/manual/manual-data";
 import { getTrainingPath, manualCheckPrefix } from "../app/manual/training-path";
+import { examCheckPrefix } from "../app/exam/exam-data";
 
 // 신입 메뉴 체크리스트 · 레시피 퀴즈 저장 층
 // 표: training_checks (직원×메뉴: 만들어 봤음 / 사장 확인함), quiz_results (퀴즈 점수)
@@ -123,12 +124,13 @@ export async function saveQuizResult(db: SupabaseClient, userId: string, score: 
 export async function readMyQuizHistory(db: SupabaseClient, userId: string) {
   const { data, error } = await db
     .from("quiz_results")
-    .select("id, score, total, created_at")
+    .select("id, score, total, created_at, detail_json")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(40);
   if (error) throw new Error(`퀴즈 기록을 읽지 못했습니다: ${error.message}`);
-  return data ?? [];
+  // 시험 필기 결과(detail_json 이 { examId … } 모양)는 연습 퀴즈 기록에서 뺀다
+  return (data ?? []).filter((row) => Array.isArray(row.detail_json)).slice(0, 10).map(({ id, score, total, created_at }) => ({ id, score, total, created_at }));
 }
 
 // 사장용: 직원별 진행률과 최근 퀴즈 점수
@@ -137,20 +139,23 @@ export async function readTrainingOverview(db: SupabaseClient) {
     readPublishedContent(db),
     db.from("profiles").select("id, login_id, display_name, role, active").order("created_at", { ascending: true }),
     db.from("training_checks").select("user_id, recipe_id, practiced_at, confirmed_at"),
-    db.from("quiz_results").select("user_id, score, total, created_at").order("created_at", { ascending: false }).limit(300),
+    db.from("quiz_results").select("user_id, score, total, created_at, detail_json").order("created_at", { ascending: false }).limit(300),
   ]);
   if (staffResult.error) throw new Error(`직원 목록을 읽지 못했습니다: ${staffResult.error.message}`);
   if (checksResult.error) throw new Error(`체크리스트를 읽지 못했습니다: ${checksResult.error.message}`);
   if (quizResult.error) throw new Error(`퀴즈 기록을 읽지 못했습니다: ${quizResult.error.message}`);
   const total = content.recipes.length;
   const latestQuiz = new Map<string, { score: number; total: number; created_at: string }>();
-  for (const row of quizResult.data ?? []) if (!latestQuiz.has(row.user_id)) latestQuiz.set(row.user_id, row);
+  for (const row of quizResult.data ?? []) {
+    // 시험 필기 결과는 "최근 퀴즈"로 치지 않는다
+    if (Array.isArray(row.detail_json) && !latestQuiz.has(row.user_id)) latestQuiz.set(row.user_id, { score: row.score, total: row.total, created_at: row.created_at });
+  }
   return {
     total,
     staff: (staffResult.data ?? []).map((person) => {
       const all = (checksResult.data ?? []).filter((row) => row.user_id === person.id);
       // 메뉴 기록과 매뉴얼 문서 기록("manual:" 로 시작)을 따로 센다
-      const mine = all.filter((row) => !row.recipe_id.startsWith(manualCheckPrefix));
+      const mine = all.filter((row) => !row.recipe_id.startsWith(manualCheckPrefix) && !row.recipe_id.startsWith(examCheckPrefix));
       const docs = all.filter((row) => row.recipe_id.startsWith(manualCheckPrefix));
       return {
         id: person.id,

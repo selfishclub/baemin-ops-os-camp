@@ -26,11 +26,11 @@ export const portalSections: PortalSection[] = [
   { id: "barista", group: "운영 매뉴얼", status: "open", href: "/manual/barista", title: "바리스타 기초", description: "원두, 분쇄도, 에스프레소 추출, 우유 스티밍" },
   { id: "equipment", group: "운영 매뉴얼", status: "open", href: "/manual/equipment", title: "기기 · 시설", description: "사용법, 세척, 고장 났을 때" },
 
-  { id: "exam", group: "사람·성장", status: "soon", title: "시험 · 인증 · 승급", description: "필기·주관식·실기, 직무 인증과 승급 기준" },
+  { id: "exam", group: "사람·성장", status: "open", href: "/exam", title: "시험 · 인증", description: "단계별 필기(자동 채점)와 실기(책임자가 직접 보고 합격). 평소엔 잠가 두고 시험 볼 때만 열기" },
   { id: "notice", group: "사람·성장", status: "open", href: "/notices", title: "공지 · 변경 이력", description: "레시피·매뉴얼이 바뀌면 여기 모이고, 하나씩 ‘확인했어요’" },
 
   { id: "menus", group: "관리", status: "open", ownerOnly: true, href: "/manage/menus", title: "메뉴 잠금 설정", description: "큰 메뉴마다 직원에게 열림/잠김 정하기" },
   { id: "changes", group: "관리", status: "open", ownerOnly: true, href: "/recipes/changes", title: "확인 현황", description: "바뀐 레시피·매뉴얼을 누가 확인했고 누가 안 봤는지" },
   { id: "staff", group: "관리", status: "open", ownerOnly: true, href: "/recipes/staff", title: "직원 계정 관리", description: "재직·중지, 역할" },
-  { id: "admin", group: "관리", status: "open", ownerOnly: true, href: "/recipes/admin", title: "관리자 편집", description: "레시피·매뉴얼 문서·영상 프롬프트 지침 편집, 게시, 버전 복구" },
+  { id: "admin", group: "관리", status: "open", ownerOnly: true, href: "/recipes/admin", title: "관리자 편집", description: "레시피·매뉴얼·교육 경로·시험 편집, 표에서 가져오기, 게시, 버전 복구" },
 ];

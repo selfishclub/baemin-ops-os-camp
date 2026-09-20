@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test tests/rendered-html.test.mjs tests/import-parse.test.mjs",
+    "test": "node --test tests/rendered-html.test.mjs tests/import-parse.test.mjs tests/exam-status.test.mjs",
     "lint": "eslint . --ignore-pattern .next"
   },
   "dependencies": {

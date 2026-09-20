@@ -3,13 +3,14 @@
 import type { Recipe, RecipeContent } from "../recipes/recipe-data";
 import { manualNoticePrefix, readableManuals } from "../manual/manual-data";
 import { getTrainingPath, manualCheckPrefix } from "../manual/training-path";
+import { buildExamStatus, examCheckKey, examCheckPrefix, getExams } from "../exam/exam-data";
 
 // 미리보기용 "사람" 데이터: 가짜 직원, 메뉴 체크리스트, 퀴즈 점수, 바뀐 레시피 알림과 확인 기록.
 // 전부 이 브라우저(localStorage)에만 있고 서버·데이터 창고로 가는 길은 없다. 실제 직원 이름은 쓰지 않는다.
 
 // 예시 기록의 모양이 바뀌면 숫자를 올린다 — 예전 버전을 눌러 본 브라우저에 남은 옛 예시가 새 화면을 가리지 않게
-const storageKey = "beansoop-preview-people-v2";
-const oldStorageKeys = ["beansoop-preview-people-v1"];
+const storageKey = "beansoop-preview-people-v3";
+const oldStorageKeys = ["beansoop-preview-people-v1", "beansoop-preview-people-v2"];
 const roleCookie = "bs_preview_role";
 
 const ownerId = "preview-owner";
@@ -17,7 +18,8 @@ const staffId = "preview-staff-a";
 
 type StaffRow = { id: string; login_id: string; display_name: string; role: "owner" | "staff"; active: boolean; created_at: string };
 type CheckRow = { user_id: string; recipe_id: string; practiced_at: string | null; confirmed_at: string | null; confirmed_by: string | null };
-type QuizRow = { id: number; user_id: string; score: number; total: number; created_at: string };
+// examId 가 있으면 시험 필기 결과, 없으면 연습 퀴즈
+type QuizRow = { id: number; user_id: string; score: number; total: number; created_at: string; examId?: string };
 type NoticeRow = { id: number; version: number; recipe_id: string; recipe_name: string; change_reason: string; published_by: string; created_at: string; acks: { user_id: string; acked_at: string }[] };
 type PreviewPeople = { staff: StaffRow[]; checks: CheckRow[]; quiz: QuizRow[]; notices: NoticeRow[] };
 
@@ -39,11 +41,19 @@ function freshPeople(recipes: Recipe[]): PreviewPeople {
       ...(first ? [{ user_id: staffId, recipe_id: first.id, practiced_at: daysAgo(5), confirmed_at: daysAgo(4), confirmed_by: ownerId }] : []),
       ...(second ? [{ user_id: staffId, recipe_id: second.id, practiced_at: daysAgo(2), confirmed_at: null, confirmed_by: null }] : []),
       ...(first ? [{ user_id: "preview-staff-b", recipe_id: first.id, practiced_at: daysAgo(9), confirmed_at: daysAgo(8), confirmed_by: ownerId }] : []),
+      { user_id: "preview-staff-b", recipe_id: examCheckKey("demo-exam-1", "p1"), practiced_at: daysAgo(7), confirmed_at: daysAgo(6), confirmed_by: ownerId },
+      { user_id: "preview-staff-b", recipe_id: examCheckKey("demo-exam-1", "p2"), practiced_at: daysAgo(7), confirmed_at: daysAgo(6), confirmed_by: ownerId },
+      { user_id: "preview-staff-b", recipe_id: examCheckKey("demo-exam-1", "p3"), practiced_at: daysAgo(1), confirmed_at: null, confirmed_by: null },
       // 매뉴얼 문서 읽음 기록 (교육 경로 1일차의 예시 문서)
       { user_id: staffId, recipe_id: `${manualCheckPrefix}demo-standard-motto`, practiced_at: daysAgo(6), confirmed_at: daysAgo(5), confirmed_by: ownerId },
       { user_id: staffId, recipe_id: `${manualCheckPrefix}demo-hygiene-daily`, practiced_at: daysAgo(6), confirmed_at: null, confirmed_by: null },
     ],
-    quiz: [{ id: 1, user_id: "preview-staff-b", score: 8, total: 10, created_at: daysAgo(3) }],
+    quiz: [
+      { id: 1, user_id: "preview-staff-b", score: 8, total: 10, created_at: daysAgo(3) },
+      // 시험 예시: 직원 B는 1단계 필기 합격 + 실기 2/3, 직원 A는 필기 한 번 떨어짐
+      { id: 2, user_id: "preview-staff-b", score: 9, total: 10, created_at: daysAgo(7), examId: "demo-exam-1" },
+      { id: 3, user_id: staffId, score: 6, total: 10, created_at: daysAgo(4), examId: "demo-exam-1" },
+    ],
     notices: third
       ? [{ id: 2, version: 1, recipe_id: `${manualNoticePrefix}demo-close-closing`, recipe_name: "예시 · 마감 순서", change_reason: "시연용 알림 · 순서 변경", published_by: "미리보기 사장", created_at: daysAgo(2), acks: [] }, { id: 1, version: 1, recipe_id: third.id, recipe_name: third.name, change_reason: "시연용 알림 · 정량 변경", published_by: "미리보기 사장", created_at: daysAgo(1), acks: [{ user_id: "preview-staff-b", acked_at: daysAgo(0.5) }] }]
       : [],
@@ -140,7 +150,7 @@ function trainingOf(people: PreviewPeople, content: RecipeContent, userId: strin
 }
 
 function quizOf(people: PreviewPeople, userId: string) {
-  return people.quiz.filter((row) => row.user_id === userId).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 10).map(({ id, score, total, created_at }) => ({ id, score, total, created_at }));
+  return people.quiz.filter((row) => row.user_id === userId && !row.examId).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 10).map(({ id, score, total, created_at }) => ({ id, score, total, created_at }));
 }
 
 function checkFor(people: PreviewPeople, userId: string, recipeId: string) {
@@ -239,7 +249,7 @@ export async function handlePeople(path: string, method: string, url: string, bo
     return json({
       total: recipes.length,
       staff: people.staff.map((person) => {
-        const mine = people.checks.filter((row) => row.user_id === person.id && recipeIds.has(row.recipe_id));
+        const mine = people.checks.filter((row) => row.user_id === person.id && recipeIds.has(row.recipe_id) && !row.recipe_id.startsWith(examCheckPrefix));
         const latest = quizOf(people, person.id)[0];
         return {
           id: person.id,
@@ -276,6 +286,62 @@ export async function handlePeople(path: string, method: string, url: string, bo
     people.quiz.push({ id: Math.max(0, ...people.quiz.map((row) => row.id)) + 1, user_id: me, score: Number(body.score), total: Number(body.total), created_at: new Date().toISOString() });
     save(people);
     return json({ quiz: quizOf(people, me) });
+  }
+
+  // 시험 · 인증
+  const examStatusOf = (people: PreviewPeople, userId: string) => ({
+    exams: buildExamStatus(
+      getExams(content),
+      people.quiz.filter((row) => row.user_id === userId && row.examId).map((row) => ({ examId: row.examId!, score: row.score, total: row.total, created_at: row.created_at })),
+      people.checks.filter((row) => row.user_id === userId && row.recipe_id.startsWith(examCheckPrefix)).map((row) => ({ recipe_id: row.recipe_id, practiced_at: row.practiced_at, confirmed_at: row.confirmed_at, confirmed_by_name: row.confirmed_by ? nameOf(people, row.confirmed_by) : null })),
+    ),
+  });
+
+  if (path === "/api/exam" && method === "GET") {
+    if (lockedForMe.includes("exam")) return json({ error: "이 메뉴는 지금 잠겨 있습니다.", locked: true }, 423);
+    return json({ ...examStatusOf(load(recipes), me), manuals: readableManuals(content).filter((doc) => !lockedForMe.includes(doc.sectionId)) });
+  }
+
+  if (path === "/api/exam" && method === "POST") {
+    const people = load(recipes);
+    const exam = getExams(content).find((item) => item.id === body.examId);
+    if (!exam) return json({ error: "어떤 시험인지 없습니다." }, 400);
+    if (body.action === "written") {
+      if (!Number.isInteger(body.score) || !Number.isInteger(body.total) || Number(body.total) <= 0) return json({ error: "점수 정보가 올바르지 않습니다." }, 400);
+      people.quiz.push({ id: Math.max(0, ...people.quiz.map((row) => row.id)) + 1, user_id: me, score: Number(body.score), total: Number(body.total), created_at: new Date().toISOString(), examId: exam.id });
+    } else if (body.action === "ready") {
+      const row = checkFor(people, me, examCheckKey(exam.id, String(body.itemId)));
+      row.practiced_at = row.practiced_at ? null : new Date().toISOString();
+    } else return json({ error: "무엇을 할지 없습니다." }, 400);
+    save(people);
+    return json({ ...examStatusOf(people, me), manuals: readableManuals(content).filter((doc) => !lockedForMe.includes(doc.sectionId)) });
+  }
+
+  if (path === "/api/admin/exam" && method === "GET") {
+    if (role !== "owner") return ownerOnly();
+    const people = load(recipes);
+    const userId = new URL(url, window.location.origin).searchParams.get("user");
+    if (userId) return json(examStatusOf(people, userId));
+    return json({
+      exams: getExams(content).map((exam) => ({ id: exam.id, title: exam.title })),
+      staff: people.staff.filter((person) => person.active).map((person) => ({
+        id: person.id,
+        name: person.display_name || person.login_id,
+        role: person.role,
+        exams: examStatusOf(people, person.id).exams.map((exam) => ({ id: exam.id, best: exam.best, writtenPassed: exam.writtenPassed, practicalPassed: exam.practical.filter((item) => item.passed_at).length, practicalTotal: exam.practical.length, waiting: exam.practical.filter((item) => item.ready_at && !item.passed_at).length, certified: exam.certified })),
+      })),
+    });
+  }
+
+  if (path === "/api/admin/exam" && method === "POST") {
+    if (role !== "owner") return ownerOnly();
+    const people = load(recipes);
+    const row = checkFor(people, String(body.userId ?? ""), examCheckKey(String(body.examId ?? ""), String(body.itemId ?? "")));
+    const passed = !row.confirmed_at;
+    row.confirmed_at = passed ? new Date().toISOString() : null;
+    row.confirmed_by = passed ? ownerId : null;
+    save(people);
+    return json(examStatusOf(people, String(body.userId ?? "")));
   }
 
   // 직원 계정 관리

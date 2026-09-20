@@ -89,6 +89,13 @@ export function validateRecipeContent(content: RecipeContent): string[] {
     }
   }
 
+  for (const exam of content.exams ?? []) {
+    const prefix = `시험 ‘${exam.title || exam.id}’`;
+    if (!exam.title.trim()) errors.push(`${prefix}: 단계 이름이 필요합니다.`);
+    if (!(exam.writtenCount >= 1) || !(exam.passScore >= 1) || exam.passScore > exam.writtenCount) errors.push(`${prefix}: 필기 합격 기준은 1 이상, 문제 수 이하여야 합니다.`);
+    if (!exam.practicalItems.some((item) => item.text.trim())) errors.push(`${prefix}: 실기 항목을 한 줄 이상 적어 주세요.`);
+  }
+
   const manualIds = new Set<string>();
   for (const doc of content.manuals ?? []) {
     const prefix = `매뉴얼 ‘${doc.title || doc.id}’`;
