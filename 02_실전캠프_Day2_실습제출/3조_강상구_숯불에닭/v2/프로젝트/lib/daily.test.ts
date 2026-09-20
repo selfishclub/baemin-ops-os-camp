@@ -1,4 +1,4 @@
-import { normalizeTime } from "./daily";
+import { monthHoursByStaff, normalizeTime } from "./daily";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CHANNELS } from "./categories";
 import { checkDay, dayTotals, daysInMonth, hoursBetween, monthChannelTotals, monthSummary, shiftDate, weekHoursByStaff, weekStart } from "./daily";
@@ -79,5 +79,25 @@ describe("normalizeTime", () => {
     expect(normalizeTime("25")).toBe("");
     expect(normalizeTime("18:75")).toBe("");
     expect(normalizeTime("abc")).toBe("");
+  });
+});
+
+describe("monthHoursByStaff", () => {
+  it("근무자별 이 달 근무일·시간·어림 인건비를 합친다", () => {
+    const staff = [
+      { id: "a", alias: "홀A", wage: 10_000, active: true },
+      { id: "b", alias: "화덕A", wage: 12_000, active: true },
+      { id: "c", alias: "그만둔B", wage: 11_000, active: false },
+    ];
+    const shifts = [
+      { date: "2026-09-01", staffId: "a", hours: 4 },
+      { date: "2026-09-02", staffId: "a", hours: 4.5 },
+      { date: "2026-09-02", staffId: "b", hours: 8 },
+      { date: "2026-08-31", staffId: "a", hours: 4 }, // 지난달
+    ];
+    const r = monthHoursByStaff("2026-09", shifts, staff);
+    expect(r.map((x) => x.alias)).toEqual(["화덕A", "홀A"]); // 그만둔 사람은 이 달 근무가 없으면 빠진다
+    expect(r[1]).toMatchObject({ days: 2, hours: 8.5, labor: 85_000 });
+    expect(r[0]).toMatchObject({ days: 1, hours: 8, labor: 96_000 });
   });
 });

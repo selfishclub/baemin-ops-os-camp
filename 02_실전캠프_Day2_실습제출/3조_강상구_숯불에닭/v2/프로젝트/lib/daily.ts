@@ -120,6 +120,29 @@ export function weekHoursByStaff(date: string, shifts: Shift[], staff: Staff[]):
     });
 }
 
+// 근무자별 이 달 합계 — 근무일수·시간·어림 인건비(시간 × 시급). 급여 계산 참고용
+export interface StaffMonth {
+  staffId: string;
+  alias: string;
+  wage: number;
+  days: number;
+  hours: number;
+  labor: number;
+  active: boolean;
+}
+
+export function monthHoursByStaff(month: Month, shifts: Shift[], staff: Staff[]): StaffMonth[] {
+  const mine = shifts.filter((s) => s.date.startsWith(month));
+  return staff
+    .map((p) => {
+      const rows = mine.filter((s) => s.staffId === p.id);
+      const hours = round1(rows.reduce((a, s) => a + s.hours, 0));
+      return { staffId: p.id, alias: p.alias, wage: p.wage, days: new Set(rows.map((s) => s.date)).size, hours, labor: Math.round(hours * p.wage), active: p.active };
+    })
+    .filter((r) => r.hours > 0 || r.active) // 그만둔 사람은 이 달 근무가 있을 때만
+    .sort((a, b) => b.labor - a.labor);
+}
+
 // 채널별 월 합계 (배달앱 탭의 주문금액을 자동으로 채우는 데 씀). 홀은 카드+현금 합계도 같이.
 export function monthChannelTotals(month: Month, sales: DailySale[], channels: Channel[]): Record<string, number> {
   const out: Record<string, number> = {};

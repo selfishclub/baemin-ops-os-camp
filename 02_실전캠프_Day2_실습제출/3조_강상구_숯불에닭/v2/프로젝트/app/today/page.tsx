@@ -11,7 +11,7 @@ import { newId } from "@/lib/classify";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
 import { CardApprovalError, parseCardApproval, type ParsedCardApproval } from "@/lib/cardApproval";
 import { DeliveryStatementError, parseBaeminStatement, type ParsedDeliveryStatement } from "@/lib/deliveryStatement";
-import { checkDay, dayTotals, daysInMonth, hoursBetween, monthSummary, normalizeTime, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
+import { checkDay, dayTotals, daysInMonth, hoursBetween, monthHoursByStaff, monthSummary, normalizeTime, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
 import { getStore } from "@/lib/storage";
@@ -110,6 +110,7 @@ export default function TodayPage() {
 
   const summary = useMemo(() => monthSummary(month, daily.sales, daily.shifts, daily.staff, today), [month, daily.sales, daily.shifts, daily.staff, today]);
   const week = useMemo(() => weekHoursByStaff(date, daily.shifts, daily.staff), [date, daily.shifts, daily.staff]);
+  const staffMonth = useMemo(() => monthHoursByStaff(month, daily.shifts, daily.staff), [month, daily.shifts, daily.staff]);
 
   const cardTotal = cardRows.reduce((a, r) => a + r.amount, 0);
   const groups = groupChannels(daily.channels, amounts);
@@ -553,6 +554,46 @@ export default function TodayPage() {
             <p className="font-bold">{pctText(summary.laborRate)}</p>
           </div>
         </div>
+        {staffMonth.some((s) => s.hours > 0) && (
+          <div className="pt-2">
+            <p className="mb-1 text-xs font-semibold text-stone-500">
+              근무자별 이 달 합계 <span className="font-normal">— 시간 × 시급 어림. 주휴·수당은 빠져 있어요</span>
+            </p>
+            <table className="num w-full text-xs">
+              <thead className="text-left text-[11px] text-stone-400">
+                <tr>
+                  <th className="py-1 font-normal">별칭</th>
+                  <th className="text-right font-normal">근무일</th>
+                  <th className="text-right font-normal">시간</th>
+                  <th className="text-right font-normal">시급</th>
+                  <th className="text-right font-normal">어림 인건비</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {staffMonth
+                  .filter((s) => s.hours > 0)
+                  .map((s) => (
+                    <tr key={s.staffId}>
+                      <td className="py-1">{s.alias}</td>
+                      <td className="text-right">{s.days}일</td>
+                      <td className="text-right">{s.hours}h</td>
+                      <td className="text-right text-stone-500">{num(s.wage)}</td>
+                      <td className="text-right font-semibold">{num(s.labor)}</td>
+                    </tr>
+                  ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-stone-200 font-semibold">
+                  <td className="py-1">합계</td>
+                  <td className="text-right">{[...new Set(daily.shifts.filter((x) => x.date.startsWith(month)).map((x) => x.date))].length}일</td>
+                  <td className="text-right">{Math.round(staffMonth.reduce((a, s) => a + s.hours, 0) * 10) / 10}h</td>
+                  <td />
+                  <td className="text-right">{num(staffMonth.reduce((a, s) => a + s.labor, 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </section>
 
       <Link href="/weather" className="card block space-y-1">
