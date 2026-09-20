@@ -555,43 +555,45 @@ export default function TodayPage() {
           </div>
         </div>
         {staffMonth.some((s) => s.hours > 0) && (
-          <div className="pt-2">
-            <p className="mb-1 text-xs font-semibold text-stone-500">
-              근무자별 이 달 합계 <span className="font-normal">— 시간 × 시급 어림. 주휴·수당은 빠져 있어요</span>
-            </p>
-            <table className="num w-full text-xs">
-              <thead className="text-left text-[11px] text-stone-400">
-                <tr>
-                  <th className="py-1 font-normal">별칭</th>
-                  <th className="text-right font-normal">근무일</th>
-                  <th className="text-right font-normal">시간</th>
-                  <th className="text-right font-normal">시급</th>
-                  <th className="text-right font-normal">어림 인건비</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {staffMonth
-                  .filter((s) => s.hours > 0)
-                  .map((s) => (
-                    <tr key={s.staffId}>
-                      <td className="py-1">{s.alias}</td>
-                      <td className="text-right">{s.days}일</td>
-                      <td className="text-right">{s.hours}h</td>
-                      <td className="text-right text-stone-500">{num(s.wage)}</td>
-                      <td className="text-right font-semibold">{num(s.labor)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-stone-200 font-semibold">
-                  <td className="py-1">합계</td>
-                  <td className="text-right">{[...new Set(daily.shifts.filter((x) => x.date.startsWith(month)).map((x) => x.date))].length}일</td>
-                  <td className="text-right">{Math.round(staffMonth.reduce((a, s) => a + s.hours, 0) * 10) / 10}h</td>
-                  <td />
-                  <td className="text-right">{num(staffMonth.reduce((a, s) => a + s.labor, 0))}</td>
-                </tr>
-              </tfoot>
-            </table>
+          <div className="mt-3 rounded-2xl border border-stone-200 bg-white">
+            <div className="flex items-baseline justify-between rounded-t-2xl bg-stone-50 px-3 py-2">
+              <p className="text-sm font-bold">근무자별 이 달 합계</p>
+              <p className="text-[11px] text-stone-500">시간 × 시급 어림 · 주휴·수당 제외</p>
+            </div>
+            <ul className="divide-y divide-stone-100 px-3">
+              {(() => {
+                const rows = staffMonth.filter((s) => s.hours > 0);
+                const max = Math.max(...rows.map((s) => s.labor), 1);
+                const total = rows.reduce((a, s) => a + s.labor, 0);
+                return rows.map((s) => (
+                  <li key={s.staffId} className="py-2.5">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-base font-bold">{s.alias}</span>
+                      <span className="num text-base font-bold text-orange-700">{won(s.labor)}</span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-stone-100">
+                      <div className="h-full rounded-full bg-orange-400" style={{ width: `${Math.round((s.labor / max) * 100)}%` }} />
+                    </div>
+                    <p className="num mt-1 flex flex-wrap gap-x-3 text-xs text-stone-600">
+                      <span>
+                        <b>{s.days}</b>일 근무
+                      </span>
+                      <span>
+                        <b>{s.hours}</b>시간
+                      </span>
+                      <span>시급 {num(s.wage)}</span>
+                      <span className="text-stone-400">{total > 0 ? Math.round((s.labor / total) * 100) : 0}%</span>
+                    </p>
+                  </li>
+                ));
+              })()}
+            </ul>
+            <div className="flex items-baseline justify-between rounded-b-2xl bg-orange-50 px-3 py-2.5">
+              <div className="num text-xs text-stone-600">
+                합계 <b>{[...new Set(daily.shifts.filter((x) => x.date.startsWith(month)).map((x) => x.date))].length}</b>일 · <b>{Math.round(staffMonth.reduce((a, s) => a + s.hours, 0) * 10) / 10}</b>시간 · {staffMonth.filter((s) => s.hours > 0).length}명
+              </div>
+              <span className="num text-lg font-bold text-orange-800">{won(staffMonth.reduce((a, s) => a + s.labor, 0))}</span>
+            </div>
           </div>
         )}
       </section>
