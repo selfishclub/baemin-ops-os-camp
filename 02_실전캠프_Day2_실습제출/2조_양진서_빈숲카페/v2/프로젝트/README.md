@@ -49,13 +49,14 @@ npm run dev
 | `/manage/menus` | 사장 | 메뉴 잠금 설정 — 큰 메뉴마다 직원에게 열림/잠김 |
 | `/recipes/staff` | 사장 | 직원 계정 재직/중지, 역할 |
 | `/recipes/changes` | 사장 | 바뀐 레시피를 누가 확인했는지 |
-| `/recipes/training` | 재직 직원 · 사장 | 신입 메뉴 체크리스트(만들어 봤음 → 사장 확인함) + 레시피 퀴즈 |
+| `/recipes/training` | 재직 직원 · 사장 | 신입 교육 경로(단계별 문서 읽었어요 · 메뉴 만들어 봤음 → 사장 확인함) + 메뉴 전체 체크리스트 + 레시피·매뉴얼 퀴즈 |
 
 ## 구조
 
 - `app/recipes/recipes-page.tsx` 직원 화면 (클라이언트) · `app/recipes/admin/studio.tsx` 관리자 화면
 - `app/manual/` 운영 매뉴얼: `manual-data.ts` 문서 틀과 가짜 예시, `[section]/` 영역 화면, `manual-chat.ts` 챗봇의 매뉴얼 답변기 · `app/api/manuals` 영역별 문서(잠금 확인) · 문서는 레시피와 같은 공식본 JSON 안(`manuals`)에 들어가 초안·게시·버전을 같이 탄다 (데이터 창고 표 추가 없음)
 - 문서 종류는 두 가지: 절차 문서(`procedure`)와 응대 카드(`response`, 응대북). 같은 칸을 종류에 따라 다른 이름으로 보여 준다(`manualLabels`). 응대 카드는 `group`(묶음)과 `keywords`(챗봇이 알아듣는 낱말)를 쓴다
+- 신입 교육 경로: `app/manual/training-path.ts` (단계·예시 경로·매뉴얼 퀴즈), 공식본 JSON 의 `trainingPath`. 문서 "읽었어요/확인함"은 기존 표 `training_checks` 의 `recipe_id` 칸에 `manual:<문서 id>` 로 적는다 (표 추가 없음)
 - `app/auth.ts` 로그인·역할 확인 · `proxy.ts` 로그인 안 한 요청을 `/login` 으로
 - `db/recipe-store.ts` 저장 층 (Supabase Postgres) · `supabase/schema.sql` 표와 잠금
 - `lib/supabase/` 열쇠 읽기와 클라이언트

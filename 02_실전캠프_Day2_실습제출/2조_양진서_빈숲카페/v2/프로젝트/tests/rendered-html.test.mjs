@@ -212,6 +212,35 @@ test("keeps a response-card book for customer service and lets the chatbot find 
   assert.match(editor, /\+ 새 응대 카드/);
 });
 
+test("bundles manuals, cards and menus into a staged training path that the owner confirms", async () => {
+  const [pathData, manualData, store, api, screen, editor, schema] = await Promise.all([
+    read("../app/manual/training-path.ts"),
+    read("../app/manual/manual-data.ts"),
+    read("../db/training-store.ts"),
+    read("../app/api/training/route.ts"),
+    read("../app/recipes/training/training-page.tsx"),
+    read("../app/recipes/admin/path-editor.tsx"),
+    read("../supabase/schema.sql"),
+  ]);
+  // 예시 경로의 매뉴얼 항목은 전부 실제로 있는 예시 문서를 가리킨다
+  const manualIds = [...pathData.matchAll(/manual\("([^"]+)"\)/g)].map((match) => match[1]);
+  assert.ok(manualIds.length >= 12);
+  for (const id of manualIds) {
+    const slug = id.replace(/^demo-(standard|open|middle|close|service|hygiene|barista|equipment)-/, "");
+    assert.match(manualData, new RegExp(`"${slug}"`), `예시 경로의 ${id} 문서가 없습니다`);
+  }
+  // 문서 읽음은 기존 교육 체크 표에 manual: 열쇠로 적는다 (표 추가 없음), 사장 확인은 창고 트리거가 지킨다
+  assert.match(pathData, /manualCheckPrefix = "manual:"/);
+  assert.match(store, /startsWith\(manualCheckPrefix\)/);
+  assert.match(schema, /recipe_id text not null/);
+  assert.match(schema, /guard_training_confirm/);
+  // 잠긴 영역의 문서는 직원 교육 화면에도 나가지 않는다
+  assert.match(api, /allowedSections\(/);
+  assert.match(screen, /읽었어요/);
+  assert.match(screen, /buildManualQuiz/);
+  assert.match(editor, /trainingPath: next/);
+});
+
 test("keeps image and video authoring without bundled cafe media", async () => {
   const studio = await read("../app/recipes/admin/studio.tsx");
   assert.match(studio, /사진 올리기/);

@@ -26,6 +26,7 @@ import styles from "./studio.module.css";
 import { apiFetch } from "../../preview/preview-api";
 import PreviewBanner from "../../preview/preview-banner";
 import ManualEditor from "./manual-editor";
+import PathEditor from "./path-editor";
 
 type AdminPayload = {
   content: RecipeContent;
@@ -44,7 +45,7 @@ type AdminPayload = {
   actor: { email: string; role: string };
 };
 
-type Tab = "recipes" | "shared" | "prompts" | "manuals" | "announcement" | "history";
+type Tab = "recipes" | "shared" | "prompts" | "manuals" | "path" | "announcement" | "history";
 const hexColor = /^#[0-9a-f]{6}$/i;
 
 function splitLines(value: string) {
@@ -157,7 +158,8 @@ export default function AdminStudio({ userName, preview = false }: { userName: s
       setPayload(body);
       setContent(body.content);
       // 매뉴얼 화면의 ‘문서 고치기’에서 넘어오면 매뉴얼 탭을 바로 연다
-      if (new URLSearchParams(window.location.search).get("tab") === "manuals") setTab("manuals");
+      const requestedTab = new URLSearchParams(window.location.search).get("tab");
+      if (requestedTab === "manuals" || requestedTab === "path") setTab(requestedTab);
       const requestedId = new URLSearchParams(window.location.search).get("recipe");
       setSelectedId((current) => current ?? body.content.recipes.find((recipe: Recipe) => recipe.id === requestedId)?.id ?? body.content.recipes[0]?.id ?? null);
       setDirty(false);
@@ -329,7 +331,7 @@ export default function AdminStudio({ userName, preview = false }: { userName: s
         </div>
       </header>
 
-      {preview && <PreviewBanner what="관리자 편집 · 영상 프롬프트 지침 · 매뉴얼 문서 · 공식 게시 · 버전 복구" role="owner" />}
+      {preview && <PreviewBanner what="관리자 편집 · 영상 프롬프트 지침 · 매뉴얼 문서 · 교육 경로 · 공식 게시 · 버전 복구" role="owner" />}
       <section className={styles.statusbar} data-dirty={dirty}>
         <span>{dirty ? "저장하지 않은 변경 있음" : "초안 저장됨"}</span>
         <p>{message}</p>
@@ -337,9 +339,9 @@ export default function AdminStudio({ userName, preview = false }: { userName: s
       </section>
 
       <nav className={styles.tabs} aria-label="관리 영역">
-        {(["recipes", "shared", "prompts", "manuals", "announcement", "history"] as Tab[]).map((item) => (
+        {(["recipes", "shared", "prompts", "manuals", "path", "announcement", "history"] as Tab[]).map((item) => (
           <button key={item} type="button" aria-pressed={tab === item} onClick={() => setTab(item)}>
-            {{ recipes: `메뉴 ${content.recipes.length}`, shared: "공통 기준", prompts: "영상 프롬프트 지침", manuals: "매뉴얼", announcement: "공지", history: "버전 기록" }[item]}
+            {{ recipes: `메뉴 ${content.recipes.length}`, shared: "공통 기준", prompts: "영상 프롬프트 지침", manuals: "매뉴얼", path: "교육 경로", announcement: "공지", history: "버전 기록" }[item]}
           </button>
         ))}
       </nav>
@@ -541,6 +543,7 @@ export default function AdminStudio({ userName, preview = false }: { userName: s
       })()}
 
       {tab === "manuals" && <ManualEditor content={content} onChange={changeContent} />}
+      {tab === "path" && <PathEditor content={content} onChange={changeContent} />}
 
       {tab === "history" && (
         <section className={styles.wideEditor}>

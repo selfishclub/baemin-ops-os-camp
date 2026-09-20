@@ -1,8 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readPublishedContent } from "./recipe-store";
+import { readableManuals } from "../app/manual/manual-data";
+import { getTrainingPath, manualCheckPrefix } from "../app/manual/training-path";
 
 // 신입 메뉴 체크리스트 · 레시피 퀴즈 저장 층
 // 표: training_checks (직원×메뉴: 만들어 봤음 / 사장 확인함), quiz_results (퀴즈 점수)
+// 매뉴얼 문서·응대 카드의 "읽었어요 / 확인함"도 같은 표에 적는다 — recipe_id 칸에 "manual:<문서 id>" 로.
 
 export type TrainingRow = {
   recipe_id: string;
@@ -38,7 +41,8 @@ async function readNames(db: SupabaseClient, ids: string[]) {
 }
 
 // 한 직원의 체크리스트: 공식 레시피 전체 × 그 직원의 기록
-export async function readTraining(db: SupabaseClient, userId: string) {
+// allowedSectionIds 를 주면 그 영역의 매뉴얼만 돌려준다 (직원에게 잠긴 영역의 문서가 교육 화면으로 새지 않게)
+export async function readTraining(db: SupabaseClient, userId: string, allowedSectionIds?: Set<string>) {
   const [content, checks] = await Promise.all([readPublishedContent(db), readChecks(db, userId)]);
   const byRecipe = new Map(checks.map((row) => [row.recipe_id, row]));
   const names = await readNames(db, checks.map((row) => row.confirmed_by ?? ""));
@@ -53,11 +57,20 @@ export async function readTraining(db: SupabaseClient, userId: string) {
       confirmed_by_name: row?.confirmed_by ? names.get(row.confirmed_by) ?? null : null,
     };
   });
+  const docChecks = Object.fromEntries(
+    checks
+      .filter((row) => row.recipe_id.startsWith(manualCheckPrefix))
+      .map((row) => [row.recipe_id.slice(manualCheckPrefix.length), { practiced_at: row.practiced_at, confirmed_at: row.confirmed_at, confirmed_by_name: row.confirmed_by ? names.get(row.confirmed_by) ?? null : null }]),
+  );
   return {
     rows,
     total: rows.length,
     practiced: rows.filter((row) => row.practiced_at).length,
     confirmed: rows.filter((row) => row.confirmed_at).length,
+    // 신입 교육 경로와 거기에 들어가는 매뉴얼 문서·응대 카드, 문서별 읽음/확인 기록
+    path: getTrainingPath(content),
+    manuals: readableManuals(content).filter((doc) => !allowedSectionIds || allowedSectionIds.has(doc.sectionId)),
+    docChecks,
   };
 }
 
@@ -135,7 +148,10 @@ export async function readTrainingOverview(db: SupabaseClient) {
   return {
     total,
     staff: (staffResult.data ?? []).map((person) => {
-      const mine = (checksResult.data ?? []).filter((row) => row.user_id === person.id);
+      const all = (checksResult.data ?? []).filter((row) => row.user_id === person.id);
+      // 메뉴 기록과 매뉴얼 문서 기록("manual:" 로 시작)을 따로 센다
+      const mine = all.filter((row) => !row.recipe_id.startsWith(manualCheckPrefix));
+      const docs = all.filter((row) => row.recipe_id.startsWith(manualCheckPrefix));
       return {
         id: person.id,
         name: person.display_name || person.login_id,
@@ -143,6 +159,8 @@ export async function readTrainingOverview(db: SupabaseClient) {
         active: person.active,
         practiced: mine.filter((row) => row.practiced_at).length,
         confirmed: mine.filter((row) => row.confirmed_at).length,
+        docsRead: docs.filter((row) => row.practiced_at).length,
+        docsConfirmed: docs.filter((row) => row.confirmed_at).length,
         quiz: latestQuiz.get(person.id) ?? null,
       };
     }),

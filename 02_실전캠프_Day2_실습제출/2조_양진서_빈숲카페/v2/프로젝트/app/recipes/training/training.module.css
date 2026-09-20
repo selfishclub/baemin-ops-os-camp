@@ -54,3 +54,18 @@
 .history { margin: 12px 0 0; color: #4d5a50; font-size: 12px; }
 
 @media (min-width: 640px) { .choices { grid-template-columns: 1fr 1fr; } }
+
+/* 신입 교육 경로 */
+.path { margin-top: 20px; }
+.path > h2, .allTitle { margin: 0 0 10px; color: #173f31; font-size: 18px; }
+.allTitle { margin-top: 28px; }
+.stage { margin-top: 10px; border: 1px solid #e1d9c8; border-radius: 16px; background: #faf7f0; }
+.stage summary { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 14px 16px; cursor: pointer; list-style: none; }
+.stage summary::-webkit-details-marker { display: none; }
+.stage summary strong { color: #173f31; font-size: 15px; }
+.stage summary span { padding: 3px 10px; border-radius: 999px; background: #ece6d8; color: #5b6359; font-size: 11px; font-weight: 800; }
+.stage summary span[data-done="true"] { background: #2f6b47; color: white; }
+.stage summary small { grid-column: 1 / -1; color: #6b7770; font-size: 12px; line-height: 1.5; }
+.stage .group { margin: 0; padding: 0 12px 12px; }
+.stage a { color: inherit; text-decoration: underline; text-decoration-color: #b9c7bd; text-underline-offset: 3px; }
+.pathEdit { margin-left: 10px; color: #2f6b47; font-size: 12px; font-weight: 800; }

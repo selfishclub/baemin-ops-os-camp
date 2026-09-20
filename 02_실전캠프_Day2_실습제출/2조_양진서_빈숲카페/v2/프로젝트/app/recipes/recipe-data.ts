@@ -1,4 +1,5 @@
 import type { ManualDoc } from "../manual/manual-data";
+import type { TrainingStage } from "../manual/training-path";
 
 export type RecipeMode = "HOT" | "ICE" | "UP" | "DINE" | "TOGO";
 
@@ -174,6 +175,8 @@ export type RecipeContent = {
   promptGuides?: PromptGuide[];
   // 운영 매뉴얼 문서 (없으면 예시 문서를 쓴다) — 레시피와 같은 초안·게시·버전 흐름을 탄다
   manuals?: ManualDoc[];
+  // 신입 교육 경로 (없으면 예시 경로를 쓴다)
+  trainingPath?: TrainingStage[];
   announcement: RecipeAnnouncement;
 };
 

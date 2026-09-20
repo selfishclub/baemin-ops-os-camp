@@ -193,8 +193,8 @@ async function handlePreview(url: string, init?: RequestInit): Promise<Response 
   }
 
   // 교육 체크·퀴즈·바뀐 레시피 확인·직원 관리: 지금 공식본(미리보기에서 게시했으면 그것)의 메뉴 기준
-  const recipes = hasWorkspaceEdits() ? load().published.recipes : defaultRecipeContent.recipes;
-  return handlePeople(path, method, url, await readBody(init), recipes);
+  const published = hasWorkspaceEdits() ? load().published : defaultRecipeContent;
+  return handlePeople(path, method, url, await readBody(init), published);
 }
 
 // preview=true 면 위 주소들은 브라우저 안에서 처리하고, 나머지는 서버로 보낸다. preview=false 면 항상 서버로.

@@ -1,6 +1,8 @@
 "use client";
 
-import type { Recipe } from "../recipes/recipe-data";
+import type { Recipe, RecipeContent } from "../recipes/recipe-data";
+import { readableManuals } from "../manual/manual-data";
+import { getTrainingPath, manualCheckPrefix } from "../manual/training-path";
 
 // 미리보기용 "사람" 데이터: 가짜 직원, 메뉴 체크리스트, 퀴즈 점수, 바뀐 레시피 알림과 확인 기록.
 // 전부 이 브라우저(localStorage)에만 있고 서버·데이터 창고로 가는 길은 없다. 실제 직원 이름은 쓰지 않는다.
@@ -35,6 +37,9 @@ function freshPeople(recipes: Recipe[]): PreviewPeople {
       ...(first ? [{ user_id: staffId, recipe_id: first.id, practiced_at: daysAgo(5), confirmed_at: daysAgo(4), confirmed_by: ownerId }] : []),
       ...(second ? [{ user_id: staffId, recipe_id: second.id, practiced_at: daysAgo(2), confirmed_at: null, confirmed_by: null }] : []),
       ...(first ? [{ user_id: "preview-staff-b", recipe_id: first.id, practiced_at: daysAgo(9), confirmed_at: daysAgo(8), confirmed_by: ownerId }] : []),
+      // 매뉴얼 문서 읽음 기록 (교육 경로 1일차의 예시 문서)
+      { user_id: staffId, recipe_id: `${manualCheckPrefix}demo-standard-motto`, practiced_at: daysAgo(6), confirmed_at: daysAgo(5), confirmed_by: ownerId },
+      { user_id: staffId, recipe_id: `${manualCheckPrefix}demo-hygiene-daily`, practiced_at: daysAgo(6), confirmed_at: null, confirmed_by: null },
     ],
     quiz: [{ id: 1, user_id: "preview-staff-b", score: 8, total: 10, created_at: daysAgo(3) }],
     notices: third
@@ -84,6 +89,12 @@ function currentRole(): "owner" | "staff" {
   return document.cookie.split("; ").includes(`${roleCookie}=staff`) ? "staff" : "owner";
 }
 
+// 미리보기 잠금 쿠키에 적힌 영역 (db/portal-store.ts 의 bs_preview_locks)
+function previewLockedSections(): string[] {
+  const item = document.cookie.split("; ").find((entry) => entry.startsWith("bs_preview_locks="));
+  return item ? decodeURIComponent(item.slice("bs_preview_locks=".length)).split(",").filter(Boolean) : [];
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 }
@@ -95,7 +106,8 @@ function nameOf(people: PreviewPeople, id: string | null) {
   return person ? person.display_name || person.login_id : null;
 }
 
-function trainingOf(people: PreviewPeople, recipes: Recipe[], userId: string) {
+function trainingOf(people: PreviewPeople, content: RecipeContent, userId: string) {
+  const recipes = content.recipes;
   const mine = new Map(people.checks.filter((row) => row.user_id === userId).map((row) => [row.recipe_id, row]));
   const rows = recipes.map((recipe) => {
     const row = mine.get(recipe.id);
@@ -108,7 +120,20 @@ function trainingOf(people: PreviewPeople, recipes: Recipe[], userId: string) {
       confirmed_by_name: row?.confirmed_by ? nameOf(people, row.confirmed_by) : null,
     };
   });
-  return { rows, total: rows.length, practiced: rows.filter((row) => row.practiced_at).length, confirmed: rows.filter((row) => row.confirmed_at).length };
+  const docChecks = Object.fromEntries(
+    people.checks
+      .filter((row) => row.user_id === userId && row.recipe_id.startsWith(manualCheckPrefix))
+      .map((row) => [row.recipe_id.slice(manualCheckPrefix.length), { practiced_at: row.practiced_at, confirmed_at: row.confirmed_at, confirmed_by_name: row.confirmed_by ? nameOf(people, row.confirmed_by) : null }]),
+  );
+  return {
+    rows,
+    total: rows.length,
+    practiced: rows.filter((row) => row.practiced_at).length,
+    confirmed: rows.filter((row) => row.confirmed_at).length,
+    path: getTrainingPath(content),
+    manuals: readableManuals(content),
+    docChecks,
+  };
 }
 
 function quizOf(people: PreviewPeople, userId: string) {
@@ -141,7 +166,8 @@ export function addPreviewNotices(recipes: Recipe[], changed: Recipe[], version:
   save(people);
 }
 
-export async function handlePeople(path: string, method: string, url: string, body: Record<string, unknown>, recipes: Recipe[]): Promise<Response | null> {
+export async function handlePeople(path: string, method: string, url: string, body: Record<string, unknown>, content: RecipeContent): Promise<Response | null> {
+  const recipes = content.recipes;
   const role = currentRole();
   const me = role === "owner" ? ownerId : staffId;
 
@@ -174,7 +200,9 @@ export async function handlePeople(path: string, method: string, url: string, bo
   // 신입 메뉴 체크리스트
   if (path === "/api/training" && method === "GET") {
     const people = load(recipes);
-    return json({ ...trainingOf(people, recipes, me), quiz: quizOf(people, me) });
+    const training = trainingOf(people, content, me);
+    const locked = role === "staff" ? previewLockedSections() : [];
+    return json({ ...training, manuals: training.manuals.filter((doc) => !locked.includes(doc.sectionId)), quiz: quizOf(people, me) });
   }
 
   if (path === "/api/training" && method === "POST") {
@@ -184,14 +212,14 @@ export async function handlePeople(path: string, method: string, url: string, bo
     const row = checkFor(people, me, recipeId);
     row.practiced_at = row.practiced_at ? null : new Date().toISOString();
     save(people);
-    return json({ ...trainingOf(people, recipes, me), quiz: quizOf(people, me) });
+    return json({ ...trainingOf(people, content, me), quiz: quizOf(people, me) });
   }
 
   if (path === "/api/admin/training" && method === "GET") {
     if (role !== "owner") return ownerOnly();
     const people = load(recipes);
     const userId = new URL(url, window.location.origin).searchParams.get("user");
-    if (userId) return json(trainingOf(people, recipes, userId));
+    if (userId) return json(trainingOf(people, content, userId));
     const recipeIds = new Set(recipes.map((recipe) => recipe.id));
     return json({
       total: recipes.length,
@@ -205,6 +233,8 @@ export async function handlePeople(path: string, method: string, url: string, bo
           active: person.active,
           practiced: mine.filter((row) => row.practiced_at).length,
           confirmed: mine.filter((row) => row.confirmed_at).length,
+          docsRead: people.checks.filter((row) => row.user_id === person.id && row.recipe_id.startsWith(manualCheckPrefix) && row.practiced_at).length,
+          docsConfirmed: people.checks.filter((row) => row.user_id === person.id && row.recipe_id.startsWith(manualCheckPrefix) && row.confirmed_at).length,
           quiz: latest ? { score: latest.score, total: latest.total, created_at: latest.created_at } : null,
         };
       }),
@@ -222,7 +252,7 @@ export async function handlePeople(path: string, method: string, url: string, bo
     row.confirmed_at = confirm ? new Date().toISOString() : null;
     row.confirmed_by = confirm ? ownerId : null;
     save(people);
-    return json(trainingOf(people, recipes, userId));
+    return json(trainingOf(people, content, userId));
   }
 
   if (path === "/api/quiz" && method === "POST") {
