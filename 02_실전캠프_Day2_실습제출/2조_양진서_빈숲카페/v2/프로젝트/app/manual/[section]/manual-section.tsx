@@ -1,17 +1,22 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../preview/preview-api";
 import PreviewRoleSwitch from "../../preview/preview-role-switch";
 import ChatPanel from "../../recipes/chat-panel";
+import { VideoRecipeCard, Watermark } from "../../recipes/media-parts";
+import { todayInSeoul } from "../../checks/check-data";
 import { manualLabels, manualNoticePrefix, responseGroups, type ManualDoc } from "../manual-data";
 import styles from "../manual.module.css";
 
-type Props = { sectionId: string; title: string; description: string; role: "owner" | "staff"; demo: boolean; lockedForStaff: boolean };
+type Props = { sectionId: string; title: string; description: string; role: "owner" | "staff"; viewerName: string; demo: boolean; lockedForStaff: boolean };
 
 // 운영 매뉴얼 한 영역의 화면: 왼쪽 문서 목록, 오른쪽 문서 내용. 모든 영역이 같은 문서 틀을 쓴다.
-export default function ManualSection({ sectionId, title, description, role, demo, lockedForStaff }: Props) {
+export default function ManualSection({ sectionId, title, description, role, viewerName, demo, lockedForStaff }: Props) {
+  // 사진·영상 위에 얹는 워터마크: 누가 언제 봤는지 남는다 (레시피와 같은 규칙)
+  const watermark = `빈숲카페 · ${viewerName} · ${todayInSeoul()}`;
   const [docs, setDocs] = useState<ManualDoc[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [message, setMessage] = useState("문서를 불러오는 중입니다.");
@@ -168,6 +173,25 @@ export default function ManualSection({ sectionId, title, description, role, dem
                   <ul>{selected.donts.map((item, index) => <li key={index}>{item}</li>)}</ul>
                 </section>
               )}
+              {(selected.images?.length || selected.videos?.length) ? (
+                <section className={styles.media}>
+                  <h3>사진 · 영상</h3>
+                  {selected.images?.length ? (
+                    <div className={styles.photos}>
+                      {selected.images.map((image) => (
+                        <figure key={image.id}>
+                          <div className={styles.photoStage}>
+                            <Watermark label={watermark} />
+                            <img src={image.url} alt={image.alt} loading="lazy" draggable={false} onContextMenu={(event) => event.preventDefault()} />
+                          </div>
+                          {(image.caption || image.alt) && <figcaption>{image.caption || image.alt}</figcaption>}
+                        </figure>
+                      ))}
+                    </div>
+                  ) : null}
+                  {selected.videos?.map((video) => <VideoRecipeCard key={video.id} video={video} watermark={watermark} />)}
+                </section>
+              ) : null}
               {selected.reportWhen.length > 0 && (
                 <section className={styles.report}>
                   <h3>{labels.reportWhen}</h3>

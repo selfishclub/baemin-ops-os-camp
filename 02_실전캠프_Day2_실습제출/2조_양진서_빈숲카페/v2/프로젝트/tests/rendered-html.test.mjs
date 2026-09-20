@@ -83,7 +83,7 @@ test("ships training checklist and quiz", async () => {
   assert.match(schema, /quiz_results/);
 });
 
-test("answers from recipes without any external AI and keeps the AI hook last", async () => {
+test("answers from the rule engine first and lets AI only rephrase the one record it found", async () => {
   const [engine, route, history, page] = await Promise.all([
     read("../app/recipes/chat-engine.ts"),
     read("../app/api/chat/route.ts"),
@@ -93,7 +93,15 @@ test("answers from recipes without any external AI and keeps the AI hook last", 
   assert.match(engine, /export function answerFromRecipes/);
   assert.match(engine, /레시피북에 없는 메뉴입니다/);
   assert.doesNotMatch(engine, /fetch\(/);
-  assert.match(route, /AI 연결 자리/);
+  // 규칙 답변기가 먼저 찾고, 찾은 한 건만 AI 에 넘긴다. 못 찾으면 AI 를 부르지 않는다
+  assert.match(route, /ruleAnswer\.found/);
+  assert.match(route, /session\.mode === "auth" && ruleAnswer\.found/);
+  const ai = await read("../app/api/chat/ai-answer.ts");
+  assert.match(ai, /process\.env\.ANTHROPIC_API_KEY/);
+  assert.match(ai, /if \(!aiEnabled\(\) \|\| !found\.found \|\| !material\.length\) return found;/);
+  assert.match(ai, /stop_reason === "refusal"/);
+  // 열쇠를 코드에 적지 않는다
+  assert.doesNotMatch(ai, /sk-ant-/);
   assert.match(history, /export function buildRecipeHistory/);
   assert.match(page, /<ChatPanel/);
   assert.match(page, /<HistoryPanel/);
@@ -189,7 +197,7 @@ test("opens the operation manual sections on one document frame with fake exampl
   assert.match(page, /checkSectionAccess\(session, section\)/);
   assert.match(api, /checkSectionAccess\(session, section\)/);
   assert.match(chat, /allowed\.has\(doc\.sectionId\)/);
-  assert.doesNotMatch(chat, /fetch\(|openai|anthropic/i);
+  assert.doesNotMatch(chat, /openai/i);
   assert.match(editor, /manuals: next/);
 });
 

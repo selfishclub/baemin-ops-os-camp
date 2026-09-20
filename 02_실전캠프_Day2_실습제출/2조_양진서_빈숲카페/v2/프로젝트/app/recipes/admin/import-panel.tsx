@@ -6,10 +6,11 @@ import { portalSections } from "../../portal-sections";
 import { recipeModeLabels, suggestLayerTone, type Recipe, type RecipeContent, type RecipeMode } from "../recipe-data";
 import { manualTemplate, parseManualTable, parseRecipeTable, recipeTemplate, type ImportResult } from "./import-parse";
 import styles from "./studio.module.css";
+import { todayInSeoul } from "../../checks/check-data";
 
 type Kind = "recipes" | "manuals";
 
-const today = () => new Date().toISOString().slice(0, 10).replaceAll("-", ".");
+const today = () => todayInSeoul().replaceAll("-", ".");
 
 // 관리자 편집의 "가져오기" 탭. 엑셀에서 복사한 표를 붙여 넣으면 어떻게 읽었는지 먼저 보여 주고,
 // 사장이 확인해야 초안에 들어간다. 여기서는 저장도 게시도 하지 않는다 — 그건 위의 ‘초안 저장’ → ‘공식 게시’가 한다.

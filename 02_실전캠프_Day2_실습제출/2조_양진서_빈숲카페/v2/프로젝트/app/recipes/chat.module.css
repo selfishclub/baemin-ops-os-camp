@@ -56,3 +56,4 @@
 .panel form button:disabled { opacity: .5; cursor: default; }
 
 @media print { .launcher, .panel { display: none; } }
+.aiNote { display: block; margin-top: 8px; color: #7a8078; font-size: 11px; line-height: 1.5; }

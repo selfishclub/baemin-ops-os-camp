@@ -4,6 +4,7 @@ import { useState } from "react";
 import { defaultManuals, getManuals, manualLabels, manualSectionIds, newManualDoc, responseGroups, type ManualDoc, type ManualKind, type ManualSectionId } from "../../manual/manual-data";
 import { portalSections } from "../../portal-sections";
 import type { RecipeContent } from "../recipe-data";
+import ManualMediaEditor from "./manual-media-editor";
 import styles from "./studio.module.css";
 
 const sectionTitle = (id: string) => portalSections.find((section) => section.id === id)?.title ?? id;
@@ -16,7 +17,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 // 관리자 편집의 "매뉴얼" 탭. 운영 매뉴얼 문서와 응대 카드를 영역별로 고친다 — 레시피와 같은 초안·게시·버전 흐름을 탄다.
-export default function ManualEditor({ content, onChange }: { content: RecipeContent; onChange: (next: RecipeContent) => void }) {
+export default function ManualEditor({ content, onChange, preview = false, onMessage = () => {} }: { content: RecipeContent; onChange: (next: RecipeContent) => void; preview?: boolean; onMessage?: (text: string) => void }) {
   const docs = getManuals(content);
   const [sectionId, setSectionId] = useState<ManualSectionId>("open");
   const [selectedId, setSelectedId] = useState("");
@@ -109,6 +110,7 @@ export default function ManualEditor({ content, onChange }: { content: RecipeCon
           {listField("doneCriteria", 3)}
           {!isCard && listField("donts", 3)}
           {listField("reportWhen", 3)}
+          <ManualMediaEditor key={selected.id} doc={selected} onPatch={patch} preview={preview} onMessage={onMessage} />
           <Field label="이번에 바뀐 이유"><input value={selected.change} onChange={(event) => patch({ change: event.target.value })} /></Field>
           <button type="button" onClick={() => { if (window.confirm("‘" + selected.title + "’ 문서를 지울까요? 공식 게시 전까지는 초안에서만 지워집니다.")) { setDocs(docs.filter((doc) => doc.id !== selected.id)); setSelectedId(""); } }}>이 문서 삭제</button>
         </article>

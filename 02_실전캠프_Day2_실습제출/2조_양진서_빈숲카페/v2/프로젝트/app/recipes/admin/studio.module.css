@@ -289,3 +289,16 @@ button:disabled { cursor: not-allowed; opacity: .48; }
 
 .dailyToggle { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0; padding: 10px 12px; border-radius: 12px; background: #eef6f0; color: #29332c; font-size: 12px; line-height: 1.6; }
 .dailyToggle input { margin-top: 3px; }
+
+/* 매뉴얼 문서의 사진·영상 */
+.manualMedia { margin: 16px 0; padding: 14px; border: 1px dashed #cfc7b4; border-radius: 14px; background: #fbf9f3; }
+.manualMedia h3 { margin: 0 0 10px; color: #2f6b47; font-size: 12px; font-weight: 900; letter-spacing: .06em; }
+.manualMediaRow { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.manualMediaRow figure { display: grid; gap: 6px; width: 150px; margin: 0; }
+.manualMediaRow img { width: 150px; height: 112px; border-radius: 10px; object-fit: cover; background: #ece6d8; }
+.manualMediaRow input { min-width: 0; padding: 6px 8px; border: 1px solid #ddd6c6; border-radius: 8px; font-size: 12px; }
+.manualMediaRow button { border: 0; background: none; color: #a33a3a; font-size: 12px; font-weight: 800; cursor: pointer; justify-self: start; }
+.manualMediaNote { margin: 8px 0 0; color: #7a8279; font-size: 12px; line-height: 1.6; }
+.uploadButton { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 1px solid #2f6b47; border-radius: 999px; background: white; color: #2f6b47; font-size: 12px; font-weight: 800; cursor: pointer; }
+.uploadButton input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.inlineInput { flex: 1; min-width: 200px; min-height: 40px; padding: 0 12px; border: 1px solid #ddd6c6; border-radius: 999px; background: white; font-size: 12px; }

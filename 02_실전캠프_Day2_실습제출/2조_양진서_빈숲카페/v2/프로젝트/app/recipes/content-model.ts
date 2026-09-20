@@ -104,6 +104,14 @@ export function validateRecipeContent(content: RecipeContent): string[] {
     if (!isManualSection(doc.sectionId)) errors.push(`${prefix}: 어느 영역의 문서인지 골라 주세요.`);
     if (!doc.title.trim()) errors.push(`${prefix}: 문서 제목이 필요합니다.`);
     if (!doc.steps.some((step) => step.trim())) errors.push(`${prefix}: 순서를 한 줄 이상 적어 주세요.`);
+    const httpsOnly = (value: string) => { try { return new URL(value).protocol === "https:"; } catch { return false; } };
+    if ((doc.images ?? []).length > 12) errors.push(`${prefix}: 사진은 최대 12장까지 붙일 수 있습니다.`);
+    if ((doc.videos ?? []).length > 8) errors.push(`${prefix}: 영상은 최대 8개까지 붙일 수 있습니다.`);
+    for (const image of doc.images ?? []) if (!(image.url.startsWith("/api/media?key=") || httpsOnly(image.url))) errors.push(`${prefix}: 사진 주소는 올린 사진이거나 https 주소여야 합니다.`);
+    for (const video of doc.videos ?? []) {
+      if (!video.title.trim()) errors.push(`${prefix}: 영상 제목이 필요합니다.`);
+      if (!httpsOnly(video.url)) errors.push(`${prefix}: 영상 주소는 https 주소여야 합니다.`);
+    }
   }
 
   const ids = new Set<string>();

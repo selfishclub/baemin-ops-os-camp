@@ -25,6 +25,7 @@ export default async function ManualSectionRoute({ params }: { params: Promise<{
       title={info.title}
       description={info.description}
       role={person.role}
+      viewerName={person.displayName}
       demo={session.mode === "demo"}
       lockedForStaff={access.locked}
     />

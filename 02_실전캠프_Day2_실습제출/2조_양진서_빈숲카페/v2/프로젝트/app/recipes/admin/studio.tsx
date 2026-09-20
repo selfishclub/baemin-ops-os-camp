@@ -23,9 +23,11 @@ import {
 } from "../recipe-data";
 import { cascadeSharedStandards, validateRecipeContent } from "../content-model";
 import styles from "./studio.module.css";
+import { todayInSeoul } from "../../checks/check-data";
 import { apiFetch } from "../../preview/preview-api";
 import PreviewBanner from "../../preview/preview-banner";
 import ManualEditor from "./manual-editor";
+import { optimizeImage } from "./optimize-image";
 import PathEditor from "./path-editor";
 import ImportPanel from "./import-panel";
 import ExamEditor from "./exam-editor";
@@ -100,28 +102,8 @@ function emptyVariant(): RecipeVariant {
   };
 }
 
-async function optimizeImage(file: File) {
-  if (file.size > 25 * 1024 * 1024) throw new Error("원본 사진은 25MB 이하여야 합니다.");
-  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-  const maxEdge = 1600;
-  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const context = canvas.getContext("2d");
-  if (!context) {
-    bitmap.close();
-    throw new Error("사진을 최적화할 수 없습니다.");
-  }
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
-  if (!blob) throw new Error("사진을 최적화할 수 없습니다.");
-  return new File([blob], `${file.name.replace(/\.[^.]+$/, "") || "drink"}.webp`, { type: "image/webp" });
-}
-
 function newRecipe(index: number): Recipe {
-  const today = new Date().toISOString().slice(0, 10).replaceAll("-", ".");
+  const today = todayInSeoul().replaceAll("-", ".");
   return {
     id: `new-menu-${Date.now()}-${index}`,
     name: "새 메뉴",
@@ -148,7 +130,7 @@ export default function AdminStudio({ userName, preview = false }: { userName: s
   const [message, setMessage] = useState("관리 데이터를 불러오는 중입니다.");
   const [errors, setErrors] = useState<string[]>([]);
   const [changeReason, setChangeReason] = useState("");
-  const [effectiveAt, setEffectiveAt] = useState(new Date().toISOString().slice(0, 10));
+  const [effectiveAt, setEffectiveAt] = useState(todayInSeoul());
   const [notifyStaff, setNotifyStaff] = useState(true);
 
   const load = async () => {
@@ -175,8 +157,14 @@ export default function AdminStudio({ userName, preview = false }: { userName: s
   };
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => { void load(); });
-    return () => window.cancelAnimationFrame(frame);
+    // 화면이 뒤에 가려져 있어도(다른 탭·창) 바로 불러온다 — requestAnimationFrame 은 보일 때까지 기다려서 "불러오는 중"에 멈춰 보였다
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) void load();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const selected = content?.recipes.find((recipe) => recipe.id === selectedId) ?? null;
@@ -460,7 +448,7 @@ export default function AdminStudio({ userName, preview = false }: { userName: s
 
       {tab === "shared" && (
         <section className={styles.wideEditor}>
-          <div className={styles.sectionTitle}><div><small>MASTER DATA</small><h2>공통 제조 기준</h2></div><div className={styles.sectionActions}><span>{impact.length}개 연결 메뉴에 게시 시 반영</span><button type="button" className={styles.secondary} onClick={() => changeContent({ ...content, sharedStandards: [...content.sharedStandards, { id: `standard-${Date.now()}`, title: "새 공통 기준", summary: "적용 내용을 입력해 주세요.", version: "1.0", updatedAt: new Date().toISOString().slice(0, 10), values: [{ label: "기본", value: "계량" }] }] })}>+ 기준 추가</button></div></div>
+          <div className={styles.sectionTitle}><div><small>MASTER DATA</small><h2>공통 제조 기준</h2></div><div className={styles.sectionActions}><span>{impact.length}개 연결 메뉴에 게시 시 반영</span><button type="button" className={styles.secondary} onClick={() => changeContent({ ...content, sharedStandards: [...content.sharedStandards, { id: `standard-${Date.now()}`, title: "새 공통 기준", summary: "적용 내용을 입력해 주세요.", version: "1.0", updatedAt: todayInSeoul(), values: [{ label: "기본", value: "계량" }] }] })}>+ 기준 추가</button></div></div>
           {content.sharedStandards.map((standard, index) => (
             <article className={styles.sharedCard} key={standard.id}>
               <div className={styles.cardActions}><strong>{standard.id}</strong><button type="button" className={styles.danger} onClick={() => {
@@ -477,7 +465,7 @@ export default function AdminStudio({ userName, preview = false }: { userName: s
             </article>
           ))}
 
-          <div className={styles.sectionTitle}><div><small>SHARED GUIDE</small><h2>공통 서비스 가이드</h2></div><button type="button" className={styles.secondary} onClick={() => changeContent({ ...content, sharedGuides: [...content.sharedGuides, { id: `guide-${Date.now()}`, title: "새 공통 가이드", scope: "적용 범위", version: "1.0", updatedAt: new Date().toISOString().slice(0, 10), sections: [{ title: "안내", items: ["내용을 입력해 주세요."] }] }] })}>+ 가이드 추가</button></div>
+          <div className={styles.sectionTitle}><div><small>SHARED GUIDE</small><h2>공통 서비스 가이드</h2></div><button type="button" className={styles.secondary} onClick={() => changeContent({ ...content, sharedGuides: [...content.sharedGuides, { id: `guide-${Date.now()}`, title: "새 공통 가이드", scope: "적용 범위", version: "1.0", updatedAt: todayInSeoul(), sections: [{ title: "안내", items: ["내용을 입력해 주세요."] }] }] })}>+ 가이드 추가</button></div>
           {content.sharedGuides.map((guide, index) => (
             <article className={styles.sharedCard} key={guide.id}>
               <div className={styles.cardActions}><strong>{guide.id}</strong><button type="button" className={styles.danger} onClick={() => {
@@ -544,7 +532,7 @@ export default function AdminStudio({ userName, preview = false }: { userName: s
         );
       })()}
 
-      {tab === "manuals" && <ManualEditor content={content} onChange={changeContent} />}
+      {tab === "manuals" && <ManualEditor content={content} onChange={changeContent} preview={preview} onMessage={(text) => setMessage(text)} />}
       {tab === "path" && <PathEditor content={content} onChange={changeContent} />}
       {tab === "exam" && <ExamEditor content={content} onChange={changeContent} />}
       {tab === "import" && <ImportPanel content={content} onChange={changeContent} onDone={(text) => setMessage(text)} />}

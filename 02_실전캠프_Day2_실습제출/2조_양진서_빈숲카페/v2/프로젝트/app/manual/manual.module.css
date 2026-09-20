@@ -49,6 +49,14 @@
 .dailyLink { margin: 12px 0 0 !important; }
 .dailyLink a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; background: #173f31; color: white; font-size: 12px; font-weight: 800; text-decoration: none; }
 
+/* 문서의 사진·영상 */
+.media { order: 4; }
+.photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.photos figure { margin: 0; }
+.photoStage { position: relative; overflow: hidden; border-radius: 14px; background: #ece6d8; user-select: none; }
+.photoStage img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; -webkit-user-drag: none; }
+.photos figcaption { margin-top: 6px; color: #6b7770; font-size: 12px; line-height: 1.5; }
+
 /* 바뀐 문서 표시 */
 .changedDot { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #b4462f; color: white; font-size: 10px; font-weight: 900; vertical-align: middle; }
 .changedBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; order: -1; margin: -6px 0 16px; padding: 12px 14px; border: 1px solid #e6c9bf; border-radius: 14px; background: #fdf1ec; }

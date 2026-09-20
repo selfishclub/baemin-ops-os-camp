@@ -56,6 +56,7 @@ export default function ChatPanel({ onOpenRecipe }: { onOpenRecipe?: (recipeId: 
         {messages.map((message) => (
           <div key={message.id} className={styles.message} data-role={message.role}>
             {message.text.map((line, index) => <p key={index}>{line}</p>)}
+            {message.answer?.source === "ai" && <small className={styles.aiNote}>AI가 매뉴얼 내용을 풀어 쓴 답이에요. 정확한 기준은 아래 ‘열기’로 원문을 확인하세요.</small>}
             {message.answer?.suggestions?.length ? (
               <div className={styles.chips}>
                 {message.answer.suggestions.map((name) => <button key={name} type="button" onClick={() => void ask(name)}>{name}</button>)}

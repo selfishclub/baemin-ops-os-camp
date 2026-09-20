@@ -11,7 +11,6 @@ import {
   defaultRecipeContent,
   Recipe,
   RecipeContent,
-  RecipeVideo,
   RecipeVariant,
   RecipeLayer,
   recipeModes,
@@ -32,6 +31,8 @@ import Link from "next/link";
 import ChatPanel from "./chat-panel";
 import HistoryPanel from "./history-panel";
 import { apiFetch } from "../preview/preview-api";
+import { VideoRecipeCard, Watermark } from "./media-parts";
+import { todayInSeoul } from "../checks/check-data";
 import PreviewRoleSwitch from "../preview/preview-role-switch";
 
 const favoriteKey = "beansoop-recipe-favorites-v1";
@@ -84,40 +85,6 @@ function recipeSearchText(recipe: Recipe) {
     .replace(/\s+/g, "");
 }
 
-function safeExternalUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" ? url : null;
-  } catch {
-    return null;
-  }
-}
-
-function videoEmbedUrl(value: string) {
-  const url = safeExternalUrl(value);
-  if (!url) return null;
-  const host = url.hostname.replace(/^www\./, "");
-  if (host === "youtu.be") {
-    const id = url.pathname.split("/").filter(Boolean)[0];
-    return id && /^[\w-]{6,}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : null;
-  }
-  if (host === "youtube.com" || host === "m.youtube.com") {
-    const parts = url.pathname.split("/").filter(Boolean);
-    const id = url.searchParams.get("v") ?? (["embed", "shorts", "live"].includes(parts[0]) ? parts[1] : null);
-    return id && /^[\w-]{6,}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : null;
-  }
-  if (host === "tv.naver.com" || host === "m.tv.naver.com") {
-    const match = url.pathname.match(/^\/(?:v|embed)\/(\d+)/);
-    return match ? `https://tv.naver.com/embed/${match[1]}` : null;
-  }
-  return null;
-}
-
-function directVideoUrl(value: string) {
-  const url = safeExternalUrl(value);
-  return url && /\.(?:mp4|webm|ogg)(?:$|\?)/i.test(`${url.pathname}${url.search}`) ? url.toString() : null;
-}
-
 export type RecipeViewer = { displayName: string; role: "owner" | "staff" };
 
 type ChangeNoticeItem = {
@@ -161,7 +128,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
   const [noticeBusy, setNoticeBusy] = useState<number | null>(null);
   const pendingNotices = notices.filter((notice) => !notice.acked);
   // 사진·영상 위에 얹는 워터마크 문구: 누가 언제 봤는지 남는다 (스크린샷 유출 억제)
-  const watermarkLabel = useMemo(() => `빈숲카페 · ${viewer?.displayName ?? "시연"} · ${new Date().toISOString().slice(0, 10)}`, [viewer?.displayName]);
+  const watermarkLabel = useMemo(() => `빈숲카페 · ${viewer?.displayName ?? "시연"} · ${todayInSeoul()}`, [viewer?.displayName]);
 
   // 바뀐 레시피 알림 (로그인한 직원만)
   const loadNotices = async () => {
@@ -375,7 +342,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
   const createSharedStandard = () => {
     if (!selectedId) return;
     const id = `standard-${Date.now()}`;
-    const today = new Date().toISOString().slice(0, 10).replaceAll("-", ".");
+    const today = todayInSeoul().replaceAll("-", ".");
     updateInlineContent((value) => ({
       ...value,
       sharedStandards: [...value.sharedStandards, {
@@ -395,7 +362,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
   const createSharedGuide = () => {
     if (!selectedId) return;
     const id = `guide-${Date.now()}`;
-    const today = new Date().toISOString().slice(0, 10).replaceAll("-", ".");
+    const today = todayInSeoul().replaceAll("-", ".");
     updateInlineContent((value) => ({
       ...value,
       sharedGuides: [...value.sharedGuides, {
@@ -461,7 +428,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
     if (!inlineAdmin || !selectedId) return;
     const reason = window.prompt("이번 수정 내용을 짧게 적어 주세요.", "레시피 현장 수정");
     if (!reason?.trim()) return;
-    const effectiveAt = new Date().toISOString().slice(0, 10);
+    const effectiveAt = todayInSeoul();
     const nextContent = {
       ...inlineAdmin.content,
       recipes: inlineAdmin.content.recipes.map((recipe) => recipe.id === selectedId ? { ...recipe, change: reason.trim(), updatedAt: effectiveAt.replaceAll("-", ".") } : recipe),
@@ -1088,34 +1055,7 @@ function VideoPromptPanel({ recipe, mode, variant, guides }: { recipe: Recipe; m
   );
 }
 
-// 사진·영상 위에 반투명으로 깔리는 워터마크 층. 클릭은 통과시킨다.
-function Watermark({ label }: { label: string }) {
-  return (
-    <div className={styles.watermark} aria-hidden="true">
-      {Array.from({ length: 12 }, (_, index) => <span key={index}>{label}</span>)}
-    </div>
-  );
-}
 
-function VideoRecipeCard({ video, watermark }: { video: RecipeVideo; watermark: string }) {
-  const embedUrl = videoEmbedUrl(video.url);
-  const directUrl = directVideoUrl(video.url);
-  const externalUrl = safeExternalUrl(video.url);
-  const inferredPortrait = /(?:youtube\.com|youtu\.be)\/shorts\//i.test(video.url);
-  const [detectedPortrait, setDetectedPortrait] = useState<boolean | null>(null);
-  const orientation = video.orientation === "portrait" || (video.orientation !== "landscape" && (detectedPortrait ?? inferredPortrait))
-    ? "portrait"
-    : "landscape";
-  return (
-    <article className={styles.videoCard} data-orientation={orientation}>
-      <div className={styles.videoStage}>
-        <Watermark label={watermark} />
-        {embedUrl ? <iframe src={embedUrl} title={video.title} loading="lazy" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" /> : directUrl ? <video src={directUrl} controls controlsList="nodownload noremoteplayback" disablePictureInPicture onContextMenu={(event) => event.preventDefault()} playsInline preload="metadata" onLoadedMetadata={(event) => setDetectedPortrait(event.currentTarget.videoHeight > event.currentTarget.videoWidth)}>이 브라우저에서는 영상을 재생할 수 없습니다.</video> : <div className={styles.videoFallback}>이 플랫폼은 새 창에서 재생됩니다.</div>}
-      </div>
-      <div className={styles.videoMeta}><strong>{video.title}</strong>{video.description && <p>{video.description}</p>}{externalUrl && !directUrl && <a href={externalUrl.toString()} target="_blank" rel="noreferrer">외부에서 보기 ↗</a>}</div>
-    </article>
-  );
-}
 
 function RecipeCard({ recipe, favorite, onOpen, onFavorite }: RecipeCardProps) {
   const visualMode = supportedModes(recipe)[0] ?? "ICE";

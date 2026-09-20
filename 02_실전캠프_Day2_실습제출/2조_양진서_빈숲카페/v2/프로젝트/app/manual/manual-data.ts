@@ -1,3 +1,5 @@
+import type { RecipeImage, RecipeVideo } from "../recipes/recipe-data";
+
 // 운영 매뉴얼 문서 틀. 레시피 말고 "일하는 방법"을 적는 문서 — 모든 영역이 같은 틀을 쓴다.
 // 공개용 버전이라 아래 예시는 전부 가짜다. ○○ 자리에 매장 기준을 적는 "빈 양식"이고, 실제 운영 값·정책은 넣지 않는다.
 
@@ -14,6 +16,9 @@ export type ManualDoc = {
   group?: string;
   // 챗봇이 알아듣는 낱말 (제목에 없는 말로 물어도 찾게)
   keywords?: string[];
+  // 사진·영상 (레시피와 같은 모양). 사진은 올린 파일(/api/media?key=…)이나 https 주소, 영상은 유튜브·네이버TV·영상 파일의 https 주소
+  images?: RecipeImage[];
+  videos?: RecipeVideo[];
   // 매일 체크하는 문서 (오픈·마감 체크처럼). 켜면 "순서"의 각 줄이 오늘 체크 항목이 되고, 누가 언제 했는지 남는다
   dailyCheck?: boolean;
   // app/portal-sections.ts 의 영역 id (open, close …)
@@ -244,5 +249,5 @@ export function readableManuals(content: { manuals?: ManualDoc[] } | null | unde
 }
 
 export function newManualDoc(sectionId: ManualSectionId, kind: ManualKind = "procedure"): ManualDoc {
-  return { id: `manual-${Date.now()}`, kind, ...(kind === "response" ? { group: responseGroups[0], keywords: [] } : {}), sectionId, title: kind === "response" ? "새 응대 카드" : "새 문서", summary: "", purpose: "", materials: [], steps: [""], doneCriteria: [], donts: [], reportWhen: [], updatedAt: new Date().toISOString().slice(0, 10), change: "새로 만듦" };
+  return { id: `manual-${Date.now()}`, kind, ...(kind === "response" ? { group: responseGroups[0], keywords: [] } : {}), sectionId, title: kind === "response" ? "새 응대 카드" : "새 문서", summary: "", purpose: "", materials: [], steps: [""], doneCriteria: [], donts: [], reportWhen: [], updatedAt: new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date()), change: "새로 만듦" };
 }

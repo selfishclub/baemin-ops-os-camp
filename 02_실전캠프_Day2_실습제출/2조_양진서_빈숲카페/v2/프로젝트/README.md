@@ -64,6 +64,8 @@ npm run dev
 - 엑셀·표에서 가져오기: `app/recipes/admin/import-parse.ts` (표 → 레시피·문서, 순수 함수) · `import-panel.tsx` (붙여넣기 → 미리보기 → 초안에 넣기). 저장·게시는 하지 않는다. `tests/import-parse.test.mjs` 가 가짜 표로 실제로 돌려 본다
 - 시험 · 인증: `app/exam/exam-data.ts` (단계·인증 규칙, 순수 함수) · `db/exam-store.ts`. 필기 결과는 기존 표 `quiz_results` 에 `detail_json = { examId, answers }`, 실기는 `training_checks` 에 `recipe_id = exam:<시험 id>:<항목 id>` (직원 = practiced_at "볼 준비", 사장 = confirmed_at "합격"). `tests/exam-status.test.mjs` 가 인증 규칙을 돌려 본다
 - 오늘 체크: `app/checks/check-data.ts` (항목 열쇠·날짜·화면용 계산, 순수 함수) · `db/check-store.ts` · 표 `daily_checks` (하루·문서·항목마다 한 줄, `item_key = __signoff__` 는 사장 확인함). 문서의 `dailyCheck` 가 켜진 절차 문서만 나온다. `tests/check-data.test.mjs` 가 규칙을 돌려 본다
+- 사진·영상 부품: `app/recipes/media-parts.tsx` (워터마크 층, 영상 카드 — 레시피와 매뉴얼이 같이 씀) · 매뉴얼 편집의 사진·영상은 `app/recipes/admin/manual-media-editor.tsx` · 올린 사진은 파일함 `recipes/manual-<문서 id>/…` 에 들어가고 `/api/media` 가 그 문서의 영역 잠금을 확인한다
+- 챗봇 AI: `app/api/chat/ai-answer.ts`. 서버 환경변수 `ANTHROPIC_API_KEY` 가 있고 로그인 모드일 때만, 규칙 답변기가 찾은 한 건의 글만 넘긴다. `AI_MODEL` 로 모델을 바꿀 수 있다(기본 `claude-opus-5`). 열쇠는 코드·저장소·`NEXT_PUBLIC_*` 에 절대 넣지 않는다
 - `app/auth.ts` 로그인·역할 확인 · `proxy.ts` 로그인 안 한 요청을 `/login` 으로
 - `db/recipe-store.ts` 저장 층 (Supabase Postgres) · `supabase/schema.sql` 표와 잠금
 - `lib/supabase/` 열쇠 읽기와 클라이언트
