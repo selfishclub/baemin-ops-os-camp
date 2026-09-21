@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog, MoneyInput, Notice } from "@/components/ui";
 import { newId } from "@/lib/classify";
 import { ITEMS_KEY, type Item } from "@/lib/costing/types";
+import { RECEIPT_EXEMPT_KEY, cardPayee, emptyExempt, matchCardReceipts, type ReceiptExempt } from "@/lib/costing/receiptMatch";
+import type { Transaction } from "@/lib/types";
 import {
   PURCHASES_KEY_PREFIX,
   PURCHASE_CATEGORIES,
@@ -44,6 +46,8 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
   const sheetRef = useRef<HTMLInputElement>(null);
   const [confirmDelete, setConfirmDelete] = useState<Purchase | null>(null);
   const [note, setNote] = useState<{ tone: "ok" | "info" | "warn"; text: string } | null>(null);
+  const [bankTxs, setBankTxs] = useState<Transaction[]>([]);
+  const [exempt, setExempt] = useState<ReceiptExempt>(emptyExempt());
   const key = PURCHASES_KEY_PREFIX + month;
 
   // 이 달부터 이번 달까지의 매입 영수증 (기준단가를 바꿀 때 "더 최근에 산 기록"이 있는지 보려고)
@@ -59,6 +63,8 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
     const list = (await getStore().getSetting<Purchase[]>(key)) ?? [];
     setPurchases(list.sort((a, b) => (a.date < b.date ? 1 : -1)));
     setPhotoCounts(await countPhotosByOwner());
+    setBankTxs(await getStore().listTransactions(month));
+    setExempt({ ...emptyExempt(), ...((await getStore().getSetting<ReceiptExempt>(RECEIPT_EXEMPT_KEY)) ?? {}) });
     setLoaded(true);
   }
 
@@ -347,6 +353,17 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
           </div>
         )}
       </section>
+
+      <CardReceiptCheck
+        txs={bankTxs}
+        purchases={purchases}
+        exempt={exempt}
+        onExempt={async (next) => {
+          await getStore().saveSetting(RECEIPT_EXEMPT_KEY, next);
+          setExempt(next);
+        }}
+        onAddReceipt={(t) => startNew({ date: t.date, vendor: cardPayee(t.payee), lines: [{ ...emptyLine(), unitPrice: t.out, amount: t.out }] })}
+      />
 
       {pasting && (
         <PasteDialog
@@ -1029,5 +1046,151 @@ function SheetDialog({ receipts, notes, fileName, items, onSave, onCancel }: { r
         </div>
       </div>
     </div>
+  );
+}
+
+// 영수증 없는 체크카드 결제 — 체크카드 출금마다 매입 영수증이 있는지 맞춰 보고, 없는 것만 모아 보여 준다
+function CardReceiptCheck({
+  txs,
+  purchases,
+  exempt,
+  onExempt,
+  onAddReceipt,
+}: {
+  txs: Transaction[];
+  purchases: Purchase[];
+  exempt: ReceiptExempt;
+  onExempt: (next: ReceiptExempt) => Promise<void>;
+  onAddReceipt: (t: Transaction) => void;
+}) {
+  const [showDone, setShowDone] = useState(false);
+  const r = useMemo(() => matchCardReceipts(txs, purchases, exempt), [txs, purchases, exempt]);
+  if (r.cardCount === 0) return null;
+  const missingSum = r.missing.reduce((a, t) => a + t.out, 0);
+  const md = (d: string) => d.slice(5).replace("-", "/");
+
+  return (
+    <section className="card space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-bold">
+          영수증 없는 체크카드 결제 <span className="text-[11px] font-normal text-stone-500">통장 체크카드 출금 ↔ 매입 영수증</span>
+        </h2>
+        <span className="num text-xs text-stone-500">
+          체크카드 {r.cardCount}건 · 영수증과 맞음 {r.matched.length} · 필요 없음 {r.exempt.length} · 취소 {r.cancelled.length}
+        </span>
+      </div>
+      <p className="text-xs text-stone-600">
+        통장의 체크카드 결제를 금액이 같은 매입 영수증(날짜 ±3일, 한 번에 여러 곳을 결제했으면 영수증 2~3장의 합)과 맞춰 봐요. 같은 날 카드 취소는 원래 결제와 함께 빠지고, “손익에 안 넣음”(개인)·통신비 같은 청구서도 빠져요.
+      </p>
+
+      {r.missing.length === 0 ? (
+        <Notice tone="ok">이 달 체크카드 결제는 모두 영수증과 맞아요.</Notice>
+      ) : (
+        <>
+          <Notice tone="warn">
+            영수증이 없는 결제 <b>{r.missing.length}건</b> · {won(missingSum)}
+          </Notice>
+          <ul className="divide-y divide-stone-100 text-sm">
+            {r.missing.map((t) => (
+              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <div className="min-w-0">
+                  <p className="font-semibold">
+                    <span className="num">{md(t.date)}</span> {cardPayee(t.payee)}
+                  </p>
+                  <p className="text-[11px] text-stone-500">
+                    지금 분류: {t.major ?? "미분류"}
+                    {t.minor ? ` / ${t.minor}` : ""}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="num w-20 text-right font-bold">{won(t.out)}</span>
+                  <button className="btn-primary whitespace-nowrap px-2 py-1 text-xs" onClick={() => onAddReceipt(t)}>
+                    영수증 넣기
+                  </button>
+                  <button className="btn-ghost whitespace-nowrap px-2 py-1 text-xs" onClick={() => void onExempt({ ...exempt, txIds: [...exempt.txIds, t.id] })}>
+                    이 결제는 필요 없음
+                  </button>
+                  <button className="btn-ghost whitespace-nowrap px-2 py-1 text-xs" onClick={() => void onExempt({ ...exempt, payees: [...exempt.payees, cardPayee(t.payee)] })}>
+                    이 거래처는 늘 필요 없음
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[11px] text-stone-500">개인 결제면 올리기 탭에서 그 줄을 “제외 · 손익에 안 넣음”으로 바꾸면 여기서도 빠져요. 교통·주차·식대처럼 영수증까지는 필요 없는 건 “필요 없음”을 누르세요.</p>
+        </>
+      )}
+
+      <button className="text-xs text-stone-500 underline" onClick={() => setShowDone((v) => !v)}>
+        {showDone ? "맞춘 결과 접기" : "맞춘 결과 보기 (영수증과 맞음 · 필요 없음 · 취소)"}
+      </button>
+      {showDone && (
+        <div className="space-y-3 text-xs">
+          {r.matched.length > 0 && (
+            <div>
+              <p className="mb-1 font-semibold text-stone-500">영수증과 맞음 {r.matched.length}건</p>
+              <ul className="num divide-y divide-stone-100">
+                {r.matched.map((m) => (
+                  <li key={m.tx.id} className="flex justify-between gap-2 py-1">
+                    <span>
+                      {md(m.tx.date)} {cardPayee(m.tx.payee)}
+                    </span>
+                    <span className="text-stone-500">→ {m.purchases.map((p) => `${md(p.date)} ${p.vendor}`).join(" + ")}</span>
+                    <span className="w-20 text-right">{won(m.tx.out)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {r.exempt.length > 0 && (
+            <div>
+              <p className="mb-1 font-semibold text-stone-500">영수증 필요 없음 {r.exempt.length}건</p>
+              <ul className="num divide-y divide-stone-100">
+                {r.exempt.map((e) => (
+                  <li key={e.tx.id} className="flex items-center justify-between gap-2 py-1">
+                    <span>
+                      {md(e.tx.date)} {cardPayee(e.tx.payee)} <span className="text-stone-400">· {e.reason}</span>
+                    </span>
+                    <span className="flex items-center gap-2">
+                      {won(e.tx.out)}
+                      {e.manual && (
+                        <button
+                          className="btn-ghost px-1.5 py-0.5 text-[11px]"
+                          onClick={() =>
+                            void onExempt({
+                              txIds: exempt.txIds.filter((id) => id !== e.tx.id),
+                              payees: e.reason.startsWith("늘") ? exempt.payees.filter((p) => p !== cardPayee(e.tx.payee)) : exempt.payees,
+                            })
+                          }
+                        >
+                          되돌리기
+                        </button>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {r.cancelled.length > 0 && (
+            <div>
+              <p className="mb-1 font-semibold text-stone-500">카드 취소로 빠진 결제 {r.cancelled.length}건</p>
+              <ul className="num divide-y divide-stone-100">
+                {r.cancelled.map((c) => (
+                  <li key={c.tx.id} className="flex justify-between gap-2 py-1">
+                    <span>
+                      {md(c.tx.date)} {cardPayee(c.tx.payee)}
+                    </span>
+                    <span className="text-stone-500">
+                      {won(c.tx.out)} → 취소 {md(c.cancel.date)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
