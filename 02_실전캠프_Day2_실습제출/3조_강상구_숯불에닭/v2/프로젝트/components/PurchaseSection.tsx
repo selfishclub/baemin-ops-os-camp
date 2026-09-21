@@ -18,6 +18,7 @@ import {
   type PurchaseLine,
 } from "@/lib/costing/purchases";
 import { LiquorParseError, liquorBrands, liquorDayToPurchase, newLiquorItems, parseLiquorLedgerGrid, type LiquorLedger } from "@/lib/costing/liquorLedger";
+import { ReceiptSheetError, parseReceiptSheets, receiptDiscount, receiptTotal, sheetReceiptToPurchase, type SheetReceipt } from "@/lib/costing/receiptSheet";
 import { RECEIPT_PROMPT, matchItem, parseReceiptText, toPurchaseLine } from "@/lib/costing/receiptText";
 import { todayStr } from "@/lib/daily";
 import { num, won } from "@/lib/format";
@@ -39,6 +40,8 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
   const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
   const [liquor, setLiquor] = useState<{ ledger: LiquorLedger; fileName: string; vendor: string } | null>(null);
   const liquorRef = useRef<HTMLInputElement>(null);
+  const [sheet, setSheet] = useState<{ receipts: SheetReceipt[]; notes: string[]; fileName: string } | null>(null);
+  const sheetRef = useRef<HTMLInputElement>(null);
   const [confirmDelete, setConfirmDelete] = useState<Purchase | null>(null);
   const [note, setNote] = useState<{ tone: "ok" | "info" | "warn"; text: string } | null>(null);
   const key = PURCHASES_KEY_PREFIX + month;
@@ -165,6 +168,53 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
     });
   }
 
+  // 영수증 정리 엑셀(폰 AI로 만든 품목별내역·영수증요약) → 영수증마다 매입 영수증
+  async function readSheetFile(file: File) {
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const sheets = wb.SheetNames.map((name) => ({ name, grid: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null }) as never[][] }));
+      const parsed = parseReceiptSheets(sheets);
+      setSheet({ ...parsed, fileName: file.name });
+    } catch (e) {
+      setNote({ tone: "warn", text: e instanceof ReceiptSheetError ? e.message : "파일을 읽지 못했어요. 영수증을 정리한 엑셀인지 확인해 주세요." });
+    } finally {
+      if (sheetRef.current) sheetRef.current.value = "";
+    }
+  }
+
+  async function saveSheet(picked: SheetReceipt[], link: boolean) {
+    const store = getStore();
+    let nextItems = items;
+    const byMonth = new Map<string, Purchase[]>();
+    for (const rc of picked) {
+      const p = sheetReceiptToPurchase(rc, nextItems, link);
+      byMonth.set(rc.date.slice(0, 7), [...(byMonth.get(rc.date.slice(0, 7)) ?? []), p]);
+    }
+    const updated = new Map<string, { name: string; from: number; to: number }>();
+    for (const [m, list] of byMonth) {
+      const k = PURCHASES_KEY_PREFIX + m;
+      const old = (await store.getSetting<Purchase[]>(k)) ?? [];
+      const ids = new Set(list.map((p) => p.id));
+      await store.saveSetting(k, [...old.filter((p) => !ids.has(p.id)), ...list]);
+      for (const p of [...list].sort((a, b) => (a.date < b.date ? -1 : 1))) {
+        const applied = applyPurchaseToItems(nextItems, p);
+        nextItems = applied.items;
+        for (const u of applied.updated) updated.set(u.name, { ...u, from: updated.get(u.name)?.from ?? u.from });
+      }
+    }
+    if (updated.size) {
+      await store.saveSetting(ITEMS_KEY, nextItems);
+      await onItemsChange();
+    }
+    setSheet(null);
+    await load();
+    setNote({
+      tone: "ok",
+      text: `영수증 ${picked.length}건 넣었어요 (${won(picked.reduce((a, r) => a + receiptTotal(r), 0))}).${updated.size ? ` 기준단가 갱신: ${[...updated.values()].map((u) => `${u.name} ${num(u.from)}→${num(u.to)}`).join(", ")}` : ""}`,
+    });
+  }
+
   if (!loaded) return null;
   const summary = summarizePurchases(purchases);
   const itemName = (id: string) => items.find((i) => i.id === id)?.name ?? id;
@@ -178,6 +228,10 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
             매입 영수증 <span className="text-[11px] font-normal text-stone-500">{monthLabel(month)} · 품목별 입고</span>
           </h2>
           <div className="flex flex-wrap gap-1.5">
+            <button className="btn-ghost whitespace-nowrap px-3 py-1.5 text-xs" onClick={() => sheetRef.current?.click()}>
+              🧾 영수증 엑셀 올리기
+            </button>
+            <input ref={sheetRef} type="file" accept=".xlsx,.xls" aria-label="영수증 정리 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readSheetFile(e.target.files[0])} />
             <button className="btn-ghost whitespace-nowrap px-3 py-1.5 text-xs" onClick={() => liquorRef.current?.click()}>
               🍺 주류 원장 올리기
             </button>
@@ -290,6 +344,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
           }}
         />
       )}
+      {sheet && <SheetDialog {...sheet} items={items} onCancel={() => setSheet(null)} onSave={(picked, link) => void saveSheet(picked, link)} />}
       {liquor && <LiquorDialog {...liquor} items={items} onCancel={() => setLiquor(null)} onSave={(vendor, createItems) => void saveLiquor(liquor.ledger, vendor, createItems)} />}
       {viewing && <PurchaseViewer purchase={viewing} items={items} onClose={() => setViewing(null)} />}
       {editing && <PurchaseEditor purchase={editing} items={items} onChange={setEditing} onSave={() => save(editing)} onCancel={() => void cancelEdit()} />}
@@ -851,6 +906,112 @@ function LiquorDialog({ ledger, fileName, vendor: initialVendor, items, onSave, 
           </button>
         </div>
         <p className="text-[11px] text-stone-500">같은 파일을 다시 올려도 겹치지 않고 그 입고일 영수증이 새 내용으로 바뀌어요.</p>
+      </div>
+    </div>
+  );
+}
+
+// 영수증 정리 엑셀 미리보기 — 영수증마다 넣을지 고르고, 식비·개인 물품뿐인 영수증은 기본으로 빼 둔다
+function SheetDialog({ receipts, notes, fileName, items, onSave, onCancel }: { receipts: SheetReceipt[]; notes: string[]; fileName: string; items: Item[]; onSave: (picked: SheetReceipt[], link: boolean) => void; onCancel: () => void }) {
+  const [on, setOn] = useState<Record<string, boolean>>(() => Object.fromEntries(receipts.map((r) => [r.key, !r.personal])));
+  const [link, setLink] = useState(true);
+  const [open, setOpen] = useState<string | null>(null);
+  const picked = receipts.filter((r) => on[r.key]);
+  const total = picked.reduce((a, r) => a + receiptTotal(r), 0);
+  const skipped = receipts.filter((r) => !on[r.key]);
+  // 영수증에 할인이 적혀 있는데 결제액이 품목 합계와 같으면: 할인은 이미 품목 가격에 들어간 것으로 본다
+  const shownOnly = receipts.filter((r) => r.shownDiscount > 0 && receiptDiscount(r) === 0);
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="영수증 엑셀 미리보기">
+      <div className="card max-h-[92vh] w-full max-w-2xl space-y-3 overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold">
+            영수증 엑셀 <span className="text-[11px] font-normal text-stone-500">{fileName}</span>
+          </h2>
+          <button className="btn-ghost px-2 py-1 text-xs" onClick={onCancel}>
+            닫기
+          </button>
+        </div>
+
+        {notes.map((n, i) => (
+          <Notice key={i} tone="warn">
+            {n}
+          </Notice>
+        ))}
+        {shownOnly.length > 0 && (
+          <Notice tone="info">
+            할인이 적혀 있지만 결제액이 품목 합계와 같은 영수증이 {shownOnly.length}건 있어요 ({shownOnly.map((r) => `${r.date.slice(5).replace("-", "/")} ${r.vendor}`).join(", ")}). 할인은 이미 품목 가격에 들어간 것으로 보고 <b>결제액 그대로</b> 넣어요. 카드 내역과 다르면 알려 주세요.
+          </Notice>
+        )}
+
+        <ul className="divide-y divide-stone-100 text-xs">
+          {receipts.map((r) => {
+            const kinds = [...new Set(r.lines.map((l) => l.rawCategory).filter(Boolean))];
+            return (
+              <li key={r.key} className={`py-1.5 ${on[r.key] ? "" : "opacity-50"}`}>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" aria-label={`${r.date} ${r.vendor} 넣기`} className="h-4 w-4 accent-orange-600" checked={!!on[r.key]} onChange={(e) => setOn({ ...on, [r.key]: e.target.checked })} />
+                  <button className="min-w-0 flex-1 text-left" onClick={() => setOpen(open === r.key ? null : r.key)}>
+                    <span className="num font-semibold">
+                      {r.date.slice(5).replace("-", "/")} {r.time}
+                    </span>{" "}
+                    <span className="font-semibold">{r.vendor}</span> <span className="text-stone-400">{r.lines.length}줄 ▾</span>
+                    <span className="block truncate text-[11px] text-stone-500">
+                      {kinds.join(" · ")}
+                      {r.personal ? " — 식비·개인 물품이라 뺐어요" : ""}
+                    </span>
+                  </button>
+                  <span className="num whitespace-nowrap text-right font-semibold">
+                    {won(receiptTotal(r))}
+                    {receiptDiscount(r) > 0 && <span className="block text-[10px] font-normal text-stone-500">할인 -{won(receiptDiscount(r))}</span>}
+                  </span>
+                </div>
+                {open === r.key && (
+                  <ul className="mt-1 space-y-0.5 rounded-lg bg-stone-50 p-2 text-[11px]">
+                    {r.lines.map((l, i) => {
+                      const it = link ? matchItem(l.name, items) : null;
+                      return (
+                        <li key={i} className="flex justify-between gap-2">
+                          <span className="min-w-0 flex-1">
+                            {l.name} <span className="text-stone-400">{l.rawCategory}</span>
+                            {it && <span className="ml-1 rounded bg-orange-50 px-1 text-[10px] text-orange-700">→ {it.name}</span>}
+                          </span>
+                          <span className="num whitespace-nowrap text-stone-500">
+                            {num(l.unitPrice)} × {fmtQty(l.qty)} = {won(l.amount)}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="num flex justify-between rounded-xl bg-stone-50 p-2 text-sm">
+          <span>
+            넣을 영수증 <b>{picked.length}건</b>
+            {skipped.length > 0 && <span className="text-xs text-stone-500"> · 뺀 것 {skipped.length}건 {won(skipped.reduce((a, r) => a + receiptTotal(r), 0))}</span>}
+          </span>
+          <b>{won(total)}</b>
+        </div>
+
+        <label className="flex items-start gap-2 text-xs text-stone-600">
+          <input type="checkbox" className="mt-0.5 h-4 w-4 accent-orange-600" checked={link} onChange={(e) => setLink(e.target.checked)} />
+          <span>상품명에 원가율 품목 이름이 들어 있으면 자동으로 연결해요 (줄을 눌러 “→ 품목”을 확인하세요). 연결되고 수량이 잡히면 그 품목의 기준단가가 이 매입가로 바뀌어요.</span>
+        </label>
+        <p className="text-[11px] text-stone-500">매입 영수증은 품목별 매입가를 보는 곳이라 손익에 따로 더하지 않아요. 손익은 통장의 체크카드 출금으로 잡혀요. 같은 파일을 다시 올려도 겹치지 않아요.</p>
+
+        <div className="flex gap-2">
+          <button className="btn-ghost flex-1" onClick={onCancel}>
+            취소
+          </button>
+          <button className="btn-primary flex-1" disabled={picked.length === 0} onClick={() => onSave(picked, link)}>
+            {picked.length}건 넣기
+          </button>
+        </div>
       </div>
     </div>
   );
