@@ -236,10 +236,24 @@ export function getManuals(content: { manuals?: ManualDoc[] } | null | undefined
 // 바뀐 문서 알림: 알림 표(recipe_change_notices.recipe_id)에 매뉴얼 문서를 적을 때 쓰는 열쇠. 레시피는 레시피 id 그대로.
 export const manualNoticePrefix = "manual:";
 
+// 내용이 같은지 비교할 때 쓰는 글: 항목(key) 순서와 무관하게 같은 내용이면 같은 글이 나온다.
+// 데이터 창고(Postgres jsonb)는 저장하면서 항목 순서를 바꾸므로, 그냥 JSON.stringify 로 비교하면 안 바뀐 것도 바뀐 것으로 보인다.
+// 값이 없는 칸(undefined)·빈 배열 칸은 없는 것과 같게 본다.
+export function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined && !(Array.isArray(item) && item.length === 0))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
 // 이전 공식본과 비교해 내용이 바뀌었거나 새로 생긴 문서 (게시할 때 직원에게 "확인했어요"를 받을 단위)
 export function changedManuals(previous: { manuals?: ManualDoc[] } | null | undefined, next: { manuals?: ManualDoc[] } | null | undefined): ManualDoc[] {
-  const before = new Map(readableManuals(previous).map((doc) => [doc.id, JSON.stringify(doc)]));
-  return readableManuals(next).filter((doc) => before.get(doc.id) !== JSON.stringify(doc));
+  const before = new Map(readableManuals(previous).map((doc) => [doc.id, stableStringify(doc)]));
+  return readableManuals(next).filter((doc) => before.get(doc.id) !== stableStringify(doc));
 }
 
 // 직원 화면·챗봇용: 편집하다 남은 빈 줄을 뺀 문서

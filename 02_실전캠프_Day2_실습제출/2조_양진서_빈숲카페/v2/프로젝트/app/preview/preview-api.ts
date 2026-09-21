@@ -4,7 +4,7 @@ import { cascadeSharedStandards, validateRecipeContent } from "../recipes/conten
 import { buildRecipeHistory } from "../recipes/history";
 import { defaultRecipeContent, type RecipeContent } from "../recipes/recipe-data";
 import { addPreviewNotices, handlePeople, hasPeopleEdits, resetPeople } from "./preview-people";
-import { changedManuals, manualNoticePrefix, readableManuals } from "../manual/manual-data";
+import { changedManuals, manualNoticePrefix, readableManuals, stableStringify } from "../manual/manual-data";
 
 // 미리보기 모드: 로그인이 꺼진(둘러보기·시연) 상태에서도 관리자 편집·지침서·게시·변경 이력,
 // 그리고 교육 체크·퀴즈·바뀐 레시피 확인·직원 관리(preview-people.ts)를 직접 눌러 볼 수 있게 한다.
@@ -142,8 +142,8 @@ async function handlePreview(url: string, init?: RequestInit): Promise<Response 
     if (!reason) errors.unshift("게시 변경 이유가 필요합니다.");
     if (!effectiveAt) errors.unshift("게시 시행일이 필요합니다.");
     if (errors.length) return json({ error: "게시 전 확인이 필요합니다.", errors }, 422);
-    const before = new Map(ws.published.recipes.map((recipe) => [recipe.id, JSON.stringify(recipe)]));
-    const changed = cascaded.content.recipes.filter((recipe) => before.get(recipe.id) !== JSON.stringify(recipe));
+    const before = new Map(ws.published.recipes.map((recipe) => [recipe.id, stableStringify(recipe)]));
+    const changed = cascaded.content.recipes.filter((recipe) => before.get(recipe.id) !== stableStringify(recipe));
     // 매뉴얼 문서·응대 카드도 바뀌었으면 알림 (서버의 publishDraft 와 같은 규칙)
     const changedDocs = changedManuals(ws.published, cascaded.content);
     const notified = body.notifyStaff === false ? 0 : changed.length + changedDocs.length;

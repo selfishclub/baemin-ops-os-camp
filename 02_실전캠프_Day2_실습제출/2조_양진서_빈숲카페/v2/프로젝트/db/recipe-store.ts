@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { changedManuals, manualNoticePrefix } from "../app/manual/manual-data";
+import { changedManuals, manualNoticePrefix, stableStringify } from "../app/manual/manual-data";
 import { defaultRecipeContent, RecipeContent } from "../app/recipes/recipe-data";
 import {
   cascadeSharedStandards,
@@ -133,8 +133,9 @@ export async function saveDraft(
 
 // 이전 공식본과 비교해 실제로 바뀐(또는 새로 생긴) 메뉴만 골라낸다
 function changedRecipes(previous: RecipeContent, next: RecipeContent) {
-  const before = new Map(previous.recipes.map((recipe) => [recipe.id, JSON.stringify(recipe)]));
-  return next.recipes.filter((recipe) => before.get(recipe.id) !== JSON.stringify(recipe));
+  // 항목 순서와 무관하게 비교한다 (데이터 창고가 저장하면서 순서를 바꾼다)
+  const before = new Map(previous.recipes.map((recipe) => [recipe.id, stableStringify(recipe)]));
+  return next.recipes.filter((recipe) => before.get(recipe.id) !== stableStringify(recipe));
 }
 
 export async function publishDraft(
