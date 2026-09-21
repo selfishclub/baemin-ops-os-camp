@@ -3690,7 +3690,7 @@ const App = (() => {
 
   /* ── 서비스 교육 › 교육 자료 ─────────────────────────────
      S.training[{id, cat, title, url, memo, by, createdAt, pin}] — 사장님이 유튜브·교육 사이트 주소를 넣고, 직원이 카드에서 바로 연다 */
-  const TRAIN_CATS = ['서비스', '위생', '조리', '안전', '기타'];
+  const TRAIN_CATS = ['서비스', '위생', '관계·소통', '조리', '안전', '기타'];
   let trainCat = 'all';
   /* 추천 영상 — 2026-09-18 확인한 공식·전문 채널 영상. 처음 열 때 넣고, "추천 영상 넣기"로 다시 넣을 수 있다 */
   const TRAIN_SEED = [
@@ -3704,14 +3704,26 @@ const App = (() => {
     { cat: '서비스', title: '클레임 대응 STAR 기법 — 불만 처리 절차와 응대 멘트 (박강사TV)', url: 'https://www.youtube.com/watch?v=IhyDt3K1B-w', memo: '컴플레인 났을 때 순서대로' },
     { cat: '서비스', title: '컴플레인과 클레임의 차이, 사례로 보는 응대 기법 (박강사TV)', url: 'https://www.youtube.com/watch?v=nBTmGw4p2eE', memo: '' },
     { cat: '서비스', title: '세대별 고객 소통 — MZ 고객 응대 기법 (박강사TV)', url: 'https://www.youtube.com/watch?v=eliBweBCONs', memo: '' },
+    { cat: '서비스', title: '악성 고객 대응과 감정노동 직원 보호 교육 (박강사TV)', url: 'https://www.youtube.com/watch?v=Rpx3Ing7AvQ', memo: '무리한 요구·폭언 손님을 만났을 때. 혼자 버티지 말고 책임자에게 넘기기' },
+    /* 관계·소통 — 함께 일하는 사람과의 관계 (2026-09-21 추가) */
+    { cat: '관계·소통', title: '직장 내 괴롭힘 예방 교육 (고용노동부)', url: 'https://www.youtube.com/watch?v=YFnojqczG6E', memo: '무엇이 괴롭힘인지, 왜 금지하는지. 전 직원 필독 — 우리 룰 "상호 존중과 바른 언어"의 근거', pin: true },
+    { cat: '관계·소통', title: '직장 내 성희롱 예방 교육 — 사업장 교육용 (고용노동부)', url: 'https://www.youtube.com/watch?v=qT3C4G9HCDE', memo: '법으로 매년 1회 해야 하는 교육(약 51분). 본 날짜를 적어 두세요', pin: true },
+    { cat: '관계·소통', title: '말 그릇을 키우는 비법 — 김윤나 (세바시)', url: 'https://www.youtube.com/watch?v=IQJzVFUbGU4', memo: '15분. 같은 말도 상대가 받아들이게 하는 법' },
+    { cat: '관계·소통', title: '나의 마음을 어떻게 말할 것인가 — 김윤나 (세바시 대학)', url: 'https://www.youtube.com/watch?v=WdxVQcQ9DOI', memo: '서운함·화를 상처 주지 않고 말하기' },
+    { cat: '관계·소통', title: '행복이 꽃피는 대화법 모아보기 — 김창옥 · 정혜신 외 (세바시)', url: 'https://www.youtube.com/watch?v=E57fs5f7mB4', memo: '긴 영상. 쉬는 시간에 나눠 보기' },
+    { cat: '관계·소통', title: '직장 동료 때문에 힘들다면 (박상미라디오 · 1분)', url: 'https://www.youtube.com/shorts/KKTiUJW7F4w', memo: '짧게 보는 영상' },
+    { cat: '관계·소통', title: '직장 내 괴롭힘 예방·조치 교육자료 — 사용자용·근로자용 (고용노동부 자료실)', url: 'https://www.moel.go.kr/policy/policydata/view.do?bbs_seq=20240102075', memo: '인쇄해서 게시할 수 있는 PPT/PDF' },
+    { cat: '안전', title: '안전보건공단 공식 채널 — "음식업" "주방"으로 검색', url: 'https://www.youtube.com/@koshamovie', memo: '화상 · 베임 · 미끄러짐 예방 영상 모음' },
   ];
-  function seedTraining() {
-    const list = (S.training = S.training || []);
+  function seedTraining(onlyNew) {
+    const list = (S.training = S.training || []), seen = (S.trainSeen = S.trainSeen || []);
     let n = 0;
-    TRAIN_SEED.forEach((t) => { if (list.some((x) => x.url === t.url)) return; list.push({ id: newId('tr'), cat: t.cat, title: t.title, url: t.url, memo: t.memo || '', pin: !!t.pin, by: '추천', createdAt: Date.now() + n, seed: true }); n++; });
+    TRAIN_SEED.forEach((t) => { if (list.some((x) => x.url === t.url)) { if (!seen.includes(t.url)) seen.push(t.url); return; }
+      if (onlyNew && seen.includes(t.url)) return;
+      seen.push(t.url); list.push({ id: newId('tr'), cat: t.cat, title: t.title, url: t.url, memo: t.memo || '', pin: !!t.pin, by: '추천', createdAt: Date.now() + n, seed: true }); n++; });
     return n;
   }
-  const trainList = () => { if (!Array.isArray(S.training)) { S.training = []; seedTraining(); } return S.training; };
+  const trainList = () => { if (!Array.isArray(S.training)) S.training = []; if ((S.trainSeen || []).length < TRAIN_SEED.length && seedTraining(true)) save(); return S.training; };
   function ytId(url) {
     try { const u = new URL(url); if (/youtu\.be$/.test(u.hostname)) return u.pathname.slice(1).split('/')[0]; if (/youtube\.com$/.test(u.hostname) || /youtube-nocookie\.com$/.test(u.hostname)) { if (u.searchParams.get('v')) return u.searchParams.get('v'); const m = u.pathname.match(/\/(shorts|embed|live)\/([^/?]+)/); if (m) return m[2]; } } catch (e) { /* 주소 아님 */ }
     return null;
@@ -3720,7 +3732,7 @@ const App = (() => {
   function vTraining() {
     let list = trainList().slice().sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0) || (b.createdAt || 0) - (a.createdAt || 0));
     if (trainCat !== 'all') list = list.filter((x) => x.cat === trainCat);
-    let h = `<div class="hd"><div><h2>교육 자료</h2><div class="sub">서비스 · 위생 · 조리 교육 영상이나 문서 주소를 넣어 두면 직원이 여기서 바로 봅니다. 유튜브는 앱 안에서 재생됩니다.</div></div>
+    let h = `<div class="hd"><div><h2>교육 자료</h2><div class="sub">서비스 · 위생 · 관계·소통 · 조리 · 안전 교육 영상이나 문서 주소를 넣어 두면 직원이 여기서 바로 봅니다. 유튜브는 앱 안에서 재생됩니다.</div></div>
       <div class="mnav"><button class="btn" data-act="trainSeed">추천 영상 넣기</button><button class="btn primary" data-act="trainAdd">+ 자료 추가</button></div></div>`;
     h += `<div class="filters">${['all', ...TRAIN_CATS].map((c) => `<button class="fl${trainCat === c ? ' on' : ''}" data-act="trainCat" data-c="${c}">${c === 'all' ? '전체' : c}</button>`).join('')}</div>`;
     if (!list.length) {
@@ -4076,7 +4088,7 @@ const App = (() => {
           break;
         }
         case 'trainAdd': trainForm(null); break;
-        case 'trainSeed': { const n = seedTraining(); save(); render(); banner(n ? `추천 영상 ${n}개를 넣었습니다` : '추천 영상이 이미 다 들어 있습니다', '식약처 · 질병관리청 · 한국외식업중앙회 · 박강사TV'); break; }
+        case 'trainSeed': { const n = seedTraining(); save(); render(); banner(n ? `추천 영상 ${n}개를 넣었습니다` : '추천 영상이 이미 다 들어 있습니다', '식약처 · 질병관리청 · 고용노동부 · 한국외식업중앙회 · 세바시 · 박강사TV'); break; }
         case 'trainEdit': closeModal(); trainForm(trainList().find((t) => t.id === id)); break;
         case 'trainCat': trainCat = b.dataset.c; render(); break;
         case 'trainDel': { if (!confirm('이 교육 자료를 삭제할까요?')) return; S.training = trainList().filter((t) => t.id !== id); save(); closeModal(); render(); break; }
