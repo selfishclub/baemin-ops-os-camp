@@ -54,3 +54,18 @@ describe("매입 영수증", () => {
     expect(guessItemQty("애호박 1개", 1, "ea")).toBe(1);
   });
 });
+
+describe("최근 매입가만 기준단가로", () => {
+  const egg = { id: "egg", name: "특란", baseUnit: "ea" as const, standardCost: 230, category: "etc" as const, active: true };
+  const buy = (id: string, date: string, amount: number, qty: number) => ({ id, date, vendor: "가짜", discount: 0, memo: "", lines: [{ name: "특란 30구", unitPrice: amount, qty: 1, amount, category: "원재료비" as const, itemId: "egg", itemQty: qty }] });
+  it("더 늦게 산 기록이 있으면 지난 영수증으로 바꾸지 않는다", () => {
+    const newer = buy("b", "2026-08-19", 34500, 150);
+    const older = buy("a", "2026-08-12", 66300, 300);
+    expect(applyPurchaseToItems([egg], older, [newer, older]).updated).toEqual([]);
+  });
+  it("가장 최근이면 바꾼다", () => {
+    const newer = buy("b", "2026-08-19", 33000, 150);
+    const older = buy("a", "2026-08-12", 66300, 300);
+    expect(applyPurchaseToItems([egg], newer, [newer, older]).items[0].standardCost).toBe(220);
+  });
+});

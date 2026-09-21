@@ -22,7 +22,7 @@ import { ReceiptSheetError, linkableCategory, parseReceiptSheets, receiptDiscoun
 import { RECEIPT_PROMPT, matchItem, parseReceiptText, toPurchaseLine } from "@/lib/costing/receiptText";
 import { todayStr } from "@/lib/daily";
 import { num, won } from "@/lib/format";
-import { monthLabel } from "@/lib/month";
+import { monthLabel, nextMonth } from "@/lib/month";
 import { addPhoto, countPhotosByOwner, deletePhoto, deletePhotosOf, getPhotoBlob, listPhotos, photosAvailable, type PhotoMeta } from "@/lib/photos";
 import { getStore } from "@/lib/storage";
 
@@ -45,6 +45,15 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
   const [confirmDelete, setConfirmDelete] = useState<Purchase | null>(null);
   const [note, setNote] = useState<{ tone: "ok" | "info" | "warn"; text: string } | null>(null);
   const key = PURCHASES_KEY_PREFIX + month;
+
+  // 이 달부터 이번 달까지의 매입 영수증 (기준단가를 바꿀 때 "더 최근에 산 기록"이 있는지 보려고)
+  async function purchasesSince(fromMonth: string): Promise<Purchase[]> {
+    const store = getStore();
+    const out: Purchase[] = [];
+    const last = todayStr().slice(0, 7) > fromMonth ? todayStr().slice(0, 7) : fromMonth;
+    for (let m = fromMonth; m <= last; m = nextMonth(m)) out.push(...((await store.getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + m)) ?? []));
+    return out;
+  }
 
   async function load() {
     const list = (await getStore().getSetting<Purchase[]>(key)) ?? [];
@@ -87,7 +96,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
     const store = getStore();
     const next = [...purchases.filter((x) => x.id !== clean.id), clean];
     await store.saveSetting(key, next);
-    const applied = applyPurchaseToItems(items, clean);
+    const applied = applyPurchaseToItems(items, clean, await purchasesSince(clean.date.slice(0, 7)));
     if (applied.updated.length) {
       await store.saveSetting(ITEMS_KEY, applied.items);
       await onItemsChange();
@@ -147,9 +156,12 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
       const old = (await store.getSetting<Purchase[]>(k)) ?? [];
       const ids = new Set(list.map((p) => p.id));
       await store.saveSetting(k, [...old.filter((p) => !ids.has(p.id)), ...list]);
-      // 오래된 입고일부터 반영해 마지막 기준단가 = 가장 최근 매입가
+    }
+    const all = await purchasesSince([...byMonth.keys()].sort()[0]);
+    for (const [, list] of byMonth) {
+      // 오래된 입고일부터 반영해 마지막 기준단가 = 가장 최근 매입가 (더 최근에 산 기록이 있으면 그대로)
       for (const p of [...list].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-        const applied = applyPurchaseToItems(nextItems, p);
+        const applied = applyPurchaseToItems(nextItems, p, all);
         nextItems = applied.items;
         for (const u of applied.updated) updated.set(u.name, { ...u, from: updated.get(u.name)?.from ?? u.from });
       }
@@ -197,8 +209,11 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
       const old = (await store.getSetting<Purchase[]>(k)) ?? [];
       const ids = new Set(list.map((p) => p.id));
       await store.saveSetting(k, [...old.filter((p) => !ids.has(p.id)), ...list]);
+    }
+    const all = await purchasesSince([...byMonth.keys()].sort()[0]);
+    for (const [, list] of byMonth) {
       for (const p of [...list].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-        const applied = applyPurchaseToItems(nextItems, p);
+        const applied = applyPurchaseToItems(nextItems, p, all);
         nextItems = applied.items;
         for (const u of applied.updated) updated.set(u.name, { ...u, from: updated.get(u.name)?.from ?? u.from });
       }

@@ -51,11 +51,19 @@ export function unitLabel(u: BaseUnit): string {
 }
 
 // 영수증을 저장할 때: 연결된 품목의 기준단가를 이 영수증의 단가로 바꾼다 (가장 최근 매입가가 기준단가)
-export function applyPurchaseToItems(items: Item[], p: Purchase): { items: Item[]; updated: { name: string; from: number; to: number }[] } {
+//  - others: 다른 매입 영수증들. 이 품목을 이 영수증보다 늦은 날짜에 산 기록이 있으면 바꾸지 않는다
+//    (지난 영수증을 나중에 넣어도 더 최근 매입가를 덮어쓰지 않게)
+export function applyPurchaseToItems(items: Item[], p: Purchase, others: Purchase[] = []): { items: Item[]; updated: { name: string; from: number; to: number }[] } {
+  const latest = new Map<string, string>();
+  for (const o of others) {
+    if (o.id === p.id) continue;
+    for (const l of o.lines) if (l.itemId && l.itemQty > 0 && o.date > (latest.get(l.itemId) ?? "")) latest.set(l.itemId, o.date);
+  }
   const updated: { name: string; from: number; to: number }[] = [];
   const next = items.map((it) => {
     const lines = p.lines.filter((l) => l.itemId === it.id && l.itemQty > 0);
     if (lines.length === 0) return it;
+    if ((latest.get(it.id) ?? "") > p.date) return it;
     // 같은 품목이 여러 줄이면 합쳐서 평균
     const net = lines.reduce((a, l) => a + lineNet(p, l), 0);
     const qty = lines.reduce((a, l) => a + l.itemQty, 0);
