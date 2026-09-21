@@ -1,5 +1,6 @@
 import { parseAmount, parseDate } from "./bank/parse";
 import { CARD_PRESETS, type ChannelId } from "./categories";
+import type { DailySale } from "./types";
 
 // 포스(오케이포스 ASP) "승인현황 (카드승인현황)" 엑셀 → 영업일자 × 카드사별 매출.
 // "간편결제승인현황"도 같은 모양인데 매입사가 토스페이머니·토스페이계좌·토스페이카드 같은 페이사이고 "발급사" 칸이 따로 있다.
@@ -105,4 +106,22 @@ export function parseCardApproval(grid: Cell[][]): ParsedCardApproval {
     }
   }
   return { kind: isEasyFile ? "easy" : "card", from: days[0].date, to: days[days.length - 1].date, days, total, byCard, unknownIssuers: [...unknown], sheetTotal };
+}
+
+// 카드승인현황에는 절대 안 나오는 채널 — 카드 파일을 넣을 때 지우면 안 된다 (손으로 넣은 간편결제·제로페이가 사라졌던 일, 9/22)
+export const NOT_IN_CARD_FILE: ChannelId[] = ["card_easy", "card_zeropay"];
+
+/** 파일의 하루치를 그날 기존 매출에 합친다.
+ *  - 카드승인현황: 카드사 줄만 파일 값으로 바꾼다. 현금·배달앱·간편결제·제로페이, 간편결제 파일에서 온 카드사 줄은 그대로
+ *  - 간편결제승인현황: 간편결제 줄과 간편결제 파일에서 온 카드사 줄만 바꾼다 */
+export function mergeApprovalDay(existing: DailySale[], day: CardApprovalDay, kind: "card" | "easy"): DailySale[] {
+  const isCard = (id: string) => id === "hall_card" || id === "hall" || CARD_PRESETS.some((p) => p.id === id);
+  const keep =
+    kind === "easy"
+      ? existing.filter((s) => s.date === day.date && s.channel !== "card_easy" && s.source !== "pos_easy")
+      : existing.filter((s) => s.date === day.date && (!isCard(s.channel) || s.source === "pos_easy" || NOT_IN_CARD_FILE.includes(s.channel)));
+  const incoming: DailySale[] = Object.entries(day.byCard)
+    .filter(([, amt]) => amt > 0)
+    .map(([channel, amount]) => (kind === "easy" && channel !== "card_easy" ? { date: day.date, channel, amount, source: "pos_easy" as const } : { date: day.date, channel, amount }));
+  return [...keep, ...incoming];
 }

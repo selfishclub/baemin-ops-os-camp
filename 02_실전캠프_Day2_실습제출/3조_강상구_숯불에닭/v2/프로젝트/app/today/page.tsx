@@ -9,7 +9,7 @@ import { CARD_PRESETS, groupChannels, type Channel, type ChannelKind } from "@/l
 import { CARD_RULE_DAYS, DEFAULT_CARD_DAYS, SETTLEMENT_RULES_KEY, type SettlementRule } from "@/lib/settlement";
 import { newId } from "@/lib/classify";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
-import { CardApprovalError, parseCardApproval, type ParsedCardApproval } from "@/lib/cardApproval";
+import { CardApprovalError, parseCardApproval, type ParsedCardApproval, mergeApprovalDay } from "@/lib/cardApproval";
 import { DeliveryStatementError, parseBaeminStatement, type ParsedDeliveryStatement } from "@/lib/deliveryStatement";
 import { checkDay, dayTotals, daysInMonth, hoursBetween, monthHoursByStaff, monthSummary, normalizeTime, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
@@ -211,19 +211,11 @@ export default function TodayPage() {
     if (!cardFile) return;
     const { parsed } = cardFile;
     const store = getStore();
-    const isCard = (id: string) => id === "hall_card" || id === "hall" || CARD_PRESETS.some((p) => p.id === id);
     const used = new Set<string>();
     for (const d of parsed.days) {
-      // 카드승인현황: 그날 카드 줄(간편결제 파일에서 온 줄은 빼고)을 바꾼다 / 간편결제승인현황: 간편결제 줄과 간편결제 파일에서 온 카드사 줄만 바꾼다
-      const keep =
-        parsed.kind === "easy"
-          ? daily.sales.filter((s) => s.date === d.date && s.channel !== "card_easy" && s.source !== "pos_easy")
-          : daily.sales.filter((s) => s.date === d.date && (!isCard(s.channel) || s.source === "pos_easy"));
-      const cards: DailySale[] = Object.entries(d.byCard)
-        .filter(([, amt]) => amt > 0)
-        .map(([channel, amount]) => (parsed.kind === "easy" && channel !== "card_easy" ? { date: d.date, channel, amount, source: "pos_easy" as const } : { date: d.date, channel, amount }));
-      for (const c of cards) used.add(c.channel);
-      await store.saveDailySales(d.date, [...keep, ...cards]);
+      const merged = mergeApprovalDay(daily.sales, d, parsed.kind);
+      for (const c of merged) if (d.byCard[c.channel]) used.add(c.channel);
+      await store.saveDailySales(d.date, merged);
     }
     for (const id of used) {
       const preset = CARD_PRESETS.find((p) => p.id === id);
