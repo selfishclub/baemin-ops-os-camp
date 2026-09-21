@@ -64,6 +64,23 @@ export function applyPurchaseToItems(items: Item[], p: Purchase, others: Purchas
     const lines = p.lines.filter((l) => l.itemId === it.id && l.itemQty > 0);
     if (lines.length === 0) return it;
     if ((latest.get(it.id) ?? "") > p.date) return it;
+    if (it.costMethod === "monthAvg") {
+      // 이 영수증이 속한 달의 매입을 모두 모아 가중평균 (할인 비례 반영)
+      const month = p.date.slice(0, 7);
+      const inMonth = [p, ...others.filter((o) => o.id !== p.id && o.date.slice(0, 7) === month)];
+      let net = 0;
+      let qty = 0;
+      for (const o of inMonth)
+        for (const l of o.lines)
+          if (l.itemId === it.id && l.itemQty > 0) {
+            net += lineNet(o, l);
+            qty += l.itemQty;
+          }
+      const avg = round1(net / qty);
+      if (avg === it.standardCost) return it;
+      updated.push({ name: it.name, from: it.standardCost, to: avg });
+      return { ...it, standardCost: avg };
+    }
     // 같은 품목이 여러 줄이면 합쳐서 평균
     const net = lines.reduce((a, l) => a + lineNet(p, l), 0);
     const qty = lines.reduce((a, l) => a + l.itemQty, 0);
@@ -73,6 +90,24 @@ export function applyPurchaseToItems(items: Item[], p: Purchase, others: Purchas
     return { ...it, standardCost: cost };
   });
   return { items: next, updated };
+}
+
+// 품목의 기준단가를 매입 기록으로 다시 계산 (가장 최근 매입이 있는 달 기준)
+//  - latest: 가장 최근 매입 영수증의 단가 / monthAvg: 그 달 매입 전체의 가중평균
+export function costFromPurchases(itemId: string, method: "latest" | "monthAvg", purchases: Purchase[]): number | null {
+  const withItem = purchases.filter((p) => p.lines.some((l) => l.itemId === itemId && l.itemQty > 0));
+  if (withItem.length === 0) return null;
+  const last = withItem.reduce((a, b) => (b.date > a.date ? b : a));
+  const pool = method === "monthAvg" ? withItem.filter((p) => p.date.slice(0, 7) === last.date.slice(0, 7)) : [last];
+  let net = 0;
+  let qty = 0;
+  for (const p of pool)
+    for (const l of p.lines)
+      if (l.itemId === itemId && l.itemQty > 0) {
+        net += lineNet(p, l);
+        qty += l.itemQty;
+      }
+  return round1(net / qty);
 }
 
 export interface PurchaseSummary {

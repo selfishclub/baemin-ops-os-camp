@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyPurchaseToItems, guessItemQty, lineNet, lineUnitCost, purchaseTotal, summarizePurchases, type Purchase } from "./purchases";
+import { applyPurchaseToItems, costFromPurchases, guessItemQty, lineNet, lineUnitCost, purchaseTotal, summarizePurchases, type Purchase } from "./purchases";
 import type { Item } from "./types";
 
 const items: Item[] = [
@@ -67,5 +67,21 @@ describe("최근 매입가만 기준단가로", () => {
     const newer = buy("b", "2026-08-19", 33000, 150);
     const older = buy("a", "2026-08-12", 66300, 300);
     expect(applyPurchaseToItems([egg], newer, [newer, older]).items[0].standardCost).toBe(220);
+  });
+});
+
+describe("월 평균 기준단가", () => {
+  const meat = { id: "m", name: "원육", baseUnit: "kg" as const, standardCost: 0, category: "meat" as const, active: true, costMethod: "monthAvg" as const };
+  const buy = (id: string, date: string, amount: number, qty: number) => ({ id, date, vendor: "가짜", discount: 0, memo: "", lines: [{ name: "원육", unitPrice: amount, qty: 1, amount, category: "원재료비" as const, itemId: "m", itemQty: qty }] });
+  const a = buy("a", "2026-08-03", 90000, 10); // 9,000/kg
+  const b = buy("b", "2026-08-20", 80000, 10); // 8,000/kg
+  const old = buy("c", "2026-07-30", 100000, 10);
+  it("영수증을 넣을 때 그 달 매입을 가중평균한다", () => {
+    expect(applyPurchaseToItems([meat], b, [a, b, old]).items[0].standardCost).toBe(8500);
+  });
+  it("다시 계산: 최근 달 평균 / 최근 매입가", () => {
+    expect(costFromPurchases("m", "monthAvg", [a, b, old])).toBe(8500);
+    expect(costFromPurchases("m", "latest", [a, b, old])).toBe(8000);
+    expect(costFromPurchases("x", "latest", [a])).toBeNull();
   });
 });

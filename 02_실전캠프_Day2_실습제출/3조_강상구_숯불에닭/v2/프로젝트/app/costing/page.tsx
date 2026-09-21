@@ -7,11 +7,12 @@ import { useLedger } from "@/components/useLedger";
 import PurchaseSection from "@/components/PurchaseSection";
 import { newId } from "@/lib/classify";
 import { buildCostRateReport, recipeUnitCost } from "@/lib/costing/costRate";
+import { PURCHASES_KEY_PREFIX, costFromPurchases, type Purchase } from "@/lib/costing/purchases";
 import { parsePosAbcGrid, PosParseError } from "@/lib/costing/okpos";
 import sample from "@/lib/costing/sample.json";
 import { ITEMS_KEY, MENUS_KEY, POS_KEY_PREFIX, RECIPES_KEY, type BaseUnit, type Item, type Menu, type PosSalesReport, type Recipe } from "@/lib/costing/types";
 import { num, pctText, won } from "@/lib/format";
-import { monthLabel } from "@/lib/month";
+import { monthLabel, prevMonth } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 
 const SAMPLE_POS = "/sample/가짜_상품ABC분석_2026-09.xlsx";
@@ -268,6 +269,15 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
     setItemCost(0);
     await onChange();
   }
+  // 기준단가를 "그 달 평균"으로 볼지 "최근 매입가"로 볼지 바꾸고, 매입 기록이 있으면 바로 다시 계산 (최근 12달)
+  async function setCostMethod(id: string, method: "latest" | "monthAvg") {
+    const purchases: Purchase[] = [];
+    let m = new Date().toISOString().slice(0, 7);
+    for (let k = 0; k < 12; k++, m = prevMonth(m)) purchases.push(...((await store.getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + m)) ?? []));
+    const cost = costFromPurchases(id, method, purchases);
+    await store.saveSetting(ITEMS_KEY, items.map((i) => (i.id === id ? { ...i, costMethod: method, standardCost: cost ?? i.standardCost } : i)));
+    await onChange();
+  }
   async function setItemCostOf(id: string, cost: number) {
     await store.saveSetting(ITEMS_KEY, items.map((i) => (i.id === id ? { ...i, standardCost: cost } : i)));
     await onChange();
@@ -359,6 +369,10 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
               </span>
               <MoneyInput label={`${i.name} 기준단가`} value={i.standardCost} onChange={(n) => setItemCostOf(i.id, n ?? 0)} />
               <span className="text-xs text-stone-500">원/{i.baseUnit}</span>
+              <label className="col-span-3 -mt-1 flex items-center gap-1 text-[11px] text-stone-500">
+                <input type="checkbox" className="h-3.5 w-3.5 accent-orange-600" checked={i.costMethod === "monthAvg"} onChange={(e) => setCostMethod(i.id, e.target.checked ? "monthAvg" : "latest")} />
+                매입 영수증으로 바꿀 때 그 달 평균으로 (여러 거래처에서 값이 다르게 들어오는 품목)
+              </label>
             </li>
           ))}
         </ul>

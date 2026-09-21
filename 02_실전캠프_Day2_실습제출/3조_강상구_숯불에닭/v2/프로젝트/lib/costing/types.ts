@@ -8,6 +8,9 @@ export interface Item {
   standardCost: number; // 기준단가 (baseUnit 1개당 원). 대략값이면 된다
   category: "meat" | "produce" | "sauce" | "drink" | "packaging" | "etc";
   active: boolean;
+  // 매입 영수증으로 기준단가를 바꿀 때: "latest"(기본) = 가장 최근 매입가, "monthAvg" = 그 달 매입의 가중평균
+  // (닭갈비 원육처럼 여러 거래처에서 값이 다르게 들어오는 품목은 평균이 더 정확하다)
+  costMethod?: "latest" | "monthAvg";
 }
 
 export interface Menu {
