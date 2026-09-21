@@ -17,6 +17,7 @@ import {
   type PurchaseCategory,
   type PurchaseLine,
 } from "@/lib/costing/purchases";
+import { LiquorParseError, liquorBrands, liquorDayToPurchase, newLiquorItems, parseLiquorLedgerGrid, type LiquorLedger } from "@/lib/costing/liquorLedger";
 import { RECEIPT_PROMPT, matchItem, parseReceiptText, toPurchaseLine } from "@/lib/costing/receiptText";
 import { todayStr } from "@/lib/daily";
 import { num, won } from "@/lib/format";
@@ -25,6 +26,7 @@ import { addPhoto, countPhotosByOwner, deletePhoto, deletePhotosOf, getPhotoBlob
 import { getStore } from "@/lib/storage";
 
 // 매입 영수증 — 마트·거래처 영수증을 품목별로 적고, 품목에 연결하면 기준단가가 최근 매입가로 바뀐다.
+const LIQUOR_VENDOR_KEY = "liquor_vendor"; // 주류 도매상 이름 (한 번 적으면 다음에도)
 const emptyLine = (): PurchaseLine => ({ name: "", unitPrice: 0, qty: 1, amount: 0, category: "원재료비", itemId: null, itemQty: 0 });
 
 export default function PurchaseSection({ month, items, onItemsChange }: { month: string; items: Item[]; onItemsChange: () => Promise<void> }) {
@@ -35,6 +37,8 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
   const [pasting, setPasting] = useState(false);
   const [viewing, setViewing] = useState<Purchase | null>(null);
   const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
+  const [liquor, setLiquor] = useState<{ ledger: LiquorLedger; fileName: string; vendor: string } | null>(null);
+  const liquorRef = useRef<HTMLInputElement>(null);
   const [confirmDelete, setConfirmDelete] = useState<Purchase | null>(null);
   const [note, setNote] = useState<{ tone: "ok" | "info" | "warn"; text: string } | null>(null);
   const key = PURCHASES_KEY_PREFIX + month;
@@ -104,6 +108,63 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
     await load();
   }
 
+  // 주류 도매상 매출원장 엑셀 → 입고일마다 매입 영수증
+  async function readLiquorFile(file: File) {
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null }) as never[][];
+      const ledger = parseLiquorLedgerGrid(grid);
+      const vendor = (await getStore().getSetting<string>(LIQUOR_VENDOR_KEY)) ?? "주류";
+      setLiquor({ ledger, fileName: file.name, vendor });
+    } catch (e) {
+      setNote({ tone: "warn", text: e instanceof LiquorParseError ? e.message : "파일을 읽지 못했어요. 주류 도매상에서 받은 매출원장 엑셀인지 확인해 주세요." });
+    } finally {
+      if (liquorRef.current) liquorRef.current.value = "";
+    }
+  }
+
+  async function saveLiquor(ledger: LiquorLedger, vendor: string, createItems: boolean) {
+    const store = getStore();
+    const v = vendor.trim() || "주류";
+    let nextItems = items;
+    const made = createItems ? newLiquorItems(ledger, items) : [];
+    if (made.length) nextItems = [...items, ...made];
+    // 달마다 나눠 저장 (같은 입고일은 id가 같아 바뀌기만 한다)
+    const byMonth = new Map<string, Purchase[]>();
+    for (const d of ledger.days) {
+      if (d.lines.length === 0) continue;
+      const p = liquorDayToPurchase(d, v, nextItems);
+      const m = d.date.slice(0, 7);
+      byMonth.set(m, [...(byMonth.get(m) ?? []), p]);
+    }
+    const updated = new Map<string, { name: string; from: number; to: number }>();
+    for (const [m, list] of byMonth) {
+      const k = PURCHASES_KEY_PREFIX + m;
+      const old = (await store.getSetting<Purchase[]>(k)) ?? [];
+      const ids = new Set(list.map((p) => p.id));
+      await store.saveSetting(k, [...old.filter((p) => !ids.has(p.id)), ...list]);
+      // 오래된 입고일부터 반영해 마지막 기준단가 = 가장 최근 매입가
+      for (const p of [...list].sort((a, b) => (a.date < b.date ? -1 : 1))) {
+        const applied = applyPurchaseToItems(nextItems, p);
+        nextItems = applied.items;
+        for (const u of applied.updated) updated.set(u.name, { ...u, from: updated.get(u.name)?.from ?? u.from });
+      }
+    }
+    if (made.length || updated.size) {
+      await store.saveSetting(ITEMS_KEY, nextItems);
+      await onItemsChange();
+    }
+    await store.saveSetting(LIQUOR_VENDOR_KEY, v);
+    setLiquor(null);
+    await load();
+    const count = [...byMonth.values()].reduce((a, l) => a + l.length, 0);
+    setNote({
+      tone: "ok",
+      text: `주류 입고 ${count}건 넣었어요 (술값 ${won(ledger.totals.subtotal)}, 보증금은 뺌).${made.length ? ` 새 품목 ${made.length}개: ${made.map((i) => i.name).join(", ")}.` : ""}${updated.size ? ` 병당 기준단가 갱신 ${updated.size}개.` : ""}`,
+    });
+  }
+
   if (!loaded) return null;
   const summary = summarizePurchases(purchases);
   const itemName = (id: string) => items.find((i) => i.id === id)?.name ?? id;
@@ -116,7 +177,11 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
           <h2 className="text-base font-bold">
             매입 영수증 <span className="text-[11px] font-normal text-stone-500">{monthLabel(month)} · 품목별 입고</span>
           </h2>
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
+            <button className="btn-ghost whitespace-nowrap px-3 py-1.5 text-xs" onClick={() => liquorRef.current?.click()}>
+              🍺 주류 원장 올리기
+            </button>
+            <input ref={liquorRef} type="file" accept=".xlsx,.xls" aria-label="주류 매출원장 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readLiquorFile(e.target.files[0])} />
             <button className="btn-ghost whitespace-nowrap px-3 py-1.5 text-xs" onClick={() => setPasting(true)}>
               📋 텍스트로 붙여넣기
             </button>
@@ -168,6 +233,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
                         .join(" · ")}
                       {p.lines.length > 4 ? " …" : ""}
                     </p>
+                    {p.memo && <p className="text-[11px] text-stone-400">{p.memo}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="num text-sm font-bold">{won(purchaseTotal(p))}</span>
@@ -224,6 +290,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
           }}
         />
       )}
+      {liquor && <LiquorDialog {...liquor} items={items} onCancel={() => setLiquor(null)} onSave={(vendor, createItems) => void saveLiquor(liquor.ledger, vendor, createItems)} />}
       {viewing && <PurchaseViewer purchase={viewing} items={items} onClose={() => setViewing(null)} />}
       {editing && <PurchaseEditor purchase={editing} items={items} onChange={setEditing} onSave={() => save(editing)} onCancel={() => void cancelEdit()} />}
       {confirmDelete && (
@@ -654,6 +721,136 @@ function PurchaseViewer({ purchase, items, onClose }: { purchase: Purchase; item
             </p>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// 주류 원장 미리보기 — 입고일별 술값·보증금·검산, 술별 병당 원가와 품목 연결을 보여 주고 넣는다
+function LiquorDialog({ ledger, fileName, vendor: initialVendor, items, onSave, onCancel }: { ledger: LiquorLedger; fileName: string; vendor: string; items: Item[]; onSave: (vendor: string, createItems: boolean) => void; onCancel: () => void }) {
+  const [vendor, setVendor] = useState(initialVendor);
+  const [createItems, setCreateItems] = useState(true);
+  const brands = liquorBrands(ledger);
+  const willCreate = newLiquorItems(ledger, items);
+  const days = ledger.days.filter((d) => d.lines.length > 0);
+  const netDeposit = ledger.totals.deposit - ledger.totals.returned;
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="주류 원장 미리보기">
+      <div className="card max-h-[92vh] w-full max-w-2xl space-y-3 overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold">
+            주류 원장 <span className="text-[11px] font-normal text-stone-500">{fileName}</span>
+          </h2>
+          <button className="btn-ghost px-2 py-1 text-xs" onClick={onCancel}>
+            닫기
+          </button>
+        </div>
+
+        <label className="block space-y-1 text-[11px] text-stone-500">
+          거래처 이름 (한 번 적으면 다음에도 그대로)
+          <input aria-label="주류 거래처" className="field" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="예: ○○주류" />
+        </label>
+
+        {ledger.notes.map((n, i) => (
+          <Notice key={i} tone="warn">
+            {n}
+          </Notice>
+        ))}
+        {ledger.notes.length === 0 && <Notice tone="ok">입고일마다 일계 줄과 맞춰 봤어요. 빠진 줄 없이 다 맞아요.</Notice>}
+
+        <div>
+          <p className="mb-1 text-xs font-semibold text-stone-500">입고일별</p>
+          <div className="num overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-[10px] text-stone-400">
+                <tr>
+                  <th className="py-1 text-left font-normal">날짜</th>
+                  <th className="text-right font-normal">박스</th>
+                  <th className="text-right font-normal">술값</th>
+                  <th className="text-right font-normal">보증금</th>
+                  <th className="text-right font-normal">빈병 반납</th>
+                  <th className="text-right font-normal">검산</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {days.map((d) => (
+                  <tr key={d.date}>
+                    <td className="py-1">{d.date.slice(5).replace("-", "/")}</td>
+                    <td className="text-right">{num(d.lines.reduce((a, l) => a + l.box, 0))}</td>
+                    <td className="text-right font-semibold">{won(d.subtotal)}</td>
+                    <td className="text-right text-stone-500">{won(d.deposit)}</td>
+                    <td className="text-right text-stone-500">{d.returned ? `-${won(d.returned)}` : "-"}</td>
+                    <td className="text-right">{d.mismatch ? "⚠" : d.checked ? "✓" : "-"}</td>
+                  </tr>
+                ))}
+                <tr className="font-bold">
+                  <td className="py-1">합계</td>
+                  <td className="text-right">{num(ledger.totals.box)}</td>
+                  <td className="text-right">{won(ledger.totals.subtotal)}</td>
+                  <td className="text-right text-stone-500">{won(ledger.totals.deposit)}</td>
+                  <td className="text-right text-stone-500">-{won(ledger.totals.returned)}</td>
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-1 text-[11px] text-stone-500">
+            매입 영수증에는 <b>술값만</b> 들어가요. 보증금은 빈병을 돌려주면 돌아오는 돈이라 원가가 아니에요 (이 파일 기간 동안 아직 안 돌아온 보증금 {won(netDeposit)}).
+            {ledger.balance !== null && (
+              <>
+                {" "}
+                파일 끝 외상 잔액은 <b>{won(ledger.balance)}</b> — 말일 결제 때 통장에서 나가는 돈과 맞춰 보세요.
+              </>
+            )}
+          </p>
+        </div>
+
+        <div>
+          <p className="mb-1 text-xs font-semibold text-stone-500">술별 병당 원가 (부가세 포함)</p>
+          <ul className="num divide-y divide-stone-100 text-xs">
+            {brands.map((b) => {
+              const linked = matchItem(b.displayName, items);
+              const creating = !linked && willCreate.some((i) => i.name === b.displayName);
+              return (
+                <li key={`${b.displayName}${b.specMl}`} className="flex items-center justify-between gap-2 py-1">
+                  <span className="min-w-0 flex-1">
+                    {b.displayName} <span className="text-stone-400">{b.specMl}ml</span>
+                    {linked ? (
+                      <span className="ml-1 rounded bg-orange-50 px-1 py-0.5 text-[10px] text-orange-700">→ {linked.name}</span>
+                    ) : creating && createItems ? (
+                      <span className="ml-1 rounded bg-emerald-50 px-1 py-0.5 text-[10px] text-emerald-700">새 품목</span>
+                    ) : (
+                      <span className="ml-1 rounded bg-stone-100 px-1 py-0.5 text-[10px] text-stone-500">연결 안 함</span>
+                    )}
+                  </span>
+                  <span className="whitespace-nowrap text-stone-500">
+                    {num(b.box)}박스{b.bottles !== null ? ` · ${num(b.bottles)}병` : ""}
+                  </span>
+                  <span className="w-20 whitespace-nowrap text-right font-semibold">{b.perBottle !== null ? `${num(Math.round(b.perBottle))}원/병` : "병 수 모름"}</span>
+                </li>
+              );
+            })}
+          </ul>
+          {willCreate.length > 0 && (
+            <label className="mt-2 flex items-start gap-2 text-xs text-stone-600">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-orange-600" checked={createItems} onChange={(e) => setCreateItems(e.target.checked)} />
+              <span>
+                원가율 품목에 없는 술 {willCreate.length}개를 <b>병 단위 품목</b>으로 새로 만들어요 ({willCreate.map((i) => i.name).join(", ")}). 이미 다른 이름으로 있는 술이면 끄고 나중에 영수증에서 직접 연결하세요.
+              </span>
+            </label>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <button className="btn-ghost flex-1" onClick={onCancel}>
+            취소
+          </button>
+          <button className="btn-primary flex-1" disabled={days.length === 0} onClick={() => onSave(vendor, createItems)}>
+            {days.length}건 넣기
+          </button>
+        </div>
+        <p className="text-[11px] text-stone-500">같은 파일을 다시 올려도 겹치지 않고 그 입고일 영수증이 새 내용으로 바뀌어요.</p>
       </div>
     </div>
   );
