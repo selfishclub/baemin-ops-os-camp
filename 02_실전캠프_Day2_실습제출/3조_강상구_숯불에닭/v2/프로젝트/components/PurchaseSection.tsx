@@ -5,6 +5,7 @@ import { ConfirmDialog, MoneyInput, Notice } from "@/components/ui";
 import { newId } from "@/lib/classify";
 import { ITEMS_KEY, type Item } from "@/lib/costing/types";
 import { RECEIPT_EXEMPT_KEY, cardPayee, emptyExempt, matchCardReceipts, type ReceiptExempt } from "@/lib/costing/receiptMatch";
+import { SAMPLE_PURCHASES, SAMPLE_PURCHASES_MONTH } from "@/lib/costing/samplePurchases";
 import type { Transaction } from "@/lib/types";
 import {
   PURCHASES_KEY_PREFIX,
@@ -290,7 +291,21 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
         )}
 
         {purchases.length === 0 ? (
-          <p className="text-xs text-stone-500">아직 영수증이 없어요. “+ 영수증 추가”로 넣어 보세요.</p>
+          <div className="space-y-2">
+            <p className="text-xs text-stone-500">아직 영수증이 없어요. “+ 영수증 추가”로 넣어 보세요.</p>
+            {month === SAMPLE_PURCHASES_MONTH && (
+              <button
+                className="btn-ghost text-xs"
+                onClick={async () => {
+                  await getStore().saveSetting(key, SAMPLE_PURCHASES);
+                  await load();
+                  setNote({ tone: "info", text: `가짜 예시 영수증 ${SAMPLE_PURCHASES.length}장을 넣었어요. 올리기 탭에 “가짜 9월 파일”도 올리면 아래에서 체크카드 결제와 맞춰 봐요.` });
+                }}
+              >
+                가짜 예시 영수증 넣기 (시연용)
+              </button>
+            )}
+          </div>
         ) : (
           <ul className="divide-y divide-stone-100 text-sm">
             {purchases.map((p) => (
@@ -1065,7 +1080,15 @@ function CardReceiptCheck({
 }) {
   const [showDone, setShowDone] = useState(false);
   const r = useMemo(() => matchCardReceipts(txs, purchases, exempt), [txs, purchases, exempt]);
-  if (r.cardCount === 0) return null;
+  if (r.cardCount === 0)
+    return (
+      <section className="card space-y-1">
+        <h2 className="text-base font-bold">영수증 없는 체크카드 결제</h2>
+        <p className="text-xs text-stone-500">
+          이 달 통장에 체크카드 결제가 없어요. 올리기 탭에 은행 거래내역을 올리면 체크카드 결제(농협은 “NH체크 ○○”)를 매입 영수증과 맞춰 보고, 영수증이 없는 결제만 여기에 모아 보여 줘요.
+        </p>
+      </section>
+    );
   const missingSum = r.missing.reduce((a, t) => a + t.out, 0);
   const md = (d: string) => d.slice(5).replace("-", "/");
 

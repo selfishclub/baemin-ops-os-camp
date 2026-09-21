@@ -69,3 +69,20 @@ describe("영수증 없는 체크카드 결제", () => {
     expect(r.missing).toHaveLength(1);
   });
 });
+
+describe("시연용 가짜 자료", () => {
+  it("가짜 9월 통장 파일과 가짜 매입 영수증이 맞음·영수증 없음·취소를 다 보여 준다", async () => {
+    const XLSX = await import("xlsx");
+    const { readFileSync } = await import("fs");
+    const { parseBankSheet } = await import("../bank/parse");
+    const { SAMPLE_PURCHASES } = await import("./samplePurchases");
+    const wb = XLSX.read(readFileSync("public/sample/가짜_거래내역_2026-09.xlsx"), { type: "buffer" });
+    const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true }) as never[][];
+    const txs = parseBankSheet(grid).rows.map((r, i) => ({ ...r, id: `b${i}`, month: r.date.slice(0, 7), source: "bank", major: null, minor: null, channel: null, review: null }) as unknown as Transaction);
+    const r = matchCardReceipts(txs, SAMPLE_PURCHASES);
+    expect(r.cardCount).toBe(10);
+    expect(r.matched).toHaveLength(6);
+    expect(r.cancelled).toHaveLength(1);
+    expect(r.missing.map((t) => cardPayee(t.payee))).toEqual(["가짜편의점", "가짜철물", "가짜주차"]);
+  });
+});
