@@ -94,3 +94,32 @@ describe("매입 영수증으로 바꾸기", () => {
     expect(sheetReceiptToPurchase(mart, [item("egg", "특란")], false).lines[0].itemId).toBeNull();
   });
 });
+
+describe("헛연결 막기", () => {
+  const drink = (id: string, name: string): Item => ({ id, name, baseUnit: "ea", standardCost: 0, category: "drink", active: true });
+  it("짧은 술 이름이 다른 말 속에 섞여도 연결하지 않는다", async () => {
+    const { matchItem } = await import("./receiptText");
+    const items = [drink("cass", "카스"), drink("terra", "테라")];
+    expect(matchItem("오리온 카스타드 30P 690g", items)).toBeNull();
+    expect(matchItem("스테라스 리필 버틀실 CR", items)).toBeNull();
+    expect(matchItem("카스맥주 500ml 박스", items)?.id).toBe("cass");
+    expect(matchItem("테라 500", items)?.id).toBe("terra");
+  });
+
+  it("소모품·기타 줄은 품목에 연결하지 않는다", () => {
+    const grid = [
+      ["구매일시", "거래처", "비용분류", "품목", "단가", "수량", "품목금액"],
+      ["2026-08-01 10:00", "가짜마트", "소모품비", "특란 모양 스티커", "1,000", "1", "1,000"],
+    ];
+    const [rc] = parseReceiptSheets([{ name: "a", grid }]).receipts;
+    expect(sheetReceiptToPurchase(rc, [item("egg", "특란")], true).lines[0].itemId).toBeNull();
+  });
+
+  it("몇 개 들었는지 없는 박스는 개당 수량을 짐작하지 않는다", async () => {
+    const { guessItemQty } = await import("./purchases");
+    expect(guessItemQty("별빛청하(BOX)", 2, "ea")).toBeNull();
+    expect(guessItemQty("콜라 30구", 5, "ea")).toBe(150);
+    expect(guessItemQty("청하 20병 박스", 2, "ea")).toBe(40);
+    expect(guessItemQty("양배추 1망", 1, "ea")).toBe(1);
+  });
+});

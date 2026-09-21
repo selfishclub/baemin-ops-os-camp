@@ -9,7 +9,7 @@ import { BankParseError, parseBankSheet } from "@/lib/bank/parse";
 import { DEFAULT_CHANNELS, type ChannelId, type Major } from "@/lib/categories";
 import { classifyRows, findRule, newId, ruleFromChoice, usualAmounts } from "@/lib/classify";
 import { num, won } from "@/lib/format";
-import { findOverlap, monthLabel, prevMonth } from "@/lib/month";
+import { findOverlap, monthLabel, monthsBetween, newBankRowsOnly, prevMonth } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 import type { Transaction } from "@/lib/types";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, isPrevMonthDefault } from "@/lib/paydays";
@@ -23,7 +23,7 @@ export default function UploadPage() {
   const { month, setMonth } = useMonth();
   const ledger = useLedger(month);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [message, setMessage] = useState<{ tone: "ok" | "error" | "warn"; text: string } | null>(null);
+  const [message, setMessage] = useState<{ tone: "ok" | "error" | "warn" | "info"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -46,17 +46,21 @@ export default function UploadPage() {
       const parsed = parseBankSheet(grid);
 
       const store = getStore();
+      // 이미 올린 기간과 겹치면: 있는 줄은 빼고 새 줄만 넣는다 (은행에서 기간을 겹쳐 내려받는 일이 많다)
+      let rows = parsed.rows;
+      let duplicates = 0;
       const overlap = findOverlap(await store.listUploads(), parsed.from, parsed.to);
       if (overlap) {
-        setMessage({
-          tone: "error",
-          text: `이미 올린 기간이에요 (${overlap.from} ~ ${overlap.to}, ${overlap.rowCount}줄). 중복 저장하지 않았어요.`,
-        });
-        return;
+        const existing = (await Promise.all(monthsBetween(parsed.from, parsed.to).map((m) => store.listTransactions(m)))).flat().filter((t) => t.source === "bank" && t.date >= parsed.from && t.date <= parsed.to);
+        ({ fresh: rows, duplicates } = newBankRowsOnly(parsed.rows, existing));
+        if (rows.length === 0) {
+          setMessage({ tone: "info", text: `이미 다 들어 있는 거래예요 (${parsed.from} ~ ${parsed.to}, ${duplicates}줄). 새로 넣은 줄은 없어요.` });
+          return;
+        }
       }
 
       const rules = await store.listRules();
-      const txs = classifyRows(parsed.rows, rules, usualAmounts(ledger.txs.concat(ledger.prevTxs), rules));
+      const txs = classifyRows(rows, rules, usualAmounts(ledger.txs.concat(ledger.prevTxs), rules));
       await store.saveTransactions(txs);
       const fileMonth = parsed.from.slice(0, 7);
       await store.saveUpload({
@@ -72,7 +76,7 @@ export default function UploadPage() {
       const auto = txs.filter((t) => t.major).length;
       setMessage({
         tone: "ok",
-        text: `${txs.length}줄 중 ${auto}줄을 자동으로 분류했어요. 확인이 필요한 줄은 ${txs.filter((t) => t.review).length}줄이에요. (${parsed.from} ~ ${parsed.to})`,
+        text: `${txs.length}줄 중 ${auto}줄을 자동으로 분류했어요. 확인이 필요한 줄은 ${txs.filter((t) => t.review).length}줄이에요. (${parsed.from} ~ ${parsed.to})${duplicates ? ` 이미 있던 ${duplicates}줄은 빼고 넣었어요.` : ""}`,
       });
       if (fileMonth !== month) setMonth(fileMonth);
       else await ledger.reload();

@@ -111,8 +111,10 @@ export function summarizePurchases(purchases: Purchase[]): PurchaseSummary {
 export function guessItemQty(name: string, qty: number, unit: BaseUnit): number | null {
   const n = name.replace(/\s/g, "");
   if (unit === "ea") {
-    const m = n.match(/(\d+)(구|개|입|매|장)/);
-    return m ? Number(m[1]) * qty : qty;
+    const m = n.match(/(\d+)(구|개|입|매|장|병)/);
+    if (m) return Number(m[1]) * qty;
+    // "별빛청하(BOX)"처럼 박스인데 몇 개 들었는지 없으면 짐작하지 않는다 (박스값이 개당 단가로 들어가면 안 됨)
+    return /box|박스|상자|케이스/i.test(n) ? null : qty;
   }
   const kg = n.match(/(\d+(?:\.\d+)?)kg/i);
   const g = n.match(/(\d+(?:\.\d+)?)g(?![a-z])/i);

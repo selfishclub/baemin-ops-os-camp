@@ -22,6 +22,9 @@ export function toPurchaseCategory(raw: string): PurchaseCategory {
   return "기타";
 }
 
+// 원가율 품목(레시피 재료)에 연결할 만한 줄: 재료비만. 소모품·기타는 연결하지 않는다 (스테라스 리필 → 테라 같은 헛연결 방지)
+export const linkableCategory = (c: PurchaseCategory) => c === "원재료비" || c === "기타재료비";
+
 // 가게 비용이 아닐 가능성이 큰 분류 (식사·간식·개인 물품) — 미리보기에서 기본으로 빼 둔다
 export const isPersonalCategory = (raw: string) => /식비|기타/.test(raw.replace(/\s/g, "")) && !/재료/.test(raw);
 
@@ -164,7 +167,7 @@ export const receiptTotal = (rc: SheetReceipt) => rc.itemSum - receiptDiscount(r
 export function sheetReceiptToPurchase(rc: SheetReceipt, items: Item[], link: boolean): Purchase {
   const lines: PurchaseLine[] = rc.lines.map((l) => {
     const category = toPurchaseCategory(l.rawCategory);
-    const it = link && category !== "기타" ? matchItem(l.name, items) : null;
+    const it = link && linkableCategory(category) ? matchItem(l.name, items) : null;
     const itemQty = it ? guessItemQty(l.name, l.qty, it.baseUnit) ?? 0 : 0;
     return { name: l.name, unitPrice: l.unitPrice, qty: l.qty, amount: l.amount, category, itemId: it ? it.id : null, itemQty: it ? itemQty : 0 };
   });

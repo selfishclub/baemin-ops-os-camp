@@ -180,6 +180,15 @@ export function parseReceiptText(text: string, monthHint?: string): ParsedReceip
 
 const norm = (s: string) => s.replace(/[\s()［］\[\]]/g, "").toLowerCase();
 
+const DRINK_TAIL = /^(맥주|소주|라이트|생|병|캔|페트|pet|box|박스|제로|오리지널|\d.*|ml.*)?$/i;
+function drinkNameMatches(name: string, itemNorm: string): boolean {
+  const tokens = name.toLowerCase().split(/[\s()［］\[\]_/,·]+/).filter(Boolean);
+  if (tokens.some((tk) => tk.startsWith(itemNorm) && DRINK_TAIL.test(tk.slice(itemNorm.length)))) return true;
+  // 여러 낱말로 된 술 이름 (참이슬 후레쉬)
+  const joined = tokens.join("");
+  return joined === itemNorm || (joined.startsWith(itemNorm) && DRINK_TAIL.test(joined.slice(itemNorm.length)));
+}
+
 /** 상품명으로 원가율 품목을 찾아 자동 연결 (가장 길게 겹치는 품목) */
 export function matchItem(name: string, items: Item[]): Item | null {
   const n = norm(name);
@@ -189,6 +198,8 @@ export function matchItem(name: string, items: Item[]): Item | null {
     if (!it.active) continue;
     const t = norm(it.name);
     if (!t) continue;
+    // 술·음료 이름은 짧아서(카스·테라) 다른 말 속에 잘 섞인다(카스타드·스테라스). 낱말 맨 앞에서 시작하고 뒤가 술 말일 때만 연결
+    if (it.category === "drink" && !drinkNameMatches(name, t)) continue;
     if (n.includes(t) || t.includes(n)) {
       if (!best || t.length > norm(best.name).length) best = it;
     }

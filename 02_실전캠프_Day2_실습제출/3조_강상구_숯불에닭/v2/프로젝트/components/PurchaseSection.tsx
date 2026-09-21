@@ -18,7 +18,7 @@ import {
   type PurchaseLine,
 } from "@/lib/costing/purchases";
 import { LiquorParseError, liquorBrands, liquorDayToPurchase, newLiquorItems, parseLiquorLedgerGrid, type LiquorLedger } from "@/lib/costing/liquorLedger";
-import { ReceiptSheetError, parseReceiptSheets, receiptDiscount, receiptTotal, sheetReceiptToPurchase, type SheetReceipt } from "@/lib/costing/receiptSheet";
+import { ReceiptSheetError, linkableCategory, parseReceiptSheets, receiptDiscount, receiptTotal, sheetReceiptToPurchase, toPurchaseCategory, type SheetReceipt } from "@/lib/costing/receiptSheet";
 import { RECEIPT_PROMPT, matchItem, parseReceiptText, toPurchaseLine } from "@/lib/costing/receiptText";
 import { todayStr } from "@/lib/daily";
 import { num, won } from "@/lib/format";
@@ -970,7 +970,7 @@ function SheetDialog({ receipts, notes, fileName, items, onSave, onCancel }: { r
                 {open === r.key && (
                   <ul className="mt-1 space-y-0.5 rounded-lg bg-stone-50 p-2 text-[11px]">
                     {r.lines.map((l, i) => {
-                      const it = link ? matchItem(l.name, items) : null;
+                      const it = link && linkableCategory(toPurchaseCategory(l.rawCategory)) ? matchItem(l.name, items) : null;
                       return (
                         <li key={i} className="flex justify-between gap-2">
                           <span className="min-w-0 flex-1">
