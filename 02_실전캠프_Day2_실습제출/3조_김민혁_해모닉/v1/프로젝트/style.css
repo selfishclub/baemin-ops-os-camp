@@ -1115,3 +1115,5 @@ table.tkLog td small{display:block;font-size:11px;color:var(--muted);font-weight
 .tTime{border:1px dashed var(--rule);background:var(--surface-2);color:var(--ink-2);border-radius:999px;
   padding:3px 9px;font:inherit;font-size:12px;font-variant-numeric:tabular-nums;cursor:pointer;margin-right:4px;white-space:nowrap}
 .tTime:hover{border-color:var(--ink);color:var(--ink)}
+.patTbl input{width:100%;box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid var(--rule);border-radius:8px;background:var(--surface)}
+.patTbl th:first-child{width:44px}

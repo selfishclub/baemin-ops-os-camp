@@ -240,7 +240,25 @@ const App = (() => {
 
   /* 그날 몇 명이 일하는가 — 편성 인원에서 자동으로 정한다.
      3명 이상이면 관리자·홀·주방을 따로 두고, 2명 이하면 홀 업무 일부를 주방이 나눠 맡는다. */
-  function crewOf(key) {
+  /* 인원 기준(2인/3인) — 시간대별로 본다.
+     오픈 = 오전 조 인원, 미들·마감 = 오후 조 인원 (사장님 결정 2026-09-23: 오후 조는 17:00 출근, 미들은 오후 인원 기준).
+     근무표에 구간별 배치가 있으면 그걸로, 없으면 옛 편성(roster) 인원, 그것도 없으면 매장 기본값. */
+  const pmStart = () => minutesOf((S.settings && S.settings.pmStart) || '17:00');
+  const segStartMin = (seg) => minutesOf(String(seg.time || '').split(/[–\-~]/)[0].trim());
+  const segIsPm = (seg) => { const m = segStartMin(seg); return m != null && m >= pmStart(); };
+  function dayCrewSplit(date) {
+    if (!S.sched || !S.sched.days || !S.sched.days[date]) return null;
+    const am = new Set(), pm = new Set();
+    dayRows(date).forEach((r) => r.active.forEach((w) => (segIsPm(r.seg) ? pm : am).add(w.name)));
+    if (!am.size && !pm.size) return null;
+    return { am: [...am], pm: [...pm] };
+  }
+  function crewOf(key, slotKey) {
+    const sp = dayCrewSplit(key);
+    if (sp) {
+      const n = (slotKey === 'open' ? sp.am : sp.pm).length || Math.max(sp.am.length, sp.pm.length);
+      return n >= 3 ? 3 : 2;
+    }
     const r = S.roster[key];
     if (r && r.length) return r.length >= 3 ? 3 : 2;
     return S.settings && S.settings.crew === 3 ? 3 : 2;   // 편성 전에는 매장 기본값
@@ -253,7 +271,7 @@ const App = (() => {
     if (rec && rec.role) return rec.role;
     const t = tpl(tid);
     if (!t) return undefined;
-    return (crewOf(key) === 2 && t.role2) || t.role;
+    return (crewOf(key, t.slot) === 2 && t.role2) || t.role;
   }
 
   function isOverdue(key, tid) {
@@ -996,10 +1014,11 @@ const App = (() => {
     const list0 = inSlot(slot.key);
 
     /* 역할 필터 */
-    const crew = crewOf(key);
+    const crew = crewOf(key, slot.key);
+    const split = dayCrewSplit(key);
     h += `<div class="filters">
       ${['all', ...ROLES].map((r) => `<button class="fl${filter === r ? ' on' : ''}" data-act="filter" data-r="${r}">${r === 'all' ? '전체' : r}</button>`).join('')}
-      <button class="crewTag" data-act="view" data-v="month" title="근무 편성 인원에 따라 자동으로 정해집니다">${crew}인 기준${crew === 2 ? ' · 홀 일부를 주방이' : ''}</button>
+      <button class="crewTag" data-act="view" data-v="month" title="근무표의 오전·오후 조 인원에 따라 시간대별로 정해집니다">${crew}인 기준${split ? ` (${slot.key === 'open' ? '오전' : '오후'} 조 ${(slot.key === 'open' ? split.am : split.pm).length}명)` : ''}${crew === 2 ? ' · 홀 일부를 주방이' : ''}</button>
     </div>`;
 
     /* 중요 지연 — 오늘일 때만, 어느 시간대든 위로 올린다 */
@@ -1231,6 +1250,70 @@ const App = (() => {
     return n;
   }
 
+  /* ── 오전·오후 조 — 사장님 근무표 방식 ──
+     오전 조 = 오후 조 시작(기본 17:00) 전 구간, 오후 조 = 그 이후 구간. 이름을 넣으면 해당 구간 전부에 배치한다.
+     명단에 없는 이름은 직원 명단에 자동으로 추가된다 (담당 역할은 직원 화면에서 나중에 정한다). */
+  const splitNames = (s) => String(s || '').split(/[,、·\/\n]+/).map((x) => x.trim()).filter(Boolean);
+  function ensureStaff(name) {
+    let st = S.staff.find((x) => x.name === name);
+    if (!st) { st = { id: 's' + Date.now() + Math.random().toString(36).slice(2, 6), name, roles: [], active: true, type: 'regular' }; S.staff.push(st); }
+    return st;
+  }
+  function applyShiftDay(date, am, pm) {
+    const sc = schedOf();
+    const mk = (n) => { const st = ensureStaff(n); return { name: n, staffId: st.id, type: st.type || 'regular', leader: false, special: isOffDay(st, date), note: '' }; };
+    const segs = {};
+    segList().forEach((sg) => { const ws = (segIsPm(sg) ? pm : am).map(mk); if (ws.length) segs[sg.key] = { workers: ws, leave: [] }; });
+    if (Object.keys(segs).length) sc.days[date] = { segs }; else delete sc.days[date];
+    syncRoster(date);
+  }
+  const patternOf = () => { const sc = schedOf(); if (!sc.pattern) sc.pattern = {}; return sc.pattern; };
+  function fillMonthFromPattern(m, overwrite) {
+    const pat = patternOf(); let n = 0;
+    monthDates(m).forEach((k) => {
+      const dow = String(new Date(k + 'T00:00:00').getDay());
+      const p2 = pat[dow]; if (!p2 || (!(p2.am || []).length && !(p2.pm || []).length)) return;
+      if (!overwrite && dayHasAny(k)) return;
+      applyShiftDay(k, p2.am || [], p2.pm || []); n++;
+    });
+    return n;
+  }
+  function patternModal() {
+    const pat = patternOf(), m = monthKey();
+    const rows = [1, 2, 3, 4, 5, 6, 0].map((d) => `<tr><th>${WD[d]}</th>
+      <td><input data-pat="${d}:am" value="${esc((pat[d] || {}).am ? pat[d].am.join(', ') : '')}" placeholder="이름, 이름" autocomplete="off"></td>
+      <td><input data-pat="${d}:pm" value="${esc((pat[d] || {}).pm ? pat[d].pm.join(', ') : '')}" placeholder="이름, 이름" autocomplete="off"></td></tr>`).join('');
+    modal('요일별 오전·오후 조 패턴', `
+      <p class="hint" style="margin-top:0">매주 같은 사람이 나오는 기본 패턴입니다. 이름은 쉼표로 나눠 적으세요. 오후 조는 <b>${esc(S.settings.pmStart || '17:00')}</b>부터입니다 (설정 › 인원 기준에서 변경).</p>
+      <div class="tkLogWrap"><table class="tkLog patTbl"><thead><tr><th>요일</th><th>오전 조</th><th>오후 조 (${esc(S.settings.pmStart || '17:00')}~)</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <label class="chk" style="margin-top:10px"><input type="checkbox" id="patOver"> 이미 배치된 날도 패턴으로 덮어쓰기 (병원·대체 같은 예외가 지워집니다)</label>
+      <div class="rowbtns" style="margin-top:8px"><button type="button" class="btn primary" data-act="patFill">${monthLabel(m)} 채우기</button>
+        <button type="button" class="btn" data-act="patFillNext">${monthLabel(monthShiftKey(m, 1))}도 채우기</button></div>
+      <p class="hint">채운 뒤 병원·대체 근무 같은 예외는 달력에서 날짜를 누르고 <b>오전·오후 조 편집</b>으로 고치면 됩니다.</p>`, () => {
+      readPattern(); save(); render();
+    }, '패턴만 저장');
+  }
+  function readPattern() {
+    const pat = patternOf();
+    document.querySelectorAll('[data-pat]').forEach((inp) => {
+      const [d, k] = inp.dataset.pat.split(':');
+      pat[d] = pat[d] || { am: [], pm: [] }; pat[d][k] = splitNames(inp.value);
+    });
+  }
+  function shiftDayModal(date) {
+    const sp = dayCrewSplit(date) || { am: [], pm: [] };
+    const d = new Date(date + 'T00:00:00');
+    modal(`${mdLabel(date)} ${WD[d.getDay()]}요일 — 오전·오후 조`, `
+      <label>오전 조<input id="sdAm" value="${esc(sp.am.join(', '))}" placeholder="이름, 이름" autocomplete="off"></label>
+      <label>오후 조 (${esc(S.settings.pmStart || '17:00')}~)<input id="sdPm" value="${esc(sp.pm.join(', '))}" placeholder="이름, 이름" autocomplete="off"></label>
+      <p class="hint">저장하면 이 날의 구간별 배치를 통째로 다시 만듭니다. 오픈 업무는 오전 조 인원, 미들·마감 업무는 오후 조 인원 기준으로 담당이 정해집니다.</p>`, () => {
+      const am = splitNames($('#sdAm').value), pm = splitNames($('#sdPm').value);
+      applyShiftDay(date, am, pm);
+      logSched(`${mdLabel(date)} 오전 ${am.length}명 · 오후 ${pm.length}명 편성`);
+      save(); render();
+    }, '저장');
+  }
+
   let schedTab = 'cal';
   function vMonth() {
     const m = monthKey(), sc = schedOf(), todayK = dateKey(), sel = mdateKey();
@@ -1254,6 +1337,7 @@ const App = (() => {
     </div>
     <div class="rowbtns" style="margin:0 0 12px">
       <button class="btn sm" data-act="sePrint">🖨 인쇄용 보기</button>
+      <button class="btn sm primary" data-act="sePattern">📅 오전·오후 조 패턴</button>
       <button class="btn sm" data-act="seMonth">📋 월 관리 (복사·자동 채우기)</button>
       <button class="btn sm" data-act="seRules">⚙ 운영 기준·공휴일</button>
     </div>`;
@@ -1330,7 +1414,11 @@ const App = (() => {
       ${r.leave.length ? `<div class="leaveLine"><b>휴가·부재</b> ${r.leave.map(esc).join(', ')} <small>배치 인원에서 제외</small></div>` : ''}
       <div class="countLine"><span>배치 ${r.assigned}명</span><span>필요 ${r.minimum}명</span></div>
     </section>`).join('')}</div>`;
-    h += `<button class="btn primary" style="width:100%;margin-top:8px" data-act="seOpen" data-k="${date}">이 날짜 근무 편집</button>
+    { const sp = dayCrewSplit(date);
+      h += `<div class="notice" style="margin-top:8px"><b>오전 조</b> ${sp && sp.am.length ? sp.am.map(esc).join(', ') : '<span class="mut">없음</span>'} <span class="mut">(${sp ? sp.am.length : 0}명)</span><br>
+        <b>오후 조</b> ${sp && sp.pm.length ? sp.pm.map(esc).join(', ') : '<span class="mut">없음</span>'} <span class="mut">(${sp ? sp.pm.length : 0}명 · ${esc(S.settings.pmStart || '17:00')}~)</span></div>`; }
+    h += `<button class="btn primary" style="width:100%;margin-top:8px" data-act="seShift" data-k="${date}">오전·오후 조 편집</button>
+      <button class="btn" style="width:100%;margin-top:6px" data-act="seOpen" data-k="${date}">구간별 상세 편집</button>
       <div class="rowbtns" style="margin:8px 0 0"><button class="btn sm ghost" data-act="seCopyPrev" data-k="${date}">전날 배치 복사</button>
       ${S.days[date] && date <= dateKey() ? `<button class="btn sm ghost" data-act="jumpDate" data-k="${date}">이날 할 일 보기</button>` : ''}
       ${any ? `<button class="btn sm ghost danger" data-act="seClearDay" data-k="${date}">이 날 비우기</button>` : ''}</div>`;
@@ -2764,6 +2852,9 @@ const App = (() => {
           <button class="btn sm${S.settings.crew === 2 ? ' on' : ''}" data-act="crew" data-n="2">2인 (관리자가 홀 겸직)</button>
           <button class="btn sm${S.settings.crew === 3 ? ' on' : ''}" data-act="crew" data-n="3">3인 (관리자·홀·주방)</button>
         </span></div>
+      <div class="setrow"><span>오후 조 시작 시각 <span class="hint" style="margin:0">이 시각 전 구간이 오전 조, 이후가 오후 조</span></span>
+        <span class="v"><input type="time" class="num wide" value="${esc(S.settings.pmStart || '17:00')}" data-act="pmStart">
+        </span></div>
       <div class="setrow"><span>2인일 때 주방이 맡는 홀 업무</span>
         <span class="v hint">${S.templates.filter((t) => t.role2 && !t.rest).map((t) => t.time).join(' · ') || '없음'}</span></div>
 
@@ -4000,9 +4091,19 @@ const App = (() => {
   }
   function closeModal() { const m = $('#modal'); m.hidden = true; m._ok = null; m.innerHTML = ''; }
 
-  function pickWho() {
-    modal('지금 누구세요?', `<div class="pick">${S.staff.filter((s) => s.active).map((s) =>
-      `<button class="btn big" data-pick="${esc(s.name)}">${esc(s.name)}</button>`).join('')}</div>`, null);
+  /* 오늘 근무표에 있는 사람만 먼저 보여준다 — 없으면 전체 */
+  function whoNames(all) {
+    const act = S.staff.filter((s) => s.active).map((s) => s.name);
+    if (all) return act;
+    const r = rosterOf(dateKey()) || [];
+    const on = r.map((e) => (S.staff.find((x) => x.id === e.staffId) || {}).name || e.name).filter(Boolean);
+    return on.length ? on : act;
+  }
+  function pickWho(all) {
+    const names = whoNames(all), partial = !all && names.length < S.staff.filter((s) => s.active).length;
+    modal('지금 누구세요?', `<div class="pick">${names.map((n) =>
+      `<button class="btn big" data-pick="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+      ${partial ? `<p class="hint">오늘 근무표에 있는 사람만 보입니다. <button type="button" class="btn sm" data-act="pickWhoAll">다른 사람</button></p>` : ''}`, null);
   }
 
   /* 완료자 선택 줄. instant=true 면 이름만 누르면 바로 완료된다(증빙 없는 항목).
@@ -4011,8 +4112,8 @@ const App = (() => {
     const cur = S.ui.whoDate === dateKey() ? S.ui.who : null;
     return `<div class="mlabel">누가 했나요?</div>
       <div class="whosel" data-tid="${tid}" data-instant="${instant ? 1 : 0}">
-        ${S.staff.filter((s) => s.active).map((s) =>
-          `<button type="button" class="btn who${!instant && s.name === cur ? ' on' : ''}" data-whosel="${esc(s.name)}">${esc(s.name)}</button>`).join('')}
+        ${whoNames(false).map((n) =>
+          `<button type="button" class="btn who${!instant && n === cur ? ' on' : ''}" data-whosel="${esc(n)}">${esc(n)}</button>`).join('')}
       </div>`;
   }
 
@@ -4340,6 +4441,7 @@ const App = (() => {
           render(); break;
         }
         case 'pickWho': pickWho(); break;
+        case 'pickWhoAll': pickWho(true); break;
         case 'tankDate': tankDateModal(Number(b.dataset.n), b.dataset.kind); break;
         case 'tankStock': tankStockModal(Number(b.dataset.n), b.dataset.pos); break;
         case 'tankCareDel': {
@@ -4426,6 +4528,18 @@ const App = (() => {
         }
         case 'seRules': schedRulesModal(); break;
         case 'seMonth': schedMonthModal(); break;
+        case 'sePattern': patternModal(); break;
+        case 'seShift': shiftDayModal(b.dataset.k); break;
+        case 'patFill': case 'patFillNext': {
+          readPattern();
+          const m = a === 'patFill' ? monthKey() : monthShiftKey(monthKey(), 1);
+          const over = !!($('#patOver') && $('#patOver').checked);
+          const n = fillMonthFromPattern(m, over);
+          logSched(`${monthLabel(m)} 오전·오후 조 패턴으로 ${n}일 채움${over ? ' (덮어쓰기)' : ''}`);
+          save(); closeModal(); render();
+          banner(`${monthLabel(m)} ${n}일을 패턴으로 채웠습니다`, n ? '달력에서 날짜를 눌러 예외를 고치세요.' : '패턴에 이름이 없거나 이미 배치된 날뿐입니다.');
+          break;
+        }
         case 'sePrint': printSchedule(); break;
         case 'hdAdd': { schedOf().holidays.push({ date: monthKey() + '-01', name: '', type: '임시공휴일' }); closeModal(); schedRulesModal(); break; }
         case 'hdDel': { const hds = schedOf().holidays.slice().sort((p2, q) => p2.date.localeCompare(q.date)); const t = hds[Number(b.dataset.i)]; schedOf().holidays = schedOf().holidays.filter((x) => x !== t); closeModal(); schedRulesModal(); break; }
@@ -4683,6 +4797,7 @@ const App = (() => {
       if (b.dataset.act === 'minWage') { S.settings.minWage = Math.max(0, Number(b.value) || 0) || MIN_WAGE.hour; save(); render(); }
       if (b.dataset.act === 'reportAt') { S.settings.reportAt = b.value || '21:30'; save(); render(); }
       if (b.dataset.act === 'tgToken') { S.settings.tgToken = b.value.trim(); save(); }
+      if (b.dataset.act === 'pmStart') { if (/^\d{2}:\d{2}$/.test(b.value)) { S.settings.pmStart = b.value; save(); render(); } }
       if (b.dataset.act === 'tgChat') { S.settings.tgChat = b.value.trim(); save(); }
       if (b.dataset.act === 'budget') { S.settings.budget = Math.max(1, Number(b.value) || 6); save(); render(); }
     });
