@@ -39,7 +39,7 @@ const SLOTS = [
 ];
 
 /* 루틴 데이터 버전 — 올리면 저장된 기존 루틴을 새 목록으로 갈아끼운다 */
-const ROUTINE_VER = 7;   // 6판: 안양점 전용 마감 루틴 2개(계단 쓸기 · 찜기 물 배출) 추가 — 2026-09-22 사장님 요청
+const ROUTINE_VER = 8;   // 8판: 안양점 17:00 입구·계단 불 켜기 추가 — 2026-09-22   // 6판: 안양점 전용 마감 루틴 2개(계단 쓸기 · 찜기 물 배출) 추가 — 2026-09-22 사장님 요청
 
 /* time    : 화면에 보이는 시각
    sort    : 정렬 기준 (마감 후 / 퇴점 전 처리용)
@@ -81,6 +81,7 @@ const TEMPLATES = [
   { id:'t28', slot:'noon', time:'16:40', sort:'16:40', title:'예약 상차림 사전 준비', role:'주방', support:'홀' },
   { id:'t30', slot:'noon', time:'17:00', sort:'17:00', title:'재고·발주 필요 항목 체크', role:ROLE_MGR, support:'주방' },
   { id:'t32', slot:'noon', time:'17:00', sort:'17:00', title:'작업대·바닥·쓰레기 정리', role:'주방' },
+  { id:'t55', slot:'noon', time:'17:00', sort:'17:01', title:'매장 입구·계단 불 켜기', memo:'입구 간판·계단 조명 ON · 안 켜지는 등이 있으면 트러블시트에 적기', role:ROLE_ANY, store:'anyang' },
 
   // ── 마감 (15) ─────────────────────────────────────────────
   { id:'t33', slot:'close', time:'20:00', sort:'20:00', title:'갑각류 중간체크', memo:'폐사 제거 · 활력 저하 개체 격리', role:ROLE_MGR, crit:true, due:'20:00', grace:30, ev:'deaths' },
