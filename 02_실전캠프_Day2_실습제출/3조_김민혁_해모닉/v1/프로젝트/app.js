@@ -70,6 +70,88 @@ const App = (() => {
 
   const tpl = (id) => S.templates.find((t) => t.id === id);
 
+  /* ── 할 일 순서 — 사장님이 끌어서 바꾼 순서(ord)가 있으면 그걸, 없으면 시각순 ──
+     ord 는 루틴(template)에 붙어 매장 문서와 함께 모든 기기에 동기화된다. */
+  const ordOf = (t) => (t && t.ord != null ? Number(t.ord) : 1e9);
+  const byOrderT = (a, b) => (ordOf(a) - ordOf(b)) || (a.sort || '').localeCompare(b.sort || '');
+  const byOrder = (a, b) => byOrderT(tpl(a), tpl(b));
+  /* 잠금: 순서 편집은 PIN 으로 풀고, 10분 지나거나 새로고침하면 다시 잠긴다 (이 기기에서만) */
+  const ORDER_UNLOCK_MS = 10 * 60 * 1000;
+  let orderUnlockedAt = 0;
+  const orderUnlocked = () => Date.now() - orderUnlockedAt < ORDER_UNLOCK_MS;
+  const pinOk = (v) => /^\d{4,6}$/.test(v || '');
+
+  function orderUnlockModal() {
+    if (!pinOk(S.settings.orderPin)) { orderPinModal(true); return; }
+    modal('순서 잠금 풀기', `<p class="hint" style="margin-top:0">할 일 순서를 바꾸려면 사장님 PIN 을 넣으세요. 10분 뒤 자동으로 다시 잠깁니다.</p>
+      <label>PIN<input id="opIn" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="숫자 4~6자리"></label>`, () => {
+      const v = $('#opIn').value.trim();
+      if (v !== String(S.settings.orderPin)) { alert('PIN 이 다릅니다.'); return false; }
+      orderUnlockedAt = Date.now(); render();
+    }, '풀기');
+    setTimeout(() => { const i = $('#opIn'); if (i) i.focus(); }, 50);
+  }
+
+  /* PIN 만들기·바꾸기. 처음이면 새 PIN 두 번, 이미 있으면 현재 PIN 확인 뒤 새 PIN 두 번 */
+  function orderPinModal(thenUnlock) {
+    const has = pinOk(S.settings.orderPin);
+    modal(has ? '순서 잠금 PIN 바꾸기' : '순서 잠금 PIN 만들기', `
+      <p class="hint" style="margin-top:0">${has ? '현재 PIN 을 확인한 뒤 새 PIN 을 넣습니다.' : '할 일 순서는 이 PIN 을 아는 사람만 바꿀 수 있습니다. 직원에게는 알려주지 마세요.'}</p>
+      ${has ? `<label>현재 PIN<input id="opCur" type="password" inputmode="numeric" maxlength="6" autocomplete="off"></label>` : ''}
+      <label>새 PIN (숫자 4~6자리)<input id="opNew" type="password" inputmode="numeric" maxlength="6" autocomplete="off"></label>
+      <label>새 PIN 한 번 더<input id="opNew2" type="password" inputmode="numeric" maxlength="6" autocomplete="off"></label>`, () => {
+      if (has && $('#opCur').value.trim() !== String(S.settings.orderPin)) { alert('현재 PIN 이 다릅니다.'); return false; }
+      const n = $('#opNew').value.trim();
+      if (!pinOk(n)) { alert('PIN 은 숫자 4~6자리로 넣어 주세요.'); return false; }
+      if (n !== $('#opNew2').value.trim()) { alert('두 번 넣은 PIN 이 서로 다릅니다.'); return false; }
+      S.settings.orderPin = n; save();
+      if (thenUnlock) orderUnlockedAt = Date.now();
+      banner(has ? 'PIN 을 바꿨습니다' : 'PIN 을 만들었습니다', thenUnlock ? '이제 손잡이(⠿)를 끌어 순서를 바꾸세요. 10분 뒤 자동으로 잠깁니다.' : '할 일 화면의 "순서 바꾸기"에서 씁니다.');
+      render();
+    }, '저장');
+  }
+
+  /* 끌어 놓은 결과(보이는 항목 id 순서)를 루틴 순서(ord)로 굳힌다.
+     안 보이는 항목(완료·다른 역할)은 제자리를 지키고, 보이는 항목끼리만 새 순서로 바꾼다. */
+  function applyOrder(seq) {
+    if (!seq.length) return;
+    const slotKey = tpl(seq[0]).slot;
+    const all = S.templates.filter((t) => t.slot === slotKey).sort(byOrderT);
+    const vis = new Set(seq); let i = 0;
+    const out = all.map((t) => (vis.has(t.id) ? tpl(seq[i++]) : t));
+    out.forEach((t, idx) => { t.ord = (idx + 1) * 10; });
+    save(); render();
+  }
+
+  /* 손잡이(⠿)를 누른 채 끌기 — 마우스·아이패드 손가락 모두 pointer 이벤트로 처리 */
+  let dragSt = null;
+  document.addEventListener('pointerdown', (e) => {
+    const hnd = e.target.closest('.dragH'); if (!hnd || !orderUnlocked()) return;
+    e.preventDefault();
+    const cardEl = hnd.closest('.tcard'), col = cardEl.closest('.colBody');
+    dragSt = { card: cardEl, col, moved: false, id: e.pointerId };
+    try { hnd.setPointerCapture(e.pointerId); } catch (_) { /* 무시 */ }
+    cardEl.classList.add('dragging');
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (!dragSt) return;
+    e.preventDefault(); dragSt.moved = true;
+    const others = [...dragSt.col.querySelectorAll('.tcard.drag')].filter((c) => c !== dragSt.card);
+    let before = null;
+    for (const c of others) { const r = c.getBoundingClientRect(); if (e.clientY < r.top + r.height / 2) { before = c; break; } }
+    if (before) { if (before.previousElementSibling !== dragSt.card) before.parentNode.insertBefore(dragSt.card, before); }
+    else { const last = others[others.length - 1]; if (last && last.nextElementSibling !== dragSt.card) last.parentNode.insertBefore(dragSt.card, last.nextSibling); }
+  }, { passive: false });
+  const dragEnd = () => {
+    if (!dragSt) return;
+    const d = dragSt; dragSt = null;
+    d.card.classList.remove('dragging');
+    if (!d.moved) return;
+    applyOrder([...d.col.querySelectorAll('.tcard.drag')].map((c) => c.dataset.tid));
+  };
+  document.addEventListener('pointerup', dragEnd);
+  document.addEventListener('pointercancel', dragEnd);
+
   function runsOn(t, d) {
     if (!t.active) return false;
     const r = t.repeat || { t: 'daily' };
@@ -882,7 +964,7 @@ const App = (() => {
     let items = list0;
     // '공통'은 그날 있는 사람이 하는 일이라 어떤 역할을 골라도 남긴다
     if (filter !== 'all') items = items.filter((t) => { const r = roleOf(key, t); return r === filter || r === ROLE_ANY; });
-    items.sort((a2, b2) => (tpl(a2).sort || '').localeCompare(tpl(b2).sort || ''));
+    items.sort(byOrder);
 
     const todoIds = items.filter((t) => day.inst[t].s === 'todo');
     const doneIds = items.filter((t) => day.inst[t].s !== 'todo')
@@ -906,6 +988,14 @@ const App = (() => {
         ${g.items.map((t) => card(key, t, { isPast, isFuture })).join('')}
       </div>`).join('');
     };
+
+    /* 순서 바꾸기 — 잠금 상태에서는 손잡이가 없다. 사장님 PIN 으로 풀면 10분 동안 끌어서 바꿀 수 있다 */
+    const unlocked = orderUnlocked();
+    const hasCustom = S.templates.some((t) => t.ord != null);
+    h += `<div class="orderBar${unlocked ? ' on' : ''}">${unlocked
+      ? `<span>🔓 <b>순서 편집 중</b> — 왼쪽 손잡이(⠿)를 끌어 순서를 바꾸세요. 바꾼 순서는 모든 기기·매일 그대로 갑니다.</span>
+         <span class="obBtns">${hasCustom ? `<button class="btn sm" data-act="orderReset">시간순으로 되돌리기</button>` : ''}<button class="btn sm primary" data-act="orderLock">잠그기</button></span>`
+      : `<span class="hint">🔒 순서 잠김${hasCustom ? ' · 사장님이 정한 순서' : ' · 시각순'}</span><button class="btn sm" data-act="orderUnlock">순서 바꾸기</button>`}</div>`;
 
     h += `<div class="splitCols">
       <section class="colBox todoCol">
@@ -960,7 +1050,9 @@ const App = (() => {
 
     const evLabel = { deaths: '폐사 마릿수 입력', kakao: '카톡 사진 전송 확인', money: '금액 입력', number: '숫자 입력' }[t.ev];
 
-    return `<div class="tcard${t.rest ? ' rest' : ''}${rec.s === 'done' ? ' done' : ''}${rec.s === 'skip' ? ' skipped' : ''}${t.crit ? ' crit' : ''}${late ? ' late' : ''}${opt.isFuture ? ' preview' : ''}">
+    const canDrag = orderUnlocked() && rec.s === 'todo' && !opt.isFuture;
+    return `<div class="tcard${t.rest ? ' rest' : ''}${rec.s === 'done' ? ' done' : ''}${rec.s === 'skip' ? ' skipped' : ''}${t.crit ? ' crit' : ''}${late ? ' late' : ''}${opt.isFuture ? ' preview' : ''}${canDrag ? ' drag' : ''}" data-tid="${tid}">
+      ${canDrag ? `<span class="dragH" data-drag="${tid}" title="끌어서 순서 바꾸기">⠿</span>` : ''}
       <button class="ck" data-act="toggle" data-id="${tid}" aria-label="${esc(t.title)} 완료"${opt.isFuture ? ' disabled' : ''}>${rec.s === 'done' ? '✓' : rec.s === 'skip' ? '–' : ''}</button>
       <button class="tcMain" data-act="cardOpen" data-id="${tid}">
         <div class="tcTitle"><span class="chip ${rc}">${role}</span>${esc(t.title)}${t.crit ? '<span class="chip crit">중요</span>' : ''}${late ? '<span class="chip late">지연</span>' : ''}${missed ? '<span class="chip missed">미완료</span>' : ''}</div>
@@ -2473,7 +2565,7 @@ const App = (() => {
       <div class="hint">나머지는 전부 일반입니다. 일반 항목도 체크리스트에 뜨고 완료율에 집계됩니다.</div></details>`;
 
     SLOTS.forEach((slot) => {
-      const list = S.templates.filter((t) => t.slot === slot.key).sort((a, b) => (a.sort || '').localeCompare(b.sort || ''));
+      const list = S.templates.filter((t) => t.slot === slot.key).sort(byOrderT);
       h += `<details class="grp" data-k="rt:${slot.key}"${attrOpen('rt:' + slot.key, true)}><summary><h3>${slot.name} <span class="cnt">${list.filter((t) => t.active).length}</span></h3></summary>`;
       h += list.map((t) => {
         const rep = t.repeat || { t: 'daily' };
@@ -2663,6 +2755,11 @@ const App = (() => {
           ? `매일 <b>${esc(S.settings.reportAt || '21:30')}</b> 에 텔레그램으로 <b>자동 전송</b>됩니다. 실패하면 30초마다 재시도하고, 화면에도 알려드립니다. 전송 시각에 앱(브라우저 탭)이 열려 있고 인터넷이 연결되어 있어야 합니다.`
           : '텔레그램을 설정하면 그 시각에 자동으로 전송됩니다. 설정 전에는 문구만 만들어져 직접 복사해 보내시면 됩니다.'}
         리포트 시점 이후에 할 업무(마감 정산·문잠금)는 '이후 예정'으로 따로 표시되고 완료율에서 빠집니다.</p>
+
+      <div class="hd sub2"><h3>할 일 순서 잠금</h3></div>
+      <div class="setrow"><span>순서 바꾸기 PIN <span class="hint" style="margin:0">사장님만 아는 숫자 4~6자리</span></span>
+        <span class="v">${pinOk(S.settings.orderPin) ? '설정됨' : '미설정'} <button class="btn sm" data-act="orderPinSet">${pinOk(S.settings.orderPin) ? 'PIN 바꾸기' : 'PIN 만들기'}</button></span></div>
+      <p class="hint">할 일 화면의 순서는 기본으로 잠겨 있어 직원이 실수로 바꿀 수 없습니다. 할 일 화면 › <b>순서 바꾸기</b>에서 PIN 을 넣으면 10분 동안 손잡이(⠿)를 끌어 순서를 바꿀 수 있고, 새로고침하거나 10분이 지나면 다시 잠깁니다. 바꾼 순서는 매일 · 모든 기기에 같이 적용됩니다.</p>
 
       <div class="hd sub2"><h3>완료자 기록</h3></div>
       <div class="setrow"><span>완료할 때마다 누가 했는지 묻기</span>
@@ -4401,6 +4498,13 @@ const App = (() => {
         case 'askPerm': Notification.requestPermission().then(() => render()); break;
         case 'toggleSound': S.settings.sound = !S.settings.sound; save(); render(); break;
         case 'toggleAskWho': S.settings.askWho = !S.settings.askWho; save(); render(); break;
+        case 'orderUnlock': orderUnlockModal(); break;
+        case 'orderLock': orderUnlockedAt = 0; render(); break;
+        case 'orderPinSet': orderPinModal(false); break;
+        case 'orderReset': {
+          if (!confirm('사장님이 정한 순서를 지우고 시각순으로 되돌릴까요? (모든 시간대 · 모든 기기)')) return;
+          S.templates.forEach((t) => { delete t.ord; }); save(); render(); break;
+        }
         case 'toggleReport': S.settings.reportOff = !S.settings.reportOff; save(); render(); break;
         case 'toggleTgInstant': S.settings.tgInstant = S.settings.tgInstant === false; save(); render(); break;
         case 'testAlarm': fire('알림 테스트', '이렇게 표시됩니다. 소리도 함께 납니다.'); break;
@@ -4660,6 +4764,7 @@ const App = (() => {
         const old = oldBy[t.id];
         // 앱에서 직접 고친 제목·메모·담당 등은 새 판을 덮어쓰지 않는다
         if (old && old.edited) { Object.keys(old.edited).forEach((f) => { nt[f] = old[f]; }); nt.edited = old.edited; }
+        if (old && old.ord != null) nt.ord = old.ord;   // 사장님이 끌어서 정한 순서는 새 판에서도 유지
         return nt;
       });
       const live = new Set(S.templates.map((t) => t.id));
