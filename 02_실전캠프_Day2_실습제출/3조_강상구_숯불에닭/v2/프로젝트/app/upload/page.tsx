@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { CategorySelect, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
@@ -35,6 +35,7 @@ export default function UploadPage() {
       .catch(() => {});
   }, []);
   const [filter, setFilter] = useState("");
+  const [txKind, setTxKind] = useState<"전체" | "입금" | "출금" | "미분류">("전체");
 
   async function handleFile(file: File | Blob, name: string) {
     setBusy(true);
@@ -155,46 +156,61 @@ export default function UploadPage() {
             <div className="mt-3 space-y-2">
               <p className="text-[11px] text-stone-500">이미 확인한 줄을 바꾸려면 그 줄의 “고치기”를 누르세요. 규칙까지 바꿀지는 거기서 고를 수 있어요.</p>
               <input aria-label="거래 찾기" className="field" placeholder="거래처·분류로 찾기 (예: 마트, 임대료)" value={filter} onChange={(e) => setFilter(e.target.value)} />
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[32rem] text-xs">
-                  <thead className="text-left text-stone-500">
-                    <tr>
-                      <th className="py-1">날짜</th>
-                      <th>거래처</th>
-                      <th>분류</th>
-                      <th className="text-right">출금</th>
-                      <th className="text-right">입금</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody className="num divide-y divide-stone-100">
-                    {ledger.txs
-                      .filter((t) => !filter.trim() || `${t.payee} ${t.major ?? ""} ${t.minor ?? ""}`.replace(/\s/g, "").includes(filter.replace(/\s/g, "")))
-                      .map((t) => (
-                        <Fragment key={t.id}>
-                          <tr className={editingId === t.id ? "bg-orange-50" : ""}>
-                            <td className="py-1">{t.date.slice(5)}</td>
-                            <td>{t.payee}</td>
-                            <td className={t.major ? "" : "text-orange-600"}>{t.major ? `${t.major} › ${t.minor}` : "미분류"}</td>
-                            <td className="text-right">{t.out ? num(t.out) : ""}</td>
-                            <td className="text-right">{t.in ? num(t.in) : ""}</td>
-                            <td className="text-right">
-                              <button className="text-[11px] font-semibold text-orange-700 underline" onClick={() => setEditingId(editingId === t.id ? null : t.id)}>
+              <div className="flex flex-wrap gap-1.5 text-xs">
+                {(["전체", "입금", "출금", "미분류"] as const).map((k) => (
+                  <button key={k} className={`rounded-full px-3 py-1 ${txKind === k ? "bg-orange-100 font-semibold text-orange-800" : "bg-stone-100 text-stone-600"}`} onClick={() => setTxKind(k)}>
+                    {k}
+                  </button>
+                ))}
+              </div>
+              <div className="space-y-3">
+                {groupByDate(
+                  ledger.txs
+                    .filter((t) => !filter.trim() || `${t.payee} ${t.major ?? ""} ${t.minor ?? ""}`.replace(/\s/g, "").includes(filter.replace(/\s/g, "")))
+                    .filter((t) => (txKind === "입금" ? t.in > 0 : txKind === "출금" ? t.out !== 0 : txKind === "미분류" ? !t.major : true)),
+                ).map(({ date, txs }) => (
+                  <div key={date}>
+                    <div className="num flex items-baseline justify-between border-b border-stone-200 pb-1 text-[11px] text-stone-500">
+                      <span className="font-semibold text-stone-700">{dayLabel(date)}</span>
+                      <span>
+                        {txs.some((t) => t.in > 0) && <span className="text-emerald-700">입금 +{num(txs.reduce((a, t) => a + t.in, 0))}</span>}
+                        {txs.some((t) => t.in > 0) && txs.some((t) => t.out !== 0) && " · "}
+                        {txs.some((t) => t.out !== 0) && <span>출금 −{num(txs.reduce((a, t) => a + t.out, 0))}</span>}
+                      </span>
+                    </div>
+                    <ul className="divide-y divide-stone-100">
+                      {txs.map((t) => {
+                        const { tag, name } = splitPayee(t.payee);
+                        return (
+                          <li key={t.id} className={editingId === t.id ? "rounded-lg bg-orange-50" : ""}>
+                            <div className="flex items-center gap-2 py-1.5">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-stone-800">
+                                  {tag && <span className="mr-1 text-[10px] font-normal text-stone-400">{tag}</span>}
+                                  {name}
+                                </p>
+                                <span className={`mt-0.5 inline-block rounded px-1.5 py-0.5 text-[10px] ${t.major ? (t.major === "제외" ? "bg-stone-100 text-stone-500" : "bg-stone-100 text-stone-700") : "bg-orange-100 font-semibold text-orange-700"}`}>
+                                  {t.major ? `${t.major} · ${t.minor}` : "미분류"}
+                                </span>
+                              </div>
+                              <span className={`num whitespace-nowrap text-right text-sm font-semibold ${t.in > 0 ? "text-emerald-700" : t.out < 0 ? "text-stone-400" : "text-stone-800"}`}>
+                                {t.in > 0 ? `+${num(t.in)}` : t.out < 0 ? `취소 ${num(-t.out)}` : `−${num(t.out)}`}
+                              </span>
+                              <button className="whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-orange-700 hover:bg-orange-50" onClick={() => setEditingId(editingId === t.id ? null : t.id)}>
                                 {editingId === t.id ? "닫기" : "고치기"}
                               </button>
-                            </td>
-                          </tr>
-                          {editingId === t.id && (
-                            <tr>
-                              <td colSpan={6} className="py-2">
+                            </div>
+                            {editingId === t.id && (
+                              <div className="pb-2">
                                 <ReviewCard tx={t} ledger={ledger} payDays={payDays} editing onDone={() => setEditingId(null)} />
-                              </td>
-                            </tr>
-                          )}
-                        </Fragment>
-                      ))}
-                  </tbody>
-                </table>
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -330,4 +346,23 @@ function ReviewCard({ tx, ledger, payDays, editing = false, onDone }: { tx: Tran
       </div>
     </article>
   );
+}
+
+// 전체 거래 목록 — 날짜별로 묶기
+function groupByDate(txs: Transaction[]): { date: string; txs: Transaction[] }[] {
+  const m = new Map<string, Transaction[]>();
+  for (const t of [...txs].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))) m.set(t.date, [...(m.get(t.date) ?? []), t]);
+  return [...m].map(([date, list]) => ({ date, txs: list }));
+}
+
+const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+function dayLabel(date: string): string {
+  const d = new Date(date + "T00:00:00Z");
+  return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 (${DAY_NAMES[d.getUTCDay()]})`;
+}
+
+// "NH체크 홈마트" → { tag: "NH체크", name: "홈마트" } — 거래 방식 앞말을 떼어 거래처 이름이 잘 보이게
+function splitPayee(payee: string): { tag: string; name: string } {
+  const m = payee.match(/^(NH\S*|PC\S*은행|폰\S*은행|자동이체|자동납부|CD현금|카드대금|타행이체|인터넷)\s+(.+)$/);
+  return m ? { tag: m[1], name: m[2] } : { tag: "", name: payee };
 }
