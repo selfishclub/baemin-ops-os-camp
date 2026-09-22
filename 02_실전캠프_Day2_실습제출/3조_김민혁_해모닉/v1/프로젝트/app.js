@@ -1177,6 +1177,11 @@ const App = (() => {
         return { key: sg.key, name: sg.name, time: sg.time, need: { weekday: base, friday: base, saturday: peak, holiday: peak } };
       });
     }
+    /* 낮 구간(오후 조 시작 전) 최소 인원은 2명이면 충분 — 사장님 결정 2026-09-23. 한 번만 맞추고 표시해 둔다 (운영 기준에서 다시 바꿀 수 있다) */
+    if (!sc.needVer) {
+      sc.segments.forEach((sg) => { if (!segIsPm(sg)) sg.need = { weekday: 2, friday: 2, saturday: 2, holiday: 2 }; });
+      sc.needVer = 1;
+    }
     if (!sc.holidays) sc.holidays = HOLIDAYS_KR.map((h) => ({ ...h }));
     if (!sc.days) sc.days = {};
     if (!sc.log) sc.log = [];
