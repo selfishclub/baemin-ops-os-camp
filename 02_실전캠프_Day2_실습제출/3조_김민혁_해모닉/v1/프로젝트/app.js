@@ -4225,9 +4225,45 @@ const App = (() => {
       ${rec.s === 'todo' ? `<button class="btn big" data-menu="skip">오늘만 건너뛰기</button>` : ''}
       <div class="mlabel">오늘만 담당 바꾸기</div>
       <div class="roles big">${ROLE_OPTS.map((x) => `<button class="rl${roleOf(key, tid) === x ? ' on' : ''}" data-menu="role:${x}">${x}</button>`).join('')}</div>
+      <button class="btn big" data-menu="title">✏️ 이름 고치기 (매일 · 두 매장 적용)</button>
       <button class="btn big" data-menu="memo">✏️ 메모 고치기 (매일 적용)</button>
     </div>`, null);
     $('#modal').dataset.tid = tid;
+  }
+
+  /* 루틴의 일부 값을 다른 매장 문서에도 그대로 넣는다 (같은 id 의 루틴이 있을 때만).
+     두 매장이 같은 루틴을 쓰므로 이름·메모는 한 곳에서 고치면 다른 매장도 따라간다 — 사장님 요청 2026-09-23 */
+  const otherStore = () => (Store.meta.stores || []).find((x) => x.id !== Store.meta.current);
+  function syncTplToOther(tid, fields) {
+    const other = otherStore(), t = tpl(tid);
+    if (!other || !t) return Promise.resolve(false);
+    return Store.loadStore(other.id).then((doc) => {
+      if (!doc || !doc.templates) return false;
+      const ot = doc.templates.find((x) => x.id === tid);
+      if (!ot) return false;
+      fields.forEach((f) => { if (t[f] === undefined) delete ot[f]; else ot[f] = t[f]; });
+      ot.edited = { ...(ot.edited || {}), ...Object.fromEntries(fields.map((f) => [f, true])) };
+      return Store.saveStore(other.id, doc).then(() => true);
+    });
+  }
+
+  /* 이름 고치기 — 할 일 화면의 ⋯ 메뉴에서. 순서 잠금 PIN 이 있으면 풀어야 한다 (직원이 실수로 못 바꾸게) */
+  function editTitle(tid) {
+    const t = tpl(tid);
+    if (pinOk(S.settings.orderPin) && !orderUnlocked()) { banner('이름을 고치려면 순서 잠금을 먼저 푸세요', '할 일 화면 위의 "순서 바꾸기"에서 PIN 을 넣은 뒤 다시 누르세요.'); orderUnlockModal(); return; }
+    const other = otherStore();
+    modal('이름 고치기', `
+      <label>업무 이름<input id="eT2" value="${esc(t.title)}" autocomplete="off"></label>
+      ${other ? `<label class="chk"><input type="checkbox" id="eBoth" checked> ${esc(other.name)}에도 같은 이름을 적용합니다</label>` : ''}
+      <p class="hint">내일부터도 이 이름으로 보입니다. 지난 기록의 이름도 함께 바뀝니다.</p>`, () => {
+      const v = $('#eT2').value.trim();
+      if (!v) { alert('이름을 비울 수 없습니다.'); return false; }
+      t.title = v; t.edited = { ...(t.edited || {}), title: true };
+      save(); render();
+      const both = $('#eBoth');
+      if (other && both && both.checked) syncTplToOther(tid, ['title']).then((ok) => { if (ok) banner(`${other.name}에도 이름을 적용했습니다`, v); });
+    }, '저장');
+    setTimeout(() => { const el = $('#eT2'); if (el) { el.focus(); el.select(); } }, 50);
   }
 
   /* 메모 수정 — 루틴 자체를 고치므로 내일부터도 그대로 보인다.
@@ -4243,15 +4279,7 @@ const App = (() => {
       t.memo = memo; t.edited = { ...(t.edited || {}), memo: true };
       save(); render();
       const both = $('#eBoth');
-      if (other && both && both.checked) {
-        Store.loadStore(other.id).then((doc) => {
-          if (!doc || !doc.templates) return;
-          const ot = doc.templates.find((x) => x.id === tid);
-          if (!ot) return;
-          ot.memo = memo; ot.edited = { ...(ot.edited || {}), memo: true };
-          return Store.saveStore(other.id, doc);
-        });
-      }
+      if (other && both && both.checked) syncTplToOther(tid, ['memo']);
     }, '저장');
     setTimeout(() => { const el = $('#eMemo'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 50);
   }
@@ -4295,6 +4323,7 @@ const App = (() => {
           if (why === null) return;
           Object.assign(rec, { s: 'skip', reason: why.trim() || '사유 없음', by: S.ui.who });
         } else if (v === 'memo') { closeModal(); editMemo(tid); return; }
+        else if (v === 'title') { closeModal(); editTitle(tid); return; }
         else if (v.startsWith('role:')) { rec.role = v.slice(5); }
         else if (v.startsWith('by:')) { rec.by = v.slice(3); }
         save(); closeModal(); render(); return;
@@ -4861,7 +4890,9 @@ const App = (() => {
         ${WD.map((n, i) => `<button type="button" class="rl day${(rep.days || []).includes(i) ? ' on' : ''}" data-d="${i}">${n}</button>`).join('')}</div>
       <label class="chk" id="eAlwaysWrap"${rep.t === 'weekly' ? '' : ' hidden'}><input type="checkbox" id="eAlways"${t.showAlways || t.showAlways == null ? ' checked' : ''}> 해당 없는 요일에도 목록에 보이기 (그날은 자동 완료로 표시)</label>
       <label class="chk"><input type="checkbox" id="eActive"${t.active ? ' checked' : ''}> 사용함 (끄면 체크리스트에서 빠집니다)</label>
+      ${otherStore() ? `<label class="chk"><input type="checkbox" id="eBothT" checked> 이름·메모를 ${esc(otherStore().name)}에도 같이 적용</label>` : ''}
     `, () => {
+      const oldTitle = t.title, oldMemo = t.memo;
       t.title = $('#eTitle').value.trim() || t.title;
       t.memo = $('#eMemo').value.trim() || undefined;
       t.role = $('#eRole').value;
@@ -4879,6 +4910,11 @@ const App = (() => {
       if (timeChanged) retime(t, nv);
       if (slotChanged || timeChanged) placeByTime(t);
       save(); render();
+      const bothT = $('#eBothT');
+      if (bothT && bothT.checked && (t.title !== oldTitle || t.memo !== oldMemo)) {
+        const fields = []; if (t.title !== oldTitle) fields.push('title'); if (t.memo !== oldMemo) fields.push('memo');
+        syncTplToOther(t.id, fields).then((ok) => { if (ok) banner(`${otherStore().name}에도 적용했습니다`, t.title); });
+      }
     }, '저장');
 
     $('#eRep').addEventListener('change', (e) => {
