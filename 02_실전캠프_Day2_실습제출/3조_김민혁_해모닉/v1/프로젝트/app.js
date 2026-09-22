@@ -49,12 +49,17 @@ const App = (() => {
   }
 
   /* ── 상태 ────────────────────────────────────────────────── */
+  /* 루틴 원본에서 이 매장 것만 — store 가 없는 루틴은 두 매장 공통, 있으면 그 매장 전용 */
+  function storeTemplates(storeId) {
+    const id = storeId || (Store.meta && Store.meta.current);
+    return TEMPLATES.filter((x) => !x.store || x.store === id);
+  }
   function freshState(storeId) {
     const setup = STORE_SETUP[storeId || (Store.meta && Store.meta.current)] || null;
     return {
       v: 1,
       created: dateKey(),
-      templates: TEMPLATES.map((t) => ({ ...t, active: true, repeat: t.repeat || { t: 'daily' } })),
+      templates: storeTemplates(storeId).map((t) => ({ ...t, active: true, repeat: t.repeat || { t: 'daily' } })),
       staff: (setup ? setup.staff : DEFAULT_STAFF).map((s) => ({ ...s, roles: s.roles.slice() })),
       settings: { ...DEFAULT_SETTINGS, ...(setup ? { crew: setup.crew } : {}) },
       roster: {},
@@ -4559,7 +4564,7 @@ const App = (() => {
        지난 체크 기록(days)은 그대로 두고 목록만 교체한다. */
     if ((S.routineVer || 1) < ROUTINE_VER) {
       const oldBy = {}; (S.templates || []).forEach((t) => { oldBy[t.id] = t; });
-      S.templates = TEMPLATES.map((t) => {
+      S.templates = storeTemplates().map((t) => {
         const nt = { ...t, active: true, repeat: t.repeat || { t: 'daily' } };
         const old = oldBy[t.id];
         // 앱에서 직접 고친 제목·메모·담당 등은 새 판을 덮어쓰지 않는다

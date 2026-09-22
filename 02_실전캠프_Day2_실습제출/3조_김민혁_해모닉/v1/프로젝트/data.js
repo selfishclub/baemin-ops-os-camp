@@ -39,7 +39,7 @@ const SLOTS = [
 ];
 
 /* 루틴 데이터 버전 — 올리면 저장된 기존 루틴을 새 목록으로 갈아끼운다 */
-const ROUTINE_VER = 5;
+const ROUTINE_VER = 7;   // 6판: 안양점 전용 마감 루틴 2개(계단 쓸기 · 찜기 물 배출) 추가 — 2026-09-22 사장님 요청
 
 /* time    : 화면에 보이는 시각
    sort    : 정렬 기준 (마감 후 / 퇴점 전 처리용)
@@ -94,6 +94,9 @@ const TEMPLATES = [
   { id:'t42', slot:'close', time:'21:25', sort:'21:25', title:'주문 마감 안내 및 추가주문 최종 확인', role:ROLE_MGR, support:'홀' },
   { id:'t43', slot:'close', time:'21:30', sort:'21:30', title:'수조 최종 점검', memo:'갑각류·수족관 상태 · 폐사 개체 완전 제거 · 산소와 여과기 작동 · 수온 · 저울과 장비 OFF', role:ROLE_MGR, support:'주방', crit:true, due:'21:30', grace:30, ev:'deaths' },
   { id:'t44', slot:'close', time:'21:30', sort:'21:30', title:'가스·전기·냉장고 문·주방 전원 최종 확인', role:'주방', crit:true, due:'21:30', grace:30 },
+  /* 안양점 전용 — store 가 있으면 그 매장에서만 목록에 들어간다 */
+  { id:'t53', slot:'close', time:'21:35', sort:'21:35', title:'계단 쓸기 (10분)', memo:'외부 계단 빗자루로 쓸고 쓰레기·담배꽁초 정리 · 젖어 있으면 물기 제거', role:ROLE_ANY, store:'anyang' },
+  { id:'t54', slot:'close', time:'21:45', sort:'21:45', title:'찜기 물 배출 (10분)', memo:'찜기 물 완전히 빼고 밸브 잠금 · 찜기 내부 헹굼 · 바닥 물기 정리', role:'주방', store:'anyang' },
   { id:'t47', slot:'close', time:'마감 후', sort:'22:10', title:'포스 마감·매출 정산·특이사항 기록', role:ROLE_MGR, crit:true, ev:'money', evLabel:'매출 금액' },
   { id:'t48', slot:'close', time:'마감 후', sort:'22:11', title:'갑각류·주류·소모품 잔량 및 발주 메모', role:ROLE_MGR, support:'주방', note:true },
   { id:'t49', slot:'close', time:'퇴점 전', sort:'22:19', title:'홀·주방 마감 완료 최종 확인', role:ROLE_MGR },
