@@ -271,7 +271,10 @@ const App = (() => {
     if (rec && rec.role) return rec.role;
     const t = tpl(tid);
     if (!t) return undefined;
-    return (crewOf(key, t.slot) === 2 && t.role2) || t.role;
+    /* 2인 시간대: 홀 담당이 따로 없다. 홀 업무는 관리자가 겸하고(설정의 "관리자가 홀 겸직"), 주방이 맡기로 정한 것(role2)만 주방으로.
+       그래서 2인일 때 담당은 갑각류 관리자 · 주방 · 공통 셋뿐이다 — 사장님 요청 2026-09-23 (낮 2명인데 셋으로 쪼개져 보이던 문제) */
+    if (crewOf(key, t.slot) === 2) { if (t.role2) return t.role2; if (t.role === '홀') return ROLE_MGR; }
+    return t.role;
   }
 
   function isOverdue(key, tid) {
@@ -942,7 +945,7 @@ const App = (() => {
     const key = viewKey(), day = dayFor(key), d = new Date(key + 'T00:00:00');
     const isToday = key === dateKey(), isPast = key < dateKey(), isFuture = key > dateKey();
     const ids = Object.keys(day.inst);
-    const filter = S.ui.filter;
+    let filter = S.ui.filter;
 
     /* 지금 시각이 속한 시간대 — 슬롯 탭의 기본 선택 */
     const curSlot = SLOTS.slice().reverse().find((sl) => nowMin() >= minutesOf(sl.from)) || SLOTS[0];
@@ -1016,9 +1019,11 @@ const App = (() => {
     /* 역할 필터 */
     const crew = crewOf(key, slot.key);
     const split = dayCrewSplit(key);
+    const roleBtns = crew === 2 ? ROLES.filter((r) => r !== '홀') : ROLES;   // 2인이면 홀 담당이 없다
+    if (crew === 2 && filter === '홀') filter = 'all';
     h += `<div class="filters">
-      ${['all', ...ROLES].map((r) => `<button class="fl${filter === r ? ' on' : ''}" data-act="filter" data-r="${r}">${r === 'all' ? '전체' : r}</button>`).join('')}
-      <button class="crewTag" data-act="view" data-v="month" title="근무표의 오전·오후 조 인원에 따라 시간대별로 정해집니다">${crew}인 기준${split ? ` (${slot.key === 'open' ? '오전' : '오후'} 조 ${(slot.key === 'open' ? split.am : split.pm).length}명)` : ''}${crew === 2 ? ' · 홀 일부를 주방이' : ''}</button>
+      ${['all', ...roleBtns].map((r) => `<button class="fl${filter === r ? ' on' : ''}" data-act="filter" data-r="${r}">${r === 'all' ? '전체' : r}</button>`).join('')}
+      <button class="crewTag" data-act="view" data-v="month" title="근무표의 오전·오후 조 인원에 따라 시간대별로 정해집니다">${crew}인 기준${split ? ` (${slot.key === 'open' ? '오전' : '오후'} 조 ${(slot.key === 'open' ? split.am : split.pm).length}명)` : ''}${crew === 2 ? ' · 홀 업무는 관리자가, 일부는 주방이' : ''}</button>
     </div>`;
 
     /* 중요 지연 — 오늘일 때만, 어느 시간대든 위로 올린다 */
