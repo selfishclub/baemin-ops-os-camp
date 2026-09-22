@@ -116,16 +116,16 @@ begin
     if v_tpl->>'sort' ~ '^\d{1,2}:\d{2}$' then v_sort := split_part(v_tpl->>'sort', ':', 1)::int * 60 + split_part(v_tpl->>'sort', ':', 2)::int; end if;
     v_total := v_total + 1;
     if v_s = 'todo' and v_sort is not null and v_sort >= v_now then
-      v_pending := v_pending + 1; v_pend := v_pend || (v_tpl->>'title'); continue;
+      v_pending := v_pending + 1; v_pend := array_append(v_pend, v_tpl->>'title'); continue;
     end if;
     if v_s = 'done' then v_done := v_done + 1; end if;
     if v_s = 'skip' then v_skip := v_skip + 1; end if;
     if coalesce((v_tpl->>'crit')::bool, false) then
       v_crit := v_crit + 1;
       if v_s = 'done' then v_crit_done := v_crit_done + 1; end if;
-      if v_s = 'todo' then v_crit_left := v_crit_left || ('· ' || (v_tpl->>'title') || ' (' || v_role || ')'); end if;
+      if v_s = 'todo' then v_crit_left := array_append(v_crit_left, '· ' || (v_tpl->>'title') || ' (' || v_role || ')'); end if;
     elsif v_s = 'todo' then
-      v_left := v_left || ('· ' || (v_tpl->>'title') || ' (' || v_role || ')');
+      v_left := array_append(v_left, '· ' || (v_tpl->>'title') || ' (' || v_role || ')');
     end if;
     if v_tpl->>'ev' = 'deaths' and v_s = 'done' and v_rec ? 'ev' then
       v_any_deaths := true;
@@ -142,28 +142,30 @@ begin
 
   v_base := v_total - v_skip - v_pending;
   v_pct := case when v_base > 0 then round(v_done::numeric * 100 / v_base) else 0 end;
-  v_out := v_out || ('🦀 해모닉 ' || v_name || ' ' || extract(month from v_d) || '/' || extract(day from v_d) || '(' || v_wd[extract(dow from v_d)::int + 1] || ') 마감 리포트');
-  v_out := v_out || '';
-  v_out := v_out || ('전체 ' || v_done || '/' || v_base || '  ' || v_pct || '%');
-  v_out := v_out || (case when array_length(v_crit_left, 1) > 0
+  v_out := array_append(v_out, '🦀 해모닉 ' || v_name || ' ' || extract(month from v_d) || '/' || extract(day from v_d) || '(' || v_wd[extract(dow from v_d)::int + 1] || ') 마감 리포트');
+  v_out := array_append(v_out, ''::text);
+  v_out := array_append(v_out, '전체 ' || v_done || '/' || v_base || '  ' || v_pct || '%');
+  v_out := array_append(v_out, case when array_length(v_crit_left, 1) > 0
     then '중요 ' || v_crit_done || '/' || v_crit || '  ⚠️ 미완료 ' || array_length(v_crit_left, 1) || '건'
     else '중요 ' || v_crit_done || '/' || v_crit || '  ✅ 전부 완료' end);
-  if array_length(v_crit_left, 1) > 0 then v_out := v_out || '' || '⚠️ 중요 미완료' || v_crit_left; end if;
-  if array_length(v_left, 1) > 0 then
-    v_out := v_out || '' || ('미완료 ' || array_length(v_left, 1) || '건') || v_left[1:8];
-    if array_length(v_left, 1) > 8 then v_out := v_out || ('· 외 ' || (array_length(v_left, 1) - 8) || '건'); end if;
+  if array_length(v_crit_left, 1) > 0 then
+    v_out := array_cat(v_out, array[''::text, '⚠️ 중요 미완료'::text]); v_out := array_cat(v_out, v_crit_left);
   end if;
-  if v_skip > 0 then v_out := v_out || '' || ('건너뜀 ' || v_skip || '건'); end if;
-  if v_pending > 0 then v_out := v_out || '' || ('⏳ 이후 예정 ' || v_pending || '건 — ' || array_to_string(v_pend[1:4], ', ') || case when v_pending > 4 then ' 외' else '' end); end if;
+  if array_length(v_left, 1) > 0 then
+    v_out := array_cat(v_out, array[''::text, ('미완료 ' || array_length(v_left, 1) || '건')::text]); v_out := array_cat(v_out, v_left[1:8]);
+    if array_length(v_left, 1) > 8 then v_out := array_append(v_out, '· 외 ' || (array_length(v_left, 1) - 8) || '건'); end if;
+  end if;
+  if v_skip > 0 then v_out := array_cat(v_out, array[''::text, ('건너뜀 ' || v_skip || '건')::text]); end if;
+  if v_pending > 0 then v_out := array_cat(v_out, array[''::text, ('⏳ 이후 예정 ' || v_pending || '건 — ' || array_to_string(v_pend[1:4], ', ') || case when v_pending > 4 then ' 외' else '' end)::text]); end if;
   v_line := '';
   if v_any_deaths then
     for v_sp in select * from jsonb_object_keys(v_deaths) loop
-      if (v_deaths->>v_sp)::int > 0 then v_parts := v_parts || (v_sp || ' ' || (v_deaths->>v_sp)); v_death_total := v_death_total + (v_deaths->>v_sp)::int; end if;
+      if (v_deaths->>v_sp)::int > 0 then v_parts := array_append(v_parts, v_sp || ' ' || (v_deaths->>v_sp)); v_death_total := v_death_total + (v_deaths->>v_sp)::int; end if;
     end loop;
     v_line := case when v_death_total > 0 then '폐사 ' || v_death_total || '마리 (' || array_to_string(v_parts, ' · ') || ')' else '폐사 없음 ✅' end;
   end if;
   if v_sales is not null then v_line := v_line || (case when v_line = '' then '' else ' · ' end) || '매출 ' || to_char(v_sales, 'FM999,999,999,999') || '원'; end if;
-  if v_line <> '' then v_out := v_out || '' || v_line; end if;
+  if v_line <> '' then v_out := array_cat(v_out, array[''::text, v_line]); end if;
   return array_to_string(v_out, E'\n');
 end $$;
 
