@@ -205,6 +205,10 @@ const Store = (() => {
     const local = await localGet(k);
     if (!cloudOn() || !CLOUD_KEYS(k)) return local;
     const remote = await cloudGet(k, local && local.blobs);
+    /* 처음 연결할 때의 안전장치 — 서버 쪽이 사실상 빈 문서인데 이 기기에는 기록이 있으면, 시각과 상관없이 이 기기 것을 올린다.
+       (기록 없는 기기를 먼저 연결해 빈 문서가 올라간 뒤, 기록 있는 아이패드가 덮이는 사고를 막는다) */
+    const isEmpty = (d) => !d || (!Object.keys(d.days || {}).length && !(d.purchases || []).length && !Object.keys(d.sales || {}).length && !(d.issues || []).length && !(d.contracts || []).length);
+    if (remote && local && isEmpty(remote) && !isEmpty(local)) { await cloudPut(k, local); return local; }
     if (remote && (!local || (remote.savedAt || 0) >= (local.savedAt || 0))) {
       await localPut(k, remote);          // 로컬은 캐시 — 오프라인에 대비해 최신본을 남겨둔다
       lastUp[k] = remote.savedAt;
