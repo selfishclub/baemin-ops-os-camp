@@ -58,3 +58,49 @@ describe("원가율", () => {
     expect(rep.itemUsage[0].name).toBe("닭 원육");
   });
 });
+
+describe("상품ABC 이어 붙이기", () => {
+  const rep = (start: string, end: string, lines: [string, number, number][]) => ({
+    month: start.slice(0, 7),
+    periodStart: start,
+    periodEnd: end,
+    lines: lines.map(([code, amount, quantity]) => ({ code, name: code, amount, quantity })),
+    totalAmount: lines.reduce((a, l) => a + l[1], 0),
+    totalQuantity: lines.reduce((a, l) => a + l[2], 0),
+  });
+  const prev = rep("2026-08-01", "2026-08-21", [["A", 100000, 10], ["B", 50000, 5]]);
+
+  it("바로 다음 날 파일은 메뉴별로 더해 이어 붙인다", async () => {
+    const { mergePosReports } = await import("./okpos");
+    const r = mergePosReports(prev, rep("2026-08-22", "2026-08-22", [["A", 10000, 1], ["C", 7000, 1]]));
+    expect(r.mode).toBe("append");
+    if (r.mode === "conflict") return;
+    expect(r.report.periodStart).toBe("2026-08-01");
+    expect(r.report.periodEnd).toBe("2026-08-22");
+    expect(r.report.totalAmount).toBe(167000);
+    expect(r.report.lines.find((l) => l.code === "A")).toMatchObject({ amount: 110000, quantity: 11 });
+    expect(r.report.lines.find((l) => l.code === "C")).toMatchObject({ amount: 7000, quantity: 1 });
+    expect(r.gapDays).toBe(0);
+  });
+
+  it("중간에 빈 날이 있으면 알려 준다", async () => {
+    const { mergePosReports } = await import("./okpos");
+    const r = mergePosReports(prev, rep("2026-08-24", "2026-08-24", [["A", 1, 1]]));
+    expect(r.mode === "append" && r.gapDays).toBe(2);
+  });
+
+  it("기존 기간을 다 덮는 파일은 통째로 바꾼다", async () => {
+    const { mergePosReports } = await import("./okpos");
+    expect(mergePosReports(prev, rep("2026-08-01", "2026-08-22", [["A", 1, 1]])).mode).toBe("replace");
+  });
+
+  it("일부만 겹치면 막는다 (두 번 세지 않게)", async () => {
+    const { mergePosReports } = await import("./okpos");
+    expect(mergePosReports(prev, rep("2026-08-20", "2026-08-22", [["A", 1, 1]])).mode).toBe("conflict");
+  });
+
+  it("다른 달이거나 처음이면 새로", async () => {
+    const { mergePosReports } = await import("./okpos");
+    expect(mergePosReports(null, prev).mode).toBe("new");
+  });
+});

@@ -8,7 +8,7 @@ import PurchaseSection from "@/components/PurchaseSection";
 import { newId } from "@/lib/classify";
 import { buildCostRateReport, recipeUnitCost } from "@/lib/costing/costRate";
 import { PURCHASES_KEY_PREFIX, costFromPurchases, type Purchase } from "@/lib/costing/purchases";
-import { parsePosAbcGrid, PosParseError } from "@/lib/costing/okpos";
+import { mergePosReports, parsePosAbcGrid, PosParseError } from "@/lib/costing/okpos";
 import sample from "@/lib/costing/sample.json";
 import { ITEMS_KEY, MENUS_KEY, POS_KEY_PREFIX, RECIPES_KEY, type BaseUnit, type Item, type Menu, type PosSalesReport, type Recipe } from "@/lib/costing/types";
 import { num, pctText, won } from "@/lib/format";
@@ -27,7 +27,7 @@ export default function CostingPage() {
   const [pos, setPos] = useState<PosSalesReport | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{ tone: "ok" | "error" | "warn"; text: string } | null>(null);
   const [view, setView] = useState<"report" | "purchases" | "setup">("report");
   const [help, setHelp] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -64,8 +64,18 @@ export default function CostingPage() {
       const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
       const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null }) as never[][];
       const parsed = parsePosAbcGrid(grid);
-      await getStore().saveSetting(POS_KEY_PREFIX + parsed.month, parsed);
-      setMessage({ tone: "ok", text: `${name}: ${parsed.lines.length}개 메뉴, 매출 ${won(parsed.totalAmount)} (${parsed.periodStart} ~ ${parsed.periodEnd})` });
+      // 같은 달 자료가 있으면 이어 붙이거나(다음 날 파일) 바꾼다(한 달치 파일). 겹치면 막는다
+      const prev = await getStore().getSetting<PosSalesReport>(POS_KEY_PREFIX + parsed.month);
+      const merged = mergePosReports(prev, parsed);
+      if (merged.mode === "conflict") {
+        setMessage({ tone: "error", text: merged.message });
+        return;
+      }
+      const r = merged.report;
+      await getStore().saveSetting(POS_KEY_PREFIX + r.month, r);
+      const how = merged.mode === "append" ? `${parsed.periodStart}${parsed.periodEnd !== parsed.periodStart ? " ~ " + parsed.periodEnd : ""} 판매를 이어 붙였어요 → ` : "";
+      const gap = merged.mode === "append" && merged.gapDays ? ` (중간에 ${merged.gapDays}일치가 비어 있어요. 그날 파일도 올려 주세요)` : "";
+      setMessage({ tone: merged.mode === "append" && merged.gapDays ? "warn" : "ok", text: `${name}: ${how}${r.lines.length}개 메뉴, 매출 ${won(r.totalAmount)} (${r.periodStart} ~ ${r.periodEnd})${gap}` });
       if (parsed.month !== month) setMonth(parsed.month);
       else await load();
     } catch (e) {
@@ -111,7 +121,7 @@ export default function CostingPage() {
           <div className="rounded-xl bg-sky-50 px-3 py-2 text-[12px] text-sky-950 ring-1 ring-sky-200">
             <ul className="list-disc space-y-0.5 pl-4">
               <li>
-                <b>넣는 것 ①</b> 포스 ASP → 매출관리 → 매출분석 → <b>상품ABC분석</b>을 한 달(1일~말일)로 조회해 엑셀로 받아 올리기
+                <b>넣는 것 ①</b> 포스 ASP → 매출관리 → 매출분석 → <b>상품ABC분석</b>을 한 달(1일~말일)로 받아 올리거나, 매일 그날 것만 올려도 이어 붙여져요
               </li>
               <li>
                 <b>넣는 것 ②</b> (처음 한 번) 품목과 기준단가(대략값), 메뉴별 레시피(품목 + g/ml/개). “품목·레시피 설정”에서

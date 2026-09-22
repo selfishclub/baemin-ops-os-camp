@@ -64,3 +64,40 @@ export function parsePosAbcGrid(grid: Cell[][]): PosSalesReport {
   }
   return { month: period.start.slice(0, 7), periodStart: period.start, periodEnd: period.end, lines, totalAmount, totalQuantity };
 }
+
+// 같은 달 상품ABC 자료를 이어 붙인다 — 매일 "오늘 판매"만 받아 올려도 한 달치가 쌓이게
+//  - 기존 기간 뒤 날짜만 담긴 파일 → 메뉴(상품코드)별로 더해 이어 붙임 (중간에 빈 날이 있으면 알려 줌)
+//  - 기존 기간을 다 덮는 파일 → 통째로 바꿈
+//  - 일부만 겹치면 두 번 세게 되므로 막는다
+export type PosMerge =
+  | { mode: "new" | "replace" | "append"; report: PosSalesReport; gapDays: number }
+  | { mode: "conflict"; message: string };
+
+const nextDay = (d: string) => new Date(Date.parse(`${d}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
+
+export function mergePosReports(prev: PosSalesReport | null, next: PosSalesReport): PosMerge {
+  if (!prev || prev.month !== next.month) return { mode: "new", report: next, gapDays: 0 };
+  if (next.periodStart <= prev.periodStart && next.periodEnd >= prev.periodEnd) return { mode: "replace", report: next, gapDays: 0 };
+  if (next.periodStart > prev.periodEnd) {
+    const byCode = new Map(prev.lines.map((l) => [l.code, { ...l }]));
+    for (const l of next.lines) {
+      const e = byCode.get(l.code);
+      if (e) {
+        e.amount += l.amount;
+        e.quantity += l.quantity;
+        e.name = l.name;
+      } else byCode.set(l.code, { ...l });
+    }
+    const lines = [...byCode.values()].sort((a, b) => b.amount - a.amount);
+    return {
+      mode: "append",
+      report: { month: prev.month, periodStart: prev.periodStart, periodEnd: next.periodEnd, lines, totalAmount: prev.totalAmount + next.totalAmount, totalQuantity: prev.totalQuantity + next.totalQuantity },
+      gapDays: Math.max(0, daysBetween(nextDay(prev.periodEnd), next.periodStart)),
+    };
+  }
+  return {
+    mode: "conflict",
+    message: `이미 ${prev.periodStart} ~ ${prev.periodEnd} 자료가 있는데, 올린 파일(${next.periodStart} ~ ${next.periodEnd})과 날짜가 겹쳐요. 같은 판매를 두 번 세지 않게 막았어요. ${prev.periodEnd} 다음 날부터 받거나, 1일부터 한 번에 받아 올려 주세요.`,
+  };
+}
