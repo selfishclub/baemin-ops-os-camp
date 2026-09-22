@@ -4857,20 +4857,20 @@ const App = (() => {
       <label>반복<select id="eRep">
         <option value="daily"${rep.t === 'daily' ? ' selected' : ''}>매일</option>
         <option value="weekly"${rep.t === 'weekly' ? ' selected' : ''}>요일 지정</option></select></label>
-      <div id="eDays" class="roles wrap"${rep.t === 'weekly' ? '' : ' hidden'}>
+      <div id="eDays" class="roles wrap" title="요일을 누르면 '요일 지정'으로 바뀝니다">
         ${WD.map((n, i) => `<button type="button" class="rl day${(rep.days || []).includes(i) ? ' on' : ''}" data-d="${i}">${n}</button>`).join('')}</div>
-      <label class="chk" id="eAlwaysWrap"${rep.t === 'weekly' ? '' : ' hidden'}><input type="checkbox" id="eAlways"${t.showAlways ? ' checked' : ''}> 해당 없는 요일에도 목록에 보이기 (그날은 자동 완료로 표시)</label>
+      <label class="chk" id="eAlwaysWrap"${rep.t === 'weekly' ? '' : ' hidden'}><input type="checkbox" id="eAlways"${t.showAlways || t.showAlways == null ? ' checked' : ''}> 해당 없는 요일에도 목록에 보이기 (그날은 자동 완료로 표시)</label>
       <label class="chk"><input type="checkbox" id="eActive"${t.active ? ' checked' : ''}> 사용함 (끄면 체크리스트에서 빠집니다)</label>
     `, () => {
       t.title = $('#eTitle').value.trim() || t.title;
       t.memo = $('#eMemo').value.trim() || undefined;
       t.role = $('#eRole').value;
       t.active = $('#eActive').checked;
-      if ($('#eRep').value === 'weekly') {
-        const days = [...document.querySelectorAll('#eDays .day.on')].map((x) => Number(x.dataset.d));
-        t.repeat = { t: 'weekly', days: days.length ? days : [1] };
+      const pickedDays = [...document.querySelectorAll('#eDays .day.on')].map((x) => Number(x.dataset.d));
+      if ($('#eRep').value === 'weekly' || pickedDays.length) {   // 요일을 골랐으면 반복을 안 바꿨어도 요일 지정으로 본다
+        t.repeat = { t: 'weekly', days: pickedDays.length ? pickedDays : [1] };
       } else t.repeat = { t: 'daily' };
-      t.showAlways = t.repeat.t === 'weekly' && $('#eAlways').checked;
+      if (t.repeat.t === 'weekly') t.showAlways = $('#eAlways').checked; else delete t.showAlways;   // 매일로 두면 표시 옵션은 지워 다음에 요일 지정할 때 기본 켜짐
       // 사장님이 직접 고친 값은 루틴 판이 올라가도 지키기 위해 표시해 둔다
       t.edited = { ...(t.edited || {}), title: true, memo: true, role: true, active: true, repeat: true, showAlways: true };
       const nv = $('#eTime').value, ns = $('#eSlot').value;
@@ -4881,9 +4881,15 @@ const App = (() => {
       save(); render();
     }, '저장');
 
-    $('#eRep').addEventListener('change', (e) => { $('#eDays').hidden = e.target.value !== 'weekly'; $('#eAlwaysWrap').hidden = e.target.value !== 'weekly'; });
+    $('#eRep').addEventListener('change', (e) => {
+      const weekly = e.target.value === 'weekly';
+      $('#eAlwaysWrap').hidden = !weekly;
+      if (!weekly) document.querySelectorAll('#eDays .day.on').forEach((x) => x.classList.remove('on'));   // 매일로 되돌리면 요일 선택도 지운다
+    });
     $('#eDays').addEventListener('click', (e) => {
-      const d = e.target.closest('.day'); if (d) d.classList.toggle('on');
+      const d = e.target.closest('.day'); if (!d) return;
+      d.classList.toggle('on');
+      if ($('#eRep').value !== 'weekly') { $('#eRep').value = 'weekly'; $('#eAlwaysWrap').hidden = false; }
     });
   }
 

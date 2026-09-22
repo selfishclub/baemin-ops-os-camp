@@ -256,6 +256,7 @@ main{max-width:860px;margin:0 auto;padding:18px 16px 96px}
 .mbox h3{font-size:18px;margin-bottom:14px;word-break:keep-all}
 .mbody label{display:block;font-size:13.5px;color:var(--muted);margin-bottom:14px}
 .mbody label[hidden]{display:none}
+.mbody .roles[hidden],.mbody label.chk[hidden]{display:none}   /* 반복이 '매일'이면 요일 줄과 매일 표시 체크를 숨긴다 */
 .mbody label.chk{display:flex;align-items:center;gap:10px;color:var(--ink);font-size:15px;
   background:var(--surface-2);padding:14px;border-radius:10px}
 .mbody label.chk input{width:22px;height:22px;accent-color:var(--accent)}
