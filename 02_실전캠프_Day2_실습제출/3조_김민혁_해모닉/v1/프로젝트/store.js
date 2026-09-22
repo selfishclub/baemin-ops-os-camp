@@ -343,6 +343,25 @@ const Store = (() => {
       return supa;
     } catch (e) { cloudFail(e); return null; }
   }
+  /* 서버 알림 — events 표에 한 줄 넣으면 서버(트리거)가 텔레그램으로 보낸다 */
+  async function supaEvent(kind, text) {
+    if (!supa) return { ok: false, err: '서버에 로그인되어 있지 않습니다' };
+    try {
+      const store = (meta && meta.current) || 'ansan';
+      const { error } = await supa.client.from('events').insert({ store, kind, text });
+      if (error) throw error;
+      return { ok: true };
+    } catch (e) { return { ok: false, err: e.message || String(e) }; }
+  }
+  async function supaEvents(n) {
+    if (!supa) return [];
+    try {
+      const { data, error } = await supa.client.from('events').select('id, store, kind, text, created_at, sent_at, tries, err').order('id', { ascending: false }).limit(n || 20);
+      if (error) throw error;
+      return data || [];
+    } catch (e) { return []; }
+  }
+
   function supaSetConfig(url, key) {
     if (!url || !key) { localStorage.removeItem(SUPA_KEY); supaCfg = null; supa = null; return; }
     localStorage.setItem(SUPA_KEY, JSON.stringify({ url: url.trim().replace(/\/+$/, ''), key: key.trim() }));
@@ -499,7 +518,7 @@ const Store = (() => {
 
   return {
     init, load, save, flush, setMeta, switchTo, dumpAll, restoreAll, loadStore, saveStore, loadShared, saveShared, watchShared,
-    supaSetConfig, supaSignIn, supaSignOut,
+    supaSetConfig, supaSignIn, supaSignOut, supaEvent, supaEvents,
     get supa() { const cfg = supaCfg || supaConfig(); return { configured: !!(cfg && cfg.url && cfg.key), url: cfg ? cfg.url : '', signedIn: !!supa, email: supa ? supa.email : '', libLoaded: !!(window.supabase && window.supabase.createClient) }; },
     get mode() { return mode; },
     get ok() { return writable; },
