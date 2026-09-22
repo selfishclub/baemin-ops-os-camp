@@ -208,14 +208,70 @@ const Store = (() => {
     /* 처음 연결할 때의 안전장치 — 서버 쪽이 사실상 빈 문서인데 이 기기에는 기록이 있으면, 시각과 상관없이 이 기기 것을 올린다.
        (기록 없는 기기를 먼저 연결해 빈 문서가 올라간 뒤, 기록 있는 아이패드가 덮이는 사고를 막는다) */
     const isEmpty = (d) => !d || (!Object.keys(d.days || {}).length && !(d.purchases || []).length && !Object.keys(d.sales || {}).length && !(d.issues || []).length && !(d.contracts || []).length);
-    if (remote && local && isEmpty(remote) && !isEmpty(local)) { await cloudPut(k, local); return local; }
+    if (remote && local && isEmpty(remote) && !isEmpty(local)) { await cloudPut(k, local); markSynced(k); return local; }
+    /* 이 기기가 서버와 처음 만나는데 양쪽 다 기록이 있으면 — 한쪽을 버리지 않고 합친다 (날짜별 기록 · 매입 · 매출 · 직원 · 계약서 …).
+       그 뒤부터는 '더 최근에 저장한 쪽'이 이긴다. */
+    if (remote && local && !isSynced(k) && !isEmpty(remote) && !isEmpty(local) && (remote.savedAt || 0) !== (local.savedAt || 0)) {
+      const merged = mergeDocs(remote, local);
+      merged.savedAt = Date.now();
+      await localPut(k, merged);
+      await cloudPut(k, merged);
+      markSynced(k);
+      return merged;
+    }
     if (remote && (!local || (remote.savedAt || 0) >= (local.savedAt || 0))) {
       await localPut(k, remote);          // 로컬은 캐시 — 오프라인에 대비해 최신본을 남겨둔다
       lastUp[k] = remote.savedAt;
+      markSynced(k);
       return remote;
     }
-    if (local) await cloudPut(k, local); // 로컬이 더 새것(오프라인에서 썼거나 첫 연결)이면 올린다
+    if (local) { await cloudPut(k, local); markSynced(k); } // 로컬이 더 새것(오프라인에서 썼거나 첫 연결)이면 올린다
     return local;
+  }
+
+  /* 이 브라우저가 문서 k 를 서버와 한 번이라도 맞춘 적이 있는지 (기기마다 기록) */
+  const SYNCED = 'hm.synced:';
+  function isSynced(k) { try { return !!localStorage.getItem(SYNCED + k); } catch (_) { return false; } }
+  function markSynced(k) { try { localStorage.setItem(SYNCED + k, String(Date.now())); } catch (_) { /* 무시 */ } }
+
+  /* 두 문서 합치기 — 더 최근 것(base)을 바탕으로, 목록은 합집합, 날짜별 기록은 진행된 쪽 우선 */
+  function mergeDocs(a, b) {
+    const newer = (a.savedAt || 0) >= (b.savedAt || 0) ? a : b;
+    const older = newer === a ? b : a;
+    const out = { ...older, ...newer };
+    const idOf = (x, by) => (x && x[by] != null) ? String(x[by]) : JSON.stringify(x);
+    const unionBy = (n, o, by) => {
+      if (!Array.isArray(n) && !Array.isArray(o)) return undefined;
+      const res = [...(n || [])]; const seen = new Set(res.map((x) => idOf(x, by)));
+      (o || []).forEach((x) => { const id = idOf(x, by); if (!seen.has(id)) { seen.add(id); res.push(x); } });
+      return res;
+    };
+    const unionObj = (n, o, each) => {
+      if (!n && !o) return undefined;
+      const res = { ...(o || {}), ...(n || {}) };
+      if (each) Object.keys(res).forEach((key) => { if (n && o && n[key] && o[key]) res[key] = each(n[key], o[key]); });
+      return res;
+    };
+    [['purchases', 'id'], ['contracts', 'id'], ['recipes', 'id'], ['notices', 'id'], ['issues', 'id'], ['training', 'id'],
+      ['health', 'id'], ['staff', 'name'], ['trainSeen', null]].forEach(([f, by]) => {
+      const v = unionBy(newer[f], older[f], by); if (v !== undefined) out[f] = v;
+    });
+    if (Array.isArray(out.issues)) out.issues = out.issues.map((i) => {
+      const n = (newer.issues || []).find((x) => x.id === i.id), o = (older.issues || []).find((x) => x.id === i.id);
+      return n && o ? { ...i, replies: unionBy(n.replies, o.replies, 'id') || [] } : i;
+    });
+    const mergeDay = (n, o) => ({
+      ...o, ...n,
+      inst: unionObj(n.inst, o.inst, (ni, oi) => ((ni.s && ni.s !== 'todo') || !(oi.s && oi.s !== 'todo')) ? ni : oi),
+      extras: unionBy(n.extras, o.extras, 'id') || [],
+      notified: { ...(o.notified || {}), ...(n.notified || {}) },
+    });
+    ['days', 'sales', 'roster', 'sched', 'payroll', 'hygiene', 'blobs'].forEach((f) => {
+      const v = unionObj(newer[f], older[f], f === 'days' ? mergeDay : null); if (v !== undefined) out[f] = v;
+    });
+    out.routineVer = Math.max(newer.routineVer || 0, older.routineVer || 0) || undefined;
+    if (out.routineVer === undefined) delete out.routineVer;
+    return out;
   }
 
   async function putDoc(k, v) {
