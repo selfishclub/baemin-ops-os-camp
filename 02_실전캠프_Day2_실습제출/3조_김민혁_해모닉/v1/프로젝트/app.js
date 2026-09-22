@@ -398,17 +398,31 @@ const App = (() => {
   async function findChats() {
     const tk = (S.settings.tgToken || '').trim();
     if (!tk) { alert('봇 토큰을 먼저 입력하세요.'); return; }
-    let list = [];
-    try {
-      const r = await fetch(`https://api.telegram.org/bot${tk}/getUpdates`);
-      const j = await r.json();
-      if (!j.ok) { alert('토큰이 올바르지 않습니다: ' + (j.description || '')); return; }
-      const seen = {};
-      (j.result || []).forEach((u) => {
-        const c = (u.message || u.my_chat_member || u.channel_post || {}).chat;
-        if (c && !seen[c.id]) { seen[c.id] = 1; list.push(c); }
-      });
-    } catch (e) { alert('인터넷 연결을 확인하세요.'); return; }
+    let list = [], updates = null;
+    if (serverSends()) {                       // 서버가 대신 물어본다 — 이 브라우저가 텔레그램에 못 닿아도 된다
+      await Store.flush();
+      const r = await Store.supaTgUpdates();
+      if (r.ok) updates = r.result;
+      else if (!/토큰이 없습니다|로그인/.test(r.err)) { alert('서버로 대화방을 못 찾았습니다: ' + r.err); return; }
+    }
+    if (!updates) {
+      try {
+        const r = await fetch(`https://api.telegram.org/bot${tk}/getUpdates`);
+        const j = await r.json();
+        if (!j.ok) { alert('토큰이 올바르지 않습니다: ' + (j.description || '')); return; }
+        updates = j.result || [];
+      } catch (e) {
+        alert('이 브라우저에서 텔레그램 서버(api.telegram.org)에 닿지 못했습니다.\n\n' +
+          '· 다른 브라우저(크롬·사파리)에서 같은 주소를 열어 설정하거나\n' +
+          '· 아래 "대화방 ID 직접 입력" 칸에 ID를 넣어 주세요.');
+        return;
+      }
+    }
+    const seen = {};
+    updates.forEach((u) => {
+      const c = (u.message || u.my_chat_member || u.channel_post || {}).chat;
+      if (c && !seen[c.id]) { seen[c.id] = 1; list.push(c); }
+    });
     if (!list.length) {
       alert('대화방을 못 찾았습니다.\n\n1) 휴대폰 텔레그램에서 봇에게 아무 메시지나 보내거나\n2) 단체방에 봇을 초대하고 아무 메시지나 올린 뒤\n다시 눌러 주세요.');
       return;
@@ -2626,6 +2640,8 @@ const App = (() => {
       <div class="setrow"><span>보낼 대화방</span>
         <span class="v">${S.settings.tgChat ? 'ID ' + esc(S.settings.tgChat) : '미설정'}
           <button class="btn sm" data-act="tgFind">대화방 찾기</button></span></div>
+      <div class="setrow"><span>대화방 ID 직접 입력 <span class="hint" style="margin:0">찾기가 안 될 때만</span></span>
+        <input type="text" class="num wide" value="${esc(S.settings.tgChat || '')}" data-act="tgChat" placeholder="-100… 또는 숫자" autocomplete="off"></div>
       <div class="rowbtns"><button class="btn" data-act="tgTest">연결 테스트 (지금 보내보기)</button></div>
 
       <details class="notice"><summary><b>텔레그램 처음 설정하기 (약 5분, 한 번만)</b></summary>
@@ -4417,6 +4433,12 @@ const App = (() => {
           b.disabled = true;
           sendTelegram('해모닉 체크리스트 연결 확인 ✅ 이 메시지가 보이면 설정 완료입니다.', 'test', true).then(async (r) => {
             b.disabled = false;
+            if (!r.ok && serverSends() && /인터넷 연결/.test(r.err)) {
+              await Store.flush();
+              const r3 = await Store.supaEvent('test', '해모닉 서버 알림 확인 🛰️ (이 브라우저는 텔레그램에 직접 못 닿아 서버가 대신 보냈습니다)');
+              alert(r3.ok ? '이 브라우저는 텔레그램에 직접 못 닿지만, 서버를 통해 보냈습니다. 휴대폰을 확인하세요. 실제 알림은 모두 서버가 보내므로 문제 없습니다.' : '실패: ' + r3.err);
+              return;
+            }
             if (!r.ok) { alert('실패: ' + r.err); return; }
             if (!serverSends()) { alert('보냈습니다! 휴대폰 텔레그램을 확인하세요.'); return; }
             const r2 = await Store.supaEvent('test', '해모닉 서버 알림 확인 🛰️ 이 메시지가 보이면 서버 알림(21:30 리포트 · 즉시 알림)도 준비된 것입니다.');

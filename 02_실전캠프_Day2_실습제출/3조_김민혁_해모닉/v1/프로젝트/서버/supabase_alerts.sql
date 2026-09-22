@@ -189,3 +189,25 @@ select cron.schedule('haemonic-daily-report', '30 12 * * *', $$select public.dai
 
 -- 확인용: 지금 안산점 리포트 문구 미리 보기 (보내지는 않음)
 select public.daily_report('ansan');
+
+-- ── 대화방 찾기 · 연결 확인을 서버가 대신 (브라우저가 텔레그램에 못 닿아도 됨) ──
+-- 앱이 tg_updates_start 로 요청을 걸고, 잠시 뒤 tg_updates_result 로 응답을 읽는다
+create or replace function public.tg_updates_start(p_store text) returns bigint
+language plpgsql security definer set search_path = public as $$
+declare v_token text; v_chat text; v_id bigint;
+begin
+  select token, chat into v_token, v_chat from public.tg_cfg(p_store);
+  if coalesce(v_token, '') = '' then return null; end if;
+  select net.http_get(url := 'https://api.telegram.org/bot' || v_token || '/getUpdates') into v_id;
+  return v_id;
+end $$;
+
+create or replace function public.tg_updates_result(p_id bigint) returns jsonb
+language sql security definer set search_path = public as $$
+  select case when r.id is null then null
+              else jsonb_build_object('status', r.status_code, 'error', r.error_msg, 'body', r.content) end
+  from (select 1) x left join net._http_response r on r.id = p_id;
+$$;
+
+grant execute on function public.tg_updates_start(text) to authenticated;
+grant execute on function public.tg_updates_result(bigint) to authenticated;

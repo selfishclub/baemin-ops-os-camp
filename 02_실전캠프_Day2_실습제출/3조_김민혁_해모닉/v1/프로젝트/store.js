@@ -353,6 +353,28 @@ const Store = (() => {
       return { ok: true };
     } catch (e) { return { ok: false, err: e.message || String(e) }; }
   }
+  /* 서버가 대신 텔레그램 getUpdates 를 호출해 준다 — 브라우저가 api.telegram.org 에 못 닿을 때를 위해 */
+  async function supaTgUpdates() {
+    if (!supa) return { ok: false, err: '서버에 로그인되어 있지 않습니다' };
+    try {
+      const store = (meta && meta.current) || 'ansan';
+      const { data: id, error } = await supa.client.rpc('tg_updates_start', { p_store: store });
+      if (error) throw error;
+      if (!id) return { ok: false, err: '서버에 저장된 봇 토큰이 없습니다 — 토큰을 넣고 잠시 뒤 다시 누르세요' };
+      for (let i = 0; i < 12; i++) {
+        await new Promise((r) => setTimeout(r, 700));
+        const { data: res, error: e2 } = await supa.client.rpc('tg_updates_result', { p_id: id });
+        if (e2) throw e2;
+        if (res && res.status != null) {
+          let body = null; try { body = JSON.parse(res.body); } catch (_) { /* 무시 */ }
+          if (!body) return { ok: false, err: '텔레그램 응답을 읽지 못했습니다 (' + res.status + ')' };
+          return body.ok ? { ok: true, result: body.result || [] } : { ok: false, err: body.description || ('HTTP ' + res.status) };
+        }
+        if (res && res.error) return { ok: false, err: res.error };
+      }
+      return { ok: false, err: '서버 응답이 늦습니다 — 잠시 뒤 다시 누르세요' };
+    } catch (e) { return { ok: false, err: e.message || String(e) }; }
+  }
   async function supaEvents(n) {
     if (!supa) return [];
     try {
@@ -518,7 +540,7 @@ const Store = (() => {
 
   return {
     init, load, save, flush, setMeta, switchTo, dumpAll, restoreAll, loadStore, saveStore, loadShared, saveShared, watchShared,
-    supaSetConfig, supaSignIn, supaSignOut, supaEvent, supaEvents,
+    supaSetConfig, supaSignIn, supaSignOut, supaEvent, supaEvents, supaTgUpdates,
     get supa() { const cfg = supaCfg || supaConfig(); return { configured: !!(cfg && cfg.url && cfg.key), url: cfg ? cfg.url : '', signedIn: !!supa, email: supa ? supa.email : '', libLoaded: !!(window.supabase && window.supabase.createClient) }; },
     get mode() { return mode; },
     get ok() { return writable; },
