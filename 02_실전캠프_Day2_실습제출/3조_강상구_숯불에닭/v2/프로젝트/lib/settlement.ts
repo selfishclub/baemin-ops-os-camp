@@ -7,8 +7,8 @@ import type { DailySale, Month, Transaction } from "./types";
 //  - weekly: 매주 weekday요일에 지난주(월~일) 매출분이 한 번에 들어온다 (주 단위 정산 앱)
 export interface SettlementRule {
   channel: ChannelId;
-  mode: "days" | "weekly";
-  days: number; // days 모드: 영업일 수 (0이면 당일)
+  mode: "days" | "weekly" | "calendar";
+  days: number; // days 모드: 영업일 수 (0이면 당일) / calendar 모드: 달력 날짜 수 (도착일이 쉬는 날이면 다음 영업일)
   weekday: number; // weekly 모드: 0=월 … 6=일
   manual?: boolean; // 쿠팡이츠처럼 사장님이 사장님 사이트에서 직접 출금 신청해야 통장에 들어오는 앱.
   //   정산 예정일 뒤에 늦게 들어오거나 며칠치가 한 번에 들어와도, 입금 순서대로 그때까지 정산된 매출 묶음에 붙인다.
@@ -49,6 +49,12 @@ export function addBusinessDays(date: string, n: number, holidays: string[] = []
 // 그 매출일의 돈이 들어올 날
 export function payoutDate(saleDate: string, rule: SettlementRule, holidays: string[] = []): string {
   if (rule.mode === "days") return addBusinessDays(saleDate, rule.days, holidays);
+  if (rule.mode === "calendar") {
+    // 달력으로 N일 뒤, 그날이 주말·공휴일이면 다음 영업일 (삼성카드: 금·토 매출이 월요일에 한 번에)
+    let p = shiftDate(saleDate, rule.days);
+    while (!isBusinessDay(p, holidays)) p = shiftDate(p, 1);
+    return p;
+  }
   // weekly: 매출일이 속한 주(월~일)의 다음 주 weekday요일
   const monday = shiftDate(saleDate, -dow(saleDate));
   let p = shiftDate(monday, 7 + rule.weekday);

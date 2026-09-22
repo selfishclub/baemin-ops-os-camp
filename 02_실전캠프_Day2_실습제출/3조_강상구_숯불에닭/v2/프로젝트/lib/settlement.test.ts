@@ -129,3 +129,18 @@ describe("배달앱 판정 기준", () => {
     expect(c.settlements[0].status).toBe("차이");
   });
 });
+
+describe("달력 N일 규칙 (삼성카드)", () => {
+  const cal = { channel: "card_samsung", mode: "calendar" as const, days: 2, weekday: 0 };
+  it("달력으로 2일 뒤, 주말이면 다음 월요일", async () => {
+    const { payoutDate } = await import("./settlement");
+    expect(payoutDate("2026-09-01", cal)).toBe("2026-09-03"); // 화 → 목
+    expect(payoutDate("2026-09-18", cal)).toBe("2026-09-21"); // 금 → 일 → 월
+    expect(payoutDate("2026-09-19", cal)).toBe("2026-09-21"); // 토 → 월
+    expect(payoutDate("2026-09-13", cal)).toBe("2026-09-15"); // 일 → 화
+  });
+  it("공휴일도 건너뛴다", async () => {
+    const { payoutDate } = await import("./settlement");
+    expect(payoutDate("2026-09-22", cal, ["2026-09-24", "2026-09-25"])).toBe("2026-09-28"); // 화 → 목(추석) → 월
+  });
+});

@@ -22,7 +22,7 @@ const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 
 export function ruleText(rule: SettlementRule | undefined): string {
   if (!rule) return "정산 규칙 없음";
-  const base = rule.mode === "weekly" ? `매주 ${DOW[rule.weekday]}요일` : `매출일 + ${rule.days}영업일`;
+  const base = rule.mode === "weekly" ? `매주 ${DOW[rule.weekday]}요일` : rule.mode === "calendar" ? `매출일 + ${rule.days}일(쉬는 날이면 다음 영업일)` : `매출일 + ${rule.days}영업일`;
   return rule.manual ? `${base} (직접 출금 신청)` : base;
 }
 

@@ -131,7 +131,7 @@ export default function SettlementSection({
                   <div className="flex justify-between">
                     <span className="font-semibold">{c.name}</span>
                     <span className="text-stone-600">
-                      {!r ? <span className="text-stone-400">규칙 없음 (직접 입력)</span> : r.mode === "days" ? `매출일 + ${r.days}영업일` : `매주 ${DOW[r.weekday]}요일에 지난주분`}
+                      {!r ? <span className="text-stone-400">규칙 없음 (직접 입력)</span> : r.mode === "days" ? `매출일 + ${r.days}영업일` : r.mode === "calendar" ? `매출일 + ${r.days}일 (쉬는 날이면 다음 영업일)` : `매주 ${DOW[r.weekday]}요일에 지난주분`}
                       {r?.manual && <span className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-900">직접 출금</span>}
                     </span>
                   </div>
@@ -165,9 +165,10 @@ export default function SettlementSection({
                   >
                     <option value="none">규칙 없음</option>
                     <option value="days">+N영업일</option>
+                    <option value="calendar">+N일(달력)</option>
                     <option value="weekly">주 단위</option>
                   </select>
-                  {has && r.mode === "days" ? (
+                  {has && (r.mode === "days" || r.mode === "calendar") ? (
                     <input aria-label={`${c.name} 영업일 수`} inputMode="numeric" className="field num text-right" value={r.days} onChange={(e) => setRule(c.id, { ...r, days: Number(e.target.value.replace(/\D/g, "")) || 0 })} />
                   ) : has ? (
                     <select aria-label={`${c.name} 입금 요일`} className="field" value={r.weekday} onChange={(e) => setRule(c.id, { ...r, weekday: Number(e.target.value) })}>
@@ -180,7 +181,7 @@ export default function SettlementSection({
                   ) : (
                     <span />
                   )}
-                  <span className="text-[11px] text-stone-500">{has && r.mode === "days" ? "영업일" : ""}</span>
+                  <span className="text-[11px] text-stone-500">{has && r.mode === "days" ? "영업일" : has && r.mode === "calendar" ? "일 뒤" : ""}</span>
                   {has && c.kind === "delivery" && (
                     <label className="col-span-4 -mt-1 flex items-center gap-2 text-[11px] text-stone-600">
                       <input type="checkbox" className="h-3.5 w-3.5 accent-orange-600" checked={!!r.manual} onChange={(e) => setRule(c.id, { ...r, manual: e.target.checked })} />
