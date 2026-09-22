@@ -788,6 +788,7 @@ const App = (() => {
         폴더 안의 <b>실행하기</b> 파일로 다시 열어주세요. 그래도 같으면 크롬이나 엣지로 열어보세요.</div></div>`;
     }
 
+    { const sp = Store.supa; if (sp.configured && !sp.signedIn && sp.libLoaded) h += `<div class="notice warn"><b>서버 로그인이 풀렸습니다.</b> 지금은 이 기기에만 저장됩니다. <button class="btn sm" data-act="supaLogin">로그인</button></div>`; }
     const ta = tankAlerts();
     if (isToday && ta.length) {
       h += `<button class="notice pin" data-act="view" data-v="tanks">🐟 <b>수조 ${ta.length}건 오늘 처리</b> — ${ta.map(esc).join(' · ')}</button>`;
@@ -2652,6 +2653,7 @@ const App = (() => {
       <input type="number" class="tkIn" data-act="tankCycle" data-k="clean" data-f="late" value="${_c.clean.late}" min="1"></div>`;
 
     h += acctSettings();
+    h += serverSettings();
     h += `<div class="hd sub2"><h3>백업</h3></div>
       <div class="setrow"><span>마지막 백업</span><span class="v">${S.settings.lastBackup || '없음'}</span></div>
       <div class="rowbtns">
@@ -3025,6 +3027,30 @@ const App = (() => {
     }, '확정');
   }
 
+  /* 설정 › 서버 연결 (Supabase 실시간 동기화) */
+  function serverSettings() {
+    const sp = Store.supa;
+    const state = !sp.libLoaded ? '<span class="chip missed">연결 도구를 못 불러옴 — 인터넷 확인</span>' : sp.signedIn ? `<span class="chip today">연결됨</span> <small class="mut">${esc(sp.email || '')}</small>` : sp.configured ? '<span class="chip crit">로그인 필요</span>' : '<span class="chip missed">미연결 — 이 기기에만 저장 중</span>';
+    return `<div class="hd sub2"><h3>서버 연결 — 실시간 동기화</h3></div>
+      <p class="hint">Supabase 서버에 연결하면 매장 아이패드 · 사장님 폰 · PC가 같은 기록을 실시간으로 봅니다. 설정 순서는 <code>서버/README.md</code>. 열쇠는 이 기기에만 저장됩니다.</p>
+      <div class="setrow"><span>상태</span><span class="v">${state}</span></div>
+      <div class="setrow"><span>Project URL</span><input class="num wide2" data-act="supaUrl" value="${esc(sp.url || '')}" placeholder="https://xxxx.supabase.co" autocomplete="off"${sp.signedIn ? ' disabled' : ''}></div>
+      <div class="setrow"><span>anon 키 <div class="hint">공개용 키. service_role 키는 넣지 마세요.</div></span><input type="password" class="num wide2" data-act="supaKey" value="${esc((JSON.parse(localStorage.getItem('hm.supa') || 'null') || {}).key || '')}" placeholder="eyJ…" autocomplete="off"${sp.signedIn ? ' disabled' : ''}></div>
+      <div class="rowbtns">${sp.signedIn ? `<button class="btn" data-act="supaLogout">로그아웃</button><button class="btn ghost danger" data-act="supaClear">연결 해제</button>` : `<button class="btn primary" data-act="supaLogin"${sp.configured ? '' : ' disabled'}>로그인</button>${sp.configured ? '<button class="btn ghost danger" data-act="supaClear">설정 지우기</button>' : ''}</div>`}
+      <p class="hint">${sp.signedIn ? '이 기기의 변경은 곧바로 서버에 올라가고, 다른 기기의 변경은 1~2초 안에 이 화면에 나타납니다.' : '주소와 키를 넣으면 로그인 버튼이 켜집니다. 처음 연결하는 기기의 기록이 서버에 올라가니, 기록이 있는 기기부터 연결하세요.'}</p>`;
+  }
+  function supaLoginModal() {
+    modal('서버 로그인 — 매장 공용 계정', `<label>이메일<input id="suE" type="email" autocomplete="username" placeholder="store@example.com"></label>
+      <label>비밀번호<input id="suP" type="password" autocomplete="current-password"></label>
+      <p class="hint">Supabase › Authentication › Users 에서 만든 계정입니다. 기기마다 한 번만 로그인하면 계속 유지됩니다.</p>`, () => {
+      const e = $('#suE').value.trim(), pw = $('#suP').value;
+      if (!e || !pw) { alert('이메일과 비밀번호를 넣어 주세요.'); return false; }
+      const btn = $('#modal [data-act="mOk"]'); if (btn) { btn.disabled = true; btn.textContent = '연결 중…'; }
+      Store.flush().then(() => Store.supaSignIn(e, pw)).then(() => { closeModal(); banner('서버에 연결했습니다', '앱을 다시 불러옵니다.'); setTimeout(() => location.reload(), 600); })
+        .catch((err) => { if (btn) { btn.disabled = false; btn.textContent = '로그인'; } alert('로그인 실패: ' + (err && err.message ? err.message : err)); });
+      return false;
+    }, '로그인');
+  }
   /* 설정 화면의 고정비 · 급여 기준 칸 */
   function acctSettings() {
     const fc = fixedList();
@@ -4371,6 +4397,9 @@ const App = (() => {
           break;
         }
         case 'showReport': showReport(b.dataset.k || viewKey()); break;
+        case 'supaLogin': supaLoginModal(); break;
+        case 'supaLogout': { if (!confirm('서버 로그아웃할까요? 이 기기 기록은 남고, 동기화만 멈춥니다.')) return; Store.flush().then(() => Store.supaSignOut()).then(() => location.reload()); break; }
+        case 'supaClear': { if (!confirm('서버 주소와 열쇠를 이 기기에서 지울까요? 기록은 남습니다.')) return; Store.supaSignOut().then(() => { Store.supaSetConfig('', ''); location.reload(); }); break; }
         case 'export': doExport(); break;
         case 'import': doImport(); break;
         case 'reset': {
@@ -4428,6 +4457,10 @@ const App = (() => {
         const v = b.value; if (v && v <= dateKey()) S.ui[b.dataset.act] = v;
         if (S.ui.sfrom && S.ui.sto && S.ui.sfrom > S.ui.sto) S.ui.sto = S.ui.sfrom;
         save(); render();
+      }
+      if (b.dataset.act === 'supaUrl' || b.dataset.act === 'supaKey') {
+        const u = (document.querySelector('[data-act="supaUrl"]') || {}).value || '', k = (document.querySelector('[data-act="supaKey"]') || {}).value || '';
+        if (u.trim() && k.trim()) { Store.supaSetConfig(u, k); render(); }
       }
       if (b.dataset.act === 'biz') { bizOf()[b.dataset.f] = b.value.trim(); save(); }
       if (b.dataset.act === 'minWage') { S.settings.minWage = Math.max(0, Number(b.value) || 0) || MIN_WAGE.hour; save(); render(); }

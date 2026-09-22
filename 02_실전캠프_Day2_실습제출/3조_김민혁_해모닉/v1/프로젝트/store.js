@@ -18,7 +18,13 @@ const Store = (() => {
      매장 상태는 본문(kv/state:매장) + 월별 날짜 조각(kv/state:매장/days/YYYY-MM)으로
      쪼개 올린다 — 문서 하나 256KB 제한 때문에 날짜 기록을 통째로 넣을 수 없다.
      'meta'(지금 보는 매장)는 기기마다 다른 게 맞으므로 올리지 않는다. */
-  let cloud = null;            // db 네임스페이스
+  let cloud = null;            // db 네임스페이스 (claude.ai 아티팩트)
+  /* Supabase 서버 — v2. 설정 › 서버 연결에 주소·anon 키를 붙여넣고 매장 공용 계정으로 로그인하면 켜진다.
+     문서 하나를 표 docs 의 한 줄(key, doc jsonb, saved_at)로 통째로 저장한다 — 256KB 제한이 없어 조각내지 않는다. */
+  const SUPA_KEY = 'hm.supa';
+  let supa = null;             // { client, url, email } 로그인까지 된 상태
+  let supaCfg = null;          // { url, key } 저장된 설정 (로그인 전에도 있음)
+  const cloudOn = () => !!(supa || cloud);
   let cloudErr = null;         // 마지막 클라우드 오류 코드
   let remoteCb = null;         // 다른 기기에서 바뀌었을 때 앱에 알린다
   const lastUp = {};           // key -> 우리가 마지막으로 올린 savedAt (내 쓰기 되돌아오는 것 무시용)
@@ -109,6 +115,16 @@ const Store = (() => {
   }
 
   async function cloudGet(k, known) {
+    if (supa) {
+      try {
+        const { data, error } = await supa.client.from('docs').select('doc, saved_at').eq('key', k).maybeSingle();
+        if (error) throw error;
+        if (!data || !data.doc) return null;
+        const doc = data.doc; if (doc.savedAt == null) doc.savedAt = Number(data.saved_at) || 0;
+        if (cloudErr) { cloudErr = null; document.dispatchEvent(new Event('cloud-status')); }
+        return doc;
+      } catch (e) { cloudFail(e); return null; }
+    }
     try {
       const snap = await cloud.doc('kv/' + k).get();
       if (!snap.exists) return null;
@@ -135,6 +151,15 @@ const Store = (() => {
   }
 
   async function cloudPut(k, v) {
+    if (supa) {
+      try {
+        lastUp[k] = v.savedAt;
+        const { error } = await supa.client.from('docs').upsert({ key: k, doc: v, saved_at: v.savedAt || Date.now(), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+        if (error) throw error;
+        if (cloudErr) { cloudErr = null; document.dispatchEvent(new Event('cloud-status')); }
+        return true;
+      } catch (e) { cloudFail(e); return false; }
+    }
     try {
       const core = { ...v };
       if (k.startsWith('state:')) {
@@ -178,7 +203,7 @@ const Store = (() => {
 
   async function getDoc(k) {
     const local = await localGet(k);
-    if (!cloud || !CLOUD_KEYS(k)) return local;
+    if (!cloudOn() || !CLOUD_KEYS(k)) return local;
     const remote = await cloudGet(k, local && local.blobs);
     if (remote && (!local || (remote.savedAt || 0) >= (local.savedAt || 0))) {
       await localPut(k, remote);          // 로컬은 캐시 — 오프라인에 대비해 최신본을 남겨둔다
@@ -191,14 +216,34 @@ const Store = (() => {
 
   async function putDoc(k, v) {
     const ok = await localPut(k, v);
-    if (cloud && CLOUD_KEYS(k)) await cloudPut(k, v);
+    if (cloudOn() && CLOUD_KEYS(k)) await cloudPut(k, v);
     return ok;
   }
 
   /* 다른 기기의 변경을 듣는다 — 내 쓰기가 되돌아오는 것(savedAt 같거나 이전)은 무시 */
+  function supaWatch(k, list) {
+    let timer = null;
+    const poke = (savedAt) => {
+      if (!(savedAt > (lastUp[k] || 0))) return;
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        if (pending && k === curKey) return;   // 내 쪽에 아직 안 올라간 변경이 있으면 그게 곧 이긴다
+        const doc = await cloudGet(k, null);
+        if (!doc || !(doc.savedAt > (lastUp[k] || 0))) return;
+        lastUp[k] = doc.savedAt;
+        await localPut(k, doc);
+        if (remoteCb) remoteCb(k, doc);
+      }, 300);
+    };
+    const ch = supa.client.channel('doc-' + k.replace(/[^a-zA-Z0-9]/g, '_'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'docs', filter: 'key=eq.' + k }, (payload) => { const row = payload.new || {}; poke(Number(row.saved_at) || 0); })
+      .subscribe();
+    list.push(() => { try { supa.client.removeChannel(ch); } catch (_) { /* 무시 */ } });
+  }
   function watch(k) {
     unsubs.forEach((u) => u()); unsubs = [];
-    if (!cloud || !CLOUD_KEYS(k)) return;
+    if (!cloudOn() || !CLOUD_KEYS(k)) return;
+    if (supa) { supaWatch(k, unsubs); return; }
     let timer = null;
     const poke = (savedAt) => {
       if (!(savedAt > (lastUp[k] || 0))) return;
@@ -221,6 +266,39 @@ const Store = (() => {
       if (qs.metadata.hasPendingWrites) return;
       qs.docChanges().forEach((c) => { const b = c.doc.data(); if (b) poke(b.savedAt || 0); });
     }, onErr));
+  }
+
+  /* ── Supabase 서버 연결 ── */
+  function supaConfig() { try { supaCfg = JSON.parse(localStorage.getItem(SUPA_KEY) || 'null'); } catch (e) { supaCfg = null; } return supaCfg; }
+  async function connectSupa() {
+    supa = null;
+    const cfg = supaConfig();
+    if (!cfg || !cfg.url || !cfg.key || !window.supabase || !window.supabase.createClient) return null;
+    try {
+      const client = window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: true, autoRefreshToken: true } });
+      const { data } = await client.auth.getSession();
+      if (!data || !data.session) return null;   // 설정은 있지만 로그인 전
+      supa = { client, url: cfg.url, email: data.session.user && data.session.user.email };
+      client.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { supa = null; document.dispatchEvent(new Event('cloud-status')); } });
+      return supa;
+    } catch (e) { cloudFail(e); return null; }
+  }
+  function supaSetConfig(url, key) {
+    if (!url || !key) { localStorage.removeItem(SUPA_KEY); supaCfg = null; supa = null; return; }
+    localStorage.setItem(SUPA_KEY, JSON.stringify({ url: url.trim().replace(/\/+$/, ''), key: key.trim() }));
+    supaConfig();
+  }
+  async function supaSignIn(email, password) {
+    const cfg = supaConfig();
+    if (!cfg || !window.supabase) throw new Error('서버 주소와 열쇠를 먼저 넣어 주세요.');
+    const client = window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: true, autoRefreshToken: true } });
+    const { error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return true;
+  }
+  async function supaSignOut() {
+    if (supa) { try { await supa.client.auth.signOut(); } catch (_) { /* 무시 */ } }
+    supa = null;
   }
 
   /* 아티팩트 안에서만 응답한다. 파일로 열었거나 PC 서버로 열었으면 조용히 로컬만 쓴다. */
@@ -262,6 +340,7 @@ const Store = (() => {
     else { mode = 'none'; writable = false; }
 
     cloud = await connectCloud();
+    await connectSupa();
 
     meta = await getDoc('meta');
     if (!meta) {
@@ -340,7 +419,8 @@ const Store = (() => {
   function watchShared(name) {
     const k = 'shared:' + name;
     unsubs2.forEach((u) => u()); unsubs2 = [];
-    if (!cloud) return;
+    if (!cloudOn()) return;
+    if (supa) { supaWatch(k, unsubs2); return; }
     let timer = null;
     unsubs2.push(cloud.doc('kv/' + k).onSnapshot((snap) => {
       if (!snap.exists || snap.metadata.hasPendingWrites) return;
@@ -359,14 +439,16 @@ const Store = (() => {
 
   return {
     init, load, save, flush, setMeta, switchTo, dumpAll, restoreAll, loadStore, saveStore, loadShared, saveShared, watchShared,
+    supaSetConfig, supaSignIn, supaSignOut,
+    get supa() { const cfg = supaCfg || supaConfig(); return { configured: !!(cfg && cfg.url && cfg.key), url: cfg ? cfg.url : '', signedIn: !!supa, email: supa ? supa.email : '', libLoaded: !!(window.supabase && window.supabase.createClient) }; },
     get mode() { return mode; },
     get ok() { return writable; },
     get label() {
       const l = { idb: 'IndexedDB', ls: '브라우저 저장소 (localStorage)', none: '저장 안 됨' }[mode];
-      return cloud ? `클라우드 동기화 (claude.ai) + ${l} 캐시` : l;
+      return supa ? `서버 실시간 동기화 (Supabase) + ${l} 캐시` : cloud ? `클라우드 동기화 (claude.ai) + ${l} 캐시` : l;
     },
     get meta() { return meta; },
-    get cloud() { return !!cloud; },
+    get cloud() { return cloudOn(); },
     get cloudErr() { return cloudErr; },
     onRemote(cb) { remoteCb = cb; },
     BLOB_CHUNK,
