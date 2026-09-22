@@ -13,6 +13,9 @@ import { compareLines, computePnl, type PnlLine } from "@/lib/pnl";
 import { getStore } from "@/lib/storage";
 import { monthSummary } from "@/lib/daily";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
+import { PURCHASES_KEY_PREFIX, type Purchase } from "@/lib/costing/purchases";
+import { buildTaxSheets, taxFileName } from "@/lib/taxExport";
+import type { Transaction } from "@/lib/types";
 
 export default function PnlPage() {
   const { month } = useMonth();
@@ -152,6 +155,8 @@ export default function PnlPage() {
         )}
       </section>
 
+      <TaxExportCard month={month} txs={ledger.txs} needsReview={pnl.needsReview} closed={closed} />
+
       {asking && (
         <ConfirmDialog title="확인이 필요한 줄이 남아 있어요" confirmLabel="그래도 마감" onConfirm={close} onCancel={() => setAsking(false)}>
           <p>
@@ -197,5 +202,49 @@ function PnlRow({ line, diff, open, onToggle, estimated = false }: { line: PnlLi
         </ul>
       )}
     </li>
+  );
+}
+
+// 세무사용 엑셀 — 파일만 만든다. 보내는 건 사장님이 직접 (자동 전송 없음)
+function TaxExportCard({ month, txs, needsReview, closed }: { month: string; txs: Transaction[]; needsReview: number; closed: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  async function download() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const store = getStore();
+      const [sales, purchases] = await Promise.all([store.listDailySales(month), store.getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + month)]);
+      const sheets = buildTaxSheets(month, txs, sales, purchases ?? []);
+      const XLSX = await import("xlsx");
+      const wb = XLSX.utils.book_new();
+      for (const sh of sheets) {
+        const ws = XLSX.utils.aoa_to_sheet(sh.rows);
+        ws["!cols"] = sh.rows[0].map((h, i) => ({ wch: Math.max(8, String(h).length * 2, ...sh.rows.slice(1, 200).map((r) => String(r[i] ?? "").length + 2)) }));
+        XLSX.utils.book_append_sheet(wb, ws, sh.name);
+      }
+      XLSX.writeFile(wb, taxFileName(month));
+      setMsg(`${taxFileName(month)} 파일을 저장했어요 (다운로드 폴더). 세무사님께는 사장님이 직접 보내 주세요.`);
+    } catch (e) {
+      setMsg(`파일을 만들지 못했어요 (${e instanceof Error ? e.message : e})`);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="card space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-bold">세무사용 엑셀</p>
+          <p className="text-[11px] text-stone-500">{monthLabel(month)} · 거래내역 · 분류별 합계 · 매출(일별 카드·현금·배달) · 매입 영수증</p>
+        </div>
+        <button className="btn-ghost whitespace-nowrap text-sm" disabled={busy} onClick={() => void download()}>
+          {busy ? "만드는 중…" : "엑셀 받기"}
+        </button>
+      </div>
+      {needsReview > 0 && <Notice tone="warn">확인이 필요한 줄 {needsReview}줄이 “미분류”로 들어가요. 올리기 탭에서 먼저 분류하면 깔끔해요.</Notice>}
+      {!closed && needsReview === 0 && <p className="text-[11px] text-stone-500">마감 전에도 받을 수 있어요. 보통은 마감한 뒤에 받아서 보내요.</p>}
+      {msg && <Notice tone="ok">{msg}</Notice>}
+    </section>
   );
 }
