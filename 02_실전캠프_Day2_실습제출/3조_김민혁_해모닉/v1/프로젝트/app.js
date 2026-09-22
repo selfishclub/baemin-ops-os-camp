@@ -1177,10 +1177,11 @@ const App = (() => {
         return { key: sg.key, name: sg.name, time: sg.time, need: { weekday: base, friday: base, saturday: peak, holiday: peak } };
       });
     }
-    /* 낮 구간(오후 조 시작 전) 최소 인원은 2명이면 충분 — 사장님 결정 2026-09-23. 한 번만 맞추고 표시해 둔다 (운영 기준에서 다시 바꿀 수 있다) */
-    if (!sc.needVer) {
-      sc.segments.forEach((sg) => { if (!segIsPm(sg)) sg.need = { weekday: 2, friday: 2, saturday: 2, holiday: 2 }; });
-      sc.needVer = 1;
+    /* 최소 인원 기준은 쓰지 않는다 — 사장님 결정 2026-09-23: 근무표는 캘린더대로 2명·3명을 그대로 넣고 부족 표시는 없앤다.
+       한 번만 0으로 맞추고 표시해 둔다. 운영 기준 화면에서 다시 숫자를 넣으면 부족 표시가 되살아난다. */
+    if ((sc.needVer || 0) < 2) {
+      sc.segments.forEach((sg) => { sg.need = { weekday: 0, friday: 0, saturday: 0, holiday: 0 }; });
+      sc.needVer = 2;
     }
     if (!sc.holidays) sc.holidays = HOLIDAYS_KR.map((h) => ({ ...h }));
     if (!sc.days) sc.days = {};
@@ -1212,6 +1213,7 @@ const App = (() => {
     return { date, seg, workers: x.workers, leave: x.leave, active, assigned: active.length, minimum, diff: active.length - minimum };
   }
   const dayRows = (date) => segList().map((sg) => segRow(date, sg));
+  const needsOn = () => segList().some((sg) => Object.values(sg.need || {}).some((v) => Number(v) > 0));
   function dayState(rows) {
     const short = rows.filter((r) => r.diff < 0).sort((p2, q) => p2.diff - q.diff);
     if (short.length) return { state: 'short', text: `${short[0].seg.name} ${-short[0].diff}명 부족`, count: short.length };
@@ -1347,15 +1349,17 @@ const App = (() => {
       <button class="btn sm" data-act="seRules">⚙ 운영 기준·공휴일</button>
     </div>`;
 
+    const nOn = needsOn();
     h += `<div class="ovGrid">
-      <button class="ov red" data-act="schedTab" data-t="short"><span class="ovIcon">!</span><span><small>${monthLabel(m)} 부족 현황</small><b>${shortDays}일 · ${shortRows.length}개 구간</b><em>필요한 날짜만 모아서 확인</em></span></button>
+      ${nOn ? `<button class="ov red" data-act="schedTab" data-t="short"><span class="ovIcon">!</span><span><small>${monthLabel(m)} 부족 현황</small><b>${shortDays}일 · ${shortRows.length}개 구간</b><em>필요한 날짜만 모아서 확인</em></span></button>`
+        : `<div class="ov"><span class="ovIcon green">✓</span><span><small>최소 인원 기준</small><b>사용 안 함</b><em>캘린더대로 넣습니다 · 운영 기준에서 켤 수 있음</em></span></div>`}
       <div class="ov"><span class="ovIcon blue">人</span><span><small>이번 달 배치 근무자</small><b>총 ${people.size}명</b><em>실제 배치된 고유 인원</em></span></div>
       <div class="ov"><span class="ovIcon amber">休</span><span><small>휴가·부재 표시</small><b>${leaveN}건</b><em>배치 인원에서 자동 제외</em></span></div>
       <div class="ov"><span class="ovIcon green">✓</span><span><small>등록 공휴일</small><b>${holN}일</b><em>일요일과 같은 기준 적용</em></span></div>
     </div>`;
 
     h += `<div class="filters" style="margin:12px 0 10px">
-      ${[['cal', '달력'], ['short', `부족 인원 ${shortRows.length}`], ['log', '변경 이력']].map(([k, n]) => `<button class="fl${schedTab === k ? ' on' : ''}" data-act="schedTab" data-t="${k}">${n}</button>`).join('')}
+      ${[['cal', '달력'], ...(nOn ? [['short', `부족 인원 ${shortRows.length}`]] : []), ['log', '변경 이력']].map(([k, n]) => `<button class="fl${schedTab === k ? ' on' : ''}" data-act="schedTab" data-t="${k}">${n}</button>`).join('')}
     </div>`;
 
     if (schedTab === 'short') {
@@ -1396,7 +1400,7 @@ const App = (() => {
       h += `<button class="dc${inM ? '' : ' out'}${k === sel ? ' sel' : ''}${k === todayK ? ' now' : ''}" data-act="mpick" data-k="${k}" aria-label="${mdLabel(k)}">
         <span class="dl"><b>${d.getDate()}</b>${hol ? `<em>${esc(hol.name)}</em>` : ''}${k === todayK ? '<i>오늘</i>' : ''}</span>
         ${names.length ? `<span class="pl">${names.slice(0, 2).map(esc).join(', ')}${names.length > 2 ? ` 외 ${names.length - 2}명` : ''}</span>` : ''}
-        ${!inM ? '' : st ? `<span class="sl ${st.state}"><i>${st.state === 'short' ? '!' : '✓'}</i>${st.text}</span>` : `<span class="sl empty">배치 없음</span>`}
+        ${!inM ? '' : st ? (nOn ? `<span class="sl ${st.state}"><i>${st.state === 'short' ? '!' : '✓'}</i>${st.text}</span>` : (() => { const sp = dayCrewSplit(k); return sp ? `<span class="sl ok"><i>·</i>오전 ${sp.am.length} · 오후 ${sp.pm.length}</span>` : ''; })()) : `<span class="sl empty">배치 없음</span>`}
       </button>`;
     }
     h += `</div></div>`;
@@ -1409,15 +1413,16 @@ const App = (() => {
     const d = new Date(date + 'T00:00:00');
     let h = `<div class="dtHead"><div><div class="eyebrow">선택한 날짜</div><h3>${mdLabel(date)} ${WD[d.getDay()]}요일</h3></div>
       ${hol ? `<span class="holBadge">${esc(hol.name)}</span>` : `<span class="mut" style="font-size:12px">${KIND_LABEL[dayKind(date)]} 기준</span>`}</div>`;
-    h += !any ? `<div class="dayAlert empty"><span>·</span><div><b>아직 배치가 없습니다</b><small>아래 버튼으로 구간별 근무자를 넣거나 전날 배치를 복사하세요</small></div></div>`
+    h += !any ? `<div class="dayAlert empty"><span>·</span><div><b>아직 배치가 없습니다</b><small>아래 버튼으로 오전·오후 조를 넣거나 전날 배치를 복사하세요</small></div></div>`
+      : !needsOn() ? ''
       : st.state === 'short' ? `<div class="dayAlert"><span>!</span><div><b>${st.count}개 시간대에 인력이 부족합니다</b><small>${esc(st.text)}</small></div></div>`
       : `<div class="dayAlert ok"><span>✓</span><div><b>모든 시간대 인원이 충족됐습니다</b><small>휴가자와 퇴사자는 배치 인원에서 제외됩니다</small></div></div>`;
     h += `<div class="shiftList">${rows.map((r) => `<section class="shiftRow">
       <div class="shiftTitle"><span><b>${esc(r.seg.name)}</b><small>${esc(r.seg.time)}</small></span>
-        <span class="avail ${r.diff < 0 ? 'short' : 'ok'}">${r.diff < 0 ? `${-r.diff}명 부족` : r.diff > 0 ? `${r.diff}명 여유` : '인원 충족'}</span></div>
+        ${needsOn() ? `<span class="avail ${r.diff < 0 ? 'short' : 'ok'}">${r.diff < 0 ? `${-r.diff}명 부족` : r.diff > 0 ? `${r.diff}명 여유` : '인원 충족'}</span>` : `<span class="avail ok">${r.assigned}명</span>`}</div>
       <div class="wchips">${r.active.map((w) => `<span class="wchip"><b>${esc(w.name)}</b>${w.leader ? '<em>구간 책임자</em>' : ''}${w.special ? '<em>휴무일 출근</em>' : ''}${w.type && w.type !== 'regular' ? `<em class="tb ${empCls(w.type)}">${esc(empLabel(w.type))}</em>` : ''}${w.note ? `<small>${esc(fmtNote(w.note))}</small>` : ''}</span>`).join('') || '<span class="mut" style="font-size:12.5px">배치 없음</span>'}</div>
       ${r.leave.length ? `<div class="leaveLine"><b>휴가·부재</b> ${r.leave.map(esc).join(', ')} <small>배치 인원에서 제외</small></div>` : ''}
-      <div class="countLine"><span>배치 ${r.assigned}명</span><span>필요 ${r.minimum}명</span></div>
+      ${needsOn() ? `<div class="countLine"><span>배치 ${r.assigned}명</span><span>필요 ${r.minimum}명</span></div>` : ''}
     </section>`).join('')}</div>`;
     { const sp = dayCrewSplit(date);
       h += `<div class="notice" style="margin-top:8px"><b>오전 조</b> ${sp && sp.am.length ? sp.am.map(esc).join(', ') : '<span class="mut">없음</span>'} <span class="mut">(${sp ? sp.am.length : 0}명)</span><br>
@@ -1440,8 +1445,8 @@ const App = (() => {
     const cand = S.staff.filter((x) => x.active && !r.workers.some((w) => w.name === x.name));
     const d = new Date(date + 'T00:00:00');
     const body = `
-      <div class="segTabs">${rows.map((x) => `<button type="button" class="${x.seg.key === seg.key ? 'on' : ''}" data-act="seTab" data-k="${date}" data-seg="${x.seg.key}">${esc(x.seg.name)}<small class="${x.diff < 0 ? 'short' : ''}">${x.diff < 0 ? `${-x.diff}명 부족` : '충족'}</small></button>`).join('')}</div>
-      <div class="edStat ${r.diff < 0 ? 'short' : 'ok'}"><b>${r.diff < 0 ? `${-r.diff}명 부족` : r.diff > 0 ? `${r.diff}명 여유` : '필요 인원 충족'}</b><span>배치 ${r.assigned}명 · 필요 ${r.minimum}명 (${KIND_LABEL[dayKind(date)]}) · ${esc(seg.time)}</span></div>
+      <div class="segTabs">${rows.map((x) => `<button type="button" class="${x.seg.key === seg.key ? 'on' : ''}" data-act="seTab" data-k="${date}" data-seg="${x.seg.key}">${esc(x.seg.name)}<small class="${x.diff < 0 ? 'short' : ''}">${!needsOn() ? `${x.assigned}명` : x.diff < 0 ? `${-x.diff}명 부족` : '충족'}</small></button>`).join('')}</div>
+      <div class="edStat ${r.diff < 0 ? 'short' : 'ok'}"><b>${!needsOn() ? `배치 ${r.assigned}명` : r.diff < 0 ? `${-r.diff}명 부족` : r.diff > 0 ? `${r.diff}명 여유` : '필요 인원 충족'}</b><span>${needsOn() ? `배치 ${r.assigned}명 · 필요 ${r.minimum}명 (${KIND_LABEL[dayKind(date)]}) · ` : ''}${esc(seg.time)}</span></div>
       <div class="mlabel">배치된 근무자</div>
       <div class="edWorkers">${r.workers.length ? r.workers.map((w) => { const onLeave = r.leave.includes(w.name); return `<article class="${onLeave ? 'onLeave' : ''}">
         <div><b>${esc(w.name)}</b> <span class="tb ${empCls(w.type)}">${esc(empLabel(w.type))}</span>${w.note ? `<small>${esc(fmtNote(w.note))}</small>` : ''}</div>
