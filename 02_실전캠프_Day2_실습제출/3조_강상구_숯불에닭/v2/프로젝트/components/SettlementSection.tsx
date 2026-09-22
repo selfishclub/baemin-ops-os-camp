@@ -8,6 +8,7 @@ import type { SettlementState } from "@/components/useSettlement";
 import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
 import { DEFAULT_RULES, RULE_NOTES, type SettlementRule } from "@/lib/settlement";
+import { explainOverdue } from "@/lib/overdue";
 
 const DOW = ["월", "화", "수", "목", "금", "토", "일"];
 
@@ -35,6 +36,7 @@ export default function SettlementSection({
   const [holidayText, setHolidayText] = useState(settlement.holidays.join(", "));
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [overdueOpen, setOverdueOpen] = useState<string | null>(null); // "all" | "cards" | 채널 id
   const [help, setHelp] = useState(false);
 
   const settleable = daily.channels.filter((c) => c.active && c.kind !== "cash");
@@ -58,6 +60,8 @@ export default function SettlementSection({
   if (!loaded) return null;
 
   const totalFee = results.reduce((a, r) => a + r.fee, 0);
+  const overdue = ledger.lastBankDate ? explainOverdue(results, rules, ledger.lastBankDate, name) : [];
+  const overdueShown = overdue.filter((o) => overdueOpen === "all" || (overdueOpen === "cards" ? o.channel.startsWith("card_") : o.channel === overdueOpen));
   const totalPending = results.reduce((a, r) => a + r.pending, 0);
   const totalMissing = results.reduce((a, r) => a + r.missing, 0);
   const unmatched = results.flatMap((r) => r.unmatchedDeposits.map((d) => ({ ...d, channel: r.channel })));
@@ -220,10 +224,15 @@ export default function SettlementSection({
                   <p className="text-[11px] text-stone-500">아직 안 들어옴</p>
                   <p className="font-bold">{won(totalPending)}</p>
                 </div>
-                <div className={`rounded-xl p-2 ${totalMissing > 0 ? "bg-red-50" : "bg-stone-50"}`}>
+                <button
+                  className={`rounded-xl p-2 ${totalMissing > 0 ? "bg-red-50 ring-1 ring-red-200 hover:bg-red-100" : "bg-stone-50"}`}
+                  disabled={totalMissing === 0}
+                  onClick={() => setOverdueOpen(overdueOpen === "all" ? null : "all")}
+                >
                   <p className="text-[11px] text-stone-500">입금일 지났는데 없음</p>
                   <p className={`font-bold ${totalMissing > 0 ? "text-red-600" : ""}`}>{won(totalMissing)}</p>
-                </div>
+                  {totalMissing > 0 && <p className="text-[10px] text-red-500 underline">{overdueOpen === "all" ? "접기" : "눌러서 자세히"}</p>}
+                </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[34rem] text-sm">
@@ -249,7 +258,15 @@ export default function SettlementSection({
                         <td className="text-right">{num(cardSum.fee)}</td>
                         <td className="text-right font-bold">{pctText(cardSum.salesDeposited > 0 ? Math.round((cardSum.fee / cardSum.salesDeposited) * 1000) / 10 : null)}</td>
                         <td className="text-right text-stone-500">{num(cardSum.pending)}</td>
-                        <td className={`text-right font-bold ${cardSum.missing > 0 ? "text-red-600" : "text-stone-400"}`}>{num(cardSum.missing)}</td>
+                        <td className={`text-right font-bold ${cardSum.missing > 0 ? "text-red-600" : "text-stone-400"}`}>
+                          {cardSum.missing > 0 ? (
+                            <button className="underline decoration-dotted" onClick={() => setOverdueOpen(overdueOpen === "cards" ? null : "cards")}>
+                              {num(cardSum.missing)}
+                            </button>
+                          ) : (
+                            num(cardSum.missing)
+                          )}
+                        </td>
                       </tr>
                     )}
                     {results.map((r) => (
@@ -275,7 +292,21 @@ export default function SettlementSection({
                             <td className="text-right">{num(r.fee)}</td>
                             <td className="text-right font-bold">{pctText(r.feeRate)}</td>
                             <td className="text-right text-stone-500">{num(r.pending)}</td>
-                            <td className={`text-right font-bold ${r.missing > 0 ? "text-red-600" : "text-stone-400"}`}>{num(r.missing)}</td>
+                            <td className={`text-right font-bold ${r.missing > 0 ? "text-red-600" : "text-stone-400"}`}>
+                              {r.missing > 0 ? (
+                                <button
+                                  className="underline decoration-dotted"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOverdueOpen(overdueOpen === r.channel ? null : r.channel);
+                                  }}
+                                >
+                                  {num(r.missing)}
+                                </button>
+                              ) : (
+                                num(r.missing)
+                              )}
+                            </td>
                           </>
                         )}
                       </tr>
@@ -283,6 +314,46 @@ export default function SettlementSection({
                   </tbody>
                 </table>
               </div>
+              {overdueOpen && (
+                <div className="space-y-2 rounded-xl bg-red-50 p-3 ring-1 ring-red-100">
+                  <div className="flex items-baseline justify-between">
+                    <p className="text-sm font-bold text-red-700">
+                      입금일 지났는데 없는 돈 {overdueOpen === "all" ? "" : overdueOpen === "cards" ? "· 카드" : `· ${name(overdueOpen)}`} <span className="num">{overdueShown.length}건 · {won(overdueShown.reduce((a, o) => a + o.sales, 0))}</span>
+                    </p>
+                    <button className="text-xs text-stone-500 underline" onClick={() => setOverdueOpen(null)}>
+                      닫기
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-stone-600">통장은 {ledger.lastBankDate?.slice(5).replace("-", "/")}까지 올라와 있어요. 그 날짜까지 들어왔어야 하는데 짝이 안 맞은 매출이에요.</p>
+                  {overdueShown.length === 0 && <p className="text-xs text-stone-500">해당하는 줄이 없어요.</p>}
+                  <ul className="space-y-2">
+                    {overdueShown.map((o) => (
+                      <li key={o.channel + o.payout} className="rounded-lg bg-white p-2 text-xs">
+                        <div className="num flex flex-wrap items-baseline justify-between gap-2">
+                          <p className="text-sm font-semibold">
+                            {name(o.channel)} · {o.from === o.to ? `${o.from.slice(5).replace("-", "/")} 매출` : `${o.from.slice(5).replace("-", "/")}~${o.to.slice(5).replace("-", "/")} 매출`}
+                          </p>
+                          <p className="text-sm font-bold text-red-600">{won(o.sales)}</p>
+                        </div>
+                        <p className="num mt-0.5 text-stone-600">
+                          들어왔어야 할 날 <b>{o.payout.slice(5).replace("-", "/")}</b>
+                          {o.daysLate > 0 ? ` · 통장 기준 ${o.daysLate}일 지남` : " · 올린 통장의 마지막 날이 입금일"} · 규칙: {o.rule}
+                        </p>
+                        {o.nearby.length > 0 && (
+                          <p className="num mt-1 text-stone-500">
+                            근처의 짝 없는 입금: {o.nearby.map((n) => `${n.date.slice(5).replace("-", "/")} ${n.sameChannel ? "" : name(n.channel) + " "}${num(n.amount)}원`).join(" · ")}
+                          </p>
+                        )}
+                        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-stone-700">
+                          {o.hints.map((h, i) => (
+                            <li key={i}>{h}</li>
+                          ))}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {open && results.some((r) => r.channel === open) && (
                 <div className="overflow-x-auto rounded-xl bg-stone-50 p-2">
                   <table className="w-full min-w-[30rem] text-xs">
