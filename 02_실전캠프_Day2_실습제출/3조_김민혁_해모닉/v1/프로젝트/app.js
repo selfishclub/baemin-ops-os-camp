@@ -70,6 +70,67 @@ const App = (() => {
 
   const tpl = (id) => S.templates.find((t) => t.id === id);
 
+  /* ── 적용 매장(scope): 'all' 공통 · 'ansan' 안산점만 · 'anyang' 안양점만 ──
+     루틴은 매장 문서마다 복사돼 있으므로, 매장 전용으로 바꾸면 다른 매장 문서에서 빼고(hiddenTpl 에 기록해 새 판에서도 안 살아남),
+     공통으로 바꾸면 다른 매장 문서에 넣는다 — 사장님 요청 2026-09-23 (안산·안양 매장 구조가 다름) */
+  const tplScope = (t) => t.scope || t.store || 'all';
+  const scopeName = (s) => (s === 'all' ? '공통' : (((Store.meta && Store.meta.stores) || []).find((x) => x.id === s) || {}).name || s);
+  async function applyScope(t, newScope) {
+    const cur = Store.meta.current, other = (Store.meta.stores || []).find((x) => x.id !== cur);
+    const tk = dateKey();
+    t.scope = newScope; t.edited = { ...(t.edited || {}), scope: true };
+    if (newScope === (other && other.id)) {            // 이 매장에서 뺀다
+      S.templates = S.templates.filter((x) => x.id !== t.id);
+      S.hiddenTpl = [...new Set([...(S.hiddenTpl || []), t.id])];
+      const td = S.days[tk]; if (td && td.inst[t.id] && td.inst[t.id].s !== 'done') delete td.inst[t.id];
+    } else S.hiddenTpl = (S.hiddenTpl || []).filter((id) => id !== t.id);
+    save(); render();
+    if (!other) return;
+    let doc = await Store.loadStore(other.id); if (!doc) doc = freshState(other.id);
+    doc.templates = doc.templates || []; doc.days = doc.days || {};
+    const idx = doc.templates.findIndex((x) => x.id === t.id);
+    if (newScope === cur) {                              // 다른 매장에서 뺀다
+      if (idx >= 0) doc.templates.splice(idx, 1);
+      doc.hiddenTpl = [...new Set([...(doc.hiddenTpl || []), t.id])];
+      const od = doc.days[tk]; if (od && od.inst[t.id] && od.inst[t.id].s !== 'done') delete od.inst[t.id];
+    } else {                                             // 공통 · 다른 매장만 → 다른 매장에 있어야 한다
+      doc.hiddenTpl = (doc.hiddenTpl || []).filter((id) => id !== t.id);
+      const copy = { ...t }; delete copy.ord;
+      if (idx >= 0) doc.templates[idx] = { ...doc.templates[idx], ...copy, ord: doc.templates[idx].ord }; else doc.templates.push(copy);
+      const od = doc.days[tk]; if (od && !od.inst[t.id]) { const r = instFor(copy, new Date(tk + 'T00:00:00')); if (r) od.inst[t.id] = r; }
+    }
+    await Store.saveStore(other.id, doc);
+    banner(`"${t.title}" — ${scopeName(newScope)}${newScope === 'all' ? '' : '만'}`, newScope === 'all' ? `${other.name}에도 넣었습니다` : newScope === cur ? `${other.name}에서 뺐습니다` : `${other.name}으로 옮겼습니다`);
+  }
+
+  /* 업무 새로 만들기 — 매장 전용 업무를 위해. 만든 업무는 새 루틴 판이 나와도 남는다(custom) */
+  function newTplModal() {
+    const cur = Store.meta.current, other = (Store.meta.stores || []).find((x) => x.id !== cur);
+    modal('업무 추가', `
+      <label>이름<input id="nT" placeholder="예: 2층 룸 환기" autocomplete="off"></label>
+      <div class="row2"><label>시각<input type="time" id="nTime" value="11:00"></label>
+        <label>시간대<select id="nSlot">${SLOTS.map((sl) => `<option value="${sl.key}">${sl.name}</option>`).join('')}</select></label></div>
+      <label>담당<select id="nRole">${ROLE_OPTS.map((r) => `<option>${r}</option>`).join('')}</select></label>
+      <label>적용 매장<select id="nScope"><option value="${cur}">${esc(storeName())}만</option><option value="all">공통 (두 매장)</option>${other ? `<option value="${other.id}">${esc(other.name)}만</option>` : ''}</select></label>
+      <label>안내 메모 <span class="opt">선택</span><textarea id="nMemo" rows="2"></textarea></label>
+      <div class="mlabel">반복 — 요일을 안 고르면 매일</div>
+      <div id="nDays" class="roles wrap">${WD.map((n, i) => `<button type="button" class="rl day" data-d="${i}">${n}</button>`).join('')}</div>
+      <label class="chk"><input type="checkbox" id="nCrit"> 중요 업무 (알림 · 리포트에 따로 표시)</label>`, () => {
+      const title = $('#nT').value.trim(); if (!title) { alert('이름을 넣어 주세요.'); return false; }
+      const time = $('#nTime').value; if (!/^\d{2}:\d{2}$/.test(time)) { alert('시각을 넣어 주세요.'); return false; }
+      const days = [...document.querySelectorAll('#nDays .day.on')].map((x) => Number(x.dataset.d));
+      const t = { id: 'u' + Date.now().toString(36), custom: true, slot: $('#nSlot').value, time, sort: time, title, memo: $('#nMemo').value.trim() || undefined,
+        role: $('#nRole').value, crit: $('#nCrit').checked, active: true, repeat: days.length ? { t: 'weekly', days } : { t: 'daily' }, showAlways: days.length ? true : undefined,
+        scope: 'all', edited: { title: true, memo: true, role: true, active: true, repeat: true, showAlways: true, scope: true } };
+      if (t.crit) { t.due = time; t.grace = 30; }
+      S.templates.push(t); placeByTime(t);
+      const td = S.days[dateKey()]; if (td) { const r = instFor(t, new Date(dateKey() + 'T00:00:00')); if (r) td.inst[t.id] = r; }
+      applyScope(t, $('#nScope').value);
+    }, '만들기');
+    $('#nDays').addEventListener('click', (e) => { const d = e.target.closest('.day'); if (d) d.classList.toggle('on'); });
+    setTimeout(() => { const el = $('#nT'); if (el) el.focus(); }, 50);
+  }
+
   /* ── 할 일 순서 — 사장님이 끌어서 바꾼 순서(ord)가 있으면 그걸, 없으면 시각순 ──
      ord 는 루틴(template)에 붙어 매장 문서와 함께 모든 기기에 동기화된다. */
   const ordOf = (t) => (t && t.ord != null ? Number(t.ord) : 1e9);
@@ -1144,7 +1205,7 @@ const App = (() => {
         ${rec.s === 'skip' ? (rec.auto ? `<div class="tcBy auto">자동 완료 — ${esc(rec.reason || '')}</div>` : `<div class="tcBy warn">건너뜀 — ${esc(rec.reason || '')}</div>`) : ''}
         <div class="tcBody">
           ${t.memo ? `<div class="tcMemo">${esc(t.memo)}</div>` : ''}
-          <div class="tcMeta">담당 ${role}${t.support ? ` · 보조 ${t.support}` : ''}${t.deadline ? ` · 마감 ${t.deadline}` : ''}${evLabel ? ` · ${evLabel}` : ''}</div>
+          <div class="tcMeta">담당 ${role}${tplScope(t) !== 'all' ? ` · ${esc(scopeName(tplScope(t)))}만` : ''}${t.support ? ` · 보조 ${t.support}` : ''}${t.deadline ? ` · 마감 ${t.deadline}` : ''}${evLabel ? ` · ${evLabel}` : ''}</div>
         </div>
       </button>
       <span class="tcRight">
@@ -1333,6 +1394,7 @@ const App = (() => {
     }, '저장');
   }
 
+  let rtScope = 'all';
   let schedTab = 'cal';
   function vMonth() {
     const m = monthKey(), sc = schedOf(), todayK = dateKey(), sel = mdateKey();
@@ -2713,7 +2775,10 @@ const App = (() => {
     const budget = S.settings.budget;
 
     let h = `<div class="hd"><div><h2>루틴 ${S.templates.filter((t) => t.active).length}개</h2>
-      <div class="sub">중요로 지정한 항목만 알림이 갑니다.</div></div></div>`;
+      <div class="sub">중요로 지정한 항목만 알림이 갑니다. 매장 구조가 달라 안산·안양에만 있는 업무는 '적용 매장'으로 나눕니다.</div></div>
+      <button class="btn primary" data-act="tplNew">+ 업무 추가</button></div>`;
+    h += `<div class="filters">${[['all', '전체'], ['common', '공통 업무'], ['mine', `${esc(storeName())}만`]].map(([k, n]) =>
+      `<button class="fl${rtScope === k ? ' on' : ''}" data-act="rtScope" data-s="${k}">${n} ${k === 'all' ? S.templates.length : k === 'common' ? S.templates.filter((t) => tplScope(t) === 'all').length : S.templates.filter((t) => tplScope(t) !== 'all').length}</button>`).join('')}</div>`;
 
     h += `<div class="notice${n > budget ? ' warn' : ' ok'}">
       <b>하루 알림 ${n}건</b> / 예산 ${budget}건
@@ -2730,7 +2795,7 @@ const App = (() => {
       <div class="hint">나머지는 전부 일반입니다. 일반 항목도 체크리스트에 뜨고 완료율에 집계됩니다.</div></details>`;
 
     SLOTS.forEach((slot) => {
-      const list = S.templates.filter((t) => t.slot === slot.key).sort(byOrderT);
+      const list = S.templates.filter((t) => t.slot === slot.key && (rtScope === 'all' || (rtScope === 'common' ? tplScope(t) === 'all' : tplScope(t) !== 'all'))).sort(byOrderT);
       h += `<details class="grp" data-k="rt:${slot.key}"${attrOpen('rt:' + slot.key, true)}><summary><h3>${slot.name} <span class="cnt">${list.filter((t) => t.active).length}</span></h3></summary>`;
       h += list.map((t) => {
         const rep = t.repeat || { t: 'daily' };
@@ -2739,7 +2804,7 @@ const App = (() => {
         return `<div class="task rt${t.active ? '' : ' off'}">
           <button class="ck sw${t.crit ? ' on' : ''}" data-act="critToggle" data-id="${t.id}" aria-label="중요 지정">${t.crit ? '중요' : '일반'}</button>
           <div class="tb"><div class="tt">${esc(t.title)}</div>
-            <div class="tm"><span class="chip ${rc}">${t.role}</span><span class="tmt">${t.time}</span> · ${rep.t === 'weekly' ? `<span class="chip wk">${repLabel}${t.showAlways ? ' · 매일 표시' : ''}</span>` : repLabel}${t.ev ? ` · ${{ number: '숫자 입력', money: '금액 입력', kakao: '카톡 전송 확인' }[t.ev]}` : ''}</div></div>
+            <div class="tm"><span class="chip ${rc}">${t.role}</span><span class="tmt">${t.time}</span> · ${rep.t === 'weekly' ? `<span class="chip wk">${repLabel}${t.showAlways ? ' · 매일 표시' : ''}</span>` : repLabel}${tplScope(t) !== 'all' ? ` · <span class="chip scope">${esc(scopeName(tplScope(t)))}만</span>` : ''}${t.ev ? ` · ${{ number: '숫자 입력', money: '금액 입력', kakao: '카톡 전송 확인' }[t.ev]}` : ''}</div></div>
           <button class="more" data-act="editTpl" data-id="${t.id}" aria-label="수정">⋯</button>
         </div>`;
       }).join('');
@@ -4719,6 +4784,8 @@ const App = (() => {
         case 'toggleSound': S.settings.sound = !S.settings.sound; save(); render(); break;
         case 'toggleAskWho': S.settings.askWho = !S.settings.askWho; save(); render(); break;
         case 'orderUnlock': orderUnlockModal(); break;
+        case 'tplNew': newTplModal(); break;
+        case 'rtScope': rtScope = b.dataset.s; render(); break;
         case 'cardTime': if (orderUnlocked()) timeModal(id); break;
         case 'orderLock': orderUnlockedAt = 0; render(); break;
         case 'orderPinSet': orderPinModal(false); break;
@@ -4890,7 +4957,11 @@ const App = (() => {
         ${WD.map((n, i) => `<button type="button" class="rl day${(rep.days || []).includes(i) ? ' on' : ''}" data-d="${i}">${n}</button>`).join('')}</div>
       <label class="chk" id="eAlwaysWrap"${rep.t === 'weekly' ? '' : ' hidden'}><input type="checkbox" id="eAlways"${t.showAlways || t.showAlways == null ? ' checked' : ''}> 해당 없는 요일에도 목록에 보이기 (그날은 자동 완료로 표시)</label>
       <label class="chk"><input type="checkbox" id="eActive"${t.active ? ' checked' : ''}> 사용함 (끄면 체크리스트에서 빠집니다)</label>
-      ${otherStore() ? `<label class="chk"><input type="checkbox" id="eBothT" checked> 이름·메모를 ${esc(otherStore().name)}에도 같이 적용</label>` : ''}
+      <label>적용 매장<select id="eScope">
+        <option value="all"${tplScope(t) === 'all' ? ' selected' : ''}>공통 (두 매장)</option>
+        <option value="${Store.meta.current}"${tplScope(t) === Store.meta.current ? ' selected' : ''}>${esc(storeName())}만</option>
+        ${otherStore() ? `<option value="${otherStore().id}"${tplScope(t) === otherStore().id ? ' selected' : ''}>${esc(otherStore().name)}만</option>` : ''}</select></label>
+      ${otherStore() && tplScope(t) === 'all' ? `<label class="chk"><input type="checkbox" id="eBothT" checked> 이름·메모를 ${esc(otherStore().name)}에도 같이 적용</label>` : ''}
     `, () => {
       const oldTitle = t.title, oldMemo = t.memo;
       t.title = $('#eTitle').value.trim() || t.title;
@@ -4910,6 +4981,8 @@ const App = (() => {
       if (timeChanged) retime(t, nv);
       if (slotChanged || timeChanged) placeByTime(t);
       save(); render();
+      const newScope = $('#eScope').value;
+      if (newScope !== tplScope(t)) { applyScope(t, newScope); return; }
       const bothT = $('#eBothT');
       if (bothT && bothT.checked && (t.title !== oldTitle || t.memo !== oldMemo)) {
         const fields = []; if (t.title !== oldTitle) fields.push('title'); if (t.memo !== oldMemo) fields.push('memo');
@@ -5003,14 +5076,18 @@ const App = (() => {
        지난 체크 기록(days)은 그대로 두고 목록만 교체한다. */
     if ((S.routineVer || 1) < ROUTINE_VER) {
       const oldBy = {}; (S.templates || []).forEach((t) => { oldBy[t.id] = t; });
-      S.templates = storeTemplates().map((t) => {
+      const prevList = S.templates || [], hidden = new Set(S.hiddenTpl || []);
+      S.templates = storeTemplates().filter((t) => !hidden.has(t.id)).map((t) => {
         const nt = { ...t, active: true, repeat: t.repeat || { t: 'daily' } };
         const old = oldBy[t.id];
         // 앱에서 직접 고친 제목·메모·담당 등은 새 판을 덮어쓰지 않는다
         if (old && old.edited) { Object.keys(old.edited).forEach((f) => { nt[f] = old[f]; }); nt.edited = old.edited; }
         if (old && old.ord != null) nt.ord = old.ord;   // 사장님이 끌어서 정한 순서는 새 판에서도 유지
+        if (old && old.scope) nt.scope = old.scope;
         return nt;
       });
+      // 앱에서 직접 만든 업무(custom)와 다른 매장에서 공통으로 넘겨준 업무는 새 판에도 남긴다
+      prevList.forEach((o) => { if (o.custom && !S.templates.some((t) => t.id === o.id) && !hidden.has(o.id)) S.templates.push(o); });
       const live = new Set(S.templates.map((t) => t.id));
       const tk = dateKey();
       Object.entries(S.days).forEach(([k, day]) => {
@@ -5046,6 +5123,7 @@ const App = (() => {
       }
       S.routineVer = ROUTINE_VER;
     }
+    S.templates.forEach((t) => { if (!t.scope) t.scope = t.store || 'all'; });
     /* 앱을 새로 열면 항상 오늘·전체 보기로 시작한다.
        공용 PC라 역할 필터가 남아 있으면 다음 사람이 자기 항목을 못 보게 된다. */
     S.ui.date = dateKey();

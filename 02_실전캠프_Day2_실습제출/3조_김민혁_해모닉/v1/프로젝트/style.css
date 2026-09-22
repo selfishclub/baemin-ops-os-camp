@@ -1129,3 +1129,4 @@ table.tkLog td small{display:block;font-size:11px;color:var(--muted);font-weight
 .tcard.auto{opacity:.7;background:var(--surface-2)}
 .tcard.auto .ck{background:var(--wk-soft);color:var(--wk);border-color:var(--wk-soft)}
 .tcBy.auto{color:var(--wk)}
+.chip.scope{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--rule)}
