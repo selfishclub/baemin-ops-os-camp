@@ -430,7 +430,9 @@ button.ov{cursor:pointer}button.ov:hover{border-color:var(--crit)}
 .dc.out{color:var(--muted);background:var(--ground);opacity:.6}
 .dc.sel{position:relative;z-index:1;background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent);border-radius:8px}
 .dc .dl{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.dc.red .dl b{color:var(--crit)}
 .dc.now .dl b{color:var(--accent)}
+.dc.now.red .dl b{color:var(--crit);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px}
 .dc .dl em{font-style:normal;font-size:10px;font-weight:700;color:var(--crit);background:var(--crit-soft);border-radius:4px;padding:0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .dc .dl i{font-style:normal;font-size:10px;background:var(--accent);color:#fff;border-radius:3px;padding:0 5px}
 .dc .pl{font-size:11.5px;color:var(--ink-2);line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:keep-all}

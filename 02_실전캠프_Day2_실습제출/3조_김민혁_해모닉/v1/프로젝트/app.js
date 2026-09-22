@@ -1394,7 +1394,7 @@ const App = (() => {
 
     h += `<div class="wsGrid"><div class="calPanel">
       <div class="calHead"><div><div class="eyebrow">월간 근무표</div><b>${monthLabel(m)}</b></div>
-        <div class="legend"><span class="legOk">인원 충족</span><span class="legShort">인원 부족</span></div></div>
+        ${nOn ? `<div class="legend"><span class="legOk">인원 충족</span><span class="legShort">인원 부족</span></div>` : `<div class="legend"><span class="mut" style="font-size:12px">빨간 날짜 = 주말·공휴일</span></div>`}</div>
       <div class="wdRow">${['월', '화', '수', '목', '금', '토', '일'].map((w, i) => `<span class="${i >= 5 ? 'we' : ''}">${w}</span>`).join('')}</div>
       <div class="calGrid">`;
     for (let i = 0; i < rows * 7; i++) {
@@ -1402,7 +1402,8 @@ const App = (() => {
       const k = dateKey(d), inM = k.slice(0, 7) === m, hol = holidayOf(k);
       const names = inM ? dayNames(k) : [], any = inM && dayHasAny(k);
       const st = any ? dayState(dayRows(k)) : null;
-      h += `<button class="dc${inM ? '' : ' out'}${k === sel ? ' sel' : ''}${k === todayK ? ' now' : ''}" data-act="mpick" data-k="${k}" aria-label="${mdLabel(k)}">
+      const red = d.getDay() === 0 || d.getDay() === 6 || !!hol;   // 주말·공휴일은 날짜 숫자를 빨갛게
+      h += `<button class="dc${inM ? '' : ' out'}${k === sel ? ' sel' : ''}${k === todayK ? ' now' : ''}${red ? ' red' : ''}" data-act="mpick" data-k="${k}" aria-label="${mdLabel(k)}">
         <span class="dl"><b>${d.getDate()}</b>${hol ? `<em>${esc(hol.name)}</em>` : ''}${k === todayK ? '<i>오늘</i>' : ''}</span>
         ${names.length ? `<span class="pl">${names.slice(0, 2).map(esc).join(', ')}${names.length > 2 ? ` 외 ${names.length - 2}명` : ''}</span>` : ''}
         ${!inM ? '' : st ? (nOn ? `<span class="sl ${st.state}"><i>${st.state === 'short' ? '!' : '✓'}</i>${st.text}</span>` : (() => { const sp = dayCrewSplit(k); return sp ? `<span class="sl ok"><i>·</i>오전 ${sp.am.length} · 오후 ${sp.pm.length}</span>` : ''; })()) : `<span class="sl empty">배치 없음</span>`}
