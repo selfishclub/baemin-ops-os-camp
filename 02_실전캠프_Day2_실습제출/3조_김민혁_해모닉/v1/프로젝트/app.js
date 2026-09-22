@@ -113,14 +113,28 @@ const App = (() => {
 
   /* 끌어 놓은 결과(보이는 항목 id 순서)를 루틴 순서(ord)로 굳힌다.
      안 보이는 항목(완료·다른 역할)은 제자리를 지키고, 보이는 항목끼리만 새 순서로 바꾼다. */
-  function applyOrder(seq) {
+  function applyOrder(seq, movedId, groupTime) {
     if (!seq.length) return;
     const slotKey = tpl(seq[0]).slot;
     const all = S.templates.filter((t) => t.slot === slotKey).sort(byOrderT);
     const vis = new Set(seq); let i = 0;
     const out = all.map((t) => (vis.has(t.id) ? tpl(seq[i++]) : t));
     out.forEach((t, idx) => { t.ord = (idx + 1) * 10; });
+    /* 다른 시각 묶음에 놓았으면 그 묶음의 시각으로 업무 시각을 옮긴다 — 알림·마감 시각도 같은 간격만큼 */
+    const mt = movedId ? tpl(movedId) : null;
+    if (mt && /^\d{1,2}:\d{2}$/.test(groupTime || '') && mt.time !== groupTime) retime(mt, groupTime);
     save(); render();
+  }
+  function retime(t, hhmm) {
+    const old = t.time || t.sort || hhmm;
+    const delta = minutesOf(hhmm) - (minutesOf(old) || 0);
+    const shift = (v) => { const m = minutesOf(v); if (m == null) return v; const n = Math.max(0, Math.min(23 * 60 + 59, m + delta)); return `${pad(Math.floor(n / 60))}:${pad(n % 60)}`; };
+    const dueMoved = !!(t.due && t.due === old);
+    if (dueMoved) t.due = hhmm;
+    if (t.deadline && delta) t.deadline = shift(t.deadline);
+    t.time = hhmm; t.sort = hhmm;
+    t.edited = { ...(t.edited || {}), time: true, sort: true, due: true, deadline: true };
+    banner(`시각을 ${old} → ${hhmm} 으로 바꿨습니다`, `${t.title}${dueMoved ? ' · 알림 시각도 함께 옮겼습니다' : ''}`);
   }
 
   /* 손잡이(⠿)를 누른 채 끌기 — 마우스·아이패드 손가락 모두 pointer 이벤트로 처리 */
@@ -129,6 +143,7 @@ const App = (() => {
     const hnd = e.target.closest('.dragH'); if (!hnd || !orderUnlocked()) return;
     e.preventDefault();
     const cardEl = hnd.closest('.tcard'), col = cardEl.closest('.colBody');
+    if (!col) return;                                   // 지연 묶음 등 목록 밖 카드는 끌지 않는다
     dragSt = { card: cardEl, col, moved: false, id: e.pointerId };
     try { hnd.setPointerCapture(e.pointerId); } catch (_) { /* 무시 */ }
     cardEl.classList.add('dragging');
@@ -136,18 +151,31 @@ const App = (() => {
   document.addEventListener('pointermove', (e) => {
     if (!dragSt) return;
     e.preventDefault(); dragSt.moved = true;
-    const others = [...dragSt.col.querySelectorAll('.tcard.drag')].filter((c) => c !== dragSt.card);
+    /* 손가락이 어느 시각 묶음 위에 있는지부터 정한다 (묶음 사이 빈틈이면 가까운 쪽).
+       그 묶음 안에서 손가락 아래쪽 첫 카드 앞에 끼우고, 없으면 묶음 맨 끝에 붙인다. */
+    const groups = [...dragSt.col.querySelectorAll('.tgroup')];
+    if (!groups.length) return;
+    let over = null, best = Infinity;
+    groups.forEach((g) => {
+      const r = g.getBoundingClientRect();
+      const dist = e.clientY < r.top ? r.top - e.clientY : e.clientY > r.bottom ? e.clientY - r.bottom : 0;
+      if (dist < best) { best = dist; over = g; }
+    });
+    dragSt.group = over;
+    const others = [...over.querySelectorAll('.tcard.drag')].filter((c) => c !== dragSt.card);
     let before = null;
     for (const c of others) { const r = c.getBoundingClientRect(); if (e.clientY < r.top + r.height / 2) { before = c; break; } }
-    if (before) { if (before.previousElementSibling !== dragSt.card) before.parentNode.insertBefore(dragSt.card, before); }
-    else { const last = others[others.length - 1]; if (last && last.nextElementSibling !== dragSt.card) last.parentNode.insertBefore(dragSt.card, last.nextSibling); }
+    if (before) { if (before.previousElementSibling !== dragSt.card) over.insertBefore(dragSt.card, before); }
+    else if (over.lastElementChild !== dragSt.card) over.appendChild(dragSt.card);
   }, { passive: false });
   const dragEnd = () => {
     if (!dragSt) return;
     const d = dragSt; dragSt = null;
     d.card.classList.remove('dragging');
     if (!d.moved) return;
-    applyOrder([...d.col.querySelectorAll('.tcard.drag')].map((c) => c.dataset.tid));
+    const grp = d.group || d.card.closest('.tgroup');
+    const lbl = grp ? (grp.querySelector('.tgTime') || {}).textContent : '';
+    applyOrder([...d.col.querySelectorAll('.tcard.drag')].map((c) => c.dataset.tid), d.card.dataset.tid, (lbl || '').trim());
   };
   document.addEventListener('pointerup', dragEnd);
   document.addEventListener('pointercancel', dragEnd);
@@ -993,7 +1021,7 @@ const App = (() => {
     const unlocked = orderUnlocked();
     const hasCustom = S.templates.some((t) => t.ord != null);
     h += `<div class="orderBar${unlocked ? ' on' : ''}">${unlocked
-      ? `<span>🔓 <b>순서 편집 중</b> — 왼쪽 손잡이(⠿)를 끌어 순서를 바꾸세요. 바꾼 순서는 모든 기기·매일 그대로 갑니다.</span>
+      ? `<span>🔓 <b>순서 편집 중</b> — 손잡이(⠿)를 끌어 순서를 바꾸세요. 다른 시각 묶음에 놓으면 그 시각으로 바뀝니다. 모든 기기·매일 그대로 갑니다.</span>
          <span class="obBtns">${hasCustom ? `<button class="btn sm" data-act="orderReset">시간순으로 되돌리기</button>` : ''}<button class="btn sm primary" data-act="orderLock">잠그기</button></span>`
       : `<span class="hint">🔒 순서 잠김${hasCustom ? ' · 사장님이 정한 순서' : ' · 시각순'}</span><button class="btn sm" data-act="orderUnlock">순서 바꾸기</button>`}</div>`;
 
