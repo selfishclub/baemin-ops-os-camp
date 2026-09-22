@@ -125,6 +125,31 @@ const App = (() => {
     if (mt && /^\d{1,2}:\d{2}$/.test(groupTime || '') && mt.time !== groupTime) retime(mt, groupTime);
     save(); render();
   }
+  /* 시각을 손으로 적어 바꿨을 때 — 사장님 순서(ord)가 있는 시간대면 새 시각에 맞는 자리로 옮겨 순서를 다시 매긴다 */
+  function placeByTime(t) {
+    const list = S.templates.filter((x) => x.slot === t.slot && x !== t).sort(byOrderT);
+    if (!list.some((x) => x.ord != null)) { delete t.ord; return; }     // 시각순 그대로면 손댈 것 없음
+    let idx = list.findIndex((x) => (x.sort || '') > (t.sort || ''));
+    if (idx < 0) idx = list.length;
+    list.splice(idx, 0, t);
+    list.forEach((x, i) => { x.ord = (i + 1) * 10; });
+  }
+  function timeModal(id) {
+    const t = tpl(id); if (!t) return;
+    modal('시각 바꾸기 — ' + t.title, `
+      <label>시각<input type="time" id="cT" value="${esc(t.time || t.sort || '')}"></label>
+      <label>시간대<select id="cS">${SLOTS.map((sl) => `<option value="${sl.key}"${sl.key === t.slot ? ' selected' : ''}>${sl.name}</option>`).join('')}</select></label>
+      <p class="hint">매일 · 모든 기기에 같이 적용됩니다. 중요 업무의 알림 시각이 업무 시각과 같으면 알림도 함께 옮깁니다.</p>`, () => {
+      const v = $('#cT').value, sl = $('#cS').value;
+      if (!/^\d{2}:\d{2}$/.test(v)) { alert('시각을 넣어 주세요 (예: 11:20).'); return false; }
+      const slotChanged = sl !== t.slot, timeChanged = v !== (t.time || t.sort);
+      if (slotChanged) { t.slot = sl; t.edited = { ...(t.edited || {}), slot: true }; }
+      if (timeChanged) retime(t, v);
+      if (slotChanged || timeChanged) placeByTime(t);
+      if (slotChanged && !timeChanged) banner(`${SLOTS.find((s) => s.key === sl).name} 시간대로 옮겼습니다`, t.title);
+      save(); render();
+    }, '저장');
+  }
   function retime(t, hhmm) {
     const old = t.time || t.sort || hhmm;
     const delta = minutesOf(hhmm) - (minutesOf(old) || 0);
@@ -1092,6 +1117,7 @@ const App = (() => {
         </div>
       </button>
       <span class="tcRight">
+        ${canDrag ? `<button class="tTime" data-act="cardTime" data-id="${tid}" title="시각 바꾸기">${esc(t.time || '')} ✎</button>` : ''}
         <span class="repBadge">${repLabel}</span>
         ${opt.isFuture ? '' : `<button class="more" data-act="menu" data-id="${tid}" aria-label="더보기">⋯</button>`}
       </span>
@@ -4527,6 +4553,7 @@ const App = (() => {
         case 'toggleSound': S.settings.sound = !S.settings.sound; save(); render(); break;
         case 'toggleAskWho': S.settings.askWho = !S.settings.askWho; save(); render(); break;
         case 'orderUnlock': orderUnlockModal(); break;
+        case 'cardTime': if (orderUnlocked()) timeModal(id); break;
         case 'orderLock': orderUnlockedAt = 0; render(); break;
         case 'orderPinSet': orderPinModal(false); break;
         case 'orderReset': {
@@ -4685,6 +4712,8 @@ const App = (() => {
     const rep = t.repeat || { t: 'daily' };
     modal(t.title, `
       <label>이름<input id="eTitle" value="${esc(t.title)}"></label>
+      <div class="row2"><label>시각<input type="time" id="eTime" value="${esc(t.time || t.sort || '')}"></label>
+        <label>시간대<select id="eSlot">${SLOTS.map((sl) => `<option value="${sl.key}"${sl.key === t.slot ? ' selected' : ''}>${sl.name}</option>`).join('')}</select></label></div>
       <label>안내 메모 <span class="opt">선택</span><textarea id="eMemo" rows="2">${esc(t.memo || '')}</textarea></label>
       <label>담당<select id="eRole">${ROLE_OPTS.map((r) => `<option${r === t.role ? ' selected' : ''}>${r}</option>`).join('')}</select></label>
       <label>반복<select id="eRep">
@@ -4704,6 +4733,11 @@ const App = (() => {
       } else t.repeat = { t: 'daily' };
       // 사장님이 직접 고친 값은 루틴 판이 올라가도 지키기 위해 표시해 둔다
       t.edited = { ...(t.edited || {}), title: true, memo: true, role: true, active: true, repeat: true };
+      const nv = $('#eTime').value, ns = $('#eSlot').value;
+      const slotChanged = ns !== t.slot, timeChanged = /^\d{2}:\d{2}$/.test(nv) && nv !== (t.time || t.sort);
+      if (slotChanged) { t.slot = ns; t.edited.slot = true; }
+      if (timeChanged) retime(t, nv);
+      if (slotChanged || timeChanged) placeByTime(t);
       save(); render();
     }, '저장');
 

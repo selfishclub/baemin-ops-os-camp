@@ -1112,3 +1112,6 @@ table.tkLog td small{display:block;font-size:11px;color:var(--muted);font-weight
 .dragH:active{cursor:grabbing}
 .tcard.drag{border-style:dashed}
 .tcard.dragging{opacity:.85;box-shadow:0 8px 24px rgba(0,0,0,.18);border-color:var(--crit);background:var(--surface);position:relative;z-index:2}
+.tTime{border:1px dashed var(--rule);background:var(--surface-2);color:var(--ink-2);border-radius:999px;
+  padding:3px 9px;font:inherit;font-size:12px;font-variant-numeric:tabular-nums;cursor:pointer;margin-right:4px;white-space:nowrap}
+.tTime:hover{border-color:var(--ink);color:var(--ink)}
