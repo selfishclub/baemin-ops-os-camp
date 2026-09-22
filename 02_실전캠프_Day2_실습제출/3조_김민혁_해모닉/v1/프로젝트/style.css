@@ -6,6 +6,7 @@
   --rule:#D3DDDB; --rule-soft:#E5ECEA;
   --accent:#0B6E6B; --accent-soft:#DCEBE9;
   --crit:#AC4229; --crit-soft:#F8E7E1;
+  --wk:#5B48B5; --wk-soft:#ECE8F8;
   --ok:#0B6E6B; --ok-soft:#DCEBE9;
   --mgr:#0B6E6B; --mgr-bg:#DCEBE9;
   --hall:#7E6029; --hall-bg:#F2E8D4;
@@ -19,6 +20,7 @@
     --rule:#25373A; --rule-soft:#1C2C2F;
     --accent:#59B9B2; --accent-soft:#13312F;
     --crit:#E58A6E; --crit-soft:#33201A;
+    --wk:#B3A5F0; --wk-soft:#2A2440;
     --ok:#59B9B2; --ok-soft:#13312F;
     --mgr:#59B9B2; --mgr-bg:#13312F;
     --hall:#CBA55C; --hall-bg:#302713;
@@ -1119,3 +1121,10 @@ table.tkLog td small{display:block;font-size:11px;color:var(--muted);font-weight
 .tTime:hover{border-color:var(--ink);color:var(--ink)}
 .patTbl input{width:100%;box-sizing:border-box;font:inherit;padding:6px 8px;border:1px solid var(--rule);border-radius:8px;background:var(--surface)}
 .patTbl th:first-child{width:44px}
+
+/* 주 n회 업무 — 매일 업무와 구분 (보라색) · 비해당 요일은 자동 완료 */
+.chip.wk{background:var(--wk-soft);color:var(--wk)}
+.tcard.weekly{border-left:4px solid var(--wk)}
+.tcard.auto{opacity:.7;background:var(--surface-2)}
+.tcard.auto .ck{background:var(--wk-soft);color:var(--wk);border-color:var(--wk-soft)}
+.tcBy.auto{color:var(--wk)}

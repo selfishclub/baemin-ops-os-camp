@@ -212,11 +212,18 @@ const App = (() => {
     return true;
   }
 
+  /* 그날 항목 하나의 시작 상태 — 해당 요일이면 할 일, 매일 보이게 한 주 n회 업무의 비해당 요일이면 '자동 완료'(auto) */
+  const repDays = (t) => ((t.repeat || {}).days || []).slice().sort().map((i) => WD[i]).join('·');
+  function instFor(t, d) {
+    if (runsOn(t, d)) return { s: 'todo' };
+    if (t.active && t.showAlways && (t.repeat || {}).t === 'weekly') return { s: 'skip', auto: true, reason: `${repDays(t)} 업무 — 오늘은 해당 없음` };
+    return null;
+  }
   function ensureDay(key) {
     if (S.days[key]) return S.days[key];
     const d = new Date(key + 'T00:00:00');
     const inst = {};
-    S.templates.forEach((t) => { if (runsOn(t, d)) inst[t.id] = { s: 'todo' }; });
+    S.templates.forEach((t) => { const r = instFor(t, d); if (r) inst[t.id] = r; });
     S.days[key] = { inst, extras: [], notified: {} };
     return S.days[key];
   }
@@ -234,7 +241,7 @@ const App = (() => {
   function dayFor(key) {
     if (key <= dateKey()) return ensureDay(key);
     const d = new Date(key + 'T00:00:00'), inst = {};
-    S.templates.forEach((t) => { if (runsOn(t, d)) inst[t.id] = { s: 'todo' }; });
+    S.templates.forEach((t) => { const r = instFor(t, d); if (r) inst[t.id] = r; });
     return { inst, extras: [], notified: {}, preview: true };
   }
 
@@ -449,7 +456,7 @@ const App = (() => {
      22:30에 하루 결과를 카톡으로 보낼 수 있게 문구를 만들어 둔다. */
   function buildReport(key) {
     const day = S.days[key]; if (!day) return null;
-    const ids = Object.keys(day.inst).filter((t) => tpl(t) && !tpl(t).rest);
+    const ids = Object.keys(day.inst).filter((t) => tpl(t) && !tpl(t).rest && !day.inst[t].auto);   // 자동 완료(비해당 요일)는 리포트에서 뺀다
 
     /* 리포트를 21:30에 보내므로, 그 시점에 아직 할 시간이 안 된 업무(마감 정산·문잠금 등)를
        미완료로 세면 매일 억울한 리포트가 나간다. '이후 예정'으로 분리하고 분모에서도 뺀다. */
@@ -954,7 +961,7 @@ const App = (() => {
 
     const inSlot = (sk) => ids.filter((t) => tpl(t)?.slot === sk);
     // 휴식은 해도 그만 안 해도 그만이라 완료율 분모에 넣지 않는다
-    const real = (list) => list.filter((t) => !tpl(t)?.rest);
+    const real = (list) => list.filter((t) => !tpl(t)?.rest && !(day.inst[t] && day.inst[t].auto));
     const doneN = (list) => real(list).filter((t) => day.inst[t].s !== 'todo').length;
 
     let h = '';
@@ -1128,13 +1135,13 @@ const App = (() => {
     const evLabel = { deaths: '폐사 마릿수 입력', kakao: '카톡 사진 전송 확인', money: '금액 입력', number: '숫자 입력' }[t.ev];
 
     const canDrag = orderUnlocked() && rec.s === 'todo' && !opt.isFuture;
-    return `<div class="tcard${t.rest ? ' rest' : ''}${rec.s === 'done' ? ' done' : ''}${rec.s === 'skip' ? ' skipped' : ''}${t.crit ? ' crit' : ''}${late ? ' late' : ''}${opt.isFuture ? ' preview' : ''}${canDrag ? ' drag' : ''}" data-tid="${tid}">
+    return `<div class="tcard${t.rest ? ' rest' : ''}${rec.s === 'done' ? ' done' : ''}${rec.s === 'skip' ? ' skipped' : ''}${rec.auto ? ' auto' : ''}${rep.t === 'weekly' ? ' weekly' : ''}${t.crit ? ' crit' : ''}${late ? ' late' : ''}${opt.isFuture ? ' preview' : ''}${canDrag ? ' drag' : ''}" data-tid="${tid}">
       ${canDrag ? `<span class="dragH" data-drag="${tid}" title="끌어서 순서 바꾸기">⠿</span>` : ''}
       <button class="ck" data-act="toggle" data-id="${tid}" aria-label="${esc(t.title)} 완료"${opt.isFuture ? ' disabled' : ''}>${rec.s === 'done' ? '✓' : rec.s === 'skip' ? '–' : ''}</button>
       <button class="tcMain" data-act="cardOpen" data-id="${tid}">
-        <div class="tcTitle"><span class="chip ${rc}">${role}</span>${esc(t.title)}${t.crit ? '<span class="chip crit">중요</span>' : ''}${late ? '<span class="chip late">지연</span>' : ''}${missed ? '<span class="chip missed">미완료</span>' : ''}</div>
+        <div class="tcTitle"><span class="chip ${rc}">${role}</span>${esc(t.title)}${t.crit ? '<span class="chip crit">중요</span>' : ''}${rep.t === 'weekly' ? `<span class="chip wk">주 ${rep.days.length}회 · ${repDays(t)}</span>` : ''}${late ? '<span class="chip late">지연</span>' : ''}${missed ? '<span class="chip missed">미완료</span>' : ''}</div>
         ${rec.s === 'done' ? `<div class="tcBy ok">${rec.by ? esc(rec.by) + ' · ' : ''}${rec.at || ''}${rec.ev != null ? ` · ${t.ev === 'deaths' || typeof rec.ev === 'object' ? esc(deathsLabel(rec.ev)) : esc(t.evLabel || '입력') + ' ' + esc(rec.ev)}` : ''}${rec.note ? ` · ${esc(rec.note)}` : ''}</div>` : ''}
-        ${rec.s === 'skip' ? `<div class="tcBy warn">건너뜀 — ${esc(rec.reason || '')}</div>` : ''}
+        ${rec.s === 'skip' ? (rec.auto ? `<div class="tcBy auto">자동 완료 — ${esc(rec.reason || '')}</div>` : `<div class="tcBy warn">건너뜀 — ${esc(rec.reason || '')}</div>`) : ''}
         <div class="tcBody">
           ${t.memo ? `<div class="tcMemo">${esc(t.memo)}</div>` : ''}
           <div class="tcMeta">담당 ${role}${t.support ? ` · 보조 ${t.support}` : ''}${t.deadline ? ` · 마감 ${t.deadline}` : ''}${evLabel ? ` · ${evLabel}` : ''}</div>
@@ -2732,7 +2739,7 @@ const App = (() => {
         return `<div class="task rt${t.active ? '' : ' off'}">
           <button class="ck sw${t.crit ? ' on' : ''}" data-act="critToggle" data-id="${t.id}" aria-label="중요 지정">${t.crit ? '중요' : '일반'}</button>
           <div class="tb"><div class="tt">${esc(t.title)}</div>
-            <div class="tm"><span class="chip ${rc}">${t.role}</span><span class="tmt">${t.time}</span> · ${repLabel}${t.ev ? ` · ${{ number: '숫자 입력', money: '금액 입력', kakao: '카톡 전송 확인' }[t.ev]}` : ''}</div></div>
+            <div class="tm"><span class="chip ${rc}">${t.role}</span><span class="tmt">${t.time}</span> · ${rep.t === 'weekly' ? `<span class="chip wk">${repLabel}${t.showAlways ? ' · 매일 표시' : ''}</span>` : repLabel}${t.ev ? ` · ${{ number: '숫자 입력', money: '금액 입력', kakao: '카톡 전송 확인' }[t.ev]}` : ''}</div></div>
           <button class="more" data-act="editTpl" data-id="${t.id}" aria-label="수정">⋯</button>
         </div>`;
       }).join('');
@@ -4852,6 +4859,7 @@ const App = (() => {
         <option value="weekly"${rep.t === 'weekly' ? ' selected' : ''}>요일 지정</option></select></label>
       <div id="eDays" class="roles wrap"${rep.t === 'weekly' ? '' : ' hidden'}>
         ${WD.map((n, i) => `<button type="button" class="rl day${(rep.days || []).includes(i) ? ' on' : ''}" data-d="${i}">${n}</button>`).join('')}</div>
+      <label class="chk" id="eAlwaysWrap"${rep.t === 'weekly' ? '' : ' hidden'}><input type="checkbox" id="eAlways"${t.showAlways ? ' checked' : ''}> 해당 없는 요일에도 목록에 보이기 (그날은 자동 완료로 표시)</label>
       <label class="chk"><input type="checkbox" id="eActive"${t.active ? ' checked' : ''}> 사용함 (끄면 체크리스트에서 빠집니다)</label>
     `, () => {
       t.title = $('#eTitle').value.trim() || t.title;
@@ -4862,8 +4870,9 @@ const App = (() => {
         const days = [...document.querySelectorAll('#eDays .day.on')].map((x) => Number(x.dataset.d));
         t.repeat = { t: 'weekly', days: days.length ? days : [1] };
       } else t.repeat = { t: 'daily' };
+      t.showAlways = t.repeat.t === 'weekly' && $('#eAlways').checked;
       // 사장님이 직접 고친 값은 루틴 판이 올라가도 지키기 위해 표시해 둔다
-      t.edited = { ...(t.edited || {}), title: true, memo: true, role: true, active: true, repeat: true };
+      t.edited = { ...(t.edited || {}), title: true, memo: true, role: true, active: true, repeat: true, showAlways: true };
       const nv = $('#eTime').value, ns = $('#eSlot').value;
       const slotChanged = ns !== t.slot, timeChanged = /^\d{2}:\d{2}$/.test(nv) && nv !== (t.time || t.sort);
       if (slotChanged) { t.slot = ns; t.edited.slot = true; }
@@ -4872,7 +4881,7 @@ const App = (() => {
       save(); render();
     }, '저장');
 
-    $('#eRep').addEventListener('change', (e) => { $('#eDays').hidden = e.target.value !== 'weekly'; });
+    $('#eRep').addEventListener('change', (e) => { $('#eDays').hidden = e.target.value !== 'weekly'; $('#eAlwaysWrap').hidden = e.target.value !== 'weekly'; });
     $('#eDays').addEventListener('click', (e) => {
       const d = e.target.closest('.day'); if (d) d.classList.toggle('on');
     });
@@ -4969,7 +4978,7 @@ const App = (() => {
         // 새로 생긴 업무는 오늘 것만 채운다 (지난 날짜에 없던 일을 만들지 않는다)
         if (k === tk) {
           const d = new Date(k + 'T00:00:00');
-          S.templates.forEach((t) => { if (runsOn(t, d) && !day.inst[t.id]) day.inst[t.id] = { s: 'todo' }; });
+          S.templates.forEach((t) => { const r = instFor(t, d); if (r && !day.inst[t.id]) day.inst[t.id] = r; });
         }
       });
       // 5판부터: 체크할 때마다 누가 했는지 고른다 — 사장님 지시(2026-09-12)
@@ -4985,6 +4994,13 @@ const App = (() => {
         // 오늘 해당하지 않게 된 항목은 (아직 안 했으면) 오늘 목록에서 뺀다
         const td = S.days[tk];
         if (td) { const d0 = new Date(tk + 'T00:00:00'); Object.keys(td.inst).forEach((id) => { const t = tpl(id); if (t && !runsOn(t, d0) && td.inst[id].s === 'todo') delete td.inst[id]; }); }
+      }
+      // 10판: 주 n회 업무도 매일 보이게(비해당 요일은 자동 완료) — 사장님 요청(2026-09-23)
+      if ((S.routineVer || 1) < 10) {
+        const t18 = S.templates.find((t) => t.id === 't18');
+        if (t18) { t18.showAlways = true; t18.edited = { ...(t18.edited || {}), showAlways: true }; }
+        const td = S.days[tk];
+        if (td) { const d0 = new Date(tk + 'T00:00:00'); S.templates.forEach((t) => { const r = instFor(t, d0); if (r && !td.inst[t.id]) td.inst[t.id] = r; }); }
       }
       S.routineVer = ROUTINE_VER;
     }

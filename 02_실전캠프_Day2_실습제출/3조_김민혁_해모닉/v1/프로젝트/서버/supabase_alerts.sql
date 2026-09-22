@@ -110,6 +110,7 @@ begin
   for v_id, v_rec in select * from jsonb_each(coalesce(v_day->'inst', '{}'::jsonb)) loop
     select t.value into v_tpl from jsonb_array_elements(coalesce(v_doc->'templates', '[]'::jsonb)) t where t.value->>'id' = v_id limit 1;
     if v_tpl is null or coalesce((v_tpl->>'rest')::bool, false) then continue; end if;
+    if coalesce((v_rec->>'auto')::bool, false) then continue; end if;   -- 비해당 요일 자동 완료는 리포트에서 뺀다
     v_s := coalesce(v_rec->>'s', 'todo');
     v_role := coalesce(v_rec->>'role', v_tpl->>'role', '');
     v_sort := null;
