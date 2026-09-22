@@ -4978,6 +4978,14 @@ const App = (() => {
         // 기본값으로 만들어졌던 '점장'이라는 직원 이름도 '매니저'로 — 역할 이름과 헷갈리지 않게
         (S.staff || []).forEach((st) => { if (st.name === '점장') st.name = '매니저'; });
       }
+      // 9판: 수조·이끼 상태 확인은 월·수·금만 — 사장님 요청(2026-09-23). 앱에서 고친 적이 있어도 이 요일 규칙을 적용한다
+      if ((S.routineVer || 1) < 9) {
+        const t18 = S.templates.find((t) => t.id === 't18');
+        if (t18) { t18.repeat = { t: 'weekly', days: [1, 3, 5] }; t18.edited = { ...(t18.edited || {}), repeat: true }; }
+        // 오늘 해당하지 않게 된 항목은 (아직 안 했으면) 오늘 목록에서 뺀다
+        const td = S.days[tk];
+        if (td) { const d0 = new Date(tk + 'T00:00:00'); Object.keys(td.inst).forEach((id) => { const t = tpl(id); if (t && !runsOn(t, d0) && td.inst[id].s === 'todo') delete td.inst[id]; }); }
+      }
       S.routineVer = ROUTINE_VER;
     }
     /* 앱을 새로 열면 항상 오늘·전체 보기로 시작한다.
