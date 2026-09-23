@@ -9,8 +9,8 @@ import { matchItem, parseDate } from "./receiptText";
 //  - "< 일 계 >" 줄로 검산한다
 export class LiquorParseError extends Error {}
 
-// 한 박스에 몇 병 (사장님 확인 2026-09-21: 맥주 500ml 20병, 소주 360ml 30병)
-export const BOTTLES_PER_BOX: Record<number, number> = { 360: 30, 500: 20 };
+// 한 박스에 몇 병 (사장님 확인 2026-09-21: 맥주 500ml 20병, 소주 360ml 30병 / 2026-09-24: 청하 300ml 30병)
+export const BOTTLES_PER_BOX: Record<number, number> = { 300: 30, 360: 30, 500: 20 };
 export function bottlesPerBox(specMl: number | null): number | null {
   return specMl !== null && BOTTLES_PER_BOX[specMl] ? BOTTLES_PER_BOX[specMl] : null;
 }

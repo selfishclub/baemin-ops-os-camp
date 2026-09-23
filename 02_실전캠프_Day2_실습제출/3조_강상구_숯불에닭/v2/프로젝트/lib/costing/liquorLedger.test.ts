@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanLiquorName, liquorBrands, liquorDayToPurchase, newLiquorItems, parseLiquorLedgerGrid } from "./liquorLedger";
+import { bottlesPerBox, cleanLiquorName, liquorBrands, liquorDayToPurchase, newLiquorItems, parseLiquorLedgerGrid } from "./liquorLedger";
 import type { Item } from "./types";
 
 // 가짜 숫자로 만든 주류 매출원장 (실제 파일과 같은 모양)
@@ -46,6 +46,14 @@ describe("주류 매출원장 읽기", () => {
     const [soju, beer] = parseLiquorLedgerGrid(grid).days[0].lines;
     expect(soju).toMatchObject({ displayName: "가짜소주", bottles: 60, perBottle: 1000 });
     expect(beer).toMatchObject({ displayName: "가짜맥주", bottles: 20, perBottle: 1500 });
+  });
+
+  it("규격마다 박스당 병 수를 안다 (청하 300ml 30병, 모르는 규격은 null)", () => {
+    expect(bottlesPerBox(300)).toBe(30);
+    expect(bottlesPerBox(360)).toBe(30);
+    expect(bottlesPerBox(500)).toBe(20);
+    expect(bottlesPerBox(750)).toBeNull();
+    expect(bottlesPerBox(null)).toBeNull();
   });
 
   it("일계와 안 맞으면 알려 준다", () => {
