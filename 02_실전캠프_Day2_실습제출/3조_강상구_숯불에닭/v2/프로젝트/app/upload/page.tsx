@@ -13,6 +13,8 @@ import { findOverlap, monthLabel, monthsBetween, newBankRowsOnly, prevMonth } fr
 import { getStore } from "@/lib/storage";
 import type { Transaction } from "@/lib/types";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, isPrevMonthDefault } from "@/lib/paydays";
+import { monthsToLoad, quickRange, searchTxs, shiftDays, txTotals } from "@/lib/txSearch";
+import { todayStr } from "@/lib/daily";
 
 const SAMPLES = [
   { label: "8월", file: "/sample/가짜_거래내역_2026-08.xlsx" },
@@ -36,6 +38,28 @@ export default function UploadPage() {
   }, []);
   const [filter, setFilter] = useState("");
   const [txKind, setTxKind] = useState<"전체" | "입금" | "출금" | "미분류">("전체");
+  // 기간으로 찾기 — 기본은 보고 있는 달 전체. 기간이 다른 달까지 걸치면 그 달 거래도 불러온다.
+  const [range, setRange] = useState(() => quickRange("month", month, todayStr()));
+  useEffect(() => setRange(quickRange("month", month, todayStr())), [month]);
+  const [moreTxs, setMoreTxs] = useState<Transaction[]>([]);
+  useEffect(() => {
+    if (!showAll) return;
+    // 지급일 규칙으로 달이 옮겨진 줄까지 잡으려고 앞뒤로 한 달씩 넉넉히 불러온다
+    const want = monthsToLoad(shiftDays(range.from, -31), shiftDays(range.to, 31), [month]);
+    if (!want.length) return setMoreTxs([]);
+    let alive = true;
+    void Promise.all(want.map((m) => getStore().listTransactions(m)))
+      .then((lists) => alive && setMoreTxs(lists.flat()))
+      .catch(() => alive && setMoreTxs([]));
+    return () => {
+      alive = false;
+    };
+  }, [showAll, range.from, range.to, month, ledger.txs]);
+  const searched = searchTxs(
+    [...ledger.txs, ...moreTxs.filter((t) => !ledger.txs.some((x) => x.id === t.id))],
+    { from: range.from, to: range.to, text: filter, kind: txKind },
+  );
+  const searchedTotals = txTotals(searched);
 
   async function handleFile(file: File | Blob, name: string) {
     setBusy(true);
@@ -155,6 +179,22 @@ export default function UploadPage() {
           {showAll && (
             <div className="mt-3 space-y-2">
               <p className="text-[11px] text-stone-500">이미 확인한 줄을 바꾸려면 그 줄의 “고치기”를 누르세요. 규칙까지 바꿀지는 거기서 고를 수 있어요.</p>
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <input aria-label="찾기 시작일" type="date" className="field num !w-36" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} />
+                <span className="text-stone-400">~</span>
+                <input aria-label="찾기 끝일" type="date" className="field num !w-36" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} />
+                {(
+                  [
+                    ["month", "이 달 전체"],
+                    ["week", "최근 7일"],
+                    ["prev", "지난달"],
+                  ] as const
+                ).map(([k, label]) => (
+                  <button key={k} className="rounded-full bg-stone-100 px-3 py-1 text-stone-600" onClick={() => setRange(quickRange(k, month, todayStr()))}>
+                    {label}
+                  </button>
+                ))}
+              </div>
               <input aria-label="거래 찾기" className="field" placeholder="거래처·분류로 찾기 (예: 마트, 임대료)" value={filter} onChange={(e) => setFilter(e.target.value)} />
               <div className="flex flex-wrap gap-1.5 text-xs">
                 {(["전체", "입금", "출금", "미분류"] as const).map((k) => (
@@ -163,12 +203,19 @@ export default function UploadPage() {
                   </button>
                 ))}
               </div>
+              <div className="num flex flex-wrap items-baseline justify-between gap-2 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-600">
+                <span>
+                  <b className="text-stone-800">{searchedTotals.count}줄</b> · {range.from.slice(5).replace("-", "/")}~{range.to.slice(5).replace("-", "/")}
+                </span>
+                <span>
+                  {searchedTotals.in > 0 && <span className="text-emerald-700">입금 +{num(searchedTotals.in)}</span>}
+                  {searchedTotals.in > 0 && searchedTotals.out !== 0 && " · "}
+                  {searchedTotals.out !== 0 && <span>출금 −{num(searchedTotals.out)}</span>}
+                </span>
+              </div>
+              {searched.length === 0 && <p className="text-xs text-stone-500">찾는 거래가 없어요. 기간을 넓히거나 글자를 지워 보세요.</p>}
               <div className="space-y-3">
-                {groupByDate(
-                  ledger.txs
-                    .filter((t) => !filter.trim() || `${t.payee} ${t.major ?? ""} ${t.minor ?? ""}`.replace(/\s/g, "").includes(filter.replace(/\s/g, "")))
-                    .filter((t) => (txKind === "입금" ? t.in > 0 : txKind === "출금" ? t.out !== 0 : txKind === "미분류" ? !t.major : true)),
-                ).map(({ date, txs }) => (
+                {groupByDate(searched).map(({ date, txs }) => (
                   <div key={date}>
                     <div className="num flex items-baseline justify-between border-b border-stone-200 pb-1 text-[11px] text-stone-500">
                       <span className="font-semibold text-stone-700">{dayLabel(date)}</span>
