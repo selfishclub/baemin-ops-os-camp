@@ -106,6 +106,14 @@ describe("헛연결 막기", () => {
     expect(matchItem("테라 500", items)?.id).toBe("terra");
   });
 
+  it("제로는 다른 술로 본다 (카스 ≠ 카스제로)", async () => {
+    const { matchItem } = await import("./receiptText");
+    const items = [drink("cass", "카스"), drink("cass0", "카스제로"), drink("cola", "코카콜라"), drink("cola0", "코카콜라제로")];
+    expect(matchItem("카스제로(레몬) 330ml 박스", items)?.id).toBe("cass0");
+    expect(matchItem("카스맥주 500ml 박스", items)?.id).toBe("cass");
+    expect(matchItem("코카콜라 제로 1.5L", items)?.id).toBe("cola0");
+  });
+
   it("소모품·기타 줄은 품목에 연결하지 않는다", () => {
     const grid = [
       ["구매일시", "거래처", "비용분류", "품목", "단가", "수량", "품목금액"],

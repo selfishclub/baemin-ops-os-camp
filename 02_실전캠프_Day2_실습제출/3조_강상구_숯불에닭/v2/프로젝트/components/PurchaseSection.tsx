@@ -22,6 +22,7 @@ import {
 } from "@/lib/costing/purchases";
 import { LiquorParseError, liquorBrands, liquorDayToPurchase, newLiquorItems, parseLiquorLedgerGrid, type LiquorLedger } from "@/lib/costing/liquorLedger";
 import { ReceiptSheetError, linkableCategory, parseReceiptSheets, receiptDiscount, receiptTotal, sheetReceiptToPurchase, toPurchaseCategory, type SheetReceipt } from "@/lib/costing/receiptSheet";
+import { LIQUOR_PROMPT, parseLiquorText } from "@/lib/costing/liquorText";
 import { RECEIPT_PROMPT, matchItem, parseReceiptText, toPurchaseLine } from "@/lib/costing/receiptText";
 import { todayStr } from "@/lib/daily";
 import { num, won } from "@/lib/format";
@@ -31,6 +32,11 @@ import { getStore } from "@/lib/storage";
 
 // 매입 영수증 — 마트·거래처 영수증을 품목별로 적고, 품목에 연결하면 기준단가가 최근 매입가로 바뀐다.
 const LIQUOR_VENDOR_KEY = "liquor_vendor"; // 주류 도매상 이름 (한 번 적으면 다음에도)
+export const LIQUOR_BALANCE_KEY = "liquor_balance"; // 주류 채권잔액 (영수증에 찍힌 아직 안 낸 외상)
+export interface LiquorBalance {
+  date: string;
+  amount: number;
+}
 const emptyLine = (): PurchaseLine => ({ name: "", unitPrice: 0, qty: 1, amount: 0, category: "원재료비", itemId: null, itemQty: 0 });
 
 export default function PurchaseSection({ month, items, onItemsChange }: { month: string; items: Item[]; onItemsChange: () => Promise<void> }) {
@@ -42,6 +48,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
   const [viewing, setViewing] = useState<Purchase | null>(null);
   const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
   const [liquor, setLiquor] = useState<{ ledger: LiquorLedger; fileName: string; vendor: string } | null>(null);
+  const [balance, setBalance] = useState<LiquorBalance | null>(null);
   const liquorRef = useRef<HTMLInputElement>(null);
   const [sheet, setSheet] = useState<{ receipts: SheetReceipt[]; notes: string[]; fileName: string } | null>(null);
   const sheetRef = useRef<HTMLInputElement>(null);
@@ -66,6 +73,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
     setPhotoCounts(await countPhotosByOwner());
     setBankTxs(await getStore().listTransactions(month));
     setExempt({ ...emptyExempt(), ...((await getStore().getSetting<ReceiptExempt>(RECEIPT_EXEMPT_KEY)) ?? {}) });
+    setBalance(await getStore().getSetting<LiquorBalance>(LIQUOR_BALANCE_KEY));
     setLoaded(true);
   }
 
@@ -141,6 +149,15 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
     } finally {
       if (liquorRef.current) liquorRef.current.value = "";
     }
+  }
+
+  // 주류 영수증에 찍힌 채권잔액 = 월말에 낼 외상. 가장 최근 것만 둔다.
+  async function saveBalance(next: LiquorBalance) {
+    const store = getStore();
+    const now = await store.getSetting<LiquorBalance>(LIQUOR_BALANCE_KEY);
+    if (now && now.date > next.date) return;
+    await store.saveSetting(LIQUOR_BALANCE_KEY, next);
+    setBalance(next);
   }
 
   async function saveLiquor(ledger: LiquorLedger, vendor: string, createItems: boolean) {
@@ -290,6 +307,12 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
           </div>
         )}
 
+        {balance && (
+          <p className="num rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-100">
+            주류 외상(채권잔액) <b>{won(balance.amount)}</b> — {balance.date.slice(5).replace("-", "/")} 영수증 기준. 월말에 낼 돈이에요.
+          </p>
+        )}
+
         {purchases.length === 0 ? (
           <div className="space-y-2">
             <p className="text-xs text-stone-500">아직 영수증이 없어요. “+ 영수증 추가”로 넣어 보세요.</p>
@@ -385,8 +408,9 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
           month={month}
           items={items}
           onCancel={() => setPasting(false)}
-          onUse={(p) => {
+          onUse={(p, balance) => {
             setPasting(false);
+            if (balance) void saveBalance(balance);
             startNew(p);
           }}
         />
@@ -524,10 +548,27 @@ function itemUnitOf(items: Item[], id: string) {
 }
 
 // 텍스트로 붙여넣기 — 폰 클로드·챗GPT 앱에 영수증 사진을 올려 받은 글자를 그대로 붙이면 줄로 바꿔 준다.
-function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: Item[]; onUse: (p: Partial<Purchase>) => void; onCancel: () => void }) {
+function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: Item[]; onUse: (p: Partial<Purchase>, balance?: LiquorBalance | null) => void; onCancel: () => void }) {
   const [text, setText] = useState("");
   const [copied, setCopied] = useState(false);
-  const parsed = useMemo(() => (text.trim() ? parseReceiptText(text, month) : null), [text, month]);
+  // 주류 판매계산서는 보증금·채권잔액이 섞여 있어 읽는 법이 다르다. 글자를 보고 알아서 고른다.
+  const looksLiquor = /보증금|채권잔액|술값소계|주류/.test(text);
+  const liquor = useMemo(() => {
+    if (!looksLiquor || !text.trim()) return null;
+    try {
+      return { ok: parseLiquorText(text, month), error: null as string | null };
+    } catch (e) {
+      return { ok: null, error: e instanceof Error ? e.message : String(e) };
+    }
+  }, [looksLiquor, text, month]);
+  const parsed = useMemo(() => (!looksLiquor && text.trim() ? parseReceiptText(text, month) : null), [looksLiquor, text, month]);
+
+  const useLiquor = () => {
+    const r = liquor?.ok;
+    if (!r) return;
+    const p = liquorDayToPurchase(r.day, r.vendor || "주류", items);
+    onUse({ date: r.day.date || undefined, vendor: p.vendor, lines: p.lines, discount: p.discount, memo: (p.memo ?? "").replace("주류 원장에서 읽음", "주류 영수증에서 읽음") }, r.balance !== null && r.day.date ? { date: r.day.date, amount: r.balance } : null);
+  };
 
   const build = () => {
     if (!parsed) return;
@@ -563,12 +604,13 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
             <li>아래 지시문을 같이 붙여 넣어요. (한 번 복사해 두면 계속 써요)</li>
             <li>나온 글자를 복사해서 아래 칸에 붙여 넣어요.</li>
           </ol>
-          <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-2 text-[11px] text-stone-700">{RECEIPT_PROMPT}</pre>
+          <p className="mt-2 text-[11px] text-stone-500">주류 판매계산서는 보증금·채권잔액이 있어서 지시문이 달라요. 아래 글은 지금 칸에 붙인 내용에 맞춰 바뀝니다.</p>
+          <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-2 text-[11px] text-stone-700">{looksLiquor ? LIQUOR_PROMPT : RECEIPT_PROMPT}</pre>
           <button
             className="btn-ghost mt-1 px-2 py-1 text-[11px]"
             onClick={async () => {
               try {
-                await navigator.clipboard.writeText(RECEIPT_PROMPT);
+                await navigator.clipboard.writeText(looksLiquor ? LIQUOR_PROMPT : RECEIPT_PROMPT);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
               } catch {
@@ -637,13 +679,68 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
           </div>
         )}
 
+        {liquor?.error && <Notice tone="error">{liquor.error}</Notice>}
+        {liquor?.ok && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-stone-500">주류 영수증으로 읽었어요</p>
+            <div className="num grid grid-cols-2 gap-2 rounded-xl bg-stone-50 p-2 text-xs sm:grid-cols-4">
+              <div>
+                <p className="text-[11px] text-stone-500">거래처</p>
+                <p className="font-bold">{liquor.ok.vendor || "못 읽음"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-stone-500">날짜</p>
+                <p className="font-bold">{liquor.ok.day.date || "못 읽음"}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-stone-500">술값 (매입)</p>
+                <p className="font-bold">{won(liquor.ok.day.subtotal)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-stone-500">채권잔액</p>
+                <p className="font-bold">{liquor.ok.balance === null ? "못 읽음" : won(liquor.ok.balance)}</p>
+              </div>
+            </div>
+            {liquor.ok.notes.map((n, i) => (
+              <Notice key={i} tone="warn">
+                {n}
+              </Notice>
+            ))}
+            <ul className="divide-y divide-stone-100 text-xs">
+              {liquor.ok.day.lines.map((l, i) => {
+                const it = matchItem(l.displayName, items);
+                return (
+                  <li key={i} className="flex items-center justify-between gap-2 py-1">
+                    <span className="min-w-0 flex-1 truncate">
+                      {l.displayName}
+                      {l.specMl ? ` ${l.specMl}ml` : ""} × {l.box}박스
+                      {it && l.bottles && <span className="ml-1 rounded bg-orange-50 px-1 py-0.5 text-[10px] text-orange-700">→ {it.name} {l.bottles}병</span>}
+                    </span>
+                    <span className="num whitespace-nowrap text-stone-500">{l.perBottle ? `${num(l.perBottle)}원/병` : ""}</span>
+                    <span className="num whitespace-nowrap font-semibold">{won(l.subtotal)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="text-[11px] text-stone-500">
+              보증금 {won(liquor.ok.day.deposit)}은 원가에서 뺐어요 (빈 병 돌려주면 받는 돈){liquor.ok.day.returned ? ` · 이번에 돌려받은 빈병값 ${won(liquor.ok.day.returned)}` : ""}.
+            </p>
+          </div>
+        )}
+
         <div className="flex gap-2">
           <button className="btn-ghost flex-1" onClick={onCancel}>
             취소
           </button>
-          <button className="btn-primary flex-1" disabled={!parsed || parsed.lines.length === 0} onClick={build}>
-            이대로 넣기
-          </button>
+          {liquor ? (
+            <button className="btn-primary flex-1" disabled={!liquor.ok} onClick={useLiquor}>
+              이대로 넣기
+            </button>
+          ) : (
+            <button className="btn-primary flex-1" disabled={!parsed || parsed.lines.length === 0} onClick={build}>
+              이대로 넣기
+            </button>
+          )}
         </div>
       </div>
     </div>

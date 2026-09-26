@@ -180,7 +180,8 @@ export function parseReceiptText(text: string, monthHint?: string): ParsedReceip
 
 const norm = (s: string) => s.replace(/[\s()［］\[\]]/g, "").toLowerCase();
 
-const DRINK_TAIL = /^(맥주|소주|라이트|생|병|캔|페트|pet|box|박스|제로|오리지널|\d.*|ml.*)?$/i;
+// "제로"는 뒤에 붙이면 다른 술·음료가 된다(카스 ↔ 카스제로). 일부러 뺐다.
+const DRINK_TAIL = /^(맥주|소주|라이트|생|병|캔|페트|pet|box|박스|오리지널|\d.*|ml.*)?$/i;
 function drinkNameMatches(name: string, itemNorm: string): boolean {
   const tokens = name.toLowerCase().split(/[\s()［］\[\]_/,·]+/).filter(Boolean);
   if (tokens.some((tk) => tk.startsWith(itemNorm) && DRINK_TAIL.test(tk.slice(itemNorm.length)))) return true;
