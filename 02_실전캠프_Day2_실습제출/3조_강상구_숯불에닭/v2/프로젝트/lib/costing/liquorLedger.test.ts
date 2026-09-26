@@ -48,8 +48,9 @@ describe("주류 매출원장 읽기", () => {
     expect(beer).toMatchObject({ displayName: "가짜맥주", bottles: 20, perBottle: 1500 });
   });
 
-  it("규격마다 박스당 병 수를 안다 (청하 300ml 30병, 모르는 규격은 null)", () => {
+  it("규격마다 박스당 병 수를 안다 (청하 300·카스제로 330ml 30병, 모르는 규격은 null)", () => {
     expect(bottlesPerBox(300)).toBe(30);
+    expect(bottlesPerBox(330)).toBe(30);
     expect(bottlesPerBox(360)).toBe(30);
     expect(bottlesPerBox(500)).toBe(20);
     expect(bottlesPerBox(750)).toBeNull();
