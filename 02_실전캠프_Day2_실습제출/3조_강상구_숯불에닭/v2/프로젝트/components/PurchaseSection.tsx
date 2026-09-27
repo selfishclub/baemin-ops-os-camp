@@ -266,44 +266,51 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
           <h2 className="text-base font-bold">
             매입 영수증 <span className="text-[11px] font-normal text-stone-500">{monthLabel(month)} · 품목별 입고</span>
           </h2>
-          <div className="flex flex-wrap gap-1.5">
-            <button className="btn-ghost whitespace-nowrap px-3 py-1.5 text-xs" onClick={() => sheetRef.current?.click()}>
-              🧾 영수증 엑셀 올리기
-            </button>
-            <input ref={sheetRef} type="file" accept=".xlsx,.xls" aria-label="영수증 정리 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readSheetFile(e.target.files[0])} />
-            <button className="btn-ghost whitespace-nowrap px-3 py-1.5 text-xs" onClick={() => liquorRef.current?.click()}>
-              🍺 주류 원장 올리기
-            </button>
-            <input ref={liquorRef} type="file" accept=".xlsx,.xls" aria-label="주류 매출원장 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readLiquorFile(e.target.files[0])} />
-            <button className="btn-ghost whitespace-nowrap px-3 py-1.5 text-xs" onClick={() => setPasting(true)}>
-              📋 텍스트로 붙여넣기
-            </button>
+          <div className="flex flex-wrap items-center gap-1.5">
             <button className="btn-primary whitespace-nowrap px-3 py-1.5 text-xs" onClick={() => startNew()}>
               + 영수증 추가
             </button>
+            <button className="btn-ghost whitespace-nowrap px-3 py-1.5 text-xs" onClick={() => setPasting(true)}>
+              📋 텍스트로 붙여넣기
+            </button>
           </div>
         </div>
-        <p className="text-xs text-stone-600">
-          마트·거래처 영수증을 상품 줄 그대로 적어요. 줄을 <b>원가율 품목에 연결</b>하고 품목 단위 수량(특란 30구×5 = 150개)을 넣으면 그 품목의 <b>기준단가가 최근 매입가로 자동</b>으로 바뀌어요. 손익은 통장 기준이라 여기 금액은 손익에 따로 더하지 않아요.
-        </p>
-        <p className="text-xs text-stone-600">
-          손으로 치기 번거로우면 <b>폰 클로드·챗GPT 앱에 영수증 사진</b>을 올려 글자로 받은 다음, “텍스트로 붙여넣기”에 그대로 붙이세요. 줄과 품목 연결까지 자동으로 채워집니다. 실물 사진은 영수증마다 붙여 두면 나중에 숫자와 나란히 볼 수 있어요.
-        </p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-500">
+          <span>엑셀로 한 번에:</span>
+          <button className="underline hover:text-stone-700" onClick={() => sheetRef.current?.click()}>
+            🧾 영수증 정리 엑셀
+          </button>
+          <input ref={sheetRef} type="file" accept=".xlsx,.xls" aria-label="영수증 정리 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readSheetFile(e.target.files[0])} />
+          <button className="underline hover:text-stone-700" onClick={() => liquorRef.current?.click()}>
+            🍺 주류 매출원장
+          </button>
+          <input ref={liquorRef} type="file" accept=".xlsx,.xls" aria-label="주류 매출원장 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readLiquorFile(e.target.files[0])} />
+        </div>
+        <details className="text-xs text-stone-600">
+          <summary className="cursor-pointer text-[11px] font-semibold text-stone-500">? 어떻게 넣나 (누르면 펼쳐져요)</summary>
+          <p className="mt-2">
+            마트·거래처 영수증을 상품 줄 그대로 적어요. 줄을 <b>원가율 품목에 연결</b>하고 품목 단위 수량(특란 30구×5 = 150개)을 넣으면 그 품목의 <b>기준단가가 최근 매입가로 자동</b>으로 바뀌어요. 손익은 통장 기준이라 여기 금액은 손익에 따로 더하지 않아요.
+          </p>
+          <p className="mt-1.5">
+            손으로 치기 번거로우면 <b>폰 클로드·챗GPT 앱에 영수증 사진</b>을 올려 글자로 받은 다음, “텍스트로 붙여넣기”에 그대로 붙이세요. 줄과 품목 연결까지 자동으로 채워집니다. 실물 사진은 영수증마다 붙여 두면 나중에 숫자와 나란히 볼 수 있어요.
+          </p>
+        </details>
         {note && <Notice tone={note.tone}>{note.text}</Notice>}
 
         {purchases.length > 0 && (
-          <div className="num grid grid-cols-2 gap-2 rounded-xl bg-stone-50 p-2 text-xs sm:grid-cols-4">
-            <div>
-              <p className="text-[11px] text-stone-500">이 달 매입</p>
-              <p className="font-bold">{won(summary.total)}</p>
-              <p className="text-[11px] text-stone-500">{summary.count}건</p>
-            </div>
-            {PURCHASE_CATEGORIES.filter((c) => summary.byCategory[c] > 0).map((c) => (
-              <div key={c}>
-                <p className="text-[11px] text-stone-500">{c}</p>
-                <p className="font-bold">{won(summary.byCategory[c])}</p>
-              </div>
-            ))}
+          <div className="num flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-xl bg-stone-50 px-3 py-2 text-xs">
+            <span className="whitespace-nowrap">
+              <span className="text-[11px] text-stone-500">이 달 매입 </span>
+              <b className="text-sm">{won(summary.total)}</b>
+              <span className="text-[11px] text-stone-500"> · {summary.count}건</span>
+            </span>
+            <span className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-stone-600">
+              {PURCHASE_CATEGORIES.filter((c) => summary.byCategory[c] > 0).map((c) => (
+                <span key={c} className="whitespace-nowrap">
+                  {c} <b className="text-stone-800">{won(summary.byCategory[c])}</b>
+                </span>
+              ))}
+            </span>
           </div>
         )}
 
@@ -348,25 +355,27 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
                     </p>
                     {p.memo && <p className="text-[11px] text-stone-400">{p.memo}</p>}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="num text-sm font-bold">{won(purchaseTotal(p))}</span>
-                    {photoCounts[p.id] > 0 && (
-                      <button className="btn-ghost whitespace-nowrap px-2 py-1 text-xs" onClick={() => setViewing(p)}>
-                        사진 보기
+                  <div className="flex items-center gap-3">
+                    <span className="num text-base font-bold">{won(purchaseTotal(p))}</span>
+                    <span className="flex items-center gap-2 text-[11px]">
+                      {photoCounts[p.id] > 0 && (
+                        <button className="whitespace-nowrap text-stone-500 underline hover:text-stone-700" onClick={() => setViewing(p)}>
+                          사진
+                        </button>
+                      )}
+                      <button
+                        className="whitespace-nowrap font-semibold text-orange-700 underline hover:text-orange-800"
+                        onClick={() => {
+                          setEditing({ ...p, lines: p.lines.map((l) => ({ ...l })) });
+                          setEditingIsNew(false);
+                        }}
+                      >
+                        고치기
                       </button>
-                    )}
-                    <button
-                      className="btn-ghost whitespace-nowrap px-2 py-1 text-xs"
-                      onClick={() => {
-                        setEditing({ ...p, lines: p.lines.map((l) => ({ ...l })) });
-                        setEditingIsNew(false);
-                      }}
-                    >
-                      고치기
-                    </button>
-                    <button className="btn-ghost whitespace-nowrap px-2 py-1 text-xs" onClick={() => setConfirmDelete(p)}>
-                      지우기
-                    </button>
+                      <button className="whitespace-nowrap text-stone-400 underline hover:text-stone-600" onClick={() => setConfirmDelete(p)}>
+                        지우기
+                      </button>
+                    </span>
                   </div>
                 </div>
               </li>
