@@ -23,6 +23,7 @@ import {
 import { LiquorParseError, liquorBrands, liquorDayToPurchase, newLiquorItems, parseLiquorLedgerGrid, type LiquorLedger } from "@/lib/costing/liquorLedger";
 import { ReceiptSheetError, linkableCategory, parseReceiptSheets, receiptDiscount, receiptTotal, sheetReceiptToPurchase, toPurchaseCategory, type SheetReceipt } from "@/lib/costing/receiptSheet";
 import { LIQUOR_PROMPT, parseLiquorText } from "@/lib/costing/liquorText";
+import { txFromPurchase } from "@/lib/costing/purchaseToTx";
 import { RECEIPT_PROMPT, matchItem, parseReceiptText, toPurchaseLine } from "@/lib/costing/receiptText";
 import { todayStr } from "@/lib/daily";
 import { num, won } from "@/lib/format";
@@ -116,12 +117,15 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
       await store.saveSetting(ITEMS_KEY, applied.items);
       await onItemsChange();
     }
+    // 같은 지출을 통장에서 또 분류하지 않게, 짝이 맞는 체크카드 줄의 분류를 대신 채운다 (아직 분류 안 한 줄만)
+    const filled = txFromPurchase(clean, bankTxs);
+    if (filled) await store.saveTransactions([filled]);
     setEditing(null);
     setEditingIsNew(false);
     await load();
     setNote({
       tone: "ok",
-      text: `${clean.date.slice(5).replace("-", "/")} ${clean.vendor} ${won(purchaseTotal(clean))} 저장했어요.${applied.updated.length ? ` 기준단가 갱신: ${applied.updated.map((u) => `${u.name} ${num(u.from)}→${num(u.to)}`).join(", ")}` : ""}`,
+      text: `${clean.date.slice(5).replace("-", "/")} ${clean.vendor} ${won(purchaseTotal(clean))} 저장했어요.${applied.updated.length ? ` 기준단가 갱신: ${applied.updated.map((u) => `${u.name} ${num(u.from)}→${num(u.to)}`).join(", ")}` : ""}${filled ? ` 통장의 ${cardPayee(filled.payee)} ${won(filled.out)}도 “${filled.major} › ${filled.minor}”로 분류했어요.` : ""}`,
     });
   }
 
