@@ -11,23 +11,19 @@ create table if not exists public.checklist_runs (
   items jsonb not null default '{}'::jsonb,   -- {"0":"2026-09-28T21:03:11Z", ...} 체크한 항목 번호 → 체크 시각
   total int not null default 0,
   done_count int not null default 0,
+  note text not null default '',            -- 특이사항 (재고 부족, 기기 이상 등)
   first_completed_at timestamptz,
   completed_at timestamptz,
   updated_at timestamptz not null default now(),
   unique (run_date, store, kind)
 );
 
--- 2) 설정: 매장 목록, 이름 목록
+-- 2) 설정: 매장 목록, 이름 목록 (사장이 앱의 점검표 → 목록 화면에서 등록. 기본값·샘플 없음)
 create table if not exists public.settings (
   key text primary key,
   value jsonb not null,
   updated_at timestamptz not null default now()
 );
-
-insert into public.settings (key, value) values
-  ('stores', '["상동점","논현점","공항점"]'::jsonb),
-  ('staff',  '["알바 A","알바 B","알바 C","매니저"]'::jsonb)
-on conflict (key) do nothing;
 
 -- 3) 잠금(RLS): 익명 키로 읽기·쓰기는 허용, 지우기는 금지
 alter table public.checklist_runs enable row level security;

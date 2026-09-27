@@ -26,8 +26,9 @@
 
   // ---------- 서버 (Supabase REST) ----------
   var SB = window.SB || {};
-  var DEFAULT_STORES = ['상동점', '논현점', '공항점'];
-  var DEFAULT_STAFF = ['알바 A', '알바 B', '알바 C', '매니저'];
+  // 매장·이름 목록은 사장이 점검표 화면에서 등록한다. 코드에 기본값(지점명 등)을 두지 않는다.
+  var DEFAULT_STORES = [];
+  var DEFAULT_STAFF = [];
   function sbOn() { return !!(SB.url && SB.anon); }
   function sbFetch(path, opts) {
     opts = opts || {};
@@ -43,10 +44,13 @@
     var cached = store.get('settings'); if (cached) { try { base = JSON.parse(cached); } catch (e) {} }
     if (!sbOn()) { settingsCache = base; return Promise.resolve(base); }
     return sbFetch('settings?select=key,value').then(function (rows) {
-      (rows || []).forEach(function (r) { if (r.key === 'stores' || r.key === 'staff') base[r.key] = r.value; });
+      (rows || []).forEach(function (r) { if ((r.key === 'stores' || r.key === 'staff') && Array.isArray(r.value)) base[r.key] = r.value; });
       settingsCache = base; store.set('settings', JSON.stringify(base)); return base;
     }).catch(function () { settingsCache = base; return base; });
   }
+  // 매장이 0~1개면 매장 선택은 보이지 않는다. 1개면 그 이름을 쓰고, 0개면 빈 이름("매장"으로 표시).
+  function storeLabel(s) { return s ? s : '매장'; }
+  function singleStore(settings) { return settings.stores.length <= 1 ? (settings.stores[0] || '') : null; }
   function saveSetting(key, value) {
     settingsCache = null; store.del('settings');
     if (!sbOn()) { var b = JSON.parse(store.get('settings') || '{}'); b[key] = value; store.set('settings', JSON.stringify(b)); return Promise.resolve(); }
@@ -73,7 +77,7 @@
     run.updated_at = new Date().toISOString();
     saveLocalRun(run);
     if (!sbOn()) return Promise.resolve({ ok: true, local: true });
-    var body = { run_date: run.run_date, store: run.store, kind: run.kind, staff: run.staff, items: run.items, total: run.total, done_count: run.done_count, first_completed_at: run.first_completed_at || null, completed_at: run.completed_at || null, updated_at: run.updated_at };
+    var body = { run_date: run.run_date, store: run.store, kind: run.kind, staff: run.staff, items: run.items, total: run.total, done_count: run.done_count, note: run.note || '', first_completed_at: run.first_completed_at || null, completed_at: run.completed_at || null, updated_at: run.updated_at };
     return sbFetch('checklist_runs?on_conflict=run_date,store,kind', { method: 'POST', prefer: 'resolution=merge-duplicates,return=representation', body: [body] })
       .then(function (rows) { if (rows && rows[0]) { run.id = rows[0].id; saveLocalRun(run); } return { ok: true }; })
       .catch(function (e) { return { ok: false, error: e.message }; });
@@ -219,22 +223,32 @@
   // 매장·이름 고르기
   function viewWho(next) {
     var cur = me() || {};
-    app.innerHTML = '<div class="crumb"><a href="#/">첫 화면</a> › 매장·이름</div><h1>누구세요?</h1><p class="muted">한 번 고르면 이 폰이 기억해요. 체크 기록에 매장과 이름이 남습니다.</p><div class="muted">불러오는 중…</div>';
+    app.innerHTML = '<div class="crumb"><a href="#/">첫 화면</a> › 이름</div><h1>누구세요?</h1><p class="muted">한 번 고르면 이 폰이 기억해요. 체크 기록에 이름이 남습니다.</p><div class="muted">불러오는 중…</div>';
     loadSettings().then(function (s) {
-      var h = '<div class="crumb"><a href="#/">첫 화면</a> › 매장·이름</div><h1>누구세요?</h1><p class="muted">한 번 고르면 이 폰이 기억해요. 체크 기록에 매장과 이름이 남습니다.</p>';
-      h += '<p class="section-title">매장</p><div class="choice" id="pick-store">' + s.stores.map(function (x) { return '<button type="button" class="choice-btn' + (cur.store === x ? ' on' : '') + '" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>';
-      h += '<p class="section-title">이름</p><div class="choice" id="pick-staff">' + s.staff.map(function (x) { return '<button type="button" class="choice-btn' + (cur.staff === x ? ' on' : '') + '" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>';
-      h += '<p class="muted small">내 이름이 없으면 사장님께 말씀해 주세요 (사장 점검표에서 추가합니다).</p>';
+      var single = singleStore(s), multi = single === null;
+      var h = '<div class="crumb"><a href="#/">첫 화면</a> › ' + (multi ? '매장·' : '') + '이름</div><h1>누구세요?</h1><p class="muted">한 번 고르면 이 폰이 기억해요. 체크 기록에 ' + (multi ? '매장과 ' : '') + '이름이 남습니다.</p>';
+      if (multi) h += '<p class="section-title">매장</p><div class="choice" id="pick-store">' + s.stores.map(function (x) { return '<button type="button" class="choice-btn' + (cur.store === x ? ' on' : '') + '" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>';
+      h += '<p class="section-title">이름</p>';
+      if (s.staff.length) {
+        h += '<div class="choice" id="pick-staff">' + s.staff.map(function (x) { return '<button type="button" class="choice-btn' + (cur.staff === x ? ' on' : '') + '" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>';
+        h += '<p class="muted small">내 이름이 없으면 사장님께 말씀해 주세요 (사장 점검표 → 목록에서 추가합니다).</p>';
+      } else {
+        h += '<input type="text" id="staff-text" class="text-input" placeholder="이름 또는 별칭 (예: 알바 A)" value="' + esc(cur.staff || '') + '" maxlength="20">';
+        h += '<p class="muted small">아직 등록된 이름 목록이 없어 직접 적습니다. 사장님이 점검표 → 목록에서 이름을 등록하면 고르기로 바뀝니다.</p>';
+      }
       h += '<button type="button" class="btn primary wide" id="who-ok">이대로 시작</button>';
       app.innerHTML = h;
-      var pick = { store: cur.store, staff: cur.staff };
+      var pick = { store: multi ? cur.store : single, staff: cur.staff };
       ['store', 'staff'].forEach(function (k) {
         app.querySelectorAll('#pick-' + k + ' .choice-btn').forEach(function (b) {
           b.addEventListener('click', function () { pick[k] = b.dataset.v; app.querySelectorAll('#pick-' + k + ' .choice-btn').forEach(function (x) { x.classList.toggle('on', x === b); }); });
         });
       });
       document.getElementById('who-ok').addEventListener('click', function () {
-        if (!pick.store || !pick.staff) { alert('매장과 이름을 둘 다 골라 주세요.'); return; }
+        var t = document.getElementById('staff-text'); if (t) pick.staff = t.value.trim();
+        if (multi && !pick.store) { alert('매장을 골라 주세요.'); return; }
+        if (!pick.staff) { alert('이름을 ' + (s.staff.length ? '골라' : '적어') + ' 주세요.'); return; }
+        if (!multi) pick.store = single;
         store.set('me', JSON.stringify(pick));
         location.hash = next || '#/';
       });
@@ -248,7 +262,7 @@
     var src = LISTS[kind], label = KIND_LABEL[kind], detail = kind === 'open' ? 4 : 10, date = today();
     var h = '<div class="crumb"><a href="#/">첫 화면</a> › 체크리스트</div>';
     h += '<h1>' + (kind === 'open' ? '☀️' : '🌙') + ' ' + label + ' 체크리스트</h1>';
-    h += '<div class="card who-line"><span><strong>' + esc(m.store) + '</strong> · ' + esc(m.staff) + ' · ' + koDate(date) + '</span><a href="#/who?next=' + encodeURIComponent('#/check/' + kind) + '">바꾸기</a></div>';
+    h += '<div class="card who-line"><span>' + (m.store ? '<strong>' + esc(m.store) + '</strong> · ' : '') + esc(m.staff) + ' · ' + koDate(date) + '</span><a href="#/who?next=' + encodeURIComponent('#/check/' + kind) + '">바꾸기</a></div>';
     h += '<div id="cl-body" class="muted">불러오는 중…</div>';
     app.innerHTML = h;
     fetchRun(date, m.store, kind).then(function (run) {
@@ -264,7 +278,8 @@
         body += '<li class="' + (on ? 'done' : '') + '"><label><input type="checkbox" data-i="' + i + '"' + (on ? ' checked' : '') + '><span>' + esc(t) + '</span><em class="when">' + (on ? hhmm(run.items[String(i)]) : '') + '</em></label></li>';
       });
       body += '</ul>';
-      body += '<button type="button" class="btn primary wide" id="cl-complete">' + label + ' 완료</button>';
+      body += '<label class="field">특이사항 (선택) <span class="muted small">— 재고 부족, 기기 이상, 손님 특이사항 등. 사장님 화면에 함께 보입니다</span><textarea id="cl-note-text" rows="3" placeholder="예: 흑임자 재고 2팩 남음 / 제빙기 소리 이상">' + esc(run.note || '') + '</textarea></label>';
+      body += '<button type="button" class="btn primary wide" id="cl-complete">' + label + ' 완료 제출</button>';
       body += '<div class="chapter-tools"><a class="btn" href="' + chapterLink(detail) + '">' + detail + '장 자세히 보기</a><button type="button" class="btn danger" id="cl-reset">오늘 체크 지우기</button></div>';
       document.getElementById('cl-body').innerHTML = body;
       var inputs = app.querySelectorAll('input[data-i]');
@@ -275,10 +290,16 @@
         document.getElementById('cl-bar').style.width = (run.total ? Math.round(done / run.total * 100) : 0) + '%';
         var dm = document.getElementById('cl-done');
         dm.hidden = !run.completed_at;
-        if (run.completed_at) dm.innerHTML = '👏 오늘 ' + esc(run.store) + ' ' + label + ' 완료 · ' + esc(run.staff) + ' · ' + hhmm(run.completed_at) + (done < run.total ? ' <span class="warn">(' + (run.total - done) + '개 빠짐)</span>' : '');
+        if (run.completed_at) dm.innerHTML = '👏 오늘 ' + (run.store ? esc(run.store) + ' ' : '') + label + ' 완료 · ' + esc(run.staff) + ' · ' + hhmm(run.completed_at) + (done < run.total ? ' <span class="warn">(' + (run.total - done) + '개 빠짐)</span>' : '');
         var btn = document.getElementById('cl-complete');
-        btn.textContent = run.completed_at ? label + ' 완료됨 — 다시 저장' : label + ' 완료' + (done < run.total ? ' (' + (run.total - done) + '개 남음)' : '');
+        btn.textContent = run.completed_at ? label + ' 완료 제출됨 — 다시 제출' : label + ' 완료 제출' + (done < run.total ? ' (' + (run.total - done) + '개 남음)' : '');
       }
+      var noteTimer = null;
+      document.getElementById('cl-note-text').addEventListener('input', function (e) {
+        run.note = e.target.value; run.staff = m.staff;
+        clearTimeout(noteTimer);
+        noteTimer = setTimeout(function () { saveRun(run).then(note); }, 800);
+      });
       function note(res) {
         var n = document.getElementById('cl-note');
         if (res.ok && !res.local) { n.hidden = true; return; }
@@ -301,12 +322,12 @@
         if (done < run.total && !confirm((run.total - done) + '개가 아직 체크 안 됐어요. 그래도 ' + label + ' 완료로 저장할까요?')) return;
         var now = new Date().toISOString();
         if (!run.first_completed_at) run.first_completed_at = now;
-        run.completed_at = now; run.staff = m.staff;
+        run.completed_at = now; run.staff = m.staff; run.note = document.getElementById('cl-note-text').value;
         refresh();
         saveRun(run).then(function (res) { note(res); if (res.ok) window.scrollTo(0, 0); });
       });
       document.getElementById('cl-reset').addEventListener('click', function () {
-        if (!confirm('오늘 ' + run.store + ' ' + label + ' 체크를 모두 지울까요? (완료 표시도 지워져요)')) return;
+        if (!confirm('오늘 ' + storeLabel(run.store) + ' ' + label + ' 체크를 모두 지울까요? (완료 표시도 지워져요)')) return;
         run.items = {}; run.completed_at = null; run.first_completed_at = null;
         inputs.forEach(function (inp) { inp.checked = false; inp.closest('li').classList.remove('done'); inp.closest('li').querySelector('.when').textContent = ''; });
         refresh(); saveRun(run).then(note);
@@ -337,15 +358,18 @@
     app.innerHTML = h;
     Promise.all([loadSettings(), fetchRunsForDate(date)]).then(function (r) {
       var s = r[0], runs = r[1] || [];
-      function find(st, k) { return runs.filter(function (x) { return x.store === st && x.kind === k; })[0]; }
-      var b = '<div class="owner-grid"><div class="og-head"></div><div class="og-head">☀️ 오픈</div><div class="og-head">🌙 마감</div>';
-      s.stores.forEach(function (st) {
-        b += '<div class="og-store">' + esc(st) + '</div>';
+      function find(st, k) { return runs.filter(function (x) { return (x.store || '') === st && x.kind === k; })[0]; }
+      var storesToShow = s.stores.length ? s.stores : [''];
+      var b = '';
+      if (!s.stores.length || !s.staff.length) b += '<div class="save-note soft">' + (!s.stores.length ? '매장 이름이 아직 없어요. ' : '') + (!s.staff.length ? '직원 이름 목록이 아직 없어요. ' : '') + '아래 "매장·이름 목록 고치기"에서 등록해 주세요. (매장이 하나면 매장 이름 하나만 적으면 되고, 직원 화면에는 매장 선택이 나오지 않아요)</div>';
+      b += '<div class="owner-grid"><div class="og-head"></div><div class="og-head">☀️ 오픈</div><div class="og-head">🌙 마감</div>';
+      storesToShow.forEach(function (st) {
+        b += '<div class="og-store">' + esc(storeLabel(st)) + '</div>';
         ['open', 'close'].forEach(function (k) {
           var run = find(st, k), stt = runStatus(run, LISTS[k].items.length);
           b += '<a class="og-cell ' + stt.cls + (detail === st + '|' + k ? ' selected' : '') + '" href="#/owner?d=' + date + '&x=' + encodeURIComponent(st + '|' + k) + '">' +
             '<span class="og-label">' + stt.label + '</span>' +
-            (run ? '<span class="og-meta">' + (run.completed_at ? hhmm(run.completed_at) + ' · ' : '') + esc(run.staff) + ' · ' + stt.done + '/' + stt.total + '</span>' : '<span class="og-meta">기록 없음</span>') + '</a>';
+            (run ? '<span class="og-meta">' + (run.completed_at ? hhmm(run.completed_at) + ' · ' : '') + esc(run.staff) + ' · ' + stt.done + '/' + stt.total + (run.note ? ' · 📝' : '') + '</span>' : '<span class="og-meta">기록 없음</span>') + '</a>';
         });
       });
       b += '</div>';
@@ -357,11 +381,13 @@
       document.getElementById('owner-body').innerHTML = b + detailHtml;
     });
     function detailFor(run, k, st) {
-      var items = LISTS[k].items, d = '<div class="card detail"><div class="title">' + esc(st) + ' · ' + KIND_LABEL[k] + '</div>';
+      var items = LISTS[k].items, d = '<div class="card detail"><div class="title">' + esc(storeLabel(st)) + ' · ' + KIND_LABEL[k] + '</div>';
       if (!run) return d + '<div class="muted">이 날 기록이 없어요.</div></div>';
       d += '<div class="sub">' + esc(run.staff) + ' · ' + (run.completed_at ? '완료 ' + hhmm(run.completed_at) : '완료 안 누름') + (run.first_completed_at && run.first_completed_at !== run.completed_at ? ' (처음 완료 ' + hhmm(run.first_completed_at) + ')' : '') + '</div><ul class="detail-list">';
       items.forEach(function (t, i) { var at = run.items[String(i)]; d += '<li class="' + (at ? 'ok' : 'miss') + '">' + (at ? '✅ ' + hhmm(at) : '⬜ 빠짐') + ' · ' + esc(t) + '</li>'; });
-      return d + '</ul></div>';
+      d += '</ul>';
+      d += '<div class="note-box"><strong>특이사항</strong><div>' + (run.note ? esc(run.note).replace(/\n/g, '<br>') : '<span class="muted">없음</span>') + '</div></div>';
+      return d + '</div>';
     }
   }
   function viewOwnerLists() {
@@ -369,14 +395,14 @@
     app.innerHTML = '<div class="crumb"><a href="#/owner">사장 점검표</a> › 목록</div><h1>매장·이름 목록</h1><div class="muted">불러오는 중…</div>';
     loadSettings().then(function (s) {
       var h = '<div class="crumb"><a href="#/owner">사장 점검표</a> › 목록</div><h1>매장·이름 목록</h1><p class="muted">한 줄에 하나씩. 실명 대신 별칭(알바 A 등)을 써도 됩니다.</p>';
-      h += '<label class="field">매장<textarea id="stores" rows="4">' + esc(s.stores.join('\n')) + '</textarea></label>';
-      h += '<label class="field">이름<textarea id="staff" rows="6">' + esc(s.staff.join('\n')) + '</textarea></label>';
+      h += '<label class="field">매장 (지점) <span class="muted small">— 하나뿐이면 하나만. 두 개 이상일 때만 직원 화면에 매장 선택이 나와요</span><textarea id="stores" rows="4" placeholder="예: 본점">' + esc(s.stores.join('\n')) + '</textarea></label>';
+      h += '<label class="field">직원 이름 <span class="muted small">— 비워 두면 직원이 직접 이름을 적습니다</span><textarea id="staff" rows="6" placeholder="예: 알바 A">' + esc(s.staff.join('\n')) + '</textarea></label>';
       h += '<button type="button" class="btn primary wide" id="lists-save">저장</button><p id="lists-note" class="muted small"></p>';
       app.innerHTML = h;
       document.getElementById('lists-save').addEventListener('click', function () {
         function lines(id) { return document.getElementById(id).value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean); }
         var st = lines('stores'), sf = lines('staff');
-        if (!st.length || !sf.length) { alert('매장과 이름은 최소 하나씩 있어야 해요.'); return; }
+        store.del('me');
         Promise.all([saveSetting('stores', st), saveSetting('staff', sf)]).then(function () { document.getElementById('lists-note').textContent = '저장했어요.'; }, function (e) { document.getElementById('lists-note').textContent = '저장 안 됨: ' + e.message; });
       });
     });

@@ -194,3 +194,7 @@ mark.todo { background: var(--todo); color: var(--todo-ink); padding: 0 4px; bor
 .detail .detail-list li.miss { color: #a33; font-weight: 700; }
 .field { display: block; margin: 10px 0; font-weight: 700; }
 .field textarea { display: block; width: 100%; margin-top: 6px; padding: 10px; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; font-weight: 400; font-family: inherit; }
+.text-input { display: block; width: 100%; padding: 12px 14px; font-size: 17px; border: 1px solid var(--line); border-radius: 10px; margin: 6px 0 4px; }
+.note-box { margin-top: 10px; padding: 10px 12px; background: var(--brand-soft); border-radius: 10px; font-size: 14px; }
+.note-box strong { display: block; margin-bottom: 4px; }
+.save-note.soft { background: var(--todo); color: var(--todo-ink); }
