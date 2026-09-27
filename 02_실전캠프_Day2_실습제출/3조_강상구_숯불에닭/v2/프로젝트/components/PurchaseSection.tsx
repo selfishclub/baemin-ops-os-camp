@@ -264,7 +264,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
       <section className="card space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-base font-bold">
-            매입 영수증 <span className="text-[11px] font-normal text-stone-500">{monthLabel(month)} · 품목별 입고</span>
+            매입 영수증 <span className="text-xs font-normal text-stone-500">{monthLabel(month)} · 품목별 입고</span>
           </h2>
           <div className="flex flex-wrap items-center gap-1.5">
             <button className="btn-primary whitespace-nowrap px-3 py-1.5 text-xs" onClick={() => startNew()}>
@@ -275,7 +275,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-500">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
           <span>엑셀로 한 번에:</span>
           <button className="underline hover:text-stone-700" onClick={() => sheetRef.current?.click()}>
             🧾 영수증 정리 엑셀
@@ -287,7 +287,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
           <input ref={liquorRef} type="file" accept=".xlsx,.xls" aria-label="주류 매출원장 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readLiquorFile(e.target.files[0])} />
         </div>
         <details className="text-xs text-stone-600">
-          <summary className="cursor-pointer text-[11px] font-semibold text-stone-500">? 어떻게 넣나 (누르면 펼쳐져요)</summary>
+          <summary className="cursor-pointer text-xs font-semibold text-stone-500">? 어떻게 넣나 (누르면 펼쳐져요)</summary>
           <p className="mt-2">
             마트·거래처 영수증을 상품 줄 그대로 적어요. 줄을 <b>원가율 품목에 연결</b>하고 품목 단위 수량(특란 30구×5 = 150개)을 넣으면 그 품목의 <b>기준단가가 최근 매입가로 자동</b>으로 바뀌어요. 손익은 통장 기준이라 여기 금액은 손익에 따로 더하지 않아요.
           </p>
@@ -300,11 +300,11 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
         {purchases.length > 0 && (
           <div className="num flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-xl bg-stone-50 px-3 py-2 text-xs">
             <span className="whitespace-nowrap">
-              <span className="text-[11px] text-stone-500">이 달 매입 </span>
+              <span className="text-xs text-stone-500">이 달 매입 </span>
               <b className="text-sm">{won(summary.total)}</b>
-              <span className="text-[11px] text-stone-500"> · {summary.count}건</span>
+              <span className="text-xs text-stone-500"> · {summary.count}건</span>
             </span>
-            <span className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-stone-600">
+            <span className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone-600">
               {PURCHASE_CATEGORIES.filter((c) => summary.byCategory[c] > 0).map((c) => (
                 <span key={c} className="whitespace-nowrap">
                   {c} <b className="text-stone-800">{won(summary.byCategory[c])}</b>
@@ -344,20 +344,20 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
                   <div className="min-w-0">
                     <p className="font-semibold">
                       {p.date.slice(5).replace("-", "/")} {p.vendor} <span className="num text-xs text-stone-500">{p.lines.length}줄</span>
-                      {photoCounts[p.id] > 0 && <span className="num ml-1 rounded bg-stone-100 px-1.5 py-0.5 text-[11px] text-stone-600">📷 {photoCounts[p.id]}</span>}
+                      {photoCounts[p.id] > 0 && <span className="num ml-1 rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-600">📷 {photoCounts[p.id]}</span>}
                     </p>
-                    <p className="text-[11px] text-stone-500">
+                    <p className="text-xs text-stone-500">
                       {p.lines
                         .slice(0, 4)
                         .map((l) => l.name)
                         .join(" · ")}
                       {p.lines.length > 4 ? " …" : ""}
                     </p>
-                    {p.memo && <p className="text-[11px] text-stone-400">{p.memo}</p>}
+                    {p.memo && <p className="text-xs text-stone-400">{p.memo}</p>}
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="num text-base font-bold">{won(purchaseTotal(p))}</span>
-                    <span className="flex items-center gap-2 text-[11px]">
+                    <span className="flex items-center gap-2 text-xs">
                       {photoCounts[p.id] > 0 && (
                         <button className="whitespace-nowrap text-stone-500 underline hover:text-stone-700" onClick={() => setViewing(p)}>
                           사진
@@ -506,14 +506,14 @@ function PurchaseEditor({ purchase, items, onChange, onSave, onCancel }: { purch
                 {l.itemId ? (
                   <div className="flex items-center gap-1">
                     <input aria-label={`품목 수량 ${i + 1}`} inputMode="decimal" className="field num px-1 py-1.5 text-right text-xs" value={l.itemQty || ""} onChange={(e) => setLine(i, { itemQty: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 })} placeholder="수량" />
-                    <span className="whitespace-nowrap text-[11px] text-stone-500">{unitLabel(itemUnitOf(items, l.itemId))}</span>
+                    <span className="whitespace-nowrap text-xs text-stone-500">{unitLabel(itemUnitOf(items, l.itemId))}</span>
                   </div>
                 ) : (
                   <span />
                 )}
               </div>
               {l.itemId && l.itemQty > 0 && (
-                <p className="num text-right text-[11px] text-stone-500">
+                <p className="num text-right text-xs text-stone-500">
                   → {num(lineUnitCost(p, l) ?? 0)}원/{unitLabel(itemUnitOf(items, l.itemId))} (할인 반영)
                 </p>
               )}
@@ -525,7 +525,7 @@ function PurchaseEditor({ purchase, items, onChange, onSave, onCancel }: { purch
         </div>
 
         <div className="grid grid-cols-2 items-end gap-2">
-          <label className="space-y-1 text-[11px] text-stone-500">
+          <label className="space-y-1 text-xs text-stone-500">
             할인 합계 (영수증의 할인금액)
             <MoneyInput label="할인 합계" value={p.discount} onChange={(n) => onChange({ ...p, discount: n ?? 0 })} />
           </label>
@@ -613,10 +613,10 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
             <li>아래 지시문을 같이 붙여 넣어요. (한 번 복사해 두면 계속 써요)</li>
             <li>나온 글자를 복사해서 아래 칸에 붙여 넣어요.</li>
           </ol>
-          <p className="mt-2 text-[11px] text-stone-500">주류 판매계산서는 보증금·채권잔액이 있어서 지시문이 달라요. 아래 글은 지금 칸에 붙인 내용에 맞춰 바뀝니다.</p>
-          <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-2 text-[11px] text-stone-700">{looksLiquor ? LIQUOR_PROMPT : RECEIPT_PROMPT}</pre>
+          <p className="mt-2 text-xs text-stone-500">주류 판매계산서는 보증금·채권잔액이 있어서 지시문이 달라요. 아래 글은 지금 칸에 붙인 내용에 맞춰 바뀝니다.</p>
+          <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-2 text-xs text-stone-700">{looksLiquor ? LIQUOR_PROMPT : RECEIPT_PROMPT}</pre>
           <button
-            className="btn-ghost mt-1 px-2 py-1 text-[11px]"
+            className="btn-ghost mt-1 px-2 py-1 text-xs"
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(looksLiquor ? LIQUOR_PROMPT : RECEIPT_PROMPT);
@@ -644,15 +644,15 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
             <p className="text-xs font-semibold text-stone-500">이렇게 읽었어요</p>
             <div className="num grid grid-cols-3 gap-2 rounded-xl bg-stone-50 p-2 text-xs">
               <div>
-                <p className="text-[11px] text-stone-500">거래처</p>
+                <p className="text-xs text-stone-500">거래처</p>
                 <p className="font-bold">{parsed.vendor || "못 읽음"}</p>
               </div>
               <div>
-                <p className="text-[11px] text-stone-500">날짜</p>
+                <p className="text-xs text-stone-500">날짜</p>
                 <p className="font-bold">{parsed.date || "못 읽음"}</p>
               </div>
               <div>
-                <p className="text-[11px] text-stone-500">합계</p>
+                <p className="text-xs text-stone-500">합계</p>
                 <p className="font-bold">{won(sum)}</p>
               </div>
             </div>
@@ -680,7 +680,7 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
                     );
                   })}
                 </ul>
-                <p className="text-[11px] text-stone-500">
+                <p className="text-xs text-stone-500">
                   {parsed.lines.length}줄 · 품목 자동 연결 {linked}개{parsed.discount > 0 ? ` · 할인 ${won(parsed.discount)}` : ""}. 넣은 뒤에도 고칠 수 있어요.
                 </p>
               </>
@@ -694,19 +694,19 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
             <p className="text-xs font-semibold text-stone-500">주류 영수증으로 읽었어요</p>
             <div className="num grid grid-cols-2 gap-2 rounded-xl bg-stone-50 p-2 text-xs sm:grid-cols-4">
               <div>
-                <p className="text-[11px] text-stone-500">거래처</p>
+                <p className="text-xs text-stone-500">거래처</p>
                 <p className="font-bold">{liquor.ok.vendor || "못 읽음"}</p>
               </div>
               <div>
-                <p className="text-[11px] text-stone-500">날짜</p>
+                <p className="text-xs text-stone-500">날짜</p>
                 <p className="font-bold">{liquor.ok.day.date || "못 읽음"}</p>
               </div>
               <div>
-                <p className="text-[11px] text-stone-500">술값 (매입)</p>
+                <p className="text-xs text-stone-500">술값 (매입)</p>
                 <p className="font-bold">{won(liquor.ok.day.subtotal)}</p>
               </div>
               <div>
-                <p className="text-[11px] text-stone-500">채권잔액</p>
+                <p className="text-xs text-stone-500">채권잔액</p>
                 <p className="font-bold">{liquor.ok.balance === null ? "못 읽음" : won(liquor.ok.balance)}</p>
               </div>
             </div>
@@ -731,7 +731,7 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
                 );
               })}
             </ul>
-            <p className="text-[11px] text-stone-500">
+            <p className="text-xs text-stone-500">
               보증금 {won(liquor.ok.day.deposit)}은 원가에서 뺐어요 (빈 병 돌려주면 받는 돈){liquor.ok.day.returned ? ` · 이번에 돌려받은 빈병값 ${won(liquor.ok.day.returned)}` : ""}.
             </p>
           </div>
@@ -796,12 +796,12 @@ function PhotoStrip({ ownerId, readOnly = false }: { ownerId: string; readOnly?:
   return (
     <div className="space-y-1 rounded-xl bg-stone-50 p-2">
       <div className="flex items-center justify-between">
-        <p className="text-[11px] font-semibold text-stone-600">
+        <p className="text-xs font-semibold text-stone-600">
           영수증·명세표 사진 {photos.length > 0 && <span className="num text-stone-500">{photos.length}장</span>}
         </p>
         {!readOnly && (
           <>
-            <button className="btn-ghost px-2 py-1 text-[11px]" disabled={busy} onClick={() => fileRef.current?.click()}>
+            <button className="btn-ghost px-2 py-1 text-xs" disabled={busy} onClick={() => fileRef.current?.click()}>
               {busy ? "넣는 중…" : "+ 사진 붙이기"}
             </button>
             <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" aria-label="영수증 사진" onChange={(e) => e.target.files?.length && addFiles(e.target.files)} />
@@ -809,7 +809,7 @@ function PhotoStrip({ ownerId, readOnly = false }: { ownerId: string; readOnly?:
         )}
       </div>
       {photos.length === 0 ? (
-        !readOnly && <p className="text-[11px] text-stone-500">폰으로 찍은 영수증 사진을 붙여 두면 나중에 숫자와 나란히 볼 수 있어요. 사진은 이 컴퓨터 브라우저에만 남아요.</p>
+        !readOnly && <p className="text-xs text-stone-500">폰으로 찍은 영수증 사진을 붙여 두면 나중에 숫자와 나란히 볼 수 있어요. 사진은 이 컴퓨터 브라우저에만 남아요.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {photos.map((p) => (
@@ -818,7 +818,7 @@ function PhotoStrip({ ownerId, readOnly = false }: { ownerId: string; readOnly?:
               <img src={urls[p.id]} alt={p.name} className="h-20 w-20 cursor-zoom-in rounded-lg object-cover" onClick={() => urls[p.id] && window.open(urls[p.id], "_blank")} />
               {!readOnly && (
                 <button
-                  className="absolute -right-1 -top-1 rounded-full bg-white px-1.5 text-[11px] text-stone-600 shadow"
+                  className="absolute -right-1 -top-1 rounded-full bg-white px-1.5 text-xs text-stone-600 shadow"
                   aria-label={`사진 지우기 ${p.name}`}
                   onClick={async () => {
                     await deletePhoto(p.id);
@@ -900,7 +900,7 @@ function PurchaseViewer({ purchase, items, onClose }: { purchase: Purchase; item
                 ))}
               </div>
             )}
-            <p className="text-[11px] text-stone-500">사진을 누르면 새 창에서 크게 봐요. 사진은 이 컴퓨터 브라우저에만 있어요.</p>
+            <p className="text-xs text-stone-500">사진을 누르면 새 창에서 크게 봐요. 사진은 이 컴퓨터 브라우저에만 있어요.</p>
           </div>
           <div>
             <ul className="divide-y divide-stone-100 text-xs">
@@ -948,14 +948,14 @@ function LiquorDialog({ ledger, fileName, vendor: initialVendor, items, onSave, 
       <div className="card max-h-[92vh] w-full max-w-2xl space-y-3 overflow-y-auto">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold">
-            주류 원장 <span className="text-[11px] font-normal text-stone-500">{fileName}</span>
+            주류 원장 <span className="text-xs font-normal text-stone-500">{fileName}</span>
           </h2>
           <button className="btn-ghost px-2 py-1 text-xs" onClick={onCancel}>
             닫기
           </button>
         </div>
 
-        <label className="block space-y-1 text-[11px] text-stone-500">
+        <label className="block space-y-1 text-xs text-stone-500">
           거래처 이름 (한 번 적으면 다음에도 그대로)
           <input aria-label="주류 거래처" className="field" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="예: ○○주류" />
         </label>
@@ -1003,7 +1003,7 @@ function LiquorDialog({ ledger, fileName, vendor: initialVendor, items, onSave, 
               </tbody>
             </table>
           </div>
-          <p className="mt-1 text-[11px] text-stone-500">
+          <p className="mt-1 text-xs text-stone-500">
             매입 영수증에는 <b>술값만</b> 들어가요. 보증금은 빈병을 돌려주면 돌아오는 돈이라 원가가 아니에요 (이 파일 기간 동안 아직 안 돌아온 보증금 {won(netDeposit)}).
             {ledger.balance !== null && (
               <>
@@ -1058,7 +1058,7 @@ function LiquorDialog({ ledger, fileName, vendor: initialVendor, items, onSave, 
             {days.length}건 넣기
           </button>
         </div>
-        <p className="text-[11px] text-stone-500">같은 파일을 다시 올려도 겹치지 않고 그 입고일 영수증이 새 내용으로 바뀌어요.</p>
+        <p className="text-xs text-stone-500">같은 파일을 다시 올려도 겹치지 않고 그 입고일 영수증이 새 내용으로 바뀌어요.</p>
       </div>
     </div>
   );
@@ -1080,7 +1080,7 @@ function SheetDialog({ receipts, notes, fileName, items, onSave, onCancel }: { r
       <div className="card max-h-[92vh] w-full max-w-2xl space-y-3 overflow-y-auto">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold">
-            영수증 엑셀 <span className="text-[11px] font-normal text-stone-500">{fileName}</span>
+            영수증 엑셀 <span className="text-xs font-normal text-stone-500">{fileName}</span>
           </h2>
           <button className="btn-ghost px-2 py-1 text-xs" onClick={onCancel}>
             닫기
@@ -1110,7 +1110,7 @@ function SheetDialog({ receipts, notes, fileName, items, onSave, onCancel }: { r
                       {r.date.slice(5).replace("-", "/")} {r.time}
                     </span>{" "}
                     <span className="font-semibold">{r.vendor}</span> <span className="text-stone-400">{r.lines.length}줄 ▾</span>
-                    <span className="block truncate text-[11px] text-stone-500">
+                    <span className="block truncate text-xs text-stone-500">
                       {kinds.join(" · ")}
                       {r.personal ? " — 식비·개인 물품이라 뺐어요" : ""}
                     </span>
@@ -1121,7 +1121,7 @@ function SheetDialog({ receipts, notes, fileName, items, onSave, onCancel }: { r
                   </span>
                 </div>
                 {open === r.key && (
-                  <ul className="mt-1 space-y-0.5 rounded-lg bg-stone-50 p-2 text-[11px]">
+                  <ul className="mt-1 space-y-0.5 rounded-lg bg-stone-50 p-2 text-xs">
                     {r.lines.map((l, i) => {
                       const it = link && linkableCategory(toPurchaseCategory(l.rawCategory)) ? matchItem(l.name, items) : null;
                       return (
@@ -1155,7 +1155,7 @@ function SheetDialog({ receipts, notes, fileName, items, onSave, onCancel }: { r
           <input type="checkbox" className="mt-0.5 h-4 w-4 accent-orange-600" checked={link} onChange={(e) => setLink(e.target.checked)} />
           <span>상품명에 원가율 품목 이름이 들어 있으면 자동으로 연결해요 (줄을 눌러 “→ 품목”을 확인하세요). 연결되고 수량이 잡히면 그 품목의 기준단가가 이 매입가로 바뀌어요.</span>
         </label>
-        <p className="text-[11px] text-stone-500">매입 영수증은 품목별 매입가를 보는 곳이라 손익에 따로 더하지 않아요. 손익은 통장의 체크카드 출금으로 잡혀요. 같은 파일을 다시 올려도 겹치지 않아요.</p>
+        <p className="text-xs text-stone-500">매입 영수증은 품목별 매입가를 보는 곳이라 손익에 따로 더하지 않아요. 손익은 통장의 체크카드 출금으로 잡혀요. 같은 파일을 다시 올려도 겹치지 않아요.</p>
 
         <div className="flex gap-2">
           <button className="btn-ghost flex-1" onClick={onCancel}>
@@ -1202,7 +1202,7 @@ function CardReceiptCheck({
     <section className="card space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-bold">
-          영수증 없는 체크카드 결제 <span className="text-[11px] font-normal text-stone-500">통장 체크카드 출금 ↔ 매입 영수증</span>
+          영수증 없는 체크카드 결제 <span className="text-xs font-normal text-stone-500">통장 체크카드 출금 ↔ 매입 영수증</span>
         </h2>
         <span className="num text-xs text-stone-500">
           체크카드 {r.cardCount}건 · 영수증과 맞음 {r.matched.length} · 필요 없음 {r.exempt.length} · 취소 {r.cancelled.length}
@@ -1221,18 +1221,19 @@ function CardReceiptCheck({
           </Notice>
           <ul className="divide-y divide-stone-100 text-sm">
             {r.missing.map((t) => (
-              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              // 금액은 늘 같은 자리(오른쪽), 버튼은 늘 아랫줄 — 줄마다 위치가 달라 보이지 않게
+              <li key={t.id} className="grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-1 py-2">
                 <div className="min-w-0">
                   <p className="font-semibold">
                     <span className="num">{md(t.date)}</span> {cardPayee(t.payee)}
                   </p>
-                  <p className="text-[11px] text-stone-500">
+                  <p className="text-xs text-stone-500">
                     지금 분류: {t.major ?? "미분류"}
                     {t.minor ? ` / ${t.minor}` : ""}
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="num w-20 text-right font-bold">{won(t.out)}</span>
+                <span className="num whitespace-nowrap text-right text-base font-bold">{won(t.out)}</span>
+                <div className="col-span-2 flex flex-wrap gap-1.5">
                   <button className="btn-primary whitespace-nowrap px-2 py-1 text-xs" onClick={() => onAddReceipt(t)}>
                     영수증 넣기
                   </button>
@@ -1246,7 +1247,7 @@ function CardReceiptCheck({
               </li>
             ))}
           </ul>
-          <p className="text-[11px] text-stone-500">개인 결제면 올리기 탭에서 그 줄을 “제외 · 손익에 안 넣음”으로 바꾸면 여기서도 빠져요. 교통·주차·식대처럼 영수증까지는 필요 없는 건 “필요 없음”을 누르세요.</p>
+          <p className="text-xs text-stone-500">개인 결제면 올리기 탭에서 그 줄을 “제외 · 손익에 안 넣음”으로 바꾸면 여기서도 빠져요. 교통·주차·식대처럼 영수증까지는 필요 없는 건 “필요 없음”을 누르세요.</p>
         </>
       )}
 
@@ -1284,7 +1285,7 @@ function CardReceiptCheck({
                       {won(e.tx.out)}
                       {e.manual && (
                         <button
-                          className="btn-ghost px-1.5 py-0.5 text-[11px]"
+                          className="btn-ghost px-1.5 py-0.5 text-xs"
                           onClick={() =>
                             void onExempt({
                               txIds: exempt.txIds.filter((id) => id !== e.tx.id),
