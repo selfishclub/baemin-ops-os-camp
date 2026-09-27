@@ -13,7 +13,7 @@ import { findOverlap, monthLabel, monthsBetween, newBankRowsOnly, prevMonth } fr
 import { getStore } from "@/lib/storage";
 import type { Transaction } from "@/lib/types";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, isPrevMonthDefault } from "@/lib/paydays";
-import { monthsToLoad, quickRange, searchTxs, shiftDays, txTotals } from "@/lib/txSearch";
+import { monthsToLoad, quickRange, searchTxs, shiftDays, txTotals, type TxOrder } from "@/lib/txSearch";
 import { todayStr } from "@/lib/daily";
 
 const SAMPLES = [
@@ -38,6 +38,7 @@ export default function UploadPage() {
   }, []);
   const [filter, setFilter] = useState("");
   const [txKind, setTxKind] = useState<"전체" | "입금" | "출금" | "미분류">("전체");
+  const [txOrder, setTxOrder] = useState<TxOrder>("최신순");
   // 기간으로 찾기 — 기본은 보고 있는 달 전체. 기간이 다른 달까지 걸치면 그 달 거래도 불러온다.
   const [range, setRange] = useState(() => quickRange("month", month, todayStr()));
   useEffect(() => setRange(quickRange("month", month, todayStr())), [month]);
@@ -58,6 +59,7 @@ export default function UploadPage() {
   const searched = searchTxs(
     [...ledger.txs, ...moreTxs.filter((t) => !ledger.txs.some((x) => x.id === t.id))],
     { from: range.from, to: range.to, text: filter, kind: txKind },
+    txOrder,
   );
   const searchedTotals = txTotals(searched);
 
@@ -199,6 +201,12 @@ export default function UploadPage() {
               <div className="flex flex-wrap gap-1.5 text-xs">
                 {(["전체", "입금", "출금", "미분류"] as const).map((k) => (
                   <button key={k} className={`rounded-full px-3 py-1 ${txKind === k ? "bg-orange-100 font-semibold text-orange-800" : "bg-stone-100 text-stone-600"}`} onClick={() => setTxKind(k)}>
+                    {k}
+                  </button>
+                ))}
+                <span className="mx-1 self-center text-stone-300">|</span>
+                {(["최신순", "오래된 순"] as const).map((k) => (
+                  <button key={k} className={`rounded-full px-3 py-1 ${txOrder === k ? "bg-stone-700 font-semibold text-white" : "bg-stone-100 text-stone-600"}`} onClick={() => setTxOrder(k)}>
                     {k}
                   </button>
                 ))}
@@ -396,9 +404,10 @@ function ReviewCard({ tx, ledger, payDays, editing = false, onDone }: { tx: Tran
 }
 
 // 전체 거래 목록 — 날짜별로 묶기
+// 이미 보고 싶은 차례로 정렬된 목록을 받아 날짜별로 묶는다 (차례는 그대로 둔다)
 function groupByDate(txs: Transaction[]): { date: string; txs: Transaction[] }[] {
   const m = new Map<string, Transaction[]>();
-  for (const t of [...txs].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))) m.set(t.date, [...(m.get(t.date) ?? []), t]);
+  for (const t of txs) m.set(t.date, [...(m.get(t.date) ?? []), t]);
   return [...m].map(([date, list]) => ({ date, txs: list }));
 }
 

@@ -17,7 +17,7 @@ const rows = [
 
 describe("통장 거래 찾기", () => {
   it("기간 밖은 뺀다", () => {
-    expect(searchTxs(rows, { from: "2026-09-01", to: "2026-09-12" }).map((t) => t.id)).toEqual(["t2", "t3", "t4"]);
+    expect(searchTxs(rows, { from: "2026-09-01", to: "2026-09-12" }, "오래된 순").map((t) => t.id)).toEqual(["t2", "t3", "t4"]);
   });
 
   it("기간을 비우면 전부 본다", () => {
@@ -25,18 +25,18 @@ describe("통장 거래 찾기", () => {
   });
 
   it("시작·끝을 거꾸로 넣어도 알아서 바로잡는다", () => {
-    expect(searchTxs(rows, { from: "2026-09-12", to: "2026-09-01" }).map((t) => t.id)).toEqual(["t2", "t3", "t4"]);
+    expect(searchTxs(rows, { from: "2026-09-12", to: "2026-09-01" }, "오래된 순").map((t) => t.id)).toEqual(["t2", "t3", "t4"]);
   });
 
   it("거래처와 분류에서 글자를 찾고, 띄어쓰기는 무시한다", () => {
-    expect(searchTxs(rows, { text: "홈마트" }).map((t) => t.id)).toEqual(["t1", "t2"]);
-    expect(searchTxs(rows, { text: "임 대 료" }).map((t) => t.id)).toEqual(["t3"]);
+    expect(searchTxs(rows, { text: "홈마트" }, "오래된 순").map((t) => t.id)).toEqual(["t1", "t2"]);
+    expect(searchTxs(rows, { text: "임 대 료" }, "오래된 순").map((t) => t.id)).toEqual(["t3"]);
   });
 
   it("입금·출금·미분류로 나눠 본다", () => {
-    expect(searchTxs(rows, { kind: "입금" }).map((t) => t.id)).toEqual(["t5"]);
-    expect(searchTxs(rows, { kind: "출금" }).map((t) => t.id)).toEqual(["t1", "t2", "t3", "t4", "t6"]); // 취소(t4)도 출금 줄
-    expect(searchTxs(rows, { kind: "미분류" }).map((t) => t.id)).toEqual(["t6"]);
+    expect(searchTxs(rows, { kind: "입금" }, "오래된 순").map((t) => t.id)).toEqual(["t5"]);
+    expect(searchTxs(rows, { kind: "출금" }, "오래된 순").map((t) => t.id)).toEqual(["t1", "t2", "t3", "t4", "t6"]); // 취소(t4)도 출금 줄
+    expect(searchTxs(rows, { kind: "미분류" }, "오래된 순").map((t) => t.id)).toEqual(["t6"]);
   });
 
   it("기간과 글자를 같이 건다", () => {
@@ -49,8 +49,10 @@ describe("통장 거래 찾기", () => {
     expect(txTotals(searchTxs(rows, { from: "2026-09-12", to: "2026-09-23" }))).toEqual({ count: 2, in: 103950, out: -1000 });
   });
 
-  it("날짜 순으로 보여 준다", () => {
-    expect(searchTxs([rows[5], rows[0], rows[2]], {}).map((t) => t.date)).toEqual(["2026-08-31", "2026-09-10", "2026-09-24"]);
+  it("기본은 최신순, 오래된 순도 고를 수 있다", () => {
+    const three = [rows[5], rows[0], rows[2]];
+    expect(searchTxs(three, {}).map((t) => t.date)).toEqual(["2026-09-24", "2026-09-10", "2026-08-31"]);
+    expect(searchTxs(three, {}, "오래된 순").map((t) => t.date)).toEqual(["2026-08-31", "2026-09-10", "2026-09-24"]);
   });
 });
 

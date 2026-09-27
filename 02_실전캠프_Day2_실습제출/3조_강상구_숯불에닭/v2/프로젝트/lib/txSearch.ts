@@ -4,6 +4,8 @@ import type { Month, Transaction } from "./types";
 // 올린 통장 거래 찾기 — 기간·글자·입출금으로 거른다.
 // 화면에서 떼어 놓아야 숫자가 맞는지 테스트할 수 있어서 여기에 둔다.
 export type TxKind = "전체" | "입금" | "출금" | "미분류";
+/** 보는 차례 — 최신순(요즘 것부터)이 기본, 오래된 순은 처음부터 훑을 때 */
+export type TxOrder = "최신순" | "오래된 순";
 
 export interface TxQuery {
   from?: string; // "2026-09-01" — 비우면 처음부터
@@ -31,9 +33,10 @@ export function matchesTx(t: Transaction, q: TxQuery): boolean {
   return true;
 }
 
-export function searchTxs(txs: Transaction[], q: TxQuery): Transaction[] {
+export function searchTxs(txs: Transaction[], q: TxQuery, order: TxOrder = "최신순"): Transaction[] {
   const query = normalizeQuery(q);
-  return txs.filter((t) => matchesTx(t, query)).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  const dir = order === "최신순" ? -1 : 1;
+  return txs.filter((t) => matchesTx(t, query)).sort((a, b) => dir * (a.date.localeCompare(b.date) || a.id.localeCompare(b.id)));
 }
 
 export function txTotals(txs: Transaction[]): { count: number; in: number; out: number } {
