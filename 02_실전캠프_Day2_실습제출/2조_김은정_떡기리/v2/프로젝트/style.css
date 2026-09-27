@@ -164,3 +164,33 @@ mark.todo { background: var(--todo); color: var(--todo-ink); padding: 0 4px; bor
 @media (min-width: 480px) {
   .toc { grid-template-columns: 1fr 1fr; }
 }
+
+/* ---- v2 ---- */
+.status-card .status-line { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.pill { display: inline-block; padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: 14px; }
+.pill.done, .og-cell.done { background: var(--ok-soft); color: var(--ok); }
+.pill.partial, .og-cell.partial { background: var(--todo); color: var(--todo-ink); }
+.pill.none, .og-cell.none { background: #fde2e2; color: #a33; }
+.small { font-size: 13px; }
+.warn { color: #a33; font-weight: 700; }
+.btn.wide { display: block; width: 100%; text-align: center; padding: 14px; font-size: 17px; margin: 14px 0; }
+.choice { display: flex; flex-wrap: wrap; gap: 8px; }
+.choice-btn { padding: 12px 16px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); font-size: 16px; cursor: pointer; }
+.choice-btn.on { border-color: var(--brand); background: var(--brand-soft); font-weight: 700; }
+.who-line { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.checklist li label .when { margin-left: auto; font-style: normal; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.save-note { background: #fde2e2; color: #a33; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; font-size: 14px; }
+.pin-form { display: flex; gap: 8px; }
+.pin-form input { flex: 1; font-size: 22px; letter-spacing: 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; }
+.date-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 6px 0 14px; }
+.owner-grid { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 6px; margin-bottom: 14px; }
+.og-head { font-size: 13px; color: var(--muted); text-align: center; padding: 4px; }
+.og-store { display: flex; align-items: center; font-weight: 700; padding: 6px 4px; }
+.og-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; padding: 10px 6px; min-height: 64px; text-align: center; }
+.og-label { font-weight: 700; font-size: 15px; }
+.og-meta { font-size: 12px; margin-top: 2px; opacity: 0.9; }
+.detail .detail-list { list-style: none; padding: 0; margin: 8px 0 0; }
+.detail .detail-list li { padding: 6px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.detail .detail-list li.miss { color: #a33; font-weight: 700; }
+.field { display: block; margin: 10px 0; font-weight: 700; }
+.field textarea { display: block; width: 100%; margin-top: 6px; padding: 10px; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; font-weight: 400; font-family: inherit; }

@@ -1,6 +1,7 @@
-/* 떡기리 신입직원 교육 온라인북 v1
- * - content.js 의 window.BOOK_MD (마크다운)를 읽어 화면으로 보여 준다.
- * - 체크 상태는 이 폰(localStorage)에만 남는다. 체크리스트는 날짜가 바뀌면 새로 시작.
+/* 떡기리 신입직원 교육 온라인북 v2
+ * v1 = 12장 매뉴얼·검색·체크리스트(폰 저장)·교육표·확인 필요
+ * v2 = 체크리스트를 "매장·이름 → 체크 → 완료" 로 서버(Supabase)에 저장 + 사장 점검표(PIN)
+ * - 서버 열쇠는 config.js (make-config.js 가 .env.local / 환경변수에서 만듦). config.js 가 없거나 비어 있으면 v1처럼 폰 저장만.
  * - 빌드 도구 없음. index.html 을 열면 바로 동작.
  */
 (function () {
@@ -10,22 +11,76 @@
   var store = {
     get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
-    del: function (k) { try { localStorage.removeItem(k); } catch (e) {} },
-    keys: function (prefix) {
-      var out = [];
-      try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(prefix) === 0) out.push(k); } } catch (e) {}
-      return out;
-    }
+    del: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
   };
-  function today() {
-    var d = new Date();
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  var session = {
+    get: function (k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
+  };
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function dateStr(d) { d = d || new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function today() { return dateStr(); }
+  function shiftDate(s, days) { var p = s.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2] + days); return dateStr(d); }
+  function hhmm(iso) { if (!iso) return ''; var d = new Date(iso); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function koDate(s) { var p = s.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]); return +p[1] + '/' + +p[2] + ' (' + '일월화수목금토'[d.getDay()] + ')'; }
+
+  // ---------- 서버 (Supabase REST) ----------
+  var SB = window.SB || {};
+  var DEFAULT_STORES = ['상동점', '논현점', '공항점'];
+  var DEFAULT_STAFF = ['알바 A', '알바 B', '알바 C', '매니저'];
+  function sbOn() { return !!(SB.url && SB.anon); }
+  function sbFetch(path, opts) {
+    opts = opts || {};
+    var headers = { 'apikey': SB.anon, 'Authorization': 'Bearer ' + SB.anon, 'Content-Type': 'application/json' };
+    if (opts.prefer) headers['Prefer'] = opts.prefer;
+    return fetch(SB.url.replace(/\/$/, '') + '/rest/v1/' + path, { method: opts.method || 'GET', headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
+      .then(function (r) { if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + ' ' + t); }); return r.status === 204 ? null : r.json(); });
+  }
+  var settingsCache = null;
+  function loadSettings() {
+    if (settingsCache) return Promise.resolve(settingsCache);
+    var base = { stores: DEFAULT_STORES.slice(), staff: DEFAULT_STAFF.slice() };
+    var cached = store.get('settings'); if (cached) { try { base = JSON.parse(cached); } catch (e) {} }
+    if (!sbOn()) { settingsCache = base; return Promise.resolve(base); }
+    return sbFetch('settings?select=key,value').then(function (rows) {
+      (rows || []).forEach(function (r) { if (r.key === 'stores' || r.key === 'staff') base[r.key] = r.value; });
+      settingsCache = base; store.set('settings', JSON.stringify(base)); return base;
+    }).catch(function () { settingsCache = base; return base; });
+  }
+  function saveSetting(key, value) {
+    settingsCache = null; store.del('settings');
+    if (!sbOn()) { var b = JSON.parse(store.get('settings') || '{}'); b[key] = value; store.set('settings', JSON.stringify(b)); return Promise.resolve(); }
+    return sbFetch('settings?on_conflict=key', { method: 'POST', prefer: 'resolution=merge-duplicates', body: [{ key: key, value: value, updated_at: new Date().toISOString() }] });
+  }
+  function runKey(date, storeName, kind) { return 'run:' + date + ':' + storeName + ':' + kind; }
+  function localRun(date, storeName, kind) { var v = store.get(runKey(date, storeName, kind)); if (!v) return null; try { return JSON.parse(v); } catch (e) { return null; } }
+  function saveLocalRun(run) { store.set(runKey(run.run_date, run.store, run.kind), JSON.stringify(run)); }
+  function fetchRun(date, storeName, kind) {
+    if (!sbOn()) return Promise.resolve(localRun(date, storeName, kind));
+    return sbFetch('checklist_runs?select=*&run_date=eq.' + date + '&store=eq.' + encodeURIComponent(storeName) + '&kind=eq.' + kind)
+      .then(function (rows) { var r = rows && rows[0] ? rows[0] : null; if (r) saveLocalRun(r); return r; })
+      .catch(function () { return localRun(date, storeName, kind); });
+  }
+  function fetchRunsForDate(date) {
+    if (!sbOn()) {
+      var out = []; try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf('run:' + date + ':') === 0) out.push(JSON.parse(localStorage.getItem(k))); } } catch (e) {}
+      return Promise.resolve(out);
+    }
+    return sbFetch('checklist_runs?select=*&run_date=eq.' + date);
+  }
+  // 저장: 서버 먼저, 실패하면 폰에만 두고 알림
+  function saveRun(run) {
+    run.updated_at = new Date().toISOString();
+    saveLocalRun(run);
+    if (!sbOn()) return Promise.resolve({ ok: true, local: true });
+    var body = { run_date: run.run_date, store: run.store, kind: run.kind, staff: run.staff, items: run.items, total: run.total, done_count: run.done_count, first_completed_at: run.first_completed_at || null, completed_at: run.completed_at || null, updated_at: run.updated_at };
+    return sbFetch('checklist_runs?on_conflict=run_date,store,kind', { method: 'POST', prefer: 'resolution=merge-duplicates,return=representation', body: [body] })
+      .then(function (rows) { if (rows && rows[0]) { run.id = rows[0].id; saveLocalRun(run); } return { ok: true }; })
+      .catch(function (e) { return { ok: false, error: e.message }; });
   }
 
-  // ---------- 마크다운 → 데이터 ----------
-  function esc(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
+  // ---------- 마크다운 → 데이터 (v1 그대로) ----------
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function inline(s) {
     var h = esc(s);
     h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -38,7 +93,6 @@
     return String(s).replace(/^[-*]\s+\[[ xX]\]\s*/, '').replace(/^[-*]\s+/, '').replace(/^\d+\.\s+/, '')
       .replace(/^>\s*/, '').replace(/^#+\s*/, '').replace(/[*`|]/g, '').replace(/\s+/g, ' ').trim();
   }
-
   function parseBook(md) {
     var lines = md.replace(/\r\n?/g, '\n').split('\n');
     var chapters = [], appendix = [], cur = null, inAppendix = false, i, l, m;
@@ -49,24 +103,14 @@
       if (m) {
         cur = { title: m[1].trim(), lines: [] };
         if (inAppendix) { appendix.push(cur); }
-        else {
-          var n = m[1].match(/^(\d+)장\.\s*(.*)$/);
-          cur.num = n ? parseInt(n[1], 10) : chapters.length + 1;
-          cur.name = n ? n[2].trim() : m[1].trim();
-          chapters.push(cur);
-        }
+        else { var n = m[1].match(/^(\d+)장\.\s*(.*)$/); cur.num = n ? parseInt(n[1], 10) : chapters.length + 1; cur.name = n ? n[2].trim() : m[1].trim(); chapters.push(cur); }
         continue;
       }
       if (cur) cur.lines.push(l);
     }
     return { chapters: chapters, appendix: appendix };
   }
-
-  function findAppendix(book, mark) {
-    for (var i = 0; i < book.appendix.length; i++) if (book.appendix[i].title.indexOf(mark) === 0) return book.appendix[i];
-    return null;
-  }
-  // 코드 블록 안의 "□ ..." 줄 → 체크 항목
+  function findAppendix(book, mark) { for (var i = 0; i < book.appendix.length; i++) if (book.appendix[i].title.indexOf(mark) === 0) return book.appendix[i]; return null; }
   function checklistItems(sec) {
     var items = [], title = '';
     if (!sec) return { title: title, items: items };
@@ -74,17 +118,13 @@
     sec.lines.forEach(function (l) {
       if (/^```/.test(l)) { inCode = !inCode; return; }
       if (!inCode) return;
-      var m = l.match(/^\[(.+)\]\s*(.*)$/);
-      if (m) { title = m[1] + (m[2] ? ' ' + m[2] : ''); return; }
-      var c = l.match(/^□\s*(.+)$/);
-      if (c) items.push(c[1].trim());
+      var m = l.match(/^\[(.+)\]\s*(.*)$/); if (m) { title = m[1] + (m[2] ? ' ' + m[2] : ''); return; }
+      var c = l.match(/^□\s*(.+)$/); if (c) items.push(c[1].trim());
     });
     return { title: title, items: items };
   }
-  // 12장 표 → 교육표
   function trainingRows(book) {
-    var ch = book.chapters.filter(function (c) { return c.num === 12; })[0];
-    var rows = [];
+    var ch = book.chapters.filter(function (c) { return c.num === 12; })[0], rows = [];
     if (!ch) return rows;
     ch.lines.forEach(function (l) {
       if (!/^\|/.test(l) || /^\|\s*-+/.test(l) || /단계\s*\|/.test(l)) return;
@@ -95,55 +135,28 @@
   }
   function todoItems(book) {
     var out = [];
-    book.chapters.forEach(function (c) {
-      c.lines.forEach(function (l, idx) {
-        if (l.indexOf('확인 필요') >= 0) out.push({ num: c.num, name: c.name, line: idx, text: plain(l) });
-      });
-    });
+    book.chapters.forEach(function (c) { c.lines.forEach(function (l, idx) { if (l.indexOf('확인 필요') >= 0) out.push({ num: c.num, name: c.name, line: idx, text: plain(l) }); }); });
     return out;
   }
-
-  // ---------- 블록 렌더 ----------
   function renderBlocks(lines, ctx) {
     var html = '', i = 0, l, j, buf, m;
     var dayKey = 'ch:' + ctx.num + ':' + today() + ':';
     function item(text, n) {
       var c = text.match(/^\[([ xX])\]\s*(.*)$/);
-      if (c) {
-        var key = dayKey + n, on = store.get(key) === '1';
-        return '<li class="chk' + (on ? ' done' : '') + '" data-line="' + n + '"><label><input type="checkbox" data-key="' + key + '"' + (on ? ' checked' : '') + '><span>' + inline(c[2]) + '</span></label></li>';
-      }
+      if (c) { var key = dayKey + n, on = store.get(key) === '1'; return '<li class="chk' + (on ? ' done' : '') + '" data-line="' + n + '"><label><input type="checkbox" data-key="' + key + '"' + (on ? ' checked' : '') + '><span>' + inline(c[2]) + '</span></label></li>'; }
       return '<li data-line="' + n + '">' + inline(text) + '</li>';
     }
     while (i < lines.length) {
       l = lines[i];
-      if (/^```/.test(l)) {
-        buf = []; j = i + 1;
-        while (j < lines.length && !/^```/.test(lines[j])) { buf.push(lines[j]); j++; }
-        html += '<pre data-line="' + i + '">' + esc(buf.join('\n')) + '</pre>'; i = j + 1; continue;
-      }
+      if (/^```/.test(l)) { buf = []; j = i + 1; while (j < lines.length && !/^```/.test(lines[j])) { buf.push(lines[j]); j++; } html += '<pre data-line="' + i + '">' + esc(buf.join('\n')) + '</pre>'; i = j + 1; continue; }
       if (/^\|/.test(l)) {
-        buf = []; j = i;
-        while (j < lines.length && /^\|/.test(lines[j])) { buf.push({ t: lines[j], n: j }); j++; }
+        buf = []; j = i; while (j < lines.length && /^\|/.test(lines[j])) { buf.push({ t: lines[j], n: j }); j++; }
         html += '<table><tbody>';
-        buf.forEach(function (row, idx) {
-          if (/^\|\s*-+/.test(row.t)) return;
-          var cells = row.t.split('|').slice(1, -1);
-          var tag = idx === 0 ? 'th' : 'td';
-          html += '<tr data-line="' + row.n + '">' + cells.map(function (c) { return '<' + tag + '>' + inline(c.trim()) + '</' + tag + '>'; }).join('') + '</tr>';
-        });
+        buf.forEach(function (row, idx) { if (/^\|\s*-+/.test(row.t)) return; var cells = row.t.split('|').slice(1, -1), tag = idx === 0 ? 'th' : 'td'; html += '<tr data-line="' + row.n + '">' + cells.map(function (c) { return '<' + tag + '>' + inline(c.trim()) + '</' + tag + '>'; }).join('') + '</tr>'; });
         html += '</tbody></table>'; i = j; continue;
       }
-      if (/^[-*]\s+/.test(l)) {
-        buf = []; j = i;
-        while (j < lines.length && /^[-*]\s+/.test(lines[j])) { buf.push({ t: lines[j].replace(/^[-*]\s+/, ''), n: j }); j++; }
-        html += '<ul>' + buf.map(function (b) { return item(b.t, b.n); }).join('') + '</ul>'; i = j; continue;
-      }
-      if (/^\d+\.\s+/.test(l)) {
-        buf = []; j = i;
-        while (j < lines.length && /^\d+\.\s+/.test(lines[j])) { buf.push({ t: lines[j].replace(/^\d+\.\s+/, ''), n: j }); j++; }
-        html += '<ol>' + buf.map(function (b) { return '<li data-line="' + b.n + '">' + inline(b.t) + '</li>'; }).join('') + '</ol>'; i = j; continue;
-      }
+      if (/^[-*]\s+/.test(l)) { buf = []; j = i; while (j < lines.length && /^[-*]\s+/.test(lines[j])) { buf.push({ t: lines[j].replace(/^[-*]\s+/, ''), n: j }); j++; } html += '<ul>' + buf.map(function (b) { return item(b.t, b.n); }).join('') + '</ul>'; i = j; continue; }
+      if (/^\d+\.\s+/.test(l)) { buf = []; j = i; while (j < lines.length && /^\d+\.\s+/.test(lines[j])) { buf.push({ t: lines[j].replace(/^\d+\.\s+/, ''), n: j }); j++; } html += '<ol>' + buf.map(function (b) { return '<li data-line="' + b.n + '">' + inline(b.t) + '</li>'; }).join('') + '</ol>'; i = j; continue; }
       if (/^>\s?/.test(l)) { html += '<blockquote data-line="' + i + '">' + inline(l.replace(/^>\s?/, '')) + '</blockquote>'; i++; continue; }
       if (/^-{3,}\s*$/.test(l)) { html += '<hr>'; i++; continue; }
       m = l.match(/^(#{1,6})\s+(.*)$/);
@@ -156,32 +169,31 @@
 
   // ---------- 화면 ----------
   var book = parseBook(window.BOOK_MD || '');
-  var OPEN = checklistItems(findAppendix(book, '②'));
-  var CLOSE = checklistItems(findAppendix(book, '③'));
+  var LISTS = { open: checklistItems(findAppendix(book, '②')), close: checklistItems(findAppendix(book, '③')) };
+  var KIND_LABEL = { open: '오픈', close: '마감' };
   var TODOS = todoItems(book);
   var app = document.getElementById('app');
-
-  function checkState(kind, count) {
-    var done = 0;
-    for (var i = 0; i < count; i++) if (store.get('check:' + kind + ':' + today() + ':' + i) === '1') done++;
-    return done;
-  }
-  function chapterLink(num) {
-    var c = book.chapters.filter(function (x) { return x.num === num; })[0];
-    return c ? '#/ch/' + num : '#/';
+  function empty(title, sub) { return '<div class="empty"><strong>' + esc(title) + '</strong>' + esc(sub) + '</div>'; }
+  function chapterLink(num) { var c = book.chapters.filter(function (x) { return x.num === num; })[0]; return c ? '#/ch/' + num : '#/'; }
+  function me() { var v = store.get('me'); if (!v) return null; try { return JSON.parse(v); } catch (e) { return null; } }
+  function runStatus(run, total) {
+    if (!run) return { cls: 'none', label: '아직', done: 0, total: total };
+    var done = Object.keys(run.items || {}).length;
+    if (run.completed_at) return { cls: 'done', label: '완료', done: done, total: run.total || total };
+    return { cls: 'partial', label: '진행 중', done: done, total: run.total || total };
   }
 
   function viewHome() {
-    var o = checkState('open', OPEN.items.length), c = checkState('close', CLOSE.items.length);
-    var h = '';
+    var m = me(), h = '';
     h += '<h1>무엇을 찾으세요?</h1>';
+    h += '<div id="home-status" class="card status-card">' + (m ? '<div class="sub">' + esc(m.store) + ' · ' + esc(m.staff) + ' <a href="#/who">바꾸기</a></div><div class="muted">오늘 상태 불러오는 중…</div>' : '<div class="sub">아직 매장·이름을 고르지 않았어요.</div><a class="btn primary" href="#/who">매장·이름 고르기</a>') + '</div>';
     h += '<div class="grid2">';
-    h += '<a class="big-btn" href="#/check/open">☀️ 오픈 체크리스트<small>' + o + '/' + OPEN.items.length + ' 완료</small></a>';
-    h += '<a class="big-btn alt" href="#/check/close">🌙 마감 체크리스트<small>' + c + '/' + CLOSE.items.length + ' 완료</small></a>';
+    h += '<a class="big-btn" href="#/check/open">☀️ 오픈 체크리스트<small id="home-open">' + LISTS.open.items.length + '항목</small></a>';
+    h += '<a class="big-btn alt" href="#/check/close">🌙 마감 체크리스트<small id="home-close">' + LISTS.close.items.length + '항목</small></a>';
     h += '</div>';
     h += '<div class="grid2" style="margin-top:10px">';
     h += '<a class="big-btn soft" href="#/train">🎓 신입 교육표<small>1·3·7일차</small></a>';
-    h += '<a class="big-btn soft" href="#/todo">📝 확인 필요<small>' + TODOS.length + '곳 · 사장님이 채울 것</small></a>';
+    h += '<a class="big-btn soft" href="#/todo">📝 확인 필요<small>' + TODOS.length + '곳</small></a>';
     h += '</div>';
     h += '<p class="section-title">목차 — 장을 누르면 열려요</p><div class="toc">';
     book.chapters.forEach(function (ch) {
@@ -189,200 +201,271 @@
       h += '<a href="#/ch/' + ch.num + '"><span class="num">' + ch.num + '</span><span>' + esc(ch.name) + '</span>' + (n ? '<span class="badge">확인 필요 ' + n + '</span>' : '') + '</a>';
     });
     h += '</div>';
+    h += '<p class="section-title">사장님용</p><a class="card link" href="#/owner"><div class="title">📋 사장 점검표</div><div class="sub">오늘 3매장 오픈·마감이 됐는지 한눈에 (PIN)</div></a>';
     app.innerHTML = h;
+    if (m) {
+      Promise.all([fetchRun(today(), m.store, 'open'), fetchRun(today(), m.store, 'close')]).then(function (rs) {
+        var o = runStatus(rs[0], LISTS.open.items.length), c = runStatus(rs[1], LISTS.close.items.length);
+        var el = document.getElementById('home-status'); if (!el) return;
+        el.innerHTML = '<div class="sub">' + esc(m.store) + ' · ' + esc(m.staff) + ' <a href="#/who">바꾸기</a></div>' +
+          '<div class="status-line"><span class="pill ' + o.cls + '">오픈 ' + o.label + (o.done ? ' ' + o.done + '/' + o.total : '') + '</span><span class="pill ' + c.cls + '">마감 ' + c.label + (c.done ? ' ' + c.done + '/' + c.total : '') + '</span></div>' +
+          (sbOn() ? '' : '<div class="muted small">서버 연결 없음 — 이 폰에만 저장돼요</div>');
+        var ho = document.getElementById('home-open'); if (ho) ho.textContent = o.label + (o.done ? ' ' + o.done + '/' + o.total : '');
+        var hc = document.getElementById('home-close'); if (hc) hc.textContent = c.label + (c.done ? ' ' + c.done + '/' + c.total : '');
+      });
+    }
   }
 
+  // 매장·이름 고르기
+  function viewWho(next) {
+    var cur = me() || {};
+    app.innerHTML = '<div class="crumb"><a href="#/">첫 화면</a> › 매장·이름</div><h1>누구세요?</h1><p class="muted">한 번 고르면 이 폰이 기억해요. 체크 기록에 매장과 이름이 남습니다.</p><div class="muted">불러오는 중…</div>';
+    loadSettings().then(function (s) {
+      var h = '<div class="crumb"><a href="#/">첫 화면</a> › 매장·이름</div><h1>누구세요?</h1><p class="muted">한 번 고르면 이 폰이 기억해요. 체크 기록에 매장과 이름이 남습니다.</p>';
+      h += '<p class="section-title">매장</p><div class="choice" id="pick-store">' + s.stores.map(function (x) { return '<button type="button" class="choice-btn' + (cur.store === x ? ' on' : '') + '" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>';
+      h += '<p class="section-title">이름</p><div class="choice" id="pick-staff">' + s.staff.map(function (x) { return '<button type="button" class="choice-btn' + (cur.staff === x ? ' on' : '') + '" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>';
+      h += '<p class="muted small">내 이름이 없으면 사장님께 말씀해 주세요 (사장 점검표에서 추가합니다).</p>';
+      h += '<button type="button" class="btn primary wide" id="who-ok">이대로 시작</button>';
+      app.innerHTML = h;
+      var pick = { store: cur.store, staff: cur.staff };
+      ['store', 'staff'].forEach(function (k) {
+        app.querySelectorAll('#pick-' + k + ' .choice-btn').forEach(function (b) {
+          b.addEventListener('click', function () { pick[k] = b.dataset.v; app.querySelectorAll('#pick-' + k + ' .choice-btn').forEach(function (x) { x.classList.toggle('on', x === b); }); });
+        });
+      });
+      document.getElementById('who-ok').addEventListener('click', function () {
+        if (!pick.store || !pick.staff) { alert('매장과 이름을 둘 다 골라 주세요.'); return; }
+        store.set('me', JSON.stringify(pick));
+        location.hash = next || '#/';
+      });
+    });
+  }
+
+  // 체크리스트 (v2: 매장·이름 → 체크 → 완료 → 서버)
+  function viewChecklist(kind) {
+    var m = me();
+    if (!m) { location.hash = '#/who?next=' + encodeURIComponent('#/check/' + kind); return; }
+    var src = LISTS[kind], label = KIND_LABEL[kind], detail = kind === 'open' ? 4 : 10, date = today();
+    var h = '<div class="crumb"><a href="#/">첫 화면</a> › 체크리스트</div>';
+    h += '<h1>' + (kind === 'open' ? '☀️' : '🌙') + ' ' + label + ' 체크리스트</h1>';
+    h += '<div class="card who-line"><span><strong>' + esc(m.store) + '</strong> · ' + esc(m.staff) + ' · ' + koDate(date) + '</span><a href="#/who?next=' + encodeURIComponent('#/check/' + kind) + '">바꾸기</a></div>';
+    h += '<div id="cl-body" class="muted">불러오는 중…</div>';
+    app.innerHTML = h;
+    fetchRun(date, m.store, kind).then(function (run) {
+      if (!run) run = { run_date: date, store: m.store, kind: kind, staff: m.staff, items: {}, total: src.items.length, done_count: 0, first_completed_at: null, completed_at: null };
+      run.total = src.items.length;
+      var body = '';
+      body += '<div class="done-msg" id="cl-done" hidden></div>';
+      body += '<div id="cl-progress" style="font-weight:700"></div><div class="progress-bar"><div id="cl-bar" style="width:0"></div></div>';
+      body += '<div id="cl-note" class="save-note" hidden></div>';
+      body += '<ul class="checklist">';
+      src.items.forEach(function (t, i) {
+        var on = !!run.items[String(i)];
+        body += '<li class="' + (on ? 'done' : '') + '"><label><input type="checkbox" data-i="' + i + '"' + (on ? ' checked' : '') + '><span>' + esc(t) + '</span><em class="when">' + (on ? hhmm(run.items[String(i)]) : '') + '</em></label></li>';
+      });
+      body += '</ul>';
+      body += '<button type="button" class="btn primary wide" id="cl-complete">' + label + ' 완료</button>';
+      body += '<div class="chapter-tools"><a class="btn" href="' + chapterLink(detail) + '">' + detail + '장 자세히 보기</a><button type="button" class="btn danger" id="cl-reset">오늘 체크 지우기</button></div>';
+      document.getElementById('cl-body').innerHTML = body;
+      var inputs = app.querySelectorAll('input[data-i]');
+      function refresh() {
+        var done = Object.keys(run.items).length;
+        run.done_count = done;
+        document.getElementById('cl-progress').textContent = done + '/' + run.total + ' 완료' + (run.completed_at ? ' · ' + label + ' 완료 ' + hhmm(run.completed_at) + ' (' + esc(run.staff) + ')' : '');
+        document.getElementById('cl-bar').style.width = (run.total ? Math.round(done / run.total * 100) : 0) + '%';
+        var dm = document.getElementById('cl-done');
+        dm.hidden = !run.completed_at;
+        if (run.completed_at) dm.innerHTML = '👏 오늘 ' + esc(run.store) + ' ' + label + ' 완료 · ' + esc(run.staff) + ' · ' + hhmm(run.completed_at) + (done < run.total ? ' <span class="warn">(' + (run.total - done) + '개 빠짐)</span>' : '');
+        var btn = document.getElementById('cl-complete');
+        btn.textContent = run.completed_at ? label + ' 완료됨 — 다시 저장' : label + ' 완료' + (done < run.total ? ' (' + (run.total - done) + '개 남음)' : '');
+      }
+      function note(res) {
+        var n = document.getElementById('cl-note');
+        if (res.ok && !res.local) { n.hidden = true; return; }
+        n.hidden = false;
+        n.textContent = res.local ? '서버 연결이 없어 이 폰에만 저장됐어요.' : '저장 안 됨 — 인터넷 연결 후 다시 눌러 주세요. (' + res.error + ')';
+      }
+      inputs.forEach(function (inp) {
+        inp.addEventListener('change', function () {
+          var i = String(inp.dataset.i);
+          if (inp.checked) run.items[i] = new Date().toISOString(); else delete run.items[i];
+          run.staff = m.staff;
+          inp.closest('li').classList.toggle('done', inp.checked);
+          inp.closest('li').querySelector('.when').textContent = inp.checked ? hhmm(run.items[i]) : '';
+          refresh();
+          saveRun(run).then(note);
+        });
+      });
+      document.getElementById('cl-complete').addEventListener('click', function () {
+        var done = Object.keys(run.items).length;
+        if (done < run.total && !confirm((run.total - done) + '개가 아직 체크 안 됐어요. 그래도 ' + label + ' 완료로 저장할까요?')) return;
+        var now = new Date().toISOString();
+        if (!run.first_completed_at) run.first_completed_at = now;
+        run.completed_at = now; run.staff = m.staff;
+        refresh();
+        saveRun(run).then(function (res) { note(res); if (res.ok) window.scrollTo(0, 0); });
+      });
+      document.getElementById('cl-reset').addEventListener('click', function () {
+        if (!confirm('오늘 ' + run.store + ' ' + label + ' 체크를 모두 지울까요? (완료 표시도 지워져요)')) return;
+        run.items = {}; run.completed_at = null; run.first_completed_at = null;
+        inputs.forEach(function (inp) { inp.checked = false; inp.closest('li').classList.remove('done'); inp.closest('li').querySelector('.when').textContent = ''; });
+        refresh(); saveRun(run).then(note);
+      });
+      refresh();
+    });
+  }
+
+  // 사장 점검표
+  function ownerOk() { return session.get('owner_ok') === '1'; }
+  function viewOwner(dateParam, detail) {
+    var pin = SB.ownerPin || '0000';
+    if (!ownerOk()) {
+      app.innerHTML = '<div class="crumb"><a href="#/">첫 화면</a> › 사장 점검표</div><h1>📋 사장 점검표</h1><p class="muted">숫자 4자리를 넣어 주세요.</p><form id="pin-form" class="pin-form"><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="pin" autocomplete="off"><button class="btn primary" type="submit">열기</button></form><p id="pin-err" class="warn" hidden>번호가 달라요.</p>';
+      document.getElementById('pin-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (document.getElementById('pin').value === String(pin)) { session.set('owner_ok', '1'); viewOwner(dateParam, detail); }
+        else document.getElementById('pin-err').hidden = false;
+      });
+      return;
+    }
+    var date = dateParam || today();
+    var h = '<div class="crumb"><a href="#/">첫 화면</a> › 사장 점검표</div><h1>📋 사장 점검표</h1>';
+    h += '<div class="date-nav"><a class="btn" href="#/owner?d=' + shiftDate(date, -1) + '">‹ 전날</a><strong>' + koDate(date) + (date === today() ? ' 오늘' : '') + '</strong><a class="btn" href="#/owner?d=' + shiftDate(date, 1) + '">다음날 ›</a></div>';
+    h += '<div id="owner-body" class="muted">불러오는 중…</div>';
+    h += '<p class="section-title">설정</p><a class="card link" href="#/owner-lists"><div class="title">매장·이름 목록 고치기</div><div class="sub">직원이 고르는 목록입니다</div></a>';
+    if (!sbOn()) h += '<div class="save-note">서버 연결이 없어 이 폰의 기록만 보여요. config.js(열쇠)를 확인해 주세요.</div>';
+    app.innerHTML = h;
+    Promise.all([loadSettings(), fetchRunsForDate(date)]).then(function (r) {
+      var s = r[0], runs = r[1] || [];
+      function find(st, k) { return runs.filter(function (x) { return x.store === st && x.kind === k; })[0]; }
+      var b = '<div class="owner-grid"><div class="og-head"></div><div class="og-head">☀️ 오픈</div><div class="og-head">🌙 마감</div>';
+      s.stores.forEach(function (st) {
+        b += '<div class="og-store">' + esc(st) + '</div>';
+        ['open', 'close'].forEach(function (k) {
+          var run = find(st, k), stt = runStatus(run, LISTS[k].items.length);
+          b += '<a class="og-cell ' + stt.cls + (detail === st + '|' + k ? ' selected' : '') + '" href="#/owner?d=' + date + '&x=' + encodeURIComponent(st + '|' + k) + '">' +
+            '<span class="og-label">' + stt.label + '</span>' +
+            (run ? '<span class="og-meta">' + (run.completed_at ? hhmm(run.completed_at) + ' · ' : '') + esc(run.staff) + ' · ' + stt.done + '/' + stt.total + '</span>' : '<span class="og-meta">기록 없음</span>') + '</a>';
+        });
+      });
+      b += '</div>';
+      var detailHtml = '';
+      if (detail) {
+        var parts = detail.split('|'), run2 = find(parts[0], parts[1]);
+        detailHtml = detailFor(run2, parts[1], parts[0]);
+      }
+      document.getElementById('owner-body').innerHTML = b + detailHtml;
+    });
+    function detailFor(run, k, st) {
+      var items = LISTS[k].items, d = '<div class="card detail"><div class="title">' + esc(st) + ' · ' + KIND_LABEL[k] + '</div>';
+      if (!run) return d + '<div class="muted">이 날 기록이 없어요.</div></div>';
+      d += '<div class="sub">' + esc(run.staff) + ' · ' + (run.completed_at ? '완료 ' + hhmm(run.completed_at) : '완료 안 누름') + (run.first_completed_at && run.first_completed_at !== run.completed_at ? ' (처음 완료 ' + hhmm(run.first_completed_at) + ')' : '') + '</div><ul class="detail-list">';
+      items.forEach(function (t, i) { var at = run.items[String(i)]; d += '<li class="' + (at ? 'ok' : 'miss') + '">' + (at ? '✅ ' + hhmm(at) : '⬜ 빠짐') + ' · ' + esc(t) + '</li>'; });
+      return d + '</ul></div>';
+    }
+  }
+  function viewOwnerLists() {
+    if (!ownerOk()) { location.hash = '#/owner'; return; }
+    app.innerHTML = '<div class="crumb"><a href="#/owner">사장 점검표</a> › 목록</div><h1>매장·이름 목록</h1><div class="muted">불러오는 중…</div>';
+    loadSettings().then(function (s) {
+      var h = '<div class="crumb"><a href="#/owner">사장 점검표</a> › 목록</div><h1>매장·이름 목록</h1><p class="muted">한 줄에 하나씩. 실명 대신 별칭(알바 A 등)을 써도 됩니다.</p>';
+      h += '<label class="field">매장<textarea id="stores" rows="4">' + esc(s.stores.join('\n')) + '</textarea></label>';
+      h += '<label class="field">이름<textarea id="staff" rows="6">' + esc(s.staff.join('\n')) + '</textarea></label>';
+      h += '<button type="button" class="btn primary wide" id="lists-save">저장</button><p id="lists-note" class="muted small"></p>';
+      app.innerHTML = h;
+      document.getElementById('lists-save').addEventListener('click', function () {
+        function lines(id) { return document.getElementById(id).value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean); }
+        var st = lines('stores'), sf = lines('staff');
+        if (!st.length || !sf.length) { alert('매장과 이름은 최소 하나씩 있어야 해요.'); return; }
+        Promise.all([saveSetting('stores', st), saveSetting('staff', sf)]).then(function () { document.getElementById('lists-note').textContent = '저장했어요.'; }, function (e) { document.getElementById('lists-note').textContent = '저장 안 됨: ' + e.message; });
+      });
+    });
+  }
+
+  // v1 화면들 (장 상세·검색·교육표·확인 필요)
   function viewChapter(num, hl) {
     var ch = book.chapters.filter(function (x) { return x.num === num; })[0];
     if (!ch) { app.innerHTML = empty('없는 장이에요.', '목차에서 다시 골라 주세요.'); return; }
-    var idx = book.chapters.indexOf(ch);
-    var prev = book.chapters[idx - 1], next = book.chapters[idx + 1];
+    var idx = book.chapters.indexOf(ch), prev = book.chapters[idx - 1], next = book.chapters[idx + 1];
     var boxes = ch.lines.filter(function (l) { return /^[-*]\s+\[[ xX]\]/.test(l); }).length;
-    var h = '<div class="crumb"><a href="#/">첫 화면</a> › ' + ch.num + '장</div>';
-    h += '<h1>' + ch.num + '장. ' + esc(ch.name) + '</h1>';
-    if (boxes) {
-      h += '<div class="chapter-tools"><span class="badge ok" id="ch-progress"></span><button class="btn danger" id="ch-reset">오늘 체크 지우기</button></div>';
-    }
+    var h = '<div class="crumb"><a href="#/">첫 화면</a> › ' + ch.num + '장</div><h1>' + ch.num + '장. ' + esc(ch.name) + '</h1>';
+    if (boxes) h += '<div class="chapter-tools"><span class="badge ok" id="ch-progress"></span><button class="btn danger" id="ch-reset">오늘 체크 지우기</button></div>';
     h += '<div class="content" id="content">' + renderBlocks(ch.lines, { num: ch.num }) + '</div>';
-    h += '<div class="grid2" style="margin-top:20px">';
-    h += prev ? '<a class="big-btn soft" href="#/ch/' + prev.num + '">‹ ' + prev.num + '장 ' + esc(prev.name) + '</a>' : '<span></span>';
-    h += next ? '<a class="big-btn soft" href="#/ch/' + next.num + '">' + next.num + '장 ' + esc(next.name) + ' ›</a>' : '<span></span>';
-    h += '</div>';
+    h += '<div class="grid2" style="margin-top:20px">' + (prev ? '<a class="big-btn soft" href="#/ch/' + prev.num + '">‹ ' + prev.num + '장 ' + esc(prev.name) + '</a>' : '<span></span>') + (next ? '<a class="big-btn soft" href="#/ch/' + next.num + '">' + next.num + '장 ' + esc(next.name) + ' ›</a>' : '<span></span>') + '</div>';
     app.innerHTML = h;
-    bindChapterChecks(ch.num);
-    if (hl !== undefined) highlight(hl);
-  }
-  function bindChapterChecks(num) {
     var inputs = app.querySelectorAll('input[data-key]');
-    function refresh() {
-      var done = 0;
-      inputs.forEach(function (inp) { if (inp.checked) done++; });
-      var p = document.getElementById('ch-progress');
-      if (p) p.textContent = '오늘 체크 ' + done + '/' + inputs.length;
-    }
-    inputs.forEach(function (inp) {
-      inp.addEventListener('change', function () {
-        store.set(inp.dataset.key, inp.checked ? '1' : '0');
-        inp.closest('li').classList.toggle('done', inp.checked);
-        refresh();
-      });
-    });
+    function refresh() { var done = 0; inputs.forEach(function (inp) { if (inp.checked) done++; }); var p = document.getElementById('ch-progress'); if (p) p.textContent = '오늘 체크 ' + done + '/' + inputs.length; }
+    inputs.forEach(function (inp) { inp.addEventListener('change', function () { store.set(inp.dataset.key, inp.checked ? '1' : '0'); inp.closest('li').classList.toggle('done', inp.checked); refresh(); }); });
     var r = document.getElementById('ch-reset');
-    if (r) r.addEventListener('click', function () {
-      if (!confirm('오늘 이 장에서 체크한 것을 모두 지울까요?')) return;
-      inputs.forEach(function (inp) { inp.checked = false; store.del(inp.dataset.key); inp.closest('li').classList.remove('done'); });
-      refresh();
-    });
+    if (r) r.addEventListener('click', function () { if (!confirm('오늘 이 장에서 체크한 것을 모두 지울까요?')) return; inputs.forEach(function (inp) { inp.checked = false; store.del(inp.dataset.key); inp.closest('li').classList.remove('done'); }); refresh(); });
     refresh();
+    if (hl !== undefined) { var el = app.querySelector('[data-line="' + hl + '"]'); if (el) { el.classList.add('hl'); setTimeout(function () { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50); } }
   }
-  function highlight(line) {
-    var el = app.querySelector('[data-line="' + line + '"]');
-    if (!el) return;
-    el.classList.add('hl');
-    setTimeout(function () { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50);
-  }
-
-  function viewChecklist(kind) {
-    var src = kind === 'open' ? OPEN : CLOSE;
-    var title = kind === 'open' ? '☀️ 오픈 체크리스트' : '🌙 마감 체크리스트';
-    var detail = kind === 'open' ? 4 : 10;
-    var h = '<div class="crumb"><a href="#/">첫 화면</a> › 체크리스트</div>';
-    h += '<h1>' + title + '</h1>';
-    h += '<p class="muted">' + esc(src.title) + ' · ' + today() + ' · 자세한 순서는 <a href="' + chapterLink(detail) + '">' + detail + '장</a></p>';
-    h += '<div class="done-msg" id="cl-done" hidden>👏 오늘 ' + (kind === 'open' ? '오픈' : '마감') + ' 항목을 모두 마쳤어요.</div>';
-    h += '<div id="cl-progress" style="font-weight:700"></div><div class="progress-bar"><div id="cl-bar" style="width:0"></div></div>';
-    h += '<ul class="checklist">';
-    src.items.forEach(function (t, i) {
-      var key = 'check:' + kind + ':' + today() + ':' + i, on = store.get(key) === '1';
-      h += '<li class="' + (on ? 'done' : '') + '"><label><input type="checkbox" data-key="' + key + '"' + (on ? ' checked' : '') + '><span>' + esc(t) + '</span></label></li>';
-    });
-    h += '</ul>';
-    h += '<div class="chapter-tools"><button class="btn danger" id="cl-reset">오늘 체크 지우기</button><a class="btn" href="' + chapterLink(detail) + '">' + detail + '장 자세히 보기</a></div>';
-    app.innerHTML = h;
-    var inputs = app.querySelectorAll('input[data-key]');
-    function refresh() {
-      var done = 0; inputs.forEach(function (i) { if (i.checked) done++; });
-      document.getElementById('cl-progress').textContent = done + '/' + inputs.length + ' 완료';
-      document.getElementById('cl-bar').style.width = (inputs.length ? Math.round(done / inputs.length * 100) : 0) + '%';
-      document.getElementById('cl-done').hidden = !(inputs.length && done === inputs.length);
-    }
-    inputs.forEach(function (inp) {
-      inp.addEventListener('change', function () {
-        store.set(inp.dataset.key, inp.checked ? '1' : '0');
-        inp.closest('li').classList.toggle('done', inp.checked);
-        refresh();
-      });
-    });
-    document.getElementById('cl-reset').addEventListener('click', function () {
-      if (!confirm('오늘 체크한 것을 모두 지울까요?')) return;
-      inputs.forEach(function (inp) { inp.checked = false; store.del(inp.dataset.key); inp.closest('li').classList.remove('done'); });
-      refresh();
-    });
-    refresh();
-  }
-
   function viewTraining() {
     var rows = trainingRows(book);
-    var h = '<div class="crumb"><a href="#/">첫 화면</a> › 신입 교육표</div>';
-    h += '<h1>🎓 신입 교육표</h1><p class="muted">그날 읽을 장을 누르고, 다 읽으면 "읽었어요"에 체크하세요. 이 체크는 날짜가 바뀌어도 남습니다. 관리자 확인은 사수에게 말로 받으세요(v2에서 화면으로 만들 예정).</p>';
+    var h = '<div class="crumb"><a href="#/">첫 화면</a> › 신입 교육표</div><h1>🎓 신입 교육표</h1><p class="muted">그날 읽을 장을 누르고, 다 읽으면 "읽었어요"에 체크하세요. 관리자 확인은 사수에게 말로 받으세요.</p>';
     if (!rows.length) h += empty('교육표가 없어요.', '12장에 표가 있는지 확인해 주세요.');
     rows.forEach(function (r, i) {
-      var key = 'train:' + i, on = store.get(key) === '1';
-      var links = '';
-      var seen = {};
+      var key = 'train:' + i, on = store.get(key) === '1', links = '', seen = {};
       r.content.replace(/(\d+)장/g, function (all, n) { if (!seen[n]) { seen[n] = 1; links += '<a href="' + chapterLink(parseInt(n, 10)) + '">' + n + '장</a>'; } return all; });
-      h += '<div class="card train-row"><div class="day">' + esc(r.day) + '</div><div>' + inline(r.content) + '</div>';
-      h += '<div class="links">' + links + '</div>';
-      h += '<label class="read"><input type="checkbox" data-key="' + key + '"' + (on ? ' checked' : '') + '><span>읽었어요' + (on ? ' ✓' : '') + '</span></label>';
-      h += '<div class="admin">' + esc(r.confirm) + '</div></div>';
+      h += '<div class="card train-row"><div class="day">' + esc(r.day) + '</div><div>' + inline(r.content) + '</div><div class="links">' + links + '</div><label class="read"><input type="checkbox" data-key="' + key + '"' + (on ? ' checked' : '') + '><span>읽었어요' + (on ? ' ✓' : '') + '</span></label><div class="admin">' + esc(r.confirm) + '</div></div>';
     });
     app.innerHTML = h;
-    app.querySelectorAll('input[data-key]').forEach(function (inp) {
-      inp.addEventListener('change', function () {
-        store.set(inp.dataset.key, inp.checked ? '1' : '0');
-        inp.nextElementSibling.textContent = '읽었어요' + (inp.checked ? ' ✓' : '');
-      });
-    });
+    app.querySelectorAll('input[data-key]').forEach(function (inp) { inp.addEventListener('change', function () { store.set(inp.dataset.key, inp.checked ? '1' : '0'); inp.nextElementSibling.textContent = '읽었어요' + (inp.checked ? ' ✓' : ''); }); });
   }
-
   function viewTodo() {
-    var h = '<div class="crumb"><a href="#/">첫 화면</a> › 확인 필요</div>';
-    h += '<h1>📝 확인 필요 ' + TODOS.length + '곳</h1><p class="muted">아직 매장 기준이 정해지지 않아 비워 둔 곳이에요. 직원은 사수나 사장님께 확인하고, 사장님은 <code>content.md</code>에서 채워 주세요.</p>';
+    var h = '<div class="crumb"><a href="#/">첫 화면</a> › 확인 필요</div><h1>📝 확인 필요 ' + TODOS.length + '곳</h1><p class="muted">아직 매장 기준이 정해지지 않아 비워 둔 곳이에요.</p>';
     if (!TODOS.length) h += empty('확인 필요가 없어요.', '모든 항목이 채워졌습니다.');
-    TODOS.forEach(function (t) {
-      h += '<a class="card link result" href="#/ch/' + t.num + '?hl=' + t.line + '"><div class="where">' + t.num + '장 ' + esc(t.name) + '</div><div class="snip">' + inline(t.text) + '</div></a>';
-    });
+    TODOS.forEach(function (t) { h += '<a class="card link result" href="#/ch/' + t.num + '?hl=' + t.line + '"><div class="where">' + t.num + '장 ' + esc(t.name) + '</div><div class="snip">' + inline(t.text) + '</div></a>'; });
     app.innerHTML = h;
   }
-
   function norm(s) { return String(s).toLowerCase().replace(/\s+/g, ''); }
   function viewSearch(q) {
     q = (q || '').trim();
     var h = '<div class="crumb"><a href="#/">첫 화면</a> › 검색</div>';
     if (!q) { h += empty('검색어를 넣어 주세요.', '예: 라벨, 냉동, 마감, 알레르기'); app.innerHTML = h; return; }
     var nq = norm(q), results = [];
-    book.chapters.forEach(function (c) {
-      c.lines.forEach(function (l, idx) {
-        var p = plain(l);
-        if (p && norm(p).indexOf(nq) >= 0) results.push({ num: c.num, name: c.name, line: idx, text: p });
-      });
-    });
+    book.chapters.forEach(function (c) { c.lines.forEach(function (l, idx) { var p = plain(l); if (p && norm(p).indexOf(nq) >= 0) results.push({ num: c.num, name: c.name, line: idx, text: p }); }); });
     h += '<h1>"' + esc(q) + '" 검색 결과 ' + results.length + '건</h1>';
-    if (!results.length) {
-      h += empty('찾는 내용이 없어요.', '사수나 사장님께 물어보세요. 다른 말로 다시 검색해 볼 수도 있어요.');
-    }
+    if (!results.length) h += empty('찾는 내용이 없어요.', '사수나 사장님께 물어보세요. 다른 말로 다시 검색해 볼 수도 있어요.');
     results.forEach(function (r) {
-      var text = esc(r.text);
-      var re = new RegExp(q.split('').map(function (ch) { return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*'; }).join(''), 'i');
+      var text = esc(r.text), re = new RegExp(q.split('').map(function (ch) { return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*'; }).join(''), 'i');
       text = text.replace(re, function (m0) { return '<mark>' + m0 + '</mark>'; });
       h += '<a class="card link result" href="#/ch/' + r.num + '?hl=' + r.line + '"><div class="where">' + r.num + '장 ' + esc(r.name) + '</div><div class="snip">' + text + '</div></a>';
     });
     app.innerHTML = h;
   }
 
-  function empty(title, sub) { return '<div class="empty"><strong>' + esc(title) + '</strong>' + esc(sub) + '</div>'; }
-
   // ---------- 라우터 ----------
   function route() {
-    var hash = location.hash || '#/';
-    var path = hash.slice(1), query = '';
-    var qi = path.indexOf('?');
+    var hash = location.hash || '#/', path = hash.slice(1), query = '', qi = path.indexOf('?');
     if (qi >= 0) { query = path.slice(qi + 1); path = path.slice(0, qi); }
     var params = {};
     query.split('&').forEach(function (kv) { if (!kv) return; var p = kv.split('='); params[decodeURIComponent(p[0])] = decodeURIComponent((p[1] || '').replace(/\+/g, ' ')); });
-    var parts = path.split('/').filter(Boolean);
-    var input = document.getElementById('search-input');
+    var parts = path.split('/').filter(Boolean), input = document.getElementById('search-input');
     if (parts[0] !== 'search' && input) input.value = '';
     window.scrollTo(0, 0);
     if (!parts.length) return viewHome();
     if (parts[0] === 'ch') return viewChapter(parseInt(parts[1], 10), params.hl !== undefined ? parseInt(params.hl, 10) : undefined);
     if (parts[0] === 'check') return viewChecklist(parts[1] === 'close' ? 'close' : 'open');
+    if (parts[0] === 'who') return viewWho(params.next);
+    if (parts[0] === 'owner') return viewOwner(params.d, params.x);
+    if (parts[0] === 'owner-lists') return viewOwnerLists();
     if (parts[0] === 'train') return viewTraining();
     if (parts[0] === 'todo') return viewTodo();
     if (parts[0] === 'search') { if (input) input.value = params.q || ''; return viewSearch(params.q); }
     viewHome();
   }
-  document.getElementById('search-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var q = document.getElementById('search-input').value.trim();
-    location.hash = '#/search?q=' + encodeURIComponent(q);
-  });
+  document.getElementById('search-form').addEventListener('submit', function (e) { e.preventDefault(); location.hash = '#/search?q=' + encodeURIComponent(document.getElementById('search-input').value.trim()); });
   window.addEventListener('hashchange', route);
-  // 카톡·인스타 등 앱 안 브라우저에서는 폰 저장이 지워질 수 있다 → 브라우저로 열기 안내
   (function inAppBanner() {
-    var ua = navigator.userAgent || '';
-    var isKakao = /KAKAOTALK/i.test(ua), isOther = /Instagram|FBAN|FBAV|NAVER\(inapp|Line\//i.test(ua);
+    var ua = navigator.userAgent || '', isKakao = /KAKAOTALK/i.test(ua), isOther = /Instagram|FBAN|FBAV|NAVER\(inapp|Line\//i.test(ua);
     if (!isKakao && !isOther) return;
-    var url = location.href.split('#')[0];
-    var bar = document.createElement('div');
+    var url = location.href.split('#')[0], bar = document.createElement('div');
     bar.className = 'inapp-banner';
-    bar.innerHTML = '<span>앱 안에서 열면 체크가 저장되지 않을 수 있어요.</span>' +
-      (isKakao ? '<a href="kakaotalk://web/openExternal?url=' + encodeURIComponent(url) + '">브라우저로 열기</a>' : '<span>오른쪽 위 메뉴에서 "브라우저로 열기"를 눌러 주세요.</span>');
+    bar.innerHTML = '<span>앱 안 브라우저예요. 체크는 서버에 남지만 더 편하게 쓰려면</span>' + (isKakao ? '<a href="kakaotalk://web/openExternal?url=' + encodeURIComponent(url) + '">브라우저로 열기</a>' : '<span>메뉴에서 "브라우저로 열기"</span>');
     document.body.insertBefore(bar, document.body.firstChild);
   })();
-  if (!book.chapters.length) {
-    app.innerHTML = empty('내용을 불러오지 못했어요.', 'content.js 가 같은 폴더에 있는지 확인해 주세요.');
-  } else {
-    route();
-  }
+  if (!book.chapters.length) app.innerHTML = empty('내용을 불러오지 못했어요.', 'content.js 가 같은 폴더에 있는지 확인해 주세요.');
+  else route();
 })();

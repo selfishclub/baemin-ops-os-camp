@@ -1,0 +1,5 @@
+{
+  "buildCommand": "node make-config.js",
+  "outputDirectory": ".",
+  "framework": null
+}
