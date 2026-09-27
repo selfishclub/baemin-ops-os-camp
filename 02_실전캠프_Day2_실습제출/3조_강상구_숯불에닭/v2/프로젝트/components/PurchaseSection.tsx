@@ -339,8 +339,9 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
         ) : (
           <ul className="divide-y divide-stone-100 text-sm">
             {purchases.map((p) => (
+              // 메모가 길어도 금액·버튼이 아랫줄로 내려가지 않게 두 칸 표로 (금액은 늘 오른쪽 같은 자리)
               <li key={p.id} className="py-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_7rem] items-baseline gap-x-3">
                   <div className="min-w-0">
                     <p className="font-semibold">
                       {p.date.slice(5).replace("-", "/")} {p.vendor} <span className="num text-xs text-stone-500">{p.lines.length}줄</span>
@@ -355,9 +356,9 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
                     </p>
                     {p.memo && <p className="text-xs text-stone-400">{p.memo}</p>}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="num text-base font-bold">{won(purchaseTotal(p))}</span>
-                    <span className="flex items-center gap-2 text-xs">
+                  <span className="num whitespace-nowrap text-right text-base font-bold">{won(purchaseTotal(p))}</span>
+                  <span className="flex items-baseline justify-end gap-2 whitespace-nowrap text-xs">
+                    <span className="flex items-baseline gap-2">
                       {photoCounts[p.id] > 0 && (
                         <button className="whitespace-nowrap text-stone-500 underline hover:text-stone-700" onClick={() => setViewing(p)}>
                           사진
@@ -376,7 +377,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
                         지우기
                       </button>
                     </span>
-                  </div>
+                  </span>
                 </div>
               </li>
             ))}
