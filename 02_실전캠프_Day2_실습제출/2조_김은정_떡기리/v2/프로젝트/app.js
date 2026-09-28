@@ -35,7 +35,7 @@
     var headers = { 'apikey': SB.anon, 'Authorization': 'Bearer ' + SB.anon, 'Content-Type': 'application/json' };
     if (opts.prefer) headers['Prefer'] = opts.prefer;
     return fetch(SB.url.replace(/\/$/, '') + '/rest/v1/' + path, { method: opts.method || 'GET', headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
-      .then(function (r) { if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + ' ' + t); }); return r.status === 204 ? null : r.json(); });
+      .then(function (r) { if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + ' ' + t); }); return r.text().then(function (t) { return t ? JSON.parse(t) : null; }); });
   }
   var settingsCache = null;
   function loadSettings() {
@@ -44,7 +44,10 @@
     var cached = store.get('settings'); if (cached) { try { base = JSON.parse(cached); } catch (e) {} }
     if (!sbOn()) { settingsCache = base; return Promise.resolve(base); }
     return sbFetch('settings?select=key,value').then(function (rows) {
-      (rows || []).forEach(function (r) { if ((r.key === 'stores' || r.key === 'staff') && Array.isArray(r.value)) base[r.key] = r.value; });
+      (rows || []).forEach(function (r) {
+        if ((r.key === 'stores' || r.key === 'staff') && Array.isArray(r.value)) base[r.key] = r.value;
+        if (r.key === 'owner_pin_hash' && typeof r.value === 'string') base.owner_pin_hash = r.value;
+      });
       settingsCache = base; store.set('settings', JSON.stringify(base)); return base;
     }).catch(function () { settingsCache = base; return base; });
   }
@@ -181,16 +184,29 @@
   function chapterLink(num) { var c = book.chapters.filter(function (x) { return x.num === num; })[0]; return c ? '#/ch/' + num : '#/'; }
   function me() { var v = store.get('me'); if (!v) return null; try { return JSON.parse(v); } catch (e) { return null; } }
   function runStatus(run, total) {
-    if (!run) return { cls: 'none', label: '아직', done: 0, total: total };
+    if (!run) return { cls: 'none', label: '미완료', done: 0, total: total };
     var done = Object.keys(run.items || {}).length;
     if (run.completed_at) return { cls: 'done', label: '완료', done: done, total: run.total || total };
     return { cls: 'partial', label: '진행 중', done: done, total: run.total || total };
+  }
+  // PIN: 설정에 저장된 해시가 있으면 그것과 비교, 없으면 config.js(환경변수 OWNER_PIN)와 비교
+  function sha256(text) {
+    if (!(window.crypto && crypto.subtle)) return Promise.resolve(null);
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+    });
+  }
+  function checkPin(input) {
+    return loadSettings().then(function (s) {
+      if (s.owner_pin_hash) return sha256(input).then(function (h) { return h === s.owner_pin_hash; });
+      return String(input) === String(SB.ownerPin || '0000');
+    });
   }
 
   function viewHome() {
     var m = me(), h = '';
     h += '<h1>무엇을 찾으세요?</h1>';
-    h += '<div id="home-status" class="card status-card">' + (m ? '<div class="sub">' + esc(m.store) + ' · ' + esc(m.staff) + ' <a href="#/who">바꾸기</a></div><div class="muted">오늘 상태 불러오는 중…</div>' : '<div class="sub">아직 매장·이름을 고르지 않았어요.</div><a class="btn primary" href="#/who">매장·이름 고르기</a>') + '</div>';
+    h += '<div id="home-status" class="card status-card">' + (m ? '<div class="sub">' + esc(m.store) + ' · ' + esc(m.staff) + ' <a href="#/who">바꾸기</a></div><div class="muted">오늘 상태 불러오는 중…</div>' : '<div class="sub">아직 이름을 고르지 않았어요.</div><a class="btn primary" href="#/who">매장·이름 고르기</a>') + '</div>';
     h += '<div class="grid2">';
     h += '<a class="big-btn" href="#/check/open">☀️ 오픈 체크리스트<small id="home-open">' + LISTS.open.items.length + '항목</small></a>';
     h += '<a class="big-btn alt" href="#/check/close">🌙 마감 체크리스트<small id="home-close">' + LISTS.close.items.length + '항목</small></a>';
@@ -339,13 +355,14 @@
   // 사장 점검표
   function ownerOk() { return session.get('owner_ok') === '1'; }
   function viewOwner(dateParam, detail) {
-    var pin = SB.ownerPin || '0000';
     if (!ownerOk()) {
-      app.innerHTML = '<div class="crumb"><a href="#/">첫 화면</a> › 사장 점검표</div><h1>📋 사장 점검표</h1><p class="muted">숫자 4자리를 넣어 주세요.</p><form id="pin-form" class="pin-form"><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="pin" autocomplete="off"><button class="btn primary" type="submit">열기</button></form><p id="pin-err" class="warn" hidden>번호가 달라요.</p>';
+      app.innerHTML = '<div class="crumb"><a href="#/">첫 화면</a> › 사장 점검표</div><h1>📋 사장 점검표</h1><p class="muted">사장님 번호(PIN)를 넣어 주세요.</p><form id="pin-form" class="pin-form"><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="pin" autocomplete="off"><button class="btn primary" type="submit">열기</button></form><p id="pin-err" class="warn" hidden>번호가 달라요.</p>';
       document.getElementById('pin-form').addEventListener('submit', function (e) {
         e.preventDefault();
-        if (document.getElementById('pin').value === String(pin)) { session.set('owner_ok', '1'); viewOwner(dateParam, detail); }
-        else document.getElementById('pin-err').hidden = false;
+        checkPin(document.getElementById('pin').value).then(function (ok) {
+          if (ok) { session.set('owner_ok', '1'); viewOwner(dateParam, detail); }
+          else document.getElementById('pin-err').hidden = false;
+        });
       });
       return;
     }
@@ -359,35 +376,47 @@
     Promise.all([loadSettings(), fetchRunsForDate(date)]).then(function (r) {
       var s = r[0], runs = r[1] || [];
       function find(st, k) { return runs.filter(function (x) { return (x.store || '') === st && x.kind === k; })[0]; }
-      var storesToShow = s.stores.length ? s.stores : [''];
+      // 등록된 매장 + 그날 기록에 있는 매장(등록 전 기록이나 이름이 바뀐 매장도 빠지지 않게)
+      var storesToShow = s.stores.slice();
+      runs.forEach(function (x) { var st = x.store || ''; if (storesToShow.indexOf(st) < 0) storesToShow.push(st); });
+      if (!storesToShow.length) storesToShow = [''];
       var b = '';
       if (!s.stores.length || !s.staff.length) b += '<div class="save-note soft">' + (!s.stores.length ? '매장 이름이 아직 없어요. ' : '') + (!s.staff.length ? '직원 이름 목록이 아직 없어요. ' : '') + '아래 "매장·이름 목록 고치기"에서 등록해 주세요. (매장이 하나면 매장 이름 하나만 적으면 되고, 직원 화면에는 매장 선택이 나오지 않아요)</div>';
+      // 위: 한눈에 보는 표 (상태 · 담당자 · 완료시간 · 미완료 개수 · 특이사항 표시)
       b += '<div class="owner-grid"><div class="og-head"></div><div class="og-head">☀️ 오픈</div><div class="og-head">🌙 마감</div>';
       storesToShow.forEach(function (st) {
         b += '<div class="og-store">' + esc(storeLabel(st)) + '</div>';
         ['open', 'close'].forEach(function (k) {
-          var run = find(st, k), stt = runStatus(run, LISTS[k].items.length);
-          b += '<a class="og-cell ' + stt.cls + (detail === st + '|' + k ? ' selected' : '') + '" href="#/owner?d=' + date + '&x=' + encodeURIComponent(st + '|' + k) + '">' +
+          var run = find(st, k), stt = runStatus(run, LISTS[k].items.length), miss = stt.total - stt.done;
+          b += '<a class="og-cell ' + stt.cls + '" href="#d-' + encodeURIComponent(st) + '-' + k + '">' +
             '<span class="og-label">' + stt.label + '</span>' +
-            (run ? '<span class="og-meta">' + (run.completed_at ? hhmm(run.completed_at) + ' · ' : '') + esc(run.staff) + ' · ' + stt.done + '/' + stt.total + (run.note ? ' · 📝' : '') + '</span>' : '<span class="og-meta">기록 없음</span>') + '</a>';
+            (run ? '<span class="og-meta">' + esc(run.staff) + '</span><span class="og-meta">' + (run.completed_at ? hhmm(run.completed_at) : '완료 안 누름') + (miss ? ' · 미완료 ' + miss : ' · ' + stt.done + '/' + stt.total) + (run.note ? ' · 📝' : '') + '</span>' : '<span class="og-meta">기록 없음</span>') + '</a>';
         });
       });
       b += '</div>';
-      var detailHtml = '';
-      if (detail) {
-        var parts = detail.split('|'), run2 = find(parts[0], parts[1]);
-        detailHtml = detailFor(run2, parts[1], parts[0]);
-      }
-      document.getElementById('owner-body').innerHTML = b + detailHtml;
+      // 아래: 기록마다 담당자·완료시간·상태·미완료 항목·특이사항 카드
+      var anyRun = false;
+      storesToShow.forEach(function (st) { ['open', 'close'].forEach(function (k) { var run = find(st, k); if (run) { anyRun = true; b += detailFor(run, k, st); } }); });
+      if (!anyRun) b += '<div class="empty"><strong>' + koDate(date) + ' 기록이 없어요.</strong>직원이 체크를 시작하면 여기에 바로 나타납니다.</div>';
+      document.getElementById('owner-body').innerHTML = b;
+      app.querySelectorAll('.og-cell').forEach(function (cell) {
+        cell.addEventListener('click', function (e) { e.preventDefault(); var id = cell.getAttribute('href').slice(1); var el = document.getElementById(id); if (el) { el.classList.add('hl'); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
+      });
     });
     function detailFor(run, k, st) {
-      var items = LISTS[k].items, d = '<div class="card detail"><div class="title">' + esc(storeLabel(st)) + ' · ' + KIND_LABEL[k] + '</div>';
-      if (!run) return d + '<div class="muted">이 날 기록이 없어요.</div></div>';
-      d += '<div class="sub">' + esc(run.staff) + ' · ' + (run.completed_at ? '완료 ' + hhmm(run.completed_at) : '완료 안 누름') + (run.first_completed_at && run.first_completed_at !== run.completed_at ? ' (처음 완료 ' + hhmm(run.first_completed_at) + ')' : '') + '</div><ul class="detail-list">';
+      var items = LISTS[k].items, stt = runStatus(run, items.length), missing = [];
+      items.forEach(function (t, i) { if (!run.items[String(i)]) missing.push(t); });
+      var d = '<div class="card detail" id="d-' + encodeURIComponent(st) + '-' + k + '">';
+      d += '<div class="title">' + esc(storeLabel(st)) + ' · ' + KIND_LABEL[k] + ' <span class="pill ' + stt.cls + '">' + stt.label + '</span></div>';
+      d += '<table class="kv"><tr><th>담당자</th><td>' + esc(run.staff) + '</td></tr>';
+      d += '<tr><th>완료시간</th><td>' + (run.completed_at ? hhmm(run.completed_at) + (run.first_completed_at && run.first_completed_at !== run.completed_at ? ' <span class="muted small">(처음 제출 ' + hhmm(run.first_completed_at) + ')</span>' : '') : '<span class="warn">완료 제출 안 함</span>') + '</td></tr>';
+      d += '<tr><th>체크</th><td>' + stt.done + '/' + stt.total + (run.updated_at ? ' <span class="muted small">(마지막 ' + hhmm(run.updated_at) + ')</span>' : '') + '</td></tr>';
+      d += '<tr><th>미완료 항목</th><td>' + (missing.length ? '<ul class="miss-list">' + missing.map(function (t) { return '<li>⬜ ' + esc(t) + '</li>'; }).join('') + '</ul>' : '<span class="ok-text">없음 — 모두 체크됨</span>') + '</td></tr>';
+      d += '<tr><th>특이사항</th><td>' + (run.note ? esc(run.note).replace(/\n/g, '<br>') : '<span class="muted">없음</span>') + '</td></tr></table>';
+      d += '<details class="times"><summary>항목별 체크 시각</summary><ul class="detail-list">';
       items.forEach(function (t, i) { var at = run.items[String(i)]; d += '<li class="' + (at ? 'ok' : 'miss') + '">' + (at ? '✅ ' + hhmm(at) : '⬜ 빠짐') + ' · ' + esc(t) + '</li>'; });
-      d += '</ul>';
-      d += '<div class="note-box"><strong>특이사항</strong><div>' + (run.note ? esc(run.note).replace(/\n/g, '<br>') : '<span class="muted">없음</span>') + '</div></div>';
-      return d + '</div>';
+      d += '</ul></details></div>';
+      return d;
     }
   }
   function viewOwnerLists() {
@@ -398,7 +427,20 @@
       h += '<label class="field">매장 (지점) <span class="muted small">— 하나뿐이면 하나만. 두 개 이상일 때만 직원 화면에 매장 선택이 나와요</span><textarea id="stores" rows="4" placeholder="예: 본점">' + esc(s.stores.join('\n')) + '</textarea></label>';
       h += '<label class="field">직원 이름 <span class="muted small">— 비워 두면 직원이 직접 이름을 적습니다</span><textarea id="staff" rows="6" placeholder="예: 알바 A">' + esc(s.staff.join('\n')) + '</textarea></label>';
       h += '<button type="button" class="btn primary wide" id="lists-save">저장</button><p id="lists-note" class="muted small"></p>';
+      h += '<p class="section-title">사장님 번호(PIN) 바꾸기</p><div class="card"><p class="muted small">점검표를 여는 숫자예요. 처음 값은 ' + (s.owner_pin_hash ? '이미 바꿨습니다' : '설치할 때 정한 값(기본 0000)') + '. 바꾼 번호는 서버에 암호화(해시)해서 저장됩니다.</p>';
+      h += '<label class="field">새 번호 (숫자 4~8자리)<input type="password" inputmode="numeric" maxlength="8" id="pin1" class="text-input" autocomplete="new-password"></label>';
+      h += '<label class="field">한 번 더<input type="password" inputmode="numeric" maxlength="8" id="pin2" class="text-input" autocomplete="new-password"></label>';
+      h += '<button type="button" class="btn wide" id="pin-save">번호 바꾸기</button><p id="pin-note" class="muted small"></p></div>';
       app.innerHTML = h;
+      document.getElementById('pin-save').addEventListener('click', function () {
+        var p1 = document.getElementById('pin1').value.trim(), p2 = document.getElementById('pin2').value.trim(), n = document.getElementById('pin-note');
+        if (!/^\d{4,8}$/.test(p1)) { n.textContent = '숫자 4~8자리로 넣어 주세요.'; return; }
+        if (p1 !== p2) { n.textContent = '두 번 넣은 번호가 달라요.'; return; }
+        sha256(p1).then(function (hsh) {
+          if (!hsh) { n.textContent = '이 브라우저에서는 바꿀 수 없어요 (https 주소에서 해 주세요).'; return; }
+          return saveSetting('owner_pin_hash', hsh).then(function () { n.textContent = '바꿨어요. 다음부터 새 번호로 여세요.'; document.getElementById('pin1').value = ''; document.getElementById('pin2').value = ''; });
+        }).catch(function (e) { n.textContent = '저장 안 됨: ' + e.message; });
+      });
       document.getElementById('lists-save').addEventListener('click', function () {
         function lines(id) { return document.getElementById(id).value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean); }
         var st = lines('stores'), sf = lines('staff');

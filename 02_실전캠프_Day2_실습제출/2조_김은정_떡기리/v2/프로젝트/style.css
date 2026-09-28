@@ -198,3 +198,16 @@ mark.todo { background: var(--todo); color: var(--todo-ink); padding: 0 4px; bor
 .note-box { margin-top: 10px; padding: 10px 12px; background: var(--brand-soft); border-radius: 10px; font-size: 14px; }
 .note-box strong { display: block; margin-bottom: 4px; }
 .save-note.soft { background: var(--todo); color: var(--todo-ink); }
+.og-cell { text-decoration: none; }
+.og-cell .og-meta { display: block; }
+.detail .title .pill { margin-left: 6px; font-size: 12px; padding: 3px 9px; vertical-align: middle; }
+table.kv { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 15px; }
+table.kv th { text-align: left; width: 88px; color: var(--muted); font-weight: 600; padding: 6px 6px 6px 0; vertical-align: top; }
+table.kv td { padding: 6px 0; vertical-align: top; border-top: 1px solid var(--line); }
+table.kv tr:first-child td { border-top: none; }
+.miss-list { list-style: none; padding: 0; margin: 0; }
+.miss-list li { color: #a33; font-weight: 700; padding: 2px 0; }
+.ok-text { color: var(--ok); font-weight: 700; }
+details.times { margin-top: 8px; }
+details.times summary { cursor: pointer; color: var(--brand); font-size: 14px; }
+.who-line a { white-space: nowrap; flex: 0 0 auto; }
