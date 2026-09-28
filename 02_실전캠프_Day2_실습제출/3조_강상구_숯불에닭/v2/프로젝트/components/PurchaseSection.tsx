@@ -792,7 +792,7 @@ function PhotoStrip({ ownerId, readOnly = false }: { ownerId: string; readOnly?:
   async function addFiles(files: FileList) {
     setBusy(true);
     for (const f of Array.from(files)) {
-      if (f.type.startsWith("image/")) await addPhoto(ownerId, f);
+      if (f.type.startsWith("image/") || f.type === "application/pdf") await addPhoto(ownerId, f);
     }
     setBusy(false);
     await load();
@@ -802,25 +802,36 @@ function PhotoStrip({ ownerId, readOnly = false }: { ownerId: string; readOnly?:
     <div className="space-y-1 rounded-xl bg-stone-50 p-2">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-stone-600">
-          영수증·명세표 사진 {photos.length > 0 && <span className="num text-stone-500">{photos.length}장</span>}
+          영수증·명세표 {photos.length > 0 && <span className="num text-stone-500">{photos.length}장</span>}
         </p>
         {!readOnly && (
           <>
             <button className="btn-ghost px-2 py-1 text-xs" disabled={busy} onClick={() => fileRef.current?.click()}>
-              {busy ? "넣는 중…" : "+ 사진 붙이기"}
+              {busy ? "넣는 중…" : "+ 사진·PDF 붙이기"}
             </button>
-            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" aria-label="영수증 사진" onChange={(e) => e.target.files?.length && addFiles(e.target.files)} />
+            <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple className="hidden" aria-label="영수증 사진" onChange={(e) => e.target.files?.length && addFiles(e.target.files)} />
           </>
         )}
       </div>
       {photos.length === 0 ? (
-        !readOnly && <p className="text-xs text-stone-500">폰으로 찍은 영수증 사진을 붙여 두면 나중에 숫자와 나란히 볼 수 있어요. 사진은 이 컴퓨터 브라우저에만 남아요.</p>
+        !readOnly && <p className="text-xs text-stone-500">폰으로 찍은 영수증 사진이나 거래처가 보내 준 명세표 PDF를 붙여 두면 나중에 숫자와 나란히 볼 수 있어요. 파일은 이 컴퓨터 브라우저에만 남아요.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {photos.map((p) => (
             <div key={p.id} className="relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={urls[p.id]} alt={p.name} className="h-20 w-20 cursor-zoom-in rounded-lg object-cover" onClick={() => urls[p.id] && window.open(urls[p.id], "_blank")} />
+              {p.type === "application/pdf" ? (
+                <button
+                  className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg bg-white p-1 text-center text-[10px] leading-tight text-stone-600 ring-1 ring-stone-200 hover:ring-orange-300"
+                  title={p.name}
+                  onClick={() => urls[p.id] && window.open(urls[p.id], "_blank")}
+                >
+                  <span className="text-lg">📄</span>
+                  <span className="line-clamp-2 break-all">{p.name.replace(/\.pdf$/i, "")}</span>
+                </button>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={urls[p.id]} alt={p.name} className="h-20 w-20 cursor-zoom-in rounded-lg object-cover" onClick={() => urls[p.id] && window.open(urls[p.id], "_blank")} />
+              )}
               {!readOnly && (
                 <button
                   className="absolute -right-1 -top-1 rounded-full bg-white px-1.5 text-xs text-stone-600 shadow"
@@ -891,18 +902,26 @@ function PurchaseViewer({ purchase, items, onClose }: { purchase: Purchase; item
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-2">
-            {currentUrl ? (
+            {currentUrl && photos.find((ph) => ph.id === current)?.type === "application/pdf" ? (
+              <iframe src={currentUrl} title="명세표 PDF" className="h-[60vh] w-full rounded-xl bg-white ring-1 ring-stone-200" />
+            ) : currentUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={currentUrl} alt="영수증 사진" className="max-h-[60vh] w-full cursor-zoom-in rounded-xl object-contain" onClick={() => window.open(currentUrl, "_blank")} />
             ) : (
-              <p className="text-xs text-stone-500">사진이 없어요.</p>
+              <p className="text-xs text-stone-500">붙여 둔 사진·PDF가 없어요.</p>
             )}
             {photos.length > 1 && (
               <div className="flex flex-wrap gap-2">
-                {photos.map((ph) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={ph.id} src={urls[ph.id]} alt={ph.name} className={`h-14 w-14 cursor-pointer rounded-lg object-cover ${current === ph.id ? "ring-2 ring-orange-500" : ""}`} onClick={() => setCurrent(ph.id)} />
-                ))}
+                {photos.map((ph) =>
+                  ph.type === "application/pdf" ? (
+                    <button key={ph.id} className={`h-14 w-14 rounded-lg bg-white text-lg ring-1 ring-stone-200 ${current === ph.id ? "ring-2 ring-orange-500" : ""}`} title={ph.name} onClick={() => setCurrent(ph.id)}>
+                      📄
+                    </button>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={ph.id} src={urls[ph.id]} alt={ph.name} className={`h-14 w-14 cursor-pointer rounded-lg object-cover ${current === ph.id ? "ring-2 ring-orange-500" : ""}`} onClick={() => setCurrent(ph.id)} />
+                  ),
+                )}
               </div>
             )}
             <p className="text-xs text-stone-500">사진을 누르면 새 창에서 크게 봐요. 사진은 이 컴퓨터 브라우저에만 있어요.</p>
