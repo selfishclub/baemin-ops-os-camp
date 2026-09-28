@@ -279,7 +279,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-stone-600">
           <span>엑셀로 한 번에:</span>
           <button className="underline hover:text-stone-700" onClick={() => sheetRef.current?.click()}>
             🧾 영수증 정리 엑셀
@@ -290,8 +290,8 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
           </button>
           <input ref={liquorRef} type="file" accept=".xlsx,.xls" aria-label="주류 매출원장 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readLiquorFile(e.target.files[0])} />
         </div>
-        <details className="text-xs text-stone-600">
-          <summary className="cursor-pointer text-xs font-semibold text-stone-500">? 어떻게 넣나 (누르면 펼쳐져요)</summary>
+        <details className="text-sm text-stone-700">
+          <summary className="cursor-pointer text-sm font-semibold text-stone-600">? 어떻게 넣나 (누르면 펼쳐져요)</summary>
           <p className="mt-2">
             마트·거래처 영수증을 상품 줄 그대로 적어요. 줄을 <b>원가율 품목에 연결</b>하고 품목 단위 수량(특란 30구×5 = 150개)을 넣으면 그 품목의 <b>기준단가가 최근 매입가로 자동</b>으로 바뀌어요. 손익은 통장 기준이라 여기 금액은 손익에 따로 더하지 않아요.
           </p>
@@ -304,11 +304,11 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
         {purchases.length > 0 && (
           <div className="num flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-xl bg-stone-50 px-3 py-2 text-xs">
             <span className="whitespace-nowrap">
-              <span className="text-xs text-stone-500">이 달 매입 </span>
+              <span className="text-xs text-stone-600">이 달 매입 </span>
               <b className="text-sm">{won(summary.total)}</b>
-              <span className="text-xs text-stone-500"> · {summary.count}건</span>
+              <span className="text-xs text-stone-600"> · {summary.count}건</span>
             </span>
-            <span className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone-600">
+            <span className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-stone-600">
               {PURCHASE_CATEGORIES.filter((c) => summary.byCategory[c] > 0).map((c) => (
                 <span key={c} className="whitespace-nowrap">
                   {c} <b className="text-stone-800">{won(summary.byCategory[c])}</b>
@@ -345,26 +345,26 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
             {purchases.map((p) => (
               // 메모가 길어도 금액·버튼이 아랫줄로 내려가지 않게 두 칸 표로 (금액은 늘 오른쪽 같은 자리)
               <li key={p.id} className="py-2">
-                <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_7rem] items-baseline gap-x-3">
+                <div className="grid grid-cols-[minmax(0,1fr)_7rem_8.5rem] items-baseline gap-x-3">
                   <div className="min-w-0">
-                    <p className="font-semibold">
-                      {p.date.slice(5).replace("-", "/")} {p.vendor} <span className="num text-xs text-stone-500">{p.lines.length}줄</span>
+                    <p className="text-base font-bold text-stone-900">
+                      {p.date.slice(5).replace("-", "/")} {p.vendor} <span className="num text-xs font-normal text-stone-500">{p.lines.length}줄</span>
                       {photoCounts[p.id] > 0 && <span className="num ml-1 rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-600">📷 {photoCounts[p.id]}</span>}
                     </p>
-                    <p className="text-xs text-stone-500">
+                    <p className="text-sm text-stone-600">
                       {p.lines
                         .slice(0, 4)
                         .map((l) => l.name)
                         .join(" · ")}
                       {p.lines.length > 4 ? " …" : ""}
                     </p>
-                    {p.memo && <p className="text-xs text-stone-400">{p.memo}</p>}
+                    {p.memo && <p className="text-xs text-stone-500">{p.memo}</p>}
                   </div>
                   <span className="num whitespace-nowrap text-right text-base font-bold">{won(purchaseTotal(p))}</span>
-                  <span className="flex items-baseline justify-end gap-2 whitespace-nowrap text-xs">
+                  <span className="flex items-baseline justify-end gap-2 whitespace-nowrap text-sm">
                     <span className="flex items-baseline gap-2">
                       {photoCounts[p.id] > 0 && (
-                        <button className="whitespace-nowrap text-stone-500 underline hover:text-stone-700" onClick={() => setViewing(p)}>
+                        <button className="whitespace-nowrap text-stone-600 underline hover:text-stone-800" onClick={() => setViewing(p)}>
                           사진
                         </button>
                       )}
@@ -377,7 +377,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
                       >
                         고치기
                       </button>
-                      <button className="whitespace-nowrap text-stone-400 underline hover:text-stone-600" onClick={() => setConfirmDelete(p)}>
+                      <button className="whitespace-nowrap text-stone-500 underline hover:text-stone-700" onClick={() => setConfirmDelete(p)}>
                         지우기
                       </button>
                     </span>
