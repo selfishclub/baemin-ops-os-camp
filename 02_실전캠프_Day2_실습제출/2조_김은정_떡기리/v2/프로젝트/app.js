@@ -273,8 +273,20 @@
 
   // 체크리스트 (v2: 매장·이름 → 체크 → 완료 → 서버)
   function viewChecklist(kind) {
-    var m = me();
-    if (!m) { location.hash = '#/who?next=' + encodeURIComponent('#/check/' + kind); return; }
+    var m = me(), next = '#/who?next=' + encodeURIComponent('#/check/' + kind);
+    if (!m) { location.hash = next; return; }
+    app.innerHTML = '<div class="muted">확인 중…</div>';
+    // 이름 목록이 등록돼 있으면 목록에 있는 이름만, 매장이 여러 개면 등록된 매장만 허용. 아니면 다시 고르게 한다.
+    loadSettings().then(function (s) {
+      var single = singleStore(s);
+      var staffOk = s.staff.length ? s.staff.indexOf(m.staff) >= 0 : !!m.staff;
+      var storeOk = single === null ? s.stores.indexOf(m.store) >= 0 : true;
+      if (!staffOk || !storeOk) { store.del('me'); location.hash = next; return; }
+      if (single !== null && m.store !== single) { m.store = single; store.set('me', JSON.stringify(m)); }
+      renderChecklist(kind, m);
+    });
+  }
+  function renderChecklist(kind, m) {
     var src = LISTS[kind], label = KIND_LABEL[kind], detail = kind === 'open' ? 4 : 10, date = today();
     var h = '<div class="crumb"><a href="#/">첫 화면</a> › 체크리스트</div>';
     h += '<h1>' + (kind === 'open' ? '☀️' : '🌙') + ' ' + label + ' 체크리스트</h1>';
