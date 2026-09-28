@@ -83,6 +83,7 @@ export default function TodayPage() {
 
   const active = daily.channels.filter((c) => c.active);
   const activeStaff = daily.staff.filter((s) => s.active);
+  const past = daily.staff.filter((s) => !s.active); // 그만뒀지만 지난 근무 기록이 남아 있는 직원
   const existing = useMemo(() => dayTotals(date, daily.sales, daily.shifts, daily.staff), [date, daily.sales, daily.shifts, daily.staff]);
 
   // 그날 저장된 값을 입력 칸에 채운다
@@ -444,6 +445,12 @@ export default function TodayPage() {
                     {activeStaff.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.alias}
+                      </option>
+                    ))}
+                    {/* 그만둔 직원의 지난 근무도 이름이 보이게 (목록에 없으면 "직원 고르기"로 비어 보인다) */}
+                    {past.filter((s) => s.id === r.staffId).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.alias} (지난 직원)
                       </option>
                     ))}
                   </select>
