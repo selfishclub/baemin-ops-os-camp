@@ -102,14 +102,14 @@ export default function CostingPage() {
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-bold">원가율 — 레시피 기준 vs 통장 기준</h2>
-          <div className="flex gap-1 text-[11px]">
-            <button className={`rounded-lg px-2 py-1 ${view === "report" ? "bg-orange-100 text-orange-800" : "text-stone-500"}`} onClick={() => setView("report")}>
+          <div className="flex gap-1 text-sm">
+            <button className={`rounded-lg px-3 py-1.5 ${view === "report" ? "bg-orange-100 font-bold text-orange-800" : "font-semibold text-stone-600 hover:bg-stone-100"}`} onClick={() => setView("report")}>
               결과
             </button>
-            <button className={`rounded-lg px-2 py-1 ${view === "purchases" ? "bg-orange-100 text-orange-800" : "text-stone-500"}`} onClick={() => setView("purchases")}>
+            <button className={`rounded-lg px-3 py-1.5 ${view === "purchases" ? "bg-orange-100 font-bold text-orange-800" : "font-semibold text-stone-600 hover:bg-stone-100"}`} onClick={() => setView("purchases")}>
               매입 영수증
             </button>
-            <button className={`rounded-lg px-2 py-1 ${view === "setup" ? "bg-orange-100 text-orange-800" : "text-stone-500"}`} onClick={() => setView("setup")}>
+            <button className={`rounded-lg px-3 py-1.5 ${view === "setup" ? "bg-orange-100 font-bold text-orange-800" : "font-semibold text-stone-600 hover:bg-stone-100"}`} onClick={() => setView("setup")}>
               품목·레시피 설정
             </button>
           </div>
