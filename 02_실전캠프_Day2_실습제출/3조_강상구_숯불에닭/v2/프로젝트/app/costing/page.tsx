@@ -114,11 +114,11 @@ export default function CostingPage() {
             </button>
           </div>
         </div>
-        <button className="w-full text-left text-[12px] text-sky-800" onClick={() => setHelp((v) => !v)}>
+        <button className="w-full text-left text-xs text-sky-800" onClick={() => setHelp((v) => !v)}>
           {help ? "▲" : "?"} 무엇을 넣고 무엇이 나오나
         </button>
         {help && (
-          <div className="rounded-xl bg-sky-50 px-3 py-2 text-[12px] text-sky-950 ring-1 ring-sky-200">
+          <div className="rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-950 ring-1 ring-sky-200">
             <ul className="list-disc space-y-0.5 pl-4">
               <li>
                 <b>넣는 것 ①</b> 포스 ASP → 매출관리 → 매출분석 → <b>상품ABC분석</b>을 한 달(1일~말일)로 받아 올리거나, 매일 그날 것만 올려도 이어 붙여져요
@@ -180,7 +180,7 @@ export default function CostingPage() {
           )}
 
           <section className="card space-y-2">
-            <h2 className="text-base font-bold">메뉴별 원가율 <span className="text-[11px] font-normal text-stone-500">원가율 높은 순 · {monthLabel(month)}</span></h2>
+            <h2 className="text-base font-bold">메뉴별 원가율 <span className="text-xs font-normal text-stone-500">원가율 높은 순 · {monthLabel(month)}</span></h2>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[32rem] text-sm">
                 <thead className="text-left text-xs text-stone-500">
@@ -209,7 +209,7 @@ export default function CostingPage() {
                   {report.unmapped.map((r) => (
                     <tr key={r.code} className="text-stone-400">
                       <td className="py-1.5">
-                        {r.name} <span className="rounded bg-stone-100 px-1 text-[10px]">레시피 없음</span>
+                        {r.name} <span className="rounded bg-stone-100 px-1 text-[11px]">레시피 없음</span>
                       </td>
                       <td className="text-right">{num(r.quantity)}</td>
                       <td className="text-right">{num(r.amount)}</td>
@@ -225,7 +225,7 @@ export default function CostingPage() {
           </section>
 
           <section className="card space-y-2">
-            <h2 className="text-base font-bold">품목별 이론 사용량 <span className="text-[11px] font-normal text-stone-500">이만큼 나갔어야 해요</span></h2>
+            <h2 className="text-base font-bold">품목별 이론 사용량 <span className="text-xs font-normal text-stone-500">이만큼 나갔어야 해요</span></h2>
             <ul className="num divide-y divide-stone-100 text-sm">
               {report.itemUsage.map((u) => (
                 <li key={u.itemId} className="flex justify-between py-1.5">
@@ -249,9 +249,9 @@ export default function CostingPage() {
 function Stat({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: "good" | "bad" }) {
   return (
     <div className={`card ${tone === "bad" ? "ring-red-300" : tone === "good" ? "ring-emerald-300" : ""}`}>
-      <p className="text-[11px] font-semibold text-stone-500">{label}</p>
+      <p className="text-xs font-semibold text-stone-500">{label}</p>
       <p className={`num mt-1 text-xl font-extrabold ${tone === "bad" ? "text-red-600" : tone === "good" ? "text-emerald-700" : ""}`}>{value}</p>
-      <p className="num mt-0.5 text-[11px] text-stone-500">{sub}</p>
+      <p className="num mt-0.5 text-xs text-stone-500">{sub}</p>
     </div>
   );
 }
@@ -364,22 +364,22 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
             <input ref={importRef} type="file" accept=".json" aria-label="레시피 파일" className="hidden" onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} />
           </div>
         </div>
-        <p className="text-[11px] text-stone-500">다른 곳에서 만든 품목·메뉴·레시피(예: 매장관리자에서 뽑은 파일)를 한 번에 가져와요. 실제 레시피 파일은 내 PC 모드에서만 쓰고 저장소에 올리지 않아요.</p>
+        <p className="text-xs text-stone-500">다른 곳에서 만든 품목·메뉴·레시피(예: 매장관리자에서 뽑은 파일)를 한 번에 가져와요. 실제 레시피 파일은 내 PC 모드에서만 쓰고 저장소에 올리지 않아요.</p>
         {ioNote && <Notice tone={ioNote.tone}>{ioNote.text}</Notice>}
       </section>
 
       <section className="card space-y-3">
-        <h2 className="text-base font-bold">품목과 기준단가 <span className="text-[11px] font-normal text-stone-500">대략값이면 돼요</span></h2>
+        <h2 className="text-base font-bold">품목과 기준단가 <span className="text-xs font-normal text-stone-500">대략값이면 돼요</span></h2>
         <ul className="divide-y divide-stone-100 text-sm">
           {items.map((i) => (
             <li key={i.id} className={`grid grid-cols-[1fr_8rem_3rem] items-center gap-2 py-1.5 ${!i.standardCost ? "bg-amber-50" : ""}`}>
               <span className="font-semibold">
                 {i.name}
-                {!i.standardCost && <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-800">단가 필요</span>}
+                {!i.standardCost && <span className="ml-1 rounded bg-amber-100 px-1 text-[11px] font-bold text-amber-800">단가 필요</span>}
               </span>
               <MoneyInput label={`${i.name} 기준단가`} value={i.standardCost} onChange={(n) => setItemCostOf(i.id, n ?? 0)} />
               <span className="text-xs text-stone-500">원/{i.baseUnit}</span>
-              <label className="col-span-3 -mt-1 flex items-center gap-1 text-[11px] text-stone-500">
+              <label className="col-span-3 -mt-1 flex items-center gap-1 text-xs text-stone-500">
                 <input type="checkbox" className="h-3.5 w-3.5 accent-orange-600" checked={i.costMethod === "monthAvg"} onChange={(e) => setCostMethod(i.id, e.target.checked ? "monthAvg" : "latest")} />
                 매입 영수증으로 바꿀 때 그 달 평균으로 (여러 거래처에서 값이 다르게 들어오는 품목)
               </label>
@@ -401,7 +401,7 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
       </section>
 
       <section className="card space-y-3">
-        <h2 className="text-base font-bold">메뉴와 레시피 <span className="text-[11px] font-normal text-stone-500">포스 상품코드로 판매 자료와 맞춰요</span></h2>
+        <h2 className="text-base font-bold">메뉴와 레시피 <span className="text-xs font-normal text-stone-500">포스 상품코드로 판매 자료와 맞춰요</span></h2>
         <ul className="divide-y divide-stone-100 text-sm">
           {menus.map((m) => {
             const r = currentRecipe(m.id);
@@ -411,7 +411,7 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <p className="font-semibold">
-                      {m.name} <span className="num text-[11px] text-stone-400">{m.posCode ?? "코드 없음"}</span>
+                      {m.name} <span className="num text-xs text-stone-400">{m.posCode ?? "코드 없음"}</span>
                     </p>
                     <p className="text-xs text-stone-500">
                       {r && r.lines.length ? r.lines.map((l) => `${items.find((i) => i.id === l.itemId)?.name ?? "?"} ${l.quantity}${l.unit}`).join(" · ") : <span className="text-amber-700">레시피 없음</span>}
@@ -430,7 +430,7 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
                           {items.find((x) => x.id === l.itemId)?.name} {l.quantity}
                           {l.unit}
                         </span>
-                        <button className="btn-ghost px-2 py-0.5 text-[11px]" onClick={() => saveRecipeLines(m.id, (r?.lines ?? []).filter((_, j) => j !== i))}>
+                        <button className="btn-ghost px-2 py-0.5 text-xs" onClick={() => saveRecipeLines(m.id, (r?.lines ?? []).filter((_, j) => j !== i))}>
                           지우기
                         </button>
                       </div>
@@ -475,7 +475,7 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
             추가
           </button>
         </div>
-        <p className="text-[11px] text-stone-500">실제 레시피·단가는 가게의 노하우예요. 시연 모드(웹)에는 가짜 값만 넣고, 실제 값은 내 PC 모드에서만 넣으세요.</p>
+        <p className="text-xs text-stone-500">실제 레시피·단가는 가게의 노하우예요. 시연 모드(웹)에는 가짜 값만 넣고, 실제 값은 내 PC 모드에서만 넣으세요.</p>
       </section>
     </>
   );

@@ -94,7 +94,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               <li key={t.href}>
                 <Link
                   href={t.href}
-                  className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-semibold ${
+                  className={`flex flex-col items-center gap-0.5 py-2 text-xs font-semibold ${
                     active ? "text-orange-600" : "text-stone-500"
                   }`}
                 >

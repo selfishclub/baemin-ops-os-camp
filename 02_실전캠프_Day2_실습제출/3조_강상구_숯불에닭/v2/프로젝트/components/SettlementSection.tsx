@@ -88,15 +88,15 @@ export default function SettlementSection({
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-bold">정산 규칙 — 언제 입금되나</h2>
-          <button className="text-[11px] text-orange-700" onClick={() => setEditing((v) => !v)}>
+          <button className="text-xs text-orange-700" onClick={() => setEditing((v) => !v)}>
             {editing ? "닫기" : rules.length ? "고치기" : "등록하기"}
           </button>
         </div>
-        <button className="w-full text-left text-[12px] text-sky-800" onClick={() => setHelp((v) => !v)}>
+        <button className="w-full text-left text-xs text-sky-800" onClick={() => setHelp((v) => !v)}>
           {help ? "▲" : "?"} 규칙을 등록하면 통장 입금을 매출과 자동으로 짝지어 수수료를 집계해요
         </button>
         {help && (
-          <div className="rounded-xl bg-sky-50 px-3 py-2 text-[12px] text-sky-950 ring-1 ring-sky-200">
+          <div className="rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-950 ring-1 ring-sky-200">
             <ul className="list-disc space-y-0.5 pl-4">
               <li>
                 <b>매출일 + N영업일</b> — 카드사, 일 단위로 정산하는 앱. 예: BC카드 +2영업일
@@ -132,11 +132,11 @@ export default function SettlementSection({
                     <span className="font-semibold">{c.name}</span>
                     <span className="text-stone-600">
                       {!r ? <span className="text-stone-400">규칙 없음 (직접 입력)</span> : r.mode === "days" ? `매출일 + ${r.days}영업일` : r.mode === "calendar" ? `매출일 + ${r.days}일 (쉬는 날이면 다음 영업일)` : `매주 ${DOW[r.weekday]}요일에 지난주분`}
-                      {r?.manual && <span className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-900">직접 출금</span>}
+                      {r?.manual && <span className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-bold text-sky-900">직접 출금</span>}
                     </span>
                   </div>
                   {RULE_NOTES[c.id] && (
-                    <p className={`text-[11px] ${RULE_NOTES[c.id].source === "unknown" ? "text-amber-700" : "text-stone-400"}`}>
+                    <p className={`text-xs ${RULE_NOTES[c.id].source === "unknown" ? "text-amber-700" : "text-stone-400"}`}>
                       {RULE_NOTES[c.id].source === "official" ? "공식 안내 · " : RULE_NOTES[c.id].source === "unknown" ? "확인 필요 · " : "일반 관행 · "}
                       {RULE_NOTES[c.id].text}
                     </p>
@@ -181,9 +181,9 @@ export default function SettlementSection({
                   ) : (
                     <span />
                   )}
-                  <span className="text-[11px] text-stone-500">{has && r.mode === "days" ? "영업일" : has && r.mode === "calendar" ? "일 뒤" : ""}</span>
+                  <span className="text-xs text-stone-500">{has && r.mode === "days" ? "영업일" : has && r.mode === "calendar" ? "일 뒤" : ""}</span>
                   {has && c.kind === "delivery" && (
-                    <label className="col-span-4 -mt-1 flex items-center gap-2 text-[11px] text-stone-600">
+                    <label className="col-span-4 -mt-1 flex items-center gap-2 text-xs text-stone-600">
                       <input type="checkbox" className="h-3.5 w-3.5 accent-orange-600" checked={!!r.manual} onChange={(e) => setRule(c.id, { ...r, manual: e.target.checked })} />
                       직접 출금 신청하는 앱 — 늦게 들어오거나 며칠치가 한 번에 들어와도 순서대로 짝 맞춰요 (쿠팡이츠)
                     </label>
@@ -191,7 +191,7 @@ export default function SettlementSection({
                 </div>
               );
             })}
-            <label className="block text-[11px] text-stone-500">
+            <label className="block text-xs text-stone-500">
               공휴일 (영업일에서 뺄 날짜, 쉼표로)
               <div className="mt-1 flex gap-2">
                 <input aria-label="공휴일" className="field" placeholder="2026-10-03, 2026-10-09" value={holidayText} onChange={(e) => setHolidayText(e.target.value)} />
@@ -208,7 +208,7 @@ export default function SettlementSection({
         <section className="card space-y-3">
           <div className="flex items-baseline justify-between">
             <h2 className="text-base font-bold">통장 입금 짝 맞추기 · 수수료 집계</h2>
-            <span className="text-[11px] text-stone-500">{monthLabel(month)} 주문분</span>
+            <span className="text-xs text-stone-500">{monthLabel(month)} 주문분</span>
           </div>
           {!hasDaily ? (
             <Notice tone="info">오늘 탭에 일별 매출을 넣으면 규칙대로 통장 입금과 짝을 맞춰 드려요. 이 달은 아직 일별 매출이 없어서 아래 직접 입력을 씁니다.</Notice>
@@ -218,11 +218,11 @@ export default function SettlementSection({
             <>
               <div className="num grid grid-cols-3 gap-2 text-center text-sm">
                 <div className="rounded-xl bg-stone-50 p-2">
-                  <p className="text-[11px] text-stone-500">확인된 수수료 합계</p>
+                  <p className="text-xs text-stone-500">확인된 수수료 합계</p>
                   <p className="font-bold">{won(totalFee)}</p>
                 </div>
                 <div className="rounded-xl bg-stone-50 p-2">
-                  <p className="text-[11px] text-stone-500">아직 안 들어옴</p>
+                  <p className="text-xs text-stone-500">아직 안 들어옴</p>
                   <p className="font-bold">{won(totalPending)}</p>
                 </div>
                 <button
@@ -230,9 +230,9 @@ export default function SettlementSection({
                   disabled={totalMissing === 0}
                   onClick={() => setOverdueOpen(overdueOpen === "all" ? null : "all")}
                 >
-                  <p className="text-[11px] text-stone-500">입금일 지났는데 없음</p>
+                  <p className="text-xs text-stone-500">입금일 지났는데 없음</p>
                   <p className={`font-bold ${totalMissing > 0 ? "text-red-600" : ""}`}>{won(totalMissing)}</p>
-                  {totalMissing > 0 && <p className="text-[10px] text-red-500 underline">{overdueOpen === "all" ? "접기" : "눌러서 자세히"}</p>}
+                  {totalMissing > 0 && <p className="text-[11px] text-red-500 underline">{overdueOpen === "all" ? "접기" : "눌러서 자세히"}</p>}
                 </button>
               </div>
               <div className="overflow-x-auto">
@@ -252,7 +252,7 @@ export default function SettlementSection({
                     {cardRows.length > 1 && (
                       <tr className="bg-stone-50 font-semibold">
                         <td className="py-2">
-                          카드 합계 <span className="text-[10px] font-normal text-stone-400">{cardRows.length}개 카드사</span>
+                          카드 합계 <span className="text-[11px] font-normal text-stone-400">{cardRows.length}개 카드사</span>
                         </td>
                         <td className="text-right">{num(cardSum.sales)}</td>
                         <td className="text-right">{num(cardSum.deposited)}</td>
@@ -273,7 +273,7 @@ export default function SettlementSection({
                     {results.map((r) => (
                       <tr key={r.channel} className="cursor-pointer hover:bg-stone-50" onClick={() => setOpen(open === r.channel ? null : r.channel)}>
                         <td className="py-2 font-semibold">
-                          {name(r.channel)} <span className="text-[10px] text-stone-400">{open === r.channel ? "▲" : "▼"}</span>
+                          {name(r.channel)} <span className="text-[11px] text-stone-400">{open === r.channel ? "▲" : "▼"}</span>
                         </td>
                         {r.sales === 0 && strayOf(r) > 0 ? (
                           <>
@@ -325,7 +325,7 @@ export default function SettlementSection({
                       닫기
                     </button>
                   </div>
-                  <p className="text-[11px] text-stone-600">통장은 {ledger.lastBankDate?.slice(5).replace("-", "/")}까지 올라와 있어요. 그 날짜까지 들어왔어야 하는데 짝이 안 맞은 매출이에요.</p>
+                  <p className="text-xs text-stone-600">통장은 {ledger.lastBankDate?.slice(5).replace("-", "/")}까지 올라와 있어요. 그 날짜까지 들어왔어야 하는데 짝이 안 맞은 매출이에요.</p>
                   {overdueShown.length === 0 && <p className="text-xs text-stone-500">해당하는 줄이 없어요.</p>}
                   <ul className="space-y-2">
                     {overdueShown.map((o) => (
@@ -383,11 +383,11 @@ export default function SettlementSection({
                             <td className="whitespace-nowrap">
                               <StatusChip status={s.status} />
                               {s.extra ? (
-                                <button className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-900" title="눌러서 고치기" onClick={() => markExtra(s.channel, s.payout, s.extra)}>
+                                <button className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-bold text-sky-900" title="눌러서 고치기" onClick={() => markExtra(s.channel, s.payout, s.extra)}>
                                   {s.note || "환급"} +{num(s.extra)}
                                 </button>
                               ) : s.status === "차이" && s.deposit > s.sales ? (
-                                <button className="ml-1 text-[10px] font-semibold text-orange-700 underline" onClick={() => markExtra(s.channel, s.payout)}>
+                                <button className="ml-1 text-[11px] font-semibold text-orange-700 underline" onClick={() => markExtra(s.channel, s.payout)}>
                                   환급 포함?
                                 </button>
                               ) : null}
@@ -422,5 +422,5 @@ export default function SettlementSection({
 function StatusChip({ status }: { status: string }) {
   const style =
     { 일치: "bg-emerald-100 text-emerald-800", 차이: "bg-red-100 text-red-700", 미입금: "bg-red-100 text-red-700", 예정: "bg-stone-200 text-stone-600", 매출없음: "bg-stone-100 text-stone-400" }[status] ?? "";
-  return <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${style}`}>{status}</span>;
+  return <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${style}`}>{status}</span>;
 }

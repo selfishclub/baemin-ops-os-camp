@@ -279,7 +279,7 @@ export default function TodayPage() {
           </button>
           <div className="text-center">
             <input aria-label="날짜" type="date" className="num bg-transparent text-center text-base font-bold outline-none" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} />
-            <p className="text-[11px] text-stone-500">
+            <p className="text-xs text-stone-500">
               {dow}요일 · {date === today ? "오늘" : existing.entered ? "입력됨" : "아직 안 넣음"}
               {todayWeather && (
                 <span className="num ml-1">
@@ -293,11 +293,11 @@ export default function TodayPage() {
           </button>
         </div>
 
-        <button className="w-full text-left text-[12px] text-sky-800" onClick={() => setHelp((v) => !v)}>
+        <button className="w-full text-left text-xs text-sky-800" onClick={() => setHelp((v) => !v)}>
           {help ? "▲" : "?"} 마감할 때 1분, 어디서 숫자를 가져오나
         </button>
         {help && (
-          <div className="rounded-xl bg-sky-50 px-3 py-2 text-[12px] text-sky-950 ring-1 ring-sky-200">
+          <div className="rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-950 ring-1 ring-sky-200">
             <ul className="list-disc space-y-0.5 pl-4">
               <li>
                 <b>홀 카드·현금</b> — 포스 <b>마감정산서</b>의 “결제수단별 매출내역”: 신용카드 → 카드, 일반현금+현금영수증 → 홀 현금, 간편결제 → 간편결제(카드사별로 나눴을 때). 할인을 뺀 <b>실매출</b> 기준이에요
@@ -319,7 +319,7 @@ export default function TodayPage() {
         <div>
           <p className="mb-1 text-xs font-semibold text-stone-500">매출 (주문일 기준)</p>
           <div className="mb-2 rounded-xl bg-stone-50 p-2">
-            <p className="mb-1 text-[11px] font-semibold text-stone-500">카드 <span className="font-normal">— 카드사를 고르고 옆에 금액. 마감정산서 “카드사별 매출내역”대로</span></p>
+            <p className="mb-1 text-xs font-semibold text-stone-500">카드 <span className="font-normal">— 카드사를 고르고 옆에 금액. 마감정산서 “카드사별 매출내역”대로</span></p>
             <div className="space-y-2">
               {cardRows.map((r, i) => (
                 <div key={i} className="grid grid-cols-[1fr_8rem_2.5rem] items-center gap-2">
@@ -349,7 +349,7 @@ export default function TodayPage() {
               카드 합계 <b>{won(cardTotal)}</b>
             </p>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border-t border-stone-200 pt-2">
-              <p className="text-[11px] text-stone-500">여러 날을 한 번에: 포스 ASP → 매출관리 → 승인현황의 카드승인현황·간편결제승인현황 엑셀 (둘 다 올리세요)</p>
+              <p className="text-xs text-stone-500">여러 날을 한 번에: 포스 ASP → 매출관리 → 승인현황의 카드승인현황·간편결제승인현황 엑셀 (둘 다 올리세요)</p>
               <input ref={cardFileRef} type="file" accept=".xls,.xlsx" aria-label="포스 카드승인현황 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readCardFile(e.target.files[0])} />
               <button className="btn-ghost px-3 py-1.5 text-xs" onClick={() => cardFileRef.current?.click()}>
                 카드·간편결제 승인현황 올리기
@@ -369,10 +369,10 @@ export default function TodayPage() {
           ).map((g) =>
             g.list.length === 0 ? null : (
               <div key={g.title} className="mb-2 rounded-xl bg-stone-50 p-2">
-                <p className="mb-1 text-[11px] font-semibold text-stone-500">{g.title}</p>
+                <p className="mb-1 text-xs font-semibold text-stone-500">{g.title}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {g.list.map((c) => (
-                    <label key={c.id} className="space-y-1 text-[11px] text-stone-500">
+                    <label key={c.id} className="space-y-1 text-xs text-stone-500">
                       {c.name}
                       <MoneyInput label={`${c.name} 매출`} value={amounts[c.id] ?? 0} onChange={(n) => { setAmounts((a) => ({ ...a, [c.id]: n ?? 0 })); setSaved(false); }} />
                     </label>
@@ -386,7 +386,7 @@ export default function TodayPage() {
                 {g.title === "배달앱" && (
                   <>
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border-t border-stone-200 pt-2">
-                      <p className="text-[11px] text-stone-500">여러 날을 한 번에: 배민 사장님 사이트 → 정산 → 정산명세서(암호 푼 것)</p>
+                      <p className="text-xs text-stone-500">여러 날을 한 번에: 배민 사장님 사이트 → 정산 → 정산명세서(암호 푼 것)</p>
                       <input ref={deliveryFileRef} type="file" accept=".xlsx,.xls" aria-label="배달앱 정산명세서 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readDeliveryFile(e.target.files[0])} />
                       <button className="btn-ghost px-3 py-1.5 text-xs" onClick={() => deliveryFileRef.current?.click()}>
                         배민 정산명세서 올리기
@@ -404,21 +404,21 @@ export default function TodayPage() {
           )}
           <p className="num mt-1 text-right text-sm">
             오늘 매출 <b>{won(dayTotal)}</b>
-            <span className="ml-2 text-[11px] text-stone-500">(카드 {num(cardTotal)} · 현금 {num(groups.cashTotal)} · 배달 {num(groups.deliveryTotal)})</span>
+            <span className="ml-2 text-xs text-stone-500">(카드 {num(cardTotal)} · 현금 {num(groups.cashTotal)} · 배달 {num(groups.deliveryTotal)})</span>
           </p>
         </div>
 
         <div>
           <div className="mb-1 flex items-baseline justify-between">
             <p className="text-xs font-semibold text-stone-500">시급제 근무</p>
-            <button className="text-[11px] text-orange-700" onClick={() => setShowSettings(true)}>
+            <button className="text-xs text-orange-700" onClick={() => setShowSettings(true)}>
               직원·채널 설정
             </button>
           </div>
           {activeStaff.length === 0 && <Notice tone="info">직원 별칭과 시급을 먼저 등록해 주세요 (실명은 넣지 마세요).</Notice>}
           <div className="space-y-2">
             {rows.length > 0 && (
-              <div className="grid grid-cols-[1fr_4rem_4rem_3rem_1.5rem] gap-1.5 px-1 text-[10px] text-stone-400">
+              <div className="grid grid-cols-[1fr_4rem_4rem_3rem_1.5rem] gap-1.5 px-1 text-[11px] text-stone-400">
                 <span>직원</span>
                 <span>출근</span>
                 <span>퇴근</span>
@@ -502,11 +502,11 @@ export default function TodayPage() {
       <section className="card space-y-2">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-bold">{monthLabel(month)}</h2>
-          <span className="text-[11px] text-stone-500">
+          <span className="text-xs text-stone-500">
             {summary.enteredDays}일 입력{summary.missingDays.length > 0 && ` · 빈 날 ${summary.missingDays.length}`}
           </span>
         </div>
-        <div className="grid grid-cols-7 gap-1 text-center text-[11px]">
+        <div className="grid grid-cols-7 gap-1 text-center text-xs">
           {DOW.map((d) => (
             <div key={d} className="text-stone-400">
               {d}
@@ -534,15 +534,15 @@ export default function TodayPage() {
         )}
         <div className="num grid grid-cols-3 gap-2 pt-1 text-center text-sm">
           <div>
-            <p className="text-[11px] text-stone-500">누적 매출</p>
+            <p className="text-xs text-stone-500">누적 매출</p>
             <p className="font-bold">{num(summary.sales)}</p>
           </div>
           <div>
-            <p className="text-[11px] text-stone-500">하루 평균</p>
+            <p className="text-xs text-stone-500">하루 평균</p>
             <p className="font-bold">{summary.avgDailySales === null ? "–" : num(summary.avgDailySales)}</p>
           </div>
           <div>
-            <p className="text-[11px] text-stone-500">인건비율</p>
+            <p className="text-xs text-stone-500">인건비율</p>
             <p className="font-bold">{pctText(summary.laborRate)}</p>
           </div>
         </div>
@@ -550,7 +550,7 @@ export default function TodayPage() {
           <div className="mt-3 rounded-2xl border border-stone-200 bg-white">
             <div className="flex items-baseline justify-between rounded-t-2xl bg-stone-50 px-3 py-2">
               <p className="text-sm font-bold">근무자별 이 달 합계</p>
-              <p className="text-[11px] text-stone-500">시간 × 시급 어림 · 주휴·수당 제외</p>
+              <p className="text-xs text-stone-500">시간 × 시급 어림 · 주휴·수당 제외</p>
             </div>
             <ul className="divide-y divide-stone-100 px-3">
               {(() => {
@@ -752,14 +752,14 @@ function SettingsDialog({ daily, onClose }: { daily: ReturnType<typeof useDaily>
         </section>
 
         <section className="space-y-2">
-          <p className="text-sm font-semibold">월 고정 인건비 <span className="text-[11px] font-normal text-stone-500">손익 어림용</span></p>
-          <p className="text-[11px] text-stone-500">급여는 다음 달에 나가서 이번 달 손익엔 아직 없어요. 그동안 손익 탭 노무관리비를 “알바 근무 × 시급 + 아래 금액”으로 임시 채워요. 급여가 통장에서 나가면 실제 금액으로 바뀌어요.</p>
+          <p className="text-sm font-semibold">월 고정 인건비 <span className="text-xs font-normal text-stone-500">손익 어림용</span></p>
+          <p className="text-xs text-stone-500">급여는 다음 달에 나가서 이번 달 손익엔 아직 없어요. 그동안 손익 탭 노무관리비를 “알바 근무 × 시급 + 아래 금액”으로 임시 채워요. 급여가 통장에서 나가면 실제 금액으로 바뀌어요.</p>
           <div className="grid grid-cols-2 gap-2">
-            <label className="space-y-1 text-[11px] text-stone-500">
+            <label className="space-y-1 text-xs text-stone-500">
               월급제 급여 합계 (주방 등)
               <MoneyInput label="월급제 급여 합계" value={fixed.salary} onChange={(n) => setFixed({ ...fixed, salary: n ?? 0 })} />
             </label>
-            <label className="space-y-1 text-[11px] text-stone-500">
+            <label className="space-y-1 text-xs text-stone-500">
               4대보험 사업주 부담 (월)
               <MoneyInput label="4대보험 사업주 부담" value={fixed.insurance} onChange={(n) => setFixed({ ...fixed, insurance: n ?? 0 })} />
             </label>
@@ -771,12 +771,12 @@ function SettingsDialog({ daily, onClose }: { daily: ReturnType<typeof useDaily>
 
         <section className="space-y-2">
           <p className="text-sm font-semibold">매출 채널</p>
-          <p className="text-[11px] text-stone-500">카드사는 오늘 탭에서 “+ 카드사 추가”로 고르면 자동으로 여기에 생겨요. 배달앱·현금 채널만 여기서 켜고 끄세요.</p>
+          <p className="text-xs text-stone-500">카드사는 오늘 탭에서 “+ 카드사 추가”로 고르면 자동으로 여기에 생겨요. 배달앱·현금 채널만 여기서 켜고 끄세요.</p>
           <ul className="divide-y divide-stone-100 text-sm">
             {channels.map((c) => (
               <li key={c.id} className="flex items-center justify-between py-1.5">
                 <span className={c.active ? "" : "text-stone-400"}>
-                  {c.name} <span className="text-[10px] text-stone-400">{{ card: "카드", cash: "현금", delivery: "배달앱" }[c.kind]}</span>
+                  {c.name} <span className="text-[11px] text-stone-400">{{ card: "카드", cash: "현금", delivery: "배달앱" }[c.kind]}</span>
                 </span>
                 <button className="btn-ghost px-2 py-1 text-xs" onClick={() => saveChannels(channels.map((x) => (x.id === c.id ? { ...x, active: !x.active } : x)))}>
                   {c.active ? "끄기" : "켜기"}

@@ -180,7 +180,7 @@ export default function UploadPage() {
           </button>
           {showAll && (
             <div className="mt-3 space-y-2">
-              <p className="text-[11px] text-stone-500">이미 확인한 줄을 바꾸려면 그 줄의 “고치기”를 누르세요. 규칙까지 바꿀지는 거기서 고를 수 있어요.</p>
+              <p className="text-xs text-stone-500">이미 확인한 줄을 바꾸려면 그 줄의 “고치기”를 누르세요. 규칙까지 바꿀지는 거기서 고를 수 있어요.</p>
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 <input aria-label="찾기 시작일" type="date" className="field num !w-36" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} />
                 <span className="text-stone-400">~</span>
@@ -225,7 +225,7 @@ export default function UploadPage() {
               <div className="space-y-3">
                 {groupByDate(searched).map(({ date, txs }) => (
                   <div key={date}>
-                    <div className="num flex items-baseline justify-between border-b border-stone-200 pb-1 text-[11px] text-stone-500">
+                    <div className="num flex items-baseline justify-between border-b border-stone-200 pb-1 text-xs text-stone-500">
                       <span className="font-semibold text-stone-700">{dayLabel(date)}</span>
                       <span>
                         {txs.some((t) => t.in > 0) && <span className="text-emerald-700">입금 +{num(txs.reduce((a, t) => a + t.in, 0))}</span>}
@@ -241,17 +241,17 @@ export default function UploadPage() {
                             <div className="flex items-center gap-2 py-1.5">
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-semibold text-stone-800">
-                                  {tag && <span className="mr-1 text-[10px] font-normal text-stone-400">{tag}</span>}
+                                  {tag && <span className="mr-1 text-[11px] font-normal text-stone-400">{tag}</span>}
                                   {name}
                                 </p>
-                                <span className={`mt-0.5 inline-block rounded px-1.5 py-0.5 text-[10px] ${t.major ? (t.major === "제외" ? "bg-stone-100 text-stone-500" : "bg-stone-100 text-stone-700") : "bg-orange-100 font-semibold text-orange-700"}`}>
+                                <span className={`mt-0.5 inline-block rounded px-1.5 py-0.5 text-[11px] ${t.major ? (t.major === "제외" ? "bg-stone-100 text-stone-500" : "bg-stone-100 text-stone-700") : "bg-orange-100 font-semibold text-orange-700"}`}>
                                   {t.major ? `${t.major} · ${t.minor}` : "미분류"}
                                 </span>
                               </div>
                               <span className={`num whitespace-nowrap text-right text-sm font-semibold ${t.in > 0 ? "text-emerald-700" : t.out < 0 ? "text-stone-400" : "text-stone-800"}`}>
                                 {t.in > 0 ? `+${num(t.in)}` : t.out < 0 ? `취소 ${num(-t.out)}` : `−${num(t.out)}`}
                               </span>
-                              <button className="whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-semibold text-orange-700 hover:bg-orange-50" onClick={() => setEditingId(editingId === t.id ? null : t.id)}>
+                              <button className="whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold text-orange-700 hover:bg-orange-50" onClick={() => setEditingId(editingId === t.id ? null : t.id)}>
                                 {editingId === t.id ? "닫기" : "고치기"}
                               </button>
                             </div>
@@ -341,7 +341,7 @@ function ReviewCard({ tx, ledger, payDays, editing = false, onDone }: { tx: Tran
         </div>
         <div className="text-right">
           <p className={`num text-sm font-bold ${isIncome ? "text-sky-700" : ""}`}>{won(tx.out || tx.in)}</p>
-          <span className="mt-0.5 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">{tx.review}</span>
+          <span className="mt-0.5 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">{tx.review}</span>
         </div>
       </div>
 

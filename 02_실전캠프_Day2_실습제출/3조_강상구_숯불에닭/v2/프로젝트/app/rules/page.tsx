@@ -92,7 +92,7 @@ export default function RulesPage() {
 
       <section className="card space-y-2">
         <h2 className="text-base font-bold">
-          지급일 설정 <span className="text-[11px] font-normal text-stone-500">처음 한 번 — 가게마다 달라요</span>
+          지급일 설정 <span className="text-xs font-normal text-stone-500">처음 한 번 — 가게마다 달라요</span>
         </h2>
         <p className="text-xs text-stone-600">
           급여·거래처 대금을 <b>다음 달에 몰아서 내는 날</b>이 있으면 적어 두세요(예: 10 또는 10, 25). 그날 통장에서 나간 <b>노무관리비·매출원가</b>는 “지난달 비용으로”가 미리 체크돼서 지난달 손익에 들어가요. 그날 내지 않는 가게는 비워 두면 돼요.
@@ -112,7 +112,7 @@ export default function RulesPage() {
           <h2 className="text-base font-bold">
             분류 규칙 <span className="text-stone-400">{ledger.rules.length}</span>
           </h2>
-          <span className="text-[11px] text-stone-500">거래처 이름에 이 글자가 있으면 → 이 항목</span>
+          <span className="text-xs text-stone-500">거래처 이름에 이 글자가 있으면 → 이 항목</span>
         </div>
         <p className="text-sm text-stone-600">올리기 탭에서 "확인 필요" 줄을 고를 때마다 여기에 규칙이 쌓여요. 잘못 기억한 규칙은 고치거나 지우세요.</p>
         <ul className="divide-y divide-stone-100">
@@ -152,11 +152,11 @@ export default function RulesPage() {
                   <div>
                     <p className="font-semibold">
                       {r.keyword}
-                      <span className={`ml-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold ${r.direction === "in" ? "bg-sky-100 text-sky-800" : "bg-stone-100 text-stone-600"}`}>
+                      <span className={`ml-1.5 rounded px-1.5 py-0.5 text-[11px] font-bold ${r.direction === "in" ? "bg-sky-100 text-sky-800" : "bg-stone-100 text-stone-600"}`}>
                         {r.direction === "in" ? "입금" : "출금"}
                       </span>
-                      {r.ambiguous && <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">매번 확인</span>}
-                      {r.prev_month && <span className="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-900">지난달 비용</span>}
+                      {r.ambiguous && <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-900">매번 확인</span>}
+                      {r.prev_month && <span className="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-bold text-violet-900">지난달 비용</span>}
                     </p>
                     <p className="text-xs text-stone-500">
                       {r.major} › {r.minor}

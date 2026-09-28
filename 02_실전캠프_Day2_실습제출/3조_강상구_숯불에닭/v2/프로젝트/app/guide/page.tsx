@@ -66,14 +66,14 @@ export default function GuidePage() {
         <section key={s.title} className="card space-y-2">
           <div className="flex items-baseline justify-between">
             <h3 className="text-sm font-bold">{s.title}</h3>
-            <span className="text-[11px] text-stone-500">{s.when}</span>
+            <span className="text-xs text-stone-500">{s.when}</span>
           </div>
           <ol className="list-decimal space-y-1.5 pl-5 text-sm text-stone-700">
             {s.items.map((it, i) => (
               <li key={i}>
                 {it.text}{" "}
                 {it.href && (
-                  <Link href={it.href} className="whitespace-nowrap text-[11px] font-bold text-orange-700 underline">
+                  <Link href={it.href} className="whitespace-nowrap text-xs font-bold text-orange-700 underline">
                     {it.label} →
                   </Link>
                 )}

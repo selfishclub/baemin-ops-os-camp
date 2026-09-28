@@ -76,7 +76,7 @@ export default function PnlPage() {
           <p className="text-xs font-semibold text-stone-500">총매출</p>
           <p className="num mt-1 text-lg font-bold">{won(pnl.revenue)}</p>
           {pnl.revenueBasis === "실매출" && (
-            <p className="num mt-1 text-[11px] text-stone-500">
+            <p className="num mt-1 text-xs text-stone-500">
               홀 {num(pnl.hallRevenue)} · 배달 {num(pnl.deliveryRevenue)}
             </p>
           )}
@@ -84,9 +84,9 @@ export default function PnlPage() {
         <div className="card">
           <p className="text-xs font-semibold text-stone-500">내가 가져간 돈 (생활비)</p>
           <p className="num mt-1 text-lg font-bold">{won(pnl.ownerDraw)}</p>
-          <p className="mt-1 text-[11px] text-stone-500">가게 비용에는 안 넣었어요</p>
+          <p className="mt-1 text-xs text-stone-500">가게 비용에는 안 넣었어요</p>
           {(pnl.excluded.in > 0 || pnl.excluded.out > 0) && (
-            <p className="num mt-1 text-[11px] text-stone-500">
+            <p className="num mt-1 text-xs text-stone-500">
               손익에서 뺀 이체(제외): 나간 돈 {num(pnl.excluded.out)} · 들어온 돈 {num(pnl.excluded.in)}
             </p>
           )}
@@ -113,13 +113,13 @@ export default function PnlPage() {
       <section className="card">
         <div className="mb-2 flex items-baseline justify-between">
           <h2 className="text-base font-bold">{monthLabel(month)} 손익</h2>
-          <span className="text-[11px] text-stone-500">금액 · 매출 대비 %{hasPrev && " · 지난달 대비"}</span>
+          <span className="text-xs text-stone-500">금액 · 매출 대비 %{hasPrev && " · 지난달 대비"}</span>
         </div>
-        <p className="mb-1 rounded-lg bg-stone-50 px-2 py-1.5 text-[11px] text-stone-600">
+        <p className="mb-1 rounded-lg bg-stone-50 px-2 py-1.5 text-xs text-stone-600">
           기준 — <b>매출·배달앱 수수료</b>: 주문이 발생한 달 · <b>비용</b>: 통장에서 돈이 나간 날. 다른 달에 결제한 비용은 지출추가 탭에서 날짜를 맞춰 넣을 수 있어요.
         </p>
         {pnl.laborEstimated && (
-          <p className="mb-1 rounded-lg bg-violet-50 px-2 py-1.5 text-[11px] text-violet-900">
+          <p className="mb-1 rounded-lg bg-violet-50 px-2 py-1.5 text-xs text-violet-900">
             <b>노무관리비는 어림값</b>이에요 — 급여가 아직 통장에서 안 나가서 오늘 탭 근무(시간 × 시급)와 월 고정 인건비(월급·4대보험, 오늘 탭 “직원·채널 설정”)로 채웠어요. 급여가 나가 통장을 올리면 실제 금액으로 바뀌어요.
           </p>
         )}
@@ -181,14 +181,14 @@ function PnlRow({ line, diff, open, onToggle, estimated = false }: { line: PnlLi
         <span className={`text-sm ${strong ? "font-bold" : "pl-3 text-stone-700"}`}>
           {line.kind === "cost" && "− "}
           {line.label}
-          {line.label === "임대료" && <span className="ml-1 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-700">월세+관리비</span>}
-          {estimated && <span className="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-900">어림</span>}
-          {canOpen && <span className="ml-1 text-[10px] text-stone-400">{open ? "▲" : "▼"}</span>}
+          {line.label === "임대료" && <span className="ml-1 rounded bg-orange-100 px-1.5 py-0.5 text-[11px] font-bold text-orange-700">월세+관리비</span>}
+          {estimated && <span className="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-bold text-violet-900">어림</span>}
+          {canOpen && <span className="ml-1 text-[11px] text-stone-400">{open ? "▲" : "▼"}</span>}
         </span>
         <span className="num flex items-baseline gap-2 text-right">
-          {diff !== null && diff !== 0 && <span className="hidden text-[11px] text-stone-400 sm:inline">{signed(diff)}</span>}
+          {diff !== null && diff !== 0 && <span className="hidden text-xs text-stone-400 sm:inline">{signed(diff)}</span>}
           <span className={`text-sm ${strong ? "font-bold" : ""}`}>{num(line.amount)}</span>
-          <span className="w-12 text-[11px] text-stone-500">{pctText(line.pct)}</span>
+          <span className="w-12 text-xs text-stone-500">{pctText(line.pct)}</span>
         </span>
       </button>
       {open && (
@@ -236,14 +236,14 @@ function TaxExportCard({ month, txs, needsReview, closed }: { month: string; txs
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-bold">세무사용 엑셀</p>
-          <p className="text-[11px] text-stone-500">{monthLabel(month)} · 거래내역 · 분류별 합계 · 매출(일별 카드·현금·배달) · 매입 영수증</p>
+          <p className="text-xs text-stone-500">{monthLabel(month)} · 거래내역 · 분류별 합계 · 매출(일별 카드·현금·배달) · 매입 영수증</p>
         </div>
         <button className="btn-ghost whitespace-nowrap text-sm" disabled={busy} onClick={() => void download()}>
           {busy ? "만드는 중…" : "엑셀 받기"}
         </button>
       </div>
       {needsReview > 0 && <Notice tone="warn">확인이 필요한 줄 {needsReview}줄이 “미분류”로 들어가요. 올리기 탭에서 먼저 분류하면 깔끔해요.</Notice>}
-      {!closed && needsReview === 0 && <p className="text-[11px] text-stone-500">마감 전에도 받을 수 있어요. 보통은 마감한 뒤에 받아서 보내요.</p>}
+      {!closed && needsReview === 0 && <p className="text-xs text-stone-500">마감 전에도 받을 수 있어요. 보통은 마감한 뒤에 받아서 보내요.</p>}
       {msg && <Notice tone="ok">{msg}</Notice>}
     </section>
   );

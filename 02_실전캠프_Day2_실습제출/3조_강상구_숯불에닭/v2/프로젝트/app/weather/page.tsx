@@ -35,13 +35,13 @@ export default function WeatherPage() {
       <section className="card space-y-2">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-bold">날씨 × 매출</h2>
-          <span className="text-[11px] text-stone-500">{STORE_LOCATION.name} · 매출·날씨 둘 다 있는 날 {a.days}일</span>
+          <span className="text-xs text-stone-500">{STORE_LOCATION.name} · 매출·날씨 둘 다 있는 날 {a.days}일</span>
         </div>
-        <button className="w-full text-left text-[12px] text-sky-800" onClick={() => setHelp((v) => !v)}>
+        <button className="w-full text-left text-xs text-sky-800" onClick={() => setHelp((v) => !v)}>
           {help ? "▲" : "?"} 무엇을 보는 화면인가
         </button>
         {help && (
-          <div className="rounded-xl bg-sky-50 px-3 py-2 text-[12px] text-sky-950 ring-1 ring-sky-200">
+          <div className="rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-950 ring-1 ring-sky-200">
             <ul className="list-disc space-y-0.5 pl-4">
               <li>오늘 탭에 넣은 일별 매출 옆에 그날 날씨(Open-Meteo, 키 없음·무료)를 자동으로 붙여요. 넣을 건 없어요.</li>
               <li>날씨별·요일별 평균 매출과 배달 비율, 인건비율을 비교해요. 4~6주는 쌓여야 믿을 만해요.</li>
@@ -107,7 +107,7 @@ export default function WeatherPage() {
           </section>
 
           <section className="card space-y-2">
-            <h2 className="text-base font-bold">요일 × 날씨 <span className="text-[11px] font-normal text-stone-500">하루 평균 매출 (날 수)</span></h2>
+            <h2 className="text-base font-bold">요일 × 날씨 <span className="text-xs font-normal text-stone-500">하루 평균 매출 (날 수)</span></h2>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[26rem] text-xs">
                 <thead className="text-stone-500">
@@ -148,7 +148,7 @@ export default function WeatherPage() {
       )}
 
       <section className="card space-y-2">
-        <h2 className="text-base font-bold">이번 주 예보와 예상 매출 <span className="text-[11px] font-normal text-stone-500">참고값</span></h2>
+        <h2 className="text-base font-bold">이번 주 예보와 예상 매출 <span className="text-xs font-normal text-stone-500">참고값</span></h2>
         {w.forecast.length === 0 ? (
           <Notice tone="info">예보를 못 받았어요. 인터넷 연결을 확인해 주세요.</Notice>
         ) : (
@@ -164,7 +164,7 @@ export default function WeatherPage() {
                     {exp ? (
                       <>
                         <b>{won(exp.amount)}</b>
-                        <span className="block text-[10px] text-stone-400">{exp.basis}</span>
+                        <span className="block text-[11px] text-stone-400">{exp.basis}</span>
                       </>
                     ) : (
                       <span className="text-stone-400">–</span>
@@ -175,7 +175,7 @@ export default function WeatherPage() {
             })}
           </ul>
         )}
-        <p className="text-[11px] text-stone-500">예상 매출은 같은 요일·같은 날씨의 과거 평균이에요. 준비량과 알바 인원은 이걸 보고 사장님이 정해요. 다음 버전(매장관리자)에서 원육 발주량까지 이어집니다.</p>
+        <p className="text-xs text-stone-500">예상 매출은 같은 요일·같은 날씨의 과거 평균이에요. 준비량과 알바 인원은 이걸 보고 사장님이 정해요. 다음 버전(매장관리자)에서 원육 발주량까지 이어집니다.</p>
       </section>
     </>
   );
@@ -186,9 +186,9 @@ const signedPct = (n: number | null) => (n === null ? "–" : `${n > 0 ? "+" : "
 function Stat({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: "good" | "bad" }) {
   return (
     <div className="card">
-      <p className="text-[11px] font-semibold text-stone-500">{label}</p>
+      <p className="text-xs font-semibold text-stone-500">{label}</p>
       <p className={`num mt-1 text-xl font-extrabold ${tone === "bad" ? "text-red-600" : tone === "good" ? "text-emerald-700" : ""}`}>{value}</p>
-      <p className="mt-0.5 text-[11px] text-stone-500">{sub}</p>
+      <p className="mt-0.5 text-xs text-stone-500">{sub}</p>
     </div>
   );
 }

@@ -476,7 +476,7 @@ function PurchaseEditor({ purchase, items, onChange, onSave, onCancel }: { purch
         </div>
 
         <div className="space-y-2">
-          <div className="hidden grid-cols-[1fr_5rem_3.5rem_6rem_2rem] gap-1 px-1 text-[10px] text-stone-400 sm:grid">
+          <div className="hidden grid-cols-[1fr_5rem_3.5rem_6rem_2rem] gap-1 px-1 text-[11px] text-stone-400 sm:grid">
             <span>상품명</span>
             <span className="text-right">단가</span>
             <span className="text-right">수량</span>
@@ -675,7 +675,7 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
                       <li key={i} className="flex items-center justify-between gap-2 py-1">
                         <span className="min-w-0 flex-1 truncate">
                           {l.name}
-                          {it && <span className="ml-1 rounded bg-orange-50 px-1 py-0.5 text-[10px] text-orange-700">→ {it.name}</span>}
+                          {it && <span className="ml-1 rounded bg-orange-50 px-1 py-0.5 text-[11px] text-orange-700">→ {it.name}</span>}
                         </span>
                         <span className="num whitespace-nowrap text-stone-500">
                           {num(l.unitPrice)} × {fmtQty(l.qty)} ={" "}
@@ -728,7 +728,7 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
                     <span className="min-w-0 flex-1 truncate">
                       {l.displayName}
                       {l.specMl ? ` ${l.specMl}ml` : ""} × {l.box}박스
-                      {it && l.bottles && <span className="ml-1 rounded bg-orange-50 px-1 py-0.5 text-[10px] text-orange-700">→ {it.name} {l.bottles}병</span>}
+                      {it && l.bottles && <span className="ml-1 rounded bg-orange-50 px-1 py-0.5 text-[11px] text-orange-700">→ {it.name} {l.bottles}병</span>}
                     </span>
                     <span className="num whitespace-nowrap text-stone-500">{l.perBottle ? `${num(l.perBottle)}원/병` : ""}</span>
                     <span className="num whitespace-nowrap font-semibold">{won(l.subtotal)}</span>
@@ -821,7 +821,7 @@ function PhotoStrip({ ownerId, readOnly = false }: { ownerId: string; readOnly?:
             <div key={p.id} className="relative">
               {p.type === "application/pdf" ? (
                 <button
-                  className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg bg-white p-1 text-center text-[10px] leading-tight text-stone-600 ring-1 ring-stone-200 hover:ring-orange-300"
+                  className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg bg-white p-1 text-center text-[11px] leading-tight text-stone-600 ring-1 ring-stone-200 hover:ring-orange-300"
                   title={p.name}
                   onClick={() => urls[p.id] && window.open(urls[p.id], "_blank")}
                 >
@@ -932,7 +932,7 @@ function PurchaseViewer({ purchase, items, onClose }: { purchase: Purchase; item
                 <li key={i} className="flex items-center justify-between gap-2 py-1">
                   <span className="min-w-0 flex-1">
                     {l.name}
-                    {l.itemId && <span className="ml-1 rounded bg-orange-50 px-1 py-0.5 text-[10px] text-orange-700">{itemName(l.itemId)}</span>}
+                    {l.itemId && <span className="ml-1 rounded bg-orange-50 px-1 py-0.5 text-[11px] text-orange-700">{itemName(l.itemId)}</span>}
                   </span>
                   <span className="num whitespace-nowrap text-stone-500">
                     {num(l.unitPrice)} × {fmtQty(l.qty)}
@@ -995,7 +995,7 @@ function LiquorDialog({ ledger, fileName, vendor: initialVendor, items, onSave, 
           <p className="mb-1 text-xs font-semibold text-stone-500">입고일별</p>
           <div className="num overflow-x-auto">
             <table className="w-full text-xs">
-              <thead className="text-[10px] text-stone-400">
+              <thead className="text-[11px] text-stone-400">
                 <tr>
                   <th className="py-1 text-left font-normal">날짜</th>
                   <th className="text-right font-normal">박스</th>
@@ -1049,11 +1049,11 @@ function LiquorDialog({ ledger, fileName, vendor: initialVendor, items, onSave, 
                   <span className="min-w-0 flex-1">
                     {b.displayName} <span className="text-stone-400">{b.specMl}ml</span>
                     {linked ? (
-                      <span className="ml-1 rounded bg-orange-50 px-1 py-0.5 text-[10px] text-orange-700">→ {linked.name}</span>
+                      <span className="ml-1 rounded bg-orange-50 px-1 py-0.5 text-[11px] text-orange-700">→ {linked.name}</span>
                     ) : creating && createItems ? (
-                      <span className="ml-1 rounded bg-emerald-50 px-1 py-0.5 text-[10px] text-emerald-700">새 품목</span>
+                      <span className="ml-1 rounded bg-emerald-50 px-1 py-0.5 text-[11px] text-emerald-700">새 품목</span>
                     ) : (
-                      <span className="ml-1 rounded bg-stone-100 px-1 py-0.5 text-[10px] text-stone-500">연결 안 함</span>
+                      <span className="ml-1 rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-500">연결 안 함</span>
                     )}
                   </span>
                   <span className="whitespace-nowrap text-stone-500">
@@ -1141,7 +1141,7 @@ function SheetDialog({ receipts, notes, fileName, items, onSave, onCancel }: { r
                   </button>
                   <span className="num whitespace-nowrap text-right font-semibold">
                     {won(receiptTotal(r))}
-                    {receiptDiscount(r) > 0 && <span className="block text-[10px] font-normal text-stone-500">할인 -{won(receiptDiscount(r))}</span>}
+                    {receiptDiscount(r) > 0 && <span className="block text-[11px] font-normal text-stone-500">할인 -{won(receiptDiscount(r))}</span>}
                   </span>
                 </div>
                 {open === r.key && (
@@ -1152,7 +1152,7 @@ function SheetDialog({ receipts, notes, fileName, items, onSave, onCancel }: { r
                         <li key={i} className="flex justify-between gap-2">
                           <span className="min-w-0 flex-1">
                             {l.name} <span className="text-stone-400">{l.rawCategory}</span>
-                            {it && <span className="ml-1 rounded bg-orange-50 px-1 text-[10px] text-orange-700">→ {it.name}</span>}
+                            {it && <span className="ml-1 rounded bg-orange-50 px-1 text-[11px] text-orange-700">→ {it.name}</span>}
                           </span>
                           <span className="num whitespace-nowrap text-stone-500">
                             {num(l.unitPrice)} × {fmtQty(l.qty)} = {won(l.amount)}

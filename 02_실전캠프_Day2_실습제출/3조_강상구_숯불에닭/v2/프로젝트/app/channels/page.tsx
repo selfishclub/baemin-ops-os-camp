@@ -110,7 +110,7 @@ export default function ChannelsPage() {
               <b>월말 미입금액</b>(선택) — {monthNo}월 주문분 중 {monthNo}월 말까지 통장에 <b>아직 안 들어온</b> 돈. 통장 대조에만 써요
             </li>
           </ul>
-          <p className="text-[12px] text-sky-900">
+          <p className="text-xs text-sky-900">
             사장님 사이트에서 기간을 {monthNo}월 1일~말일, <b>주문일(거래일) 기준</b>으로 조회한 합계를 넣으세요. 수수료율은 같은 주문분끼리 비교해야 정확해요.
           </p>
         </div>
@@ -123,23 +123,23 @@ export default function ChannelsPage() {
             <div key={s.channel} className="rounded-xl bg-stone-50 p-3">
               <input aria-label={`${s.channel} 채널 이름`} className="mb-2 w-full bg-transparent text-sm font-bold outline-none" value={s.name} onChange={(e) => patch(i, { name: e.target.value })} />
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <label className="space-y-1 text-[11px] text-stone-500">
+                <label className="space-y-1 text-xs text-stone-500">
                   {channelKind(s.channel, daily.channels) !== "delivery" ? "포스 매출 (주문금액)" : "주문금액"}
-                  {fromDaily.includes(s.channel) && <span className="ml-1 rounded bg-emerald-100 px-1 text-[10px] text-emerald-800">일별 합계</span>}
+                  {fromDaily.includes(s.channel) && <span className="ml-1 rounded bg-emerald-100 px-1 text-[11px] text-emerald-800">일별 합계</span>}
                   <MoneyInput label={`${s.name} 주문금액`} value={s.orders} onChange={(n) => patch(i, { orders: n ?? 0 })} />
                 </label>
                 {channelKind(s.channel, daily.channels) === "cash" ? null : (
-                <label className="space-y-1 text-[11px] text-stone-500">
+                <label className="space-y-1 text-xs text-stone-500">
                   {channelKind(s.channel, daily.channels) === "card" ? "카드 정산금액" : "정산금액"}
                   <MoneyInput label={`${s.name} 정산금액`} value={s.deposit} onChange={(n) => patch(i, { deposit: n ?? 0 })} />
                 </label>
                 )}
-                <label className="space-y-1 text-[11px] text-stone-500">
+                <label className="space-y-1 text-xs text-stone-500">
                   건수
                   <MoneyInput label={`${s.name} 건수`} value={s.count} onChange={(n) => patch(i, { count: n ?? 0 })} />
                 </label>
                 {channelKind(s.channel, daily.channels) === "cash" ? null : (
-                <label className="space-y-1 text-[11px] text-stone-500">
+                <label className="space-y-1 text-xs text-stone-500">
                   월말 미입금액 (선택)
                   <MoneyInput label={`${s.name} 월말 미입금액`} allowEmpty placeholder="모르면 비워 두기" value={s.unsettled ?? null} onChange={(n) => patch(i, { unsettled: n })} />
                 </label>
@@ -170,7 +170,7 @@ export default function ChannelsPage() {
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-bold">앱별 수수료 비교</h2>
-          <span className="text-[11px] text-stone-500">{monthNo}월 주문분 기준</span>
+          <span className="text-xs text-stone-500">{monthNo}월 주문분 기준</span>
         </div>
         {fees.length === 0 ? (
           <Notice tone="info">실매출을 저장하면 앱별 수수료율이 나와요.</Notice>
@@ -214,7 +214,7 @@ export default function ChannelsPage() {
         <section className="card space-y-3">
           <div className="flex items-baseline justify-between">
             <h2 className="text-base font-bold">통장 입금과 맞춰 보기{autoChannels.length > 0 && " (규칙 없는 채널)"}</h2>
-            <span className="text-[11px] text-stone-500">{monthNo}월에 통장에 들어온 돈 기준</span>
+            <span className="text-xs text-stone-500">{monthNo}월에 통장에 들어온 돈 기준</span>
           </div>
           <p className="text-sm text-stone-600">
             주문한 날과 입금되는 날이 달라서 따로 봐요. <b>들어와야 할 돈</b> = {Number(prevMonth(month).slice(5))}월 말 미입금액 + {monthNo}월 정산금액 − {monthNo}월 말 미입금액
@@ -277,7 +277,7 @@ function GapCell({ fee }: { fee: ChannelFee }) {
   if (fee.gapKind === "시차 포함") {
     return (
       <span className="text-stone-500">
-        {text} <span className="text-[10px]">시차 포함</span>
+        {text} <span className="text-[11px]">시차 포함</span>
       </span>
     );
   }
