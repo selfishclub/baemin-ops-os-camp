@@ -18,6 +18,8 @@ import { getStore } from "@/lib/storage";
 import type { DailySale, Shift, Staff } from "@/lib/types";
 import sample from "@/lib/sampleDaily.json";
 import { useWeather } from "@/components/useWeather";
+import { buildPayslip } from "@/lib/payslip";
+import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY } from "@/lib/paydays";
 import { KIND_ICON, expectedSales } from "@/lib/weather";
 
 const DOW = ["월", "화", "수", "목", "금", "토", "일"];
@@ -58,6 +60,25 @@ export default function TodayPage() {
   const [issues, setIssues] = useState<DailyIssue[]>([]);
   const [asking, setAsking] = useState<"check" | "overwrite" | null>(null);
   const [saved, setSaved] = useState(false);
+  // 직원에게 카톡으로 보낼 급여 글 — 복사가 막힌 브라우저면 글상자로 띄워 직접 복사하게 한다
+  const [payDays, setPayDays] = useState<number[]>(DEFAULT_PAY_DAYS);
+  const [copiedStaff, setCopiedStaff] = useState<string | null>(null);
+  const [payslipText, setPayslipText] = useState<string | null>(null);
+  useEffect(() => {
+    getStore()
+      .getSetting<number[]>(PAY_DAYS_KEY)
+      .then((v) => v?.length && setPayDays(v))
+      .catch(() => {});
+  }, []);
+  async function copyPayslip(staffId: string, text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedStaff(staffId);
+      setTimeout(() => setCopiedStaff(null), 2000);
+    } catch {
+      setPayslipText(text);
+    }
+  }
   const [showSettings, setShowSettings] = useState(false);
   const [help, setHelp] = useState(false);
   const [cardFile, setCardFile] = useState<{ parsed: ParsedCardApproval; name: string } | null>(null);
@@ -568,7 +589,15 @@ export default function TodayPage() {
                   <li key={s.staffId} className="py-2.5">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="text-base font-bold">{s.alias}</span>
-                      <span className="num text-base font-bold text-orange-700">{won(s.labor)}</span>
+                      <span className="flex items-baseline gap-2">
+                        <button
+                          className="whitespace-nowrap text-xs font-semibold text-orange-700 underline hover:text-orange-800"
+                          onClick={() => void copyPayslip(s.staffId, buildPayslip({ month, alias: s.alias, days: s.days, hours: s.hours, wage: s.wage, labor: s.labor, payDay: payDays[0] ?? null }))}
+                        >
+                          {copiedStaff === s.staffId ? "복사했어요" : "카톡 글 복사"}
+                        </button>
+                        <span className="num text-base font-bold text-orange-700">{won(s.labor)}</span>
+                      </span>
                     </div>
                     <div className="mt-1 h-2 overflow-hidden rounded-full bg-stone-100">
                       <div className="h-full rounded-full bg-orange-400" style={{ width: `${Math.round((s.labor / max) * 100)}%` }} />
@@ -626,6 +655,20 @@ export default function TodayPage() {
       </Link>
 
       {showSettings && <SettingsDialog daily={daily} onClose={() => setShowSettings(false)} />}
+      {payslipText && (
+        <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="급여 안내 글">
+          <div className="card w-full max-w-md space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold">카톡에 붙여넣을 글</h2>
+              <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setPayslipText(null)}>
+                닫기
+              </button>
+            </div>
+            <p className="text-xs text-stone-600">이 브라우저가 자동 복사를 막고 있어요. 아래 글을 끌어서 복사해 주세요.</p>
+            <textarea aria-label="급여 안내 글" className="field h-48 w-full font-mono text-xs" readOnly value={payslipText} onFocus={(e) => e.currentTarget.select()} />
+          </div>
+        </div>
+      )}
 
       {deliveryFile && (
         <ConfirmDialog title={`${deliveryFile.parsed.channelName} 정산명세서 — 이대로 넣을까요?`} confirmLabel={`${deliveryFile.parsed.days.length}일치 넣기`} onConfirm={applyDeliveryFile} onCancel={() => setDeliveryFile(null)}>
