@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
+import { BreakevenCard } from "@/components/BreakevenCard";
+import { WeekdayCard } from "@/components/WeekdayCard";
 import { useDaily } from "@/components/useDaily";
 import { useSettlement } from "@/components/useSettlement";
 import { num, pctText, signed, won } from "@/lib/format";
@@ -12,6 +14,7 @@ import { closeMonth, isClosed, monthLabel } from "@/lib/month";
 import { compareLines, computePnl, type PnlLine } from "@/lib/pnl";
 import { getStore } from "@/lib/storage";
 import { monthSummary } from "@/lib/daily";
+import { dayTotals } from "@/lib/weekday";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
 import { PURCHASES_KEY_PREFIX, type Purchase } from "@/lib/costing/purchases";
 import { buildTaxSheets, taxFileName } from "@/lib/taxExport";
@@ -36,6 +39,7 @@ export default function PnlPage() {
   if (ledger.error) return <Notice tone="error">{ledger.error}</Notice>;
 
   const hourlyLabor = monthSummary(month, daily.sales, daily.shifts, daily.staff).labor;
+  const openDays = dayTotals(daily.sales, daily.channels).length; // 매출이 있었던 날 = 영업일
   const pnl = computePnl(ledger.txs, settlement.effectiveSales, { hourly: hourlyLabor, salary: fixedLabor.salary, insurance: fixedLabor.insurance });
   const hasPrev = ledger.prevTxs.length > 0 || ledger.prevSales.length > 0;
   const diff = compareLines(pnl, hasPrev ? computePnl(ledger.prevTxs, ledger.prevSales) : null);
@@ -129,6 +133,10 @@ export default function PnlPage() {
           ))}
         </ul>
       </section>
+
+      <WeekdayCard month={month} sales={daily.sales} channels={daily.channels} />
+
+      <BreakevenCard month={month} pnl={pnl} openDays={openDays} />
 
       <section className="card space-y-2">
         {closed ? (
