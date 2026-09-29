@@ -211,3 +211,5 @@ table.kv tr:first-child td { border-top: none; }
 details.times { margin-top: 8px; }
 details.times summary { cursor: pointer; color: var(--brand); font-size: 14px; }
 .who-line a { white-space: nowrap; flex: 0 0 auto; }
+.chip { display: inline-block; background: var(--brand-soft); color: var(--brand); padding: 2px 8px; border-radius: 999px; font-weight: 600; margin: 2px 0; }
+.preview { margin: -4px 0 10px; }

@@ -435,9 +435,9 @@
     if (!ownerOk()) { location.hash = '#/owner'; return; }
     app.innerHTML = '<div class="crumb"><a href="#/owner">사장 점검표</a> › 목록</div><h1>매장·이름 목록</h1><div class="muted">불러오는 중…</div>';
     loadSettings().then(function (s) {
-      var h = '<div class="crumb"><a href="#/owner">사장 점검표</a> › 목록</div><h1>매장·이름 목록</h1><p class="muted">한 줄에 하나씩. 실명 대신 별칭(알바 A 등)을 써도 됩니다.</p>';
-      h += '<label class="field">매장 (지점) <span class="muted small">— 하나뿐이면 하나만. 두 개 이상일 때만 직원 화면에 매장 선택이 나와요</span><textarea id="stores" rows="4" placeholder="예: 본점">' + esc(s.stores.join('\n')) + '</textarea></label>';
-      h += '<label class="field">직원 이름 <span class="muted small">— 비워 두면 직원이 직접 이름을 적습니다</span><textarea id="staff" rows="6" placeholder="예: 알바 A">' + esc(s.staff.join('\n')) + '</textarea></label>';
+      var h = '<div class="crumb"><a href="#/owner">사장 점검표</a> › 목록</div><h1>매장·이름 목록</h1><p class="muted"><strong>한 줄에 한 명(한 곳)씩</strong> 적습니다. 엔터로 줄을 바꾸거나 쉼표(,)로 나눠도 됩니다. 실명 대신 별칭(알바 A 등)도 됩니다.</p>';
+      h += '<label class="field">매장 (지점) <span class="muted small">— 하나뿐이면 하나만. 두 개 이상일 때만 직원 화면에 매장 선택이 나와요</span><textarea id="stores" rows="3" placeholder="예: 본점">' + esc(s.stores.join('\n')) + '</textarea></label><p class="preview muted small" id="stores-preview"></p>';
+      h += '<label class="field">직원 이름 <span class="muted small">— 비워 두면 직원이 직접 이름을 적습니다</span><textarea id="staff" rows="6" placeholder="예:\n김하나\n이두리\n알바 A">' + esc(s.staff.join('\n')) + '</textarea></label><p class="preview muted small" id="staff-preview"></p>';
       h += '<button type="button" class="btn primary wide" id="lists-save">저장</button><p id="lists-note" class="muted small"></p>';
       h += '<p class="section-title">사장님 번호(PIN) 바꾸기</p><div class="card"><p class="muted small">점검표를 여는 숫자예요. 처음 값은 ' + (s.owner_pin_hash ? '이미 바꿨습니다' : '설치할 때 정한 값(기본 0000)') + '. 바꾼 번호는 서버에 암호화(해시)해서 저장됩니다.</p>';
       h += '<label class="field">새 번호 (숫자 4~8자리)<input type="password" inputmode="numeric" maxlength="8" id="pin1" class="text-input" autocomplete="new-password"></label>';
@@ -453,8 +453,20 @@
           return saveSetting('owner_pin_hash', hsh).then(function () { n.textContent = '바꿨어요. 다음부터 새 번호로 여세요.'; document.getElementById('pin1').value = ''; document.getElementById('pin2').value = ''; });
         }).catch(function (e) { n.textContent = '저장 안 됨: ' + e.message; });
       });
+      // 줄바꿈·쉼표·슬래시로 나눈다. 중복은 하나로.
+      function lines(id) {
+        var out = [];
+        document.getElementById(id).value.split(/[\n,\/]/).forEach(function (x) { x = x.trim().replace(/\s+/g, ' '); if (x && out.indexOf(x) < 0) out.push(x); });
+        return out;
+      }
+      function preview(id, label) {
+        var arr = lines(id), el = document.getElementById(id + '-preview');
+        el.innerHTML = arr.length ? '저장될 ' + label + ' <strong>' + arr.length + '</strong>: ' + arr.map(function (x) { return '<span class="chip">' + esc(x) + '</span>'; }).join(' ') : '(비어 있음)';
+        var spaced = arr.filter(function (x) { return x.indexOf(' ') >= 0; });
+        if (spaced.length) el.innerHTML += '<br><span class="warn">띄어쓰기가 있는 이름이 있어요: ' + spaced.map(esc).join(', ') + ' — 두 사람이면 엔터나 쉼표로 나눠 주세요.</span>';
+      }
+      ['stores', 'staff'].forEach(function (id) { var lb = id === 'stores' ? '매장' : '이름'; preview(id, lb); document.getElementById(id).addEventListener('input', function () { preview(id, lb); }); });
       document.getElementById('lists-save').addEventListener('click', function () {
-        function lines(id) { return document.getElementById(id).value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean); }
         var st = lines('stores'), sf = lines('staff');
         store.del('me');
         Promise.all([saveSetting('stores', st), saveSetting('staff', sf)]).then(function () { document.getElementById('lists-note').textContent = '저장했어요.'; }, function (e) { document.getElementById('lists-note').textContent = '저장 안 됨: ' + e.message; });
