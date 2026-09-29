@@ -192,7 +192,10 @@ export function parseLiquorText(text: string, monthHint?: string): ParsedLiquorR
     if (ml === null) notes.push(`${displayName}는 용량을 못 읽어 병당 원가를 못 냈어요.`);
   }
 
-  if (!lines.length) throw new LiquorParseError("주류 영수증으로 읽지 못했어요. 품목 줄이 보이지 않아요. 지시문을 그대로 쓰셨는지 확인해 주세요.");
+  // 공병·용기만 수거해 가는 날은 판매 품목이 한 줄도 없다(매출총계 0, 회수액만). 그것도 받는다.
+  if (!lines.length && sums.returned === 0 && sums.balance === null)
+    throw new LiquorParseError("주류 영수증으로 읽지 못했어요. 품목 줄이 보이지 않아요. 지시문을 그대로 쓰셨는지 확인해 주세요.");
+  if (!lines.length) notes.push("술 매입 없이 빈 병·용기 회수만 적힌 계산서예요. 원가에는 넣지 않고 주류 외상(채권잔액)만 줄여요.");
   if (!date) notes.push("날짜를 못 읽었어요. 직접 골라 주세요.");
 
   const subtotal = lines.reduce((a, l) => a + l.subtotal, 0);

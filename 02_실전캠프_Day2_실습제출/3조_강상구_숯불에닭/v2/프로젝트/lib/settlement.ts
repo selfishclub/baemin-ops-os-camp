@@ -105,6 +105,14 @@ function depositsByDate(txs: Transaction[], channel: ChannelId): Map<string, num
   return m;
 }
 
+// 채널·날짜별 통장 입금을 건별로 (같은 날 두 건이 들어오면 나눠 볼 수 있게)
+function depositItemsByDate(txs: Transaction[], channel: ChannelId): Map<string, number[]> {
+  const m = new Map<string, number[]>();
+  const same = (c: string | null) => c === channel || (channel === "hall_card" && c === "hall");
+  for (const t of txs) if (same(t.channel) && t.in > 0) m.set(t.date, [...(m.get(t.date) ?? []), t.in]);
+  return m;
+}
+
 const round1 = (n: number) => Math.round(n * 10) / 10;
 export const MISMATCH_TOLERANCE = 0.005; // 0.5% 이내 차이는 "일치"로 본다 (반올림 등)
 
@@ -178,6 +186,8 @@ export function settleChannel(
     settlements.splice(i, 2, merged);
   }
 
+  splitSameDayDeposits(settlements, depositItemsByDate(txs, channel), floor, adj);
+
   const deposited = settlements.filter((s) => s.status === "일치" || s.status === "차이");
   const salesDeposited = deposited.reduce((a, s) => a + s.sales, 0);
   const refunds = [...adj.values()].reduce((a, x) => a + x.amount, 0);
@@ -201,6 +211,35 @@ export function settleChannel(
     settlements,
     unmatchedDeposits,
   };
+}
+
+// 같은 날 들어온 입금이 여러 건이면 한 묶음이 다 가져가지 않는다.
+// 배달앱이 연휴 앞뒤로 다음 묶음 몫까지 하루에 같이 보내는 일이 있다(2026-09-23 배민: 09-18~20분과 09-21분이 같은 날).
+// 뒤쪽 "미입금" 묶음에 한 건을 떼어 줬을 때 양쪽 다 맞으면 그렇게 나눈다. 한쪽이라도 안 맞으면 그냥 둔다.
+function splitSameDayDeposits(
+  settlements: Settlement[],
+  items: Map<string, number[]>,
+  floor: number,
+  adj: Map<string, SettlementAdjustment>,
+) {
+  for (let i = 0; i < settlements.length; i++) {
+    const a = settlements[i];
+    if (a.status !== "일치" && a.status !== "차이") continue;
+    if (adj.has(a.payout)) continue; // 환급이 섞인 입금은 건드리지 않는다
+    const parts = items.get(a.payout);
+    if (!parts || parts.length < 2) continue;
+    for (let j = i + 1; j < settlements.length; j++) {
+      const b = settlements[j];
+      if (b.status !== "미입금") continue;
+      const part = parts.find((n) => judge(b.sales, n, floor) === "일치");
+      if (part === undefined) continue;
+      const rest = a.deposit - part;
+      if (rest <= 0 || judge(a.sales, rest, floor) !== "일치") continue;
+      settlements[i] = { ...a, deposit: rest, fee: a.sales - rest, feeRate: round1(((a.sales - rest) / a.sales) * 100), status: "일치" };
+      settlements[j] = { ...b, deposit: part, fee: b.sales - part, feeRate: round1(((b.sales - part) / b.sales) * 100), status: "일치", note: `${a.payout}에 ${a.from}~${a.to}분과 같이 들어왔어요` };
+      break;
+    }
+  }
 }
 
 // 직접 출금 신청하는 앱: 입금을 날짜순으로 보며, 그 입금일까지 정산 예정일이 지난(아직 안 붙은) 매출 묶음을 한꺼번에 그 입금에 붙인다.

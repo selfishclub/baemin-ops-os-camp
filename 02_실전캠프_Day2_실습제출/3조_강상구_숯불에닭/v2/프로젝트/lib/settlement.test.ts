@@ -120,6 +120,56 @@ describe("환급 포함 표시 · 늦은 입금 합치기", () => {
   });
 });
 
+describe("같은 날 두 건으로 들어온 정산 나누기", () => {
+  // 2026-09-23 배민: 09-18~20분(326,993)과 09-21분(42,585)이 같은 날 두 건으로 들어왔다.
+  // 합쳐서 한 묶음에 주면 그 줄 수수료율이 6.7%로 내려가고 09-21은 미입금으로 남는다.
+  const rule: SettlementRule = { channel: "baemin", mode: "days", days: 3, weekday: 0 };
+  const holidays = ["2026-09-24", "2026-09-25"];
+  const daily: DailySale[] = [
+    { date: "2026-09-18", channel: "baemin", amount: 41_000 },
+    { date: "2026-09-19", channel: "baemin", amount: 123_500 },
+    { date: "2026-09-20", channel: "baemin", amount: 231_500 },
+    { date: "2026-09-21", channel: "baemin", amount: 54_000 },
+  ];
+  const two: Transaction[] = [
+    { ...tx("2026-09-23", "baemin", 326_993), id: "a" },
+    { ...tx("2026-09-23", "baemin", 42_585), id: "b" },
+  ];
+
+  it("뒤쪽 미입금 묶음에 한 건을 떼어 주면 양쪽 다 맞는다", () => {
+    const r = settleChannel("baemin", "2026-09", rule, daily, two, "2026-09-29", holidays);
+    const big = r.settlements.find((s) => s.from === "2026-09-18")!;
+    const late = r.settlements.find((s) => s.from === "2026-09-21")!;
+    expect(big.deposit).toBe(326_993);
+    expect(big.feeRate).toBe(17.4);
+    expect(late.status).toBe("일치");
+    expect(late.deposit).toBe(42_585);
+    expect(late.feeRate).toBe(21.1);
+    expect(r.missing).toBe(0);
+  });
+
+  it("수수료도 두 묶음 몫이 다 잡힌다", () => {
+    const r = settleChannel("baemin", "2026-09", rule, daily, two, "2026-09-29", holidays);
+    expect(r.fee).toBe(41_000 + 123_500 + 231_500 + 54_000 - 326_993 - 42_585);
+  });
+
+  it("한 건만 들어온 날은 그대로 둔다", () => {
+    const one = [{ ...tx("2026-09-23", "baemin", 369_578), id: "a" }];
+    const r = settleChannel("baemin", "2026-09", rule, daily, one, "2026-09-29", holidays);
+    expect(r.settlements.find((s) => s.from === "2026-09-18")!.deposit).toBe(369_578);
+    expect(r.settlements.find((s) => s.from === "2026-09-21")!.status).toBe("미입금");
+  });
+
+  it("떼어 줘도 앞 묶음이 안 맞으면 나누지 않는다", () => {
+    const odd = [
+      { ...tx("2026-09-23", "baemin", 42_585), id: "a" },
+      { ...tx("2026-09-23", "baemin", 1_000), id: "b" },
+    ];
+    const r = settleChannel("baemin", "2026-09", rule, daily, odd, "2026-09-29", holidays);
+    expect(r.settlements.find((s) => s.from === "2026-09-21")!.status).toBe("미입금");
+  });
+});
+
 describe("배달앱 판정 기준", () => {
   it("배달앱은 입금이 매출의 50%만 넘으면 일치, 카드는 70%", () => {
     const daily: DailySale[] = [{ date: "2026-09-07", channel: "coupang", amount: 19_000 }]; // 월 → 9/11

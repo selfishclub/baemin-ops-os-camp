@@ -19,7 +19,7 @@ export const costKey = (major: string, minor: string) => `${major}\u203a${minor}
 // 대분류가 통째로 변동비인 것
 const ALL_VARIABLE = ["매출원가", "가맹수수료"];
 // 대분류는 고정비지만 이 소분류만 변동비인 것 (부가세는 많이 팔수록 많이 낸다)
-const VARIABLE_MINORS = ["배달앱 수수료", "카드수수료", "부가세"];
+const VARIABLE_MINORS = ["배달앱 수수료", "배달대행비", "카드수수료", "부가세"];
 
 export function isVariableByDefault(major: string, minor: string): boolean {
   return ALL_VARIABLE.includes(major) || VARIABLE_MINORS.includes(minor);

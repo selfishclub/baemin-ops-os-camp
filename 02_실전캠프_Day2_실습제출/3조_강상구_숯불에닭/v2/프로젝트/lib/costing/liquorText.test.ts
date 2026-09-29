@@ -81,3 +81,31 @@ describe("매입 영수증으로 바꾸기", () => {
     expect(p.lines[0].itemId).toBeNull();
   });
 });
+
+describe("공병·용기만 수거해 간 날", () => {
+  // 판매는 없고 회수만 있는 계산서 (숫자는 가짜)
+  const text = [
+    "거래처: 가짜주류",
+    "날짜: 2026-09-29",
+    "술값소계: 0",
+    "보증금소계: 0",
+    "빈병회수: 95,900",
+    "채권잔액: 2,905,800",
+  ].join("\n");
+
+  it("품목 줄이 없어도 읽는다", () => {
+    const r = parseLiquorText(text);
+    expect(r.vendor).toBe("가짜주류");
+    expect(r.day.lines).toHaveLength(0);
+    expect(r.day.returned).toBe(95_900);
+    expect(r.balance).toBe(2_905_800);
+  });
+
+  it("원가에 안 넣는다고 알려 준다", () => {
+    expect(parseLiquorText(text).notes.join(" ")).toContain("원가에는 넣지 않고");
+  });
+
+  it("회수도 채권잔액도 없으면 그대로 거절한다", () => {
+    expect(() => parseLiquorText("거래처: 가짜주류\n날짜: 2026-09-29")).toThrow(/품목 줄이 보이지 않아요/);
+  });
+});
