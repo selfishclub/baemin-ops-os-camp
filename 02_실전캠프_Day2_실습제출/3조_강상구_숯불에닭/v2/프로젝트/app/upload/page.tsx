@@ -297,10 +297,24 @@ function ReviewCard({ tx, ledger, payDays, editing = false, onDone }: { tx: Tran
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [major, payDays]);
   const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   async function confirm() {
     if (!major) return;
+    const chosen = major;
     setSaving(true);
+    setErr(null);
+    try {
+      await save(chosen);
+    } catch (e) {
+      // 저장이 실패해도 단추가 눌린 채로 멈추지 않게 (시연 모드에서 표에 없는 열을 쓰면 여기로 온다)
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function save(major: Major) {
     const store = getStore();
     const ch = isIncome && channel ? channel : null;
     const monthOf = (t: Transaction) => (lastMonth ? prevMonth(t.date.slice(0, 7)) : t.date.slice(0, 7));
@@ -326,7 +340,6 @@ function ReviewCard({ tx, ledger, payDays, editing = false, onDone }: { tx: Tran
     await store.saveTransactions(updated);
     await ledger.recordEdit(`${tx.payee} ${won(tx.out || tx.in)} → ${major} › ${minor}${lastMonth ? " (지난달 비용)" : ""}`);
     await ledger.reload();
-    setSaving(false);
     onDone?.();
   }
 
@@ -381,6 +394,7 @@ function ReviewCard({ tx, ledger, payDays, editing = false, onDone }: { tx: Tran
           </span>
         </label>
       )}
+      {err && <Notice tone="error">저장하지 못했어요 — {err}</Notice>}
       <div className="flex items-center justify-between gap-3">
         {hasRule && editing ? (
           <label className="flex items-center gap-2 text-xs text-stone-700">
@@ -396,7 +410,7 @@ function ReviewCard({ tx, ledger, payDays, editing = false, onDone }: { tx: Tran
           </label>
         )}
         <button className="btn-primary" disabled={!major || saving} onClick={confirm}>
-          {editing ? "이렇게 바꾸기" : "확인"}
+          {saving ? "저장 중…" : editing ? "이렇게 바꾸기" : "확인"}
         </button>
       </div>
     </article>

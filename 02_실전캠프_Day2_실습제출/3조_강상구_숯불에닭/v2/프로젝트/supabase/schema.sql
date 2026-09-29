@@ -24,8 +24,12 @@ create table if not exists rules (
   major text not null,
   minor text not null,
   channel text,
-  ambiguous boolean not null default false
+  ambiguous boolean not null default false,
+  prev_month boolean not null default false  -- 급여·거래처 대금처럼 다음 달에 내는 돈: 지난달 비용으로 잡는다
 );
+
+-- 이미 만들어 둔 시연 DB에 나중에 생긴 열을 더한다 (여러 번 돌려도 안전)
+alter table rules add column if not exists prev_month boolean not null default false;
 
 create table if not exists channel_sales (
   month text not null,
