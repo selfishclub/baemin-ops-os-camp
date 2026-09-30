@@ -50,6 +50,9 @@ export interface MenuCostRow {
   theoreticalCost: number; // quantity × unitCost
   costRate: number | null; // theoreticalCost ÷ amount %
   marginPerUnit: number | null; // 판매단가 − 원가
+  listPrice: number | null; // 차림표 제값 (안 넣었으면 null)
+  giveaway: number | null; // 제값 × 판매수량 − 실매출. 서비스·할인으로 안 받은 돈
+  giveawayQty: number | null; // 그게 몇 개분인지
 }
 
 export interface CostRateReport {
@@ -67,6 +70,21 @@ export interface CostRateReport {
   rows: MenuCostRow[]; // 원가율 높은 순
   unmapped: MenuCostRow[]; // 레시피 없음 (포스 코드로 메뉴 못 찾음 또는 레시피 미등록)
   itemUsage: { itemId: string; name: string; unit: BaseUnit; quantity: number; cost: number }[]; // 품목별 이론 사용량·원가
+  // 서비스·할인으로 안 받은 돈 (정가를 넣은 메뉴만)
+  giveaway: number;
+  giveawayFull: number; // 그 메뉴들을 전부 제값에 팔았다면 나왔을 매출
+  giveawayRate: number | null; // giveaway ÷ giveawayFull %
+  pricedMenus: number; // 정가를 넣은 메뉴 수
+}
+
+// 차림표 제값이 있으면 "제값에 다 팔았다면 얼마"와 실매출의 차이를 낸다.
+// 서비스로 준 것과 깎아 준 것이 섞여 있어 둘을 나누지는 못한다.
+function giveawayOf(menu: Menu | null, quantity: number, amount: number) {
+  const list = menu?.listPrice;
+  if (!list || list <= 0 || quantity <= 0) return { listPrice: null, giveaway: null, giveawayQty: null };
+  const full = list * quantity;
+  const gap = Math.max(0, full - amount); // 제값보다 많이 받았으면(가격 인상 등) 0
+  return { listPrice: list, giveaway: gap, giveawayQty: r1(gap / list) };
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -82,7 +100,7 @@ export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes:
     const menu = byCode.get(l.code) ?? byName.get(l.name.replace(/\s+/g, "")) ?? null;
     const recipe = menu ? recipeBy.get(menu.id) : undefined;
     if (!menu || !recipe || recipe.lines.length === 0) {
-      return { code: l.code, name: l.name, menuId: menu?.id ?? null, quantity: l.quantity, amount: l.amount, unitCost: null, theoreticalCost: 0, costRate: null, marginPerUnit: null };
+      return { code: l.code, name: l.name, menuId: menu?.id ?? null, quantity: l.quantity, amount: l.amount, unitCost: null, theoreticalCost: 0, costRate: null, marginPerUnit: null, ...giveawayOf(menu, l.quantity, l.amount) };
     }
     const { cost } = recipeUnitCost(recipe, items);
     for (const rl of recipe.lines) {
@@ -96,7 +114,7 @@ export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes:
     }
     const theoretical = cost * l.quantity;
     const unitPrice = l.quantity > 0 ? l.amount / l.quantity : 0;
-    return { code: l.code, name: l.name, menuId: menu.id, quantity: l.quantity, amount: l.amount, unitCost: cost, theoreticalCost: theoretical, costRate: pct(theoretical, l.amount), marginPerUnit: l.quantity > 0 ? Math.round(unitPrice - cost) : null };
+    return { code: l.code, name: l.name, menuId: menu.id, quantity: l.quantity, amount: l.amount, unitCost: cost, theoreticalCost: theoretical, costRate: pct(theoretical, l.amount), marginPerUnit: l.quantity > 0 ? Math.round(unitPrice - cost) : null, ...giveawayOf(menu, l.quantity, l.amount) };
   });
 
   const covered = rows.filter((r) => r.unitCost !== null);
@@ -106,6 +124,9 @@ export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes:
   const theoreticalRate = pct(theoreticalCost, coveredAmount);
   const estimatedTotalCost = theoreticalRate === null ? theoreticalCost : Math.round((pos.totalAmount * theoreticalRate) / 100);
   const actualRate = pct(actualCost, pos.totalAmount);
+  const priced = rows.filter((r) => r.listPrice !== null);
+  const giveaway = priced.reduce((a, r) => a + (r.giveaway ?? 0), 0);
+  const giveawayFull = priced.reduce((a, r) => a + r.listPrice! * r.quantity, 0);
 
   return {
     month: pos.month,
@@ -117,6 +138,10 @@ export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes:
     estimatedTotalCost,
     actualCost,
     actualRate,
+    giveaway,
+    giveawayFull,
+    giveawayRate: pct(giveaway, giveawayFull),
+    pricedMenus: priced.length,
     gap: actualCost - estimatedTotalCost,
     gapRate: actualRate === null || theoreticalRate === null ? null : r1(actualRate - theoreticalRate),
     rows: covered.sort((a, b) => (b.costRate ?? 0) - (a.costRate ?? 0)),

@@ -17,7 +17,9 @@ export interface Menu {
   id: string;
   name: string;
   posCode: string | null; // 포스 상품코드. 이름은 흔들려도 코드는 안 흔들린다
-  price: number;
+  price: number; // 포스 실매출 ÷ 판매수량으로 나온 평균 단가 (서비스·할인이 섞여 있다)
+  // 차림표에 적힌 제값. 넣어 두면 "서비스·할인으로 나간 몫"을 낼 수 있다 (정가 × 판매수량 − 실매출)
+  listPrice?: number | null;
   active: boolean;
 }
 

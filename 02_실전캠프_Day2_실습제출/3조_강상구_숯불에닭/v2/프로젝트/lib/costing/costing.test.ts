@@ -104,3 +104,54 @@ describe("상품ABC 이어 붙이기", () => {
     expect(mergePosReports(null, prev).mode).toBe("new");
   });
 });
+
+describe("서비스·할인으로 나간 몫", () => {
+  // 음료는 차림표에 전부 2,000원인데 포스 실매출은 그보다 적다 = 서비스로 나간 것
+  const menu = (id: string, code: string, name: string, listPrice: number | null): Menu => ({ id, name, posCode: code, price: 0, listPrice, active: true });
+  const drinkMenus: Menu[] = [
+    menu("m1", "c1", "가짜환타", 2000),
+    menu("m2", "c2", "가짜콜라", 2000),
+    menu("m3", "c3", "가짜커피", null), // 제값을 안 넣은 메뉴
+  ];
+  const pos = {
+    month: "2026-09",
+    periodStart: "2026-09-01",
+    periodEnd: "2026-09-30",
+    lines: [
+      { code: "c1", name: "가짜환타", amount: 24_000, quantity: 17 }, // 제값이면 34,000
+      { code: "c2", name: "가짜콜라", amount: 106_000, quantity: 56 }, // 제값이면 112,000
+      { code: "c3", name: "가짜커피", amount: 50_000, quantity: 10 },
+    ],
+    totalAmount: 180_000,
+    totalQuantity: 83,
+  };
+  const rep = buildCostRateReport(pos, drinkMenus, [], [], 0);
+  const row = (name: string) => [...rep.rows, ...rep.unmapped].find((r) => r.name === name)!;
+
+  it("제값 × 판매수량 − 실매출", () => {
+    expect(row("가짜환타").giveaway).toBe(10_000);
+    expect(row("가짜콜라").giveaway).toBe(6_000);
+  });
+
+  it("몇 개분인지도 센다", () => {
+    expect(row("가짜환타").giveawayQty).toBe(5);
+    expect(row("가짜콜라").giveawayQty).toBe(3);
+  });
+
+  it("제값을 안 넣은 메뉴는 계산하지 않는다", () => {
+    expect(row("가짜커피").listPrice).toBeNull();
+    expect(row("가짜커피").giveaway).toBeNull();
+  });
+
+  it("합계는 제값을 넣은 메뉴만", () => {
+    expect(rep.giveaway).toBe(16_000);
+    expect(rep.giveawayFull).toBe(146_000); // 34,000 + 112,000
+    expect(rep.giveawayRate).toBe(11);
+    expect(rep.pricedMenus).toBe(2);
+  });
+
+  it("제값보다 많이 받았으면 0으로 본다 (가격을 올렸을 때)", () => {
+    const up = { ...pos, lines: [{ code: "c1", name: "가짜환타", amount: 40_000, quantity: 17 }] };
+    expect(buildCostRateReport(up, drinkMenus, [], [], 0).giveaway).toBe(0);
+  });
+});

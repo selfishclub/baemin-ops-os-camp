@@ -11,7 +11,7 @@ import { PURCHASES_KEY_PREFIX, costFromPurchases, type Purchase } from "@/lib/co
 import { mergePosReports, parsePosAbcGrid, PosParseError } from "@/lib/costing/okpos";
 import sample from "@/lib/costing/sample.json";
 import { ITEMS_KEY, MENUS_KEY, POS_KEY_PREFIX, RECIPES_KEY, type BaseUnit, type Item, type Menu, type PosSalesReport, type Recipe } from "@/lib/costing/types";
-import { num, pctText, won } from "@/lib/format";
+import { num, pctText, won, parseNum } from "@/lib/format";
 import { monthLabel, prevMonth } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 
@@ -97,6 +97,10 @@ export default function CostingPage() {
 
   if (!loaded || ledger.loading) return <p className="py-10 text-center text-sm text-stone-500">불러오는 중…</p>;
 
+  // 서비스·할인이 많이 나간 메뉴 (레시피 있는 것·없는 것 다 본다).
+  // 위에 조건부 return이 있어서 훅(useMemo)을 쓰면 안 된다 — 그냥 계산한다.
+  const giveawayRows = report ? [...report.rows, ...report.unmapped].filter((r) => (r.giveaway ?? 0) > 0).sort((a, b) => b.giveaway! - a.giveaway!) : [];
+
   return (
     <>
       <section className="card space-y-3">
@@ -177,6 +181,35 @@ export default function CostingPage() {
             <Notice tone="warn">
               통장 재료비가 레시피 기준보다 <b>{report.gapRate.toFixed(1)}%p</b>({won(report.gap)}) 많아요. 원인은 셋 중 하나예요: ① 재료값이 올랐다(시세) ② 레시피보다 많이 쓰거나 버렸다(로스) ③ 이달에 산 재료가 아직 냉장고에 있다(재고). 다음 버전에서 입고·실사를 붙이면 셋을 나눠 보여 드려요.
             </Notice>
+          )}
+
+          {report.pricedMenus > 0 && (
+            <section className="card">
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <h2 className="text-base font-bold">서비스·할인으로 나간 몫</h2>
+                <span className="text-xs text-stone-500">제값 넣은 메뉴 {report.pricedMenus}개</span>
+              </div>
+              <p className="num text-2xl font-extrabold text-stone-900">{won(report.giveaway)}</p>
+              <p className="mt-1 text-sm text-stone-600">
+                제값대로 다 팔았다면 {won(report.giveawayFull)}인데 실제로는 {won(report.giveawayFull - report.giveaway)}을 받았어요 — <b>{pctText(report.giveawayRate)}</b>가 서비스·할인으로 나갔어요.
+              </p>
+              {giveawayRows.length > 0 && (
+                <ul className="mt-2 divide-y divide-stone-100">
+                  {giveawayRows.slice(0, 8).map((r) => (
+                    <li key={r.code} className="grid grid-cols-[minmax(0,1fr)_5rem_5.5rem] items-baseline gap-x-2 py-1.5">
+                      <span className="truncate text-sm font-semibold text-stone-800">{r.name}</span>
+                      <span className="num text-right text-sm font-bold">{num(r.giveaway!)}</span>
+                      <span className="whitespace-nowrap text-right text-[11px] text-stone-500">
+                        {r.quantity}개 중 {r.giveawayQty}개분
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-2 rounded-lg bg-stone-50 px-2 py-1.5 text-xs text-stone-600">
+                서비스로 준 것과 깎아 준 것이 섞여 있어요. <b>재료비는 그대로 나가니</b> 그 메뉴 원가율이 유독 높아 보이면 이것 때문일 수 있어요. 제값은 “품목·레시피 설정”의 메뉴 줄에서 넣어요.
+              </p>
+            </section>
           )}
 
           <section className="card space-y-2">
@@ -286,6 +319,11 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
     for (let k = 0; k < 12; k++, m = prevMonth(m)) purchases.push(...((await store.getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + m)) ?? []));
     const cost = costFromPurchases(id, method, purchases);
     await store.saveSetting(ITEMS_KEY, items.map((i) => (i.id === id ? { ...i, costMethod: method, standardCost: cost ?? i.standardCost } : i)));
+    await onChange();
+  }
+  // 차림표 제값. 넣어 두면 "서비스·할인으로 나간 몫"이 나온다
+  async function setListPriceOf(id: string, price: number) {
+    await store.saveSetting(MENUS_KEY, menus.map((m) => (m.id === id ? { ...m, listPrice: price > 0 ? price : null } : m)));
     await onChange();
   }
   async function setItemCostOf(id: string, cost: number) {
@@ -418,9 +456,25 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
                       {cost !== null && <span className="num"> → 1개 원가 {num(cost)}원{m.price > 0 && ` (${Math.round((cost / m.price) * 1000) / 10}%)`}</span>}
                     </p>
                   </div>
-                  <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setEditMenu(editMenu === m.id ? null : m.id)}>
-                    {editMenu === m.id ? "닫기" : "레시피"}
-                  </button>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <label className="flex items-center gap-1 text-xs text-stone-500">
+                      제값
+                      <input
+                        aria-label={`${m.name} 제값`}
+                        inputMode="numeric"
+                        className="field num w-20 px-2 py-1 text-right text-xs"
+                        placeholder="–"
+                        defaultValue={m.listPrice ? num(m.listPrice) : ""}
+                        onBlur={(e) => {
+                          const v = parseNum(e.target.value);
+                          if (v !== (m.listPrice ?? 0)) void setListPriceOf(m.id, v);
+                        }}
+                      />
+                    </label>
+                    <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setEditMenu(editMenu === m.id ? null : m.id)}>
+                      {editMenu === m.id ? "닫기" : "레시피"}
+                    </button>
+                  </span>
                 </div>
                 {editMenu === m.id && (
                   <div className="mt-2 space-y-2 rounded-xl bg-stone-50 p-2">
