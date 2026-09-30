@@ -4236,7 +4236,9 @@ const App = (() => {
     if (!trainWho || !names.includes(trainWho)) trainWho = (names.includes(whoNow()) ? whoNow() : names[0]) || null;
     let h = `<div class="hd"><div><h2>교육 자료</h2><div class="sub">서비스 · 위생 · 동료 관계 · 조리 · 안전. 순서대로 보는 <b>학습 프로그램</b>과 전체 자료 목록이 있습니다. 유튜브는 앱 안에서 재생됩니다.</div></div>
       <div class="mnav"><button class="btn" data-act="trainSeed">추천 영상 넣기</button><button class="btn primary" data-act="trainAdd">+ 자료 추가</button></div></div>`;
-    h += `<div class="filters">${[['program', '🎓 학습 프로그램'], ['board', '🏅 직원별 진행'], ['all', '📚 자료 전체 ' + trainList().length]].map(([k, n]) => `<button class="fl${trainTab === k ? ' on' : ''}" data-act="trainTab" data-t="${k}">${n}</button>`).join('')}</div>`;
+    const waitN = (S.missions || []).filter((x) => x.status === 'claimed').length;
+    h += `<div class="filters">${[['program', '🎓 학습 프로그램'], ['mission', '🎯 개인 미션' + (waitN ? ` <span class="chip crit">확인 ${waitN}</span>` : '')], ['board', '🏅 직원별 진행'], ['all', '📚 자료 전체 ' + trainList().length]].map(([k, n]) => `<button class="fl${trainTab === k ? ' on' : ''}" data-act="trainTab" data-t="${k}">${n}</button>`).join('')}</div>`;
+    if (trainTab === 'mission') return h + vMissions(names);
     if (trainTab === 'program') return h + vTrainProgram(names);
     if (trainTab === 'board') return h + vTrainBoard(names);
     return h + vTrainAll();
@@ -4253,6 +4255,7 @@ const App = (() => {
     h += `<div class="progCard${ps.pct === 100 ? ' done' : ''}"><div class="pcTop"><div><b>${esc(trainWho)}님의 학습</b>
         <div class="pcSub">본 영상 <b>${ps.n}</b> / ${ps.total}편 · 누적 ${ps.mins}분 · 완주 배지 ${ps.badges.length ? ps.badges.map((b) => b.icon).join(' ') : '아직 없음'}</div></div>
         <div class="pcNum">${ps.pct}<small>%</small></div></div><div class="bar"><i style="width:${ps.pct}%"></i></div>
+      <div class="trNext"><span class="chip cat">🎯 이달 미션</span> ${(() => { const ms = missionsOf(trainWho, monthNow()); const d = ms.filter((x) => x.status === 'done').length; return `<b>${d}</b> / ${missionGoal()}개 달성 · 진행 중 ${ms.filter((x) => x.status === 'open').length} · 확인 대기 ${ms.filter((x) => x.status === 'claimed').length}`; })()} <button class="btn sm" data-act="trainTab" data-t="mission">미션 보기</button></div>
       ${nextItem ? `<div class="trNext"><span class="chip wk">다음에 볼 영상</span> <b>${esc(nextItem.title)}</b>${nextItem.min ? ` <span class="mut">· ${nextItem.min}분</span>` : ''} <span class="mut">· ${esc(nextTr.name)}</span>
         <button class="btn sm primary" data-act="trainOpen" data-u="${esc(nextUrl)}">지금 보기</button></div>` : `<div class="trNext">🎉 모든 코스를 마쳤습니다. 사장님께 알려 주세요!</div>`}</div>`;
     TRAIN_TRACKS.forEach((tr) => {
@@ -4270,7 +4273,7 @@ const App = (() => {
             ${st.steps.map((u) => { idx++; const it = trainByUrl(u); if (!it) return ''; const d = done[u]; const isNext = u === pr.next;
               return `<div class="trStep${d ? ' done' : ''}${isNext ? ' next' : ''}"><span class="trNo">${d ? '✓' : idx}</span>
                 <div class="trStepMain"><div class="trStepTitle">${esc(it.title)}</div><div class="mut">${esc(it.cat)}${it.sub ? ' · ' + esc(it.sub) : ''}${it.min ? ' · ' + it.min + '분' : ''}${d ? ' · ' + d + ' 시청' : ''}${isNext ? ' · <b>다음 차례</b>' : ''}</div></div>
-                <span class="rowbtns" style="margin:0"><button class="btn sm${isNext ? ' primary' : ''}" data-act="trainOpen" data-u="${esc(u)}">보기</button>${d ? `<button class="btn sm ghost" data-act="trainUndo" data-u="${esc(u)}">취소</button>` : `<button class="btn sm ghost" data-act="trainDone" data-u="${esc(u)}">봤어요</button>`}</span></div>`; }).join('')}
+                <span class="rowbtns" style="margin:0"><button class="btn sm${isNext ? ' primary' : ''}" data-act="trainOpen" data-u="${esc(u)}">${d ? '다시 보기' : '보기'}</button>${d ? `<button class="btn sm ghost" data-act="trainUndo" data-u="${esc(u)}">취소</button>` : ''}</span></div>`; }).join('')}
           </div>`; }).join('')}
       </details>`;
     });
@@ -4316,22 +4319,102 @@ const App = (() => {
         ${x.memo ? `<div class="nbody">${esc(x.memo)}</div>` : ''}
         ${id ? `<div class="ytBox"><iframe src="https://www.youtube-nocookie.com/embed/${esc(id)}" title="${esc(x.title)}" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : ''}
         <div class="rowbtns"><a class="btn sm primary" href="${esc(x.url)}" target="_blank" rel="noopener">${id ? '유튜브에서 열기' : '열기'}</a>
-          <button class="btn sm" data-act="trainDone" data-u="${esc(x.url)}">봤어요</button>
+          <button class="btn sm" data-act="trainOpen" data-u="${esc(x.url)}">보고 기록하기</button>
           <button class="btn sm ghost" data-act="trainEdit" data-id="${x.id}">수정</button></div>
         <div class="rcMeta">${seenBy.length ? '본 사람: ' + seenBy.map(esc).join(', ') : '아직 본 사람 없음'}</div></div>`; }).join('')}</div>`;
     });
     return h;
   }
-  /* 영상 보기 창 — 앱 안에서 재생하고 "시청 완료"로 기록 */
+  /* ── 개인 미션 — 영상을 보고 "내일 매장에서 적용할 것 한 가지"를 적으면 그게 그달의 미션이 된다 ──
+     S.missions[{id, who, text, cat, srcUrl, srcTitle, month, createdAt, status: open|claimed|done, claimedAt, doneAt, note}]
+     본인이 "해냈어요" → 확인 대기 → 사장님 확인(PIN) → 완료. 월 목표(기본 3개) 달성 · 완료 때만 텔레그램 공유 — 사장님 결정 2026-09-30 */
+  const MISSION_CATS = ['고객 서비스', '동료 관계', '위생·안전', '매장 개선', '자기 관리'];
+  const missionCatOf = (item) => ({ '서비스': '고객 서비스', '관계·소통': '동료 관계', '위생': '위생·안전', '안전': '위생·안전', '조리': '매장 개선' }[(item || {}).cat] || '매장 개선');
+  const missionGoal = () => Number(S.settings.missionGoal) || 3;
+  const missionsOf = (who, month) => (S.missions || []).filter((m) => m.who === who && (!month || m.month === month));
+  const monthNow = () => dateKey().slice(0, 7);
+
+  /* 유튜브 플레이어 API — 실제 재생 시간을 잰다. 못 불러오면 영상 길이 기준 타이머로 대신한다 */
+  let ytApiP = null;
+  function loadYtApi() {
+    if (window.YT && window.YT.Player) return Promise.resolve(true);
+    if (ytApiP) return ytApiP;
+    ytApiP = new Promise((res) => {
+      const t = setTimeout(() => res(!!(window.YT && window.YT.Player)), 5000);
+      window.onYouTubeIframeAPIReady = () => { clearTimeout(t); res(true); };
+      const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; s.onerror = () => { clearTimeout(t); res(false); };
+      document.head.appendChild(s);
+    });
+    return ytApiP;
+  }
+  let watch = null;   // { player, dur, watched, last, playing, ended, ready, timer, startedAt, item }
+  function watchStop() { if (watch && watch.timer) clearInterval(watch.timer); if (watch && watch.player && watch.player.destroy) { try { watch.player.destroy(); } catch (_) { /* 무시 */ } } watch = null; }
+  const fmtSec = (s) => `${Math.floor(s / 60)}:${pad(Math.floor(s % 60))}`;
+  function watchTick() {
+    if (!watch) return;
+    const m = $('#modal'); if (!m || m.hidden) { watchStop(); return; }
+    const w = watch;
+    if (w.player && w.playing) {
+      let cur = 0; try { cur = w.player.getCurrentTime() || 0; if (!w.dur) w.dur = w.player.getDuration() || 0; } catch (_) { /* 무시 */ }
+      if (w.last != null && cur > w.last && cur - w.last < 2.5) w.watched += cur - w.last;   // 앞으로 감기는 안 센다
+      w.last = cur;
+    } else if (!w.player && w.fallbackSec) {
+      w.watched = (Date.now() - w.startedAt) / 1000;   // API 없을 때: 창을 연 뒤 지난 시간
+    }
+    const need = w.player ? (w.dur ? w.dur * 0.9 : Infinity) : (w.fallbackSec || 0) * 0.9;
+    const ready = w.ended || (need !== Infinity && w.watched >= need);
+    if (ready && !w.ready) { w.ready = true; }
+    const bar = $('#wProg'), txt = $('#wTxt'), ta = $('#msText'), ok = m.querySelector('[data-act="mOk"]');
+    const pct = need && need !== Infinity ? Math.min(100, Math.round(w.watched / need * 100)) : 0;
+    if (bar) bar.style.width = pct + '%';
+    if (txt) txt.textContent = w.ready ? '✅ 다 봤습니다 — 아래에 적용할 것 한 가지를 적어 주세요' : (w.player && w.dur ? `시청 ${fmtSec(w.watched)} / ${fmtSec(w.dur)} · 90% 이상 보면 열립니다` : w.fallbackSec ? `시청 ${fmtSec(w.watched)} / 약 ${fmtSec(w.fallbackSec)}` : '재생을 시작하세요');
+    if (ta) ta.disabled = !w.ready;
+    if (ok) ok.disabled = !w.ready;
+  }
   function trainOpen(url) {
     const it = trainByUrl(url); if (!it) return;
     const id = it.noEmbed ? null : ytId(url), who = trainWho || whoNow();
-    modal(it.title, `${id ? `<div class="ytBox"><iframe src="https://www.youtube-nocookie.com/embed/${esc(id)}?autoplay=1" title="${esc(it.title)}" allow="autoplay; accelerometer; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : `<p><a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener">새 창에서 열기</a></p>`}
-      ${it.noEmbed ? `<p class="hint">이 영상은 제작자가 다른 사이트 재생을 막아 두어 유튜브에서 열립니다.</p>` : ''}
+    if (!who) { alert('누구의 기록인지 이름을 먼저 고르세요.'); return; }
+    watchStop();
+    const cat0 = missionCatOf(it);
+    modal(it.title, `${id ? `<div class="ytBox"><div id="ytp"></div></div>` : `<p><a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener">${it.noEmbed ? '유튜브에서 열기 (외부 재생만 허용된 영상)' : '새 창에서 열기'}</a></p>`}
+      <div class="wBar"><i id="wProg"></i></div><div class="hint" id="wTxt">${id ? '재생 준비 중…' : '보고 나서 아래에 적어 주세요'}</div>
       ${it.memo ? `<p class="mmemo">${esc(it.memo)}</p>` : ''}
-      <p class="hint">${who ? `<b>${esc(who)}</b>님의 기록으로 남습니다. 다 보고 나서 아래 "시청 완료"를 누르세요.` : '위에서 이름을 먼저 고르세요.'}</p>`, () => { trainMarkDone(url, who); }, '시청 완료');
+      <div class="mlabel">🎯 <b>${esc(who)}</b>님, 내일 매장에서 적용할 것 한 가지</div>
+      <textarea id="msText" rows="2" placeholder="예: 손님 들어올 때 하던 일 멈추고 눈 맞추며 인사하기" ${id ? 'disabled' : ''}></textarea>
+      <div class="roles wrap sm" id="msCats">${MISSION_CATS.map((c) => `<button type="button" class="rl${c === cat0 ? ' on' : ''}" data-cat="${c}">${c}</button>`).join('')}</div>
+      <p class="hint">이 한 줄이 이달의 <b>개인 미션</b>이 됩니다 (월 목표 ${missionGoal()}개). 해내면 "해냈어요"를 누르고 사장님 확인을 받으세요.</p>`, () => {
+      if (watch && !watch.ready) { alert('영상을 90% 이상 본 뒤에 적을 수 있어요.'); return false; }
+      const text = $('#msText').value.trim();
+      if (text.length < 5) { alert('적용할 것을 한 줄로 조금 더 구체적으로 적어 주세요 (5자 이상).'); return false; }
+      const catSel = document.querySelector('#msCats .rl.on'); const cat = catSel ? catSel.dataset.cat : cat0;
+      if (!S.missions) S.missions = [];
+      S.missions.push({ id: newId('ms'), who, text, cat, srcUrl: url, srcTitle: it.title, month: monthNow(), createdAt: Date.now(), status: 'open' });
+      watchStop();
+      trainMarkDone(url, who, text);
+    }, '시청 완료 · 미션 등록');
+    const ok = $('#modal').querySelector('[data-act="mOk"]'); if (ok && id) ok.disabled = true;
+    $('#msCats').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return; $('#msCats').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); });
+    watch = { player: null, dur: 0, watched: 0, last: null, playing: false, ended: false, ready: !id, timer: null, startedAt: Date.now(), fallbackSec: (it.min || 0) * 60, item: it };
+    if (!id) return;
+    loadYtApi().then((okApi) => {
+      if (!watch || watch.item !== it) return;
+      if (okApi && $('#ytp')) {
+        try {
+          watch.player = new window.YT.Player('ytp', { videoId: id, host: 'https://www.youtube-nocookie.com', playerVars: { autoplay: 1, rel: 0, playsinline: 1 }, events: {
+            onReady: (e) => { try { watch.dur = e.target.getDuration() || 0; } catch (_) { /* 무시 */ } },
+            onStateChange: (e) => { if (!watch) return; watch.playing = e.data === 1; if (e.data === 0) watch.ended = true; if (e.data !== 1) watch.last = null; },
+          } });
+        } catch (_) { watch.player = null; }
+      }
+      if (!watch.player) {   // API 실패 → 일반 iframe + 길이 기준 타이머
+        const box = $('#ytp'); if (box) box.outerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${esc(id)}?autoplay=1" title="${esc(it.title)}" allow="autoplay; accelerometer; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+        if (!watch.fallbackSec) watch.ready = true;
+      }
+      watch.timer = setInterval(watchTick, 1000); watchTick();
+    });
   }
-  function trainMarkDone(url, who) {
+  function trainMarkDone(url, who, missionText) {
     if (!who) { alert('누구의 기록인지 이름을 먼저 고르세요.'); return; }
     const before = TRAIN_TRACKS.filter((tr) => trackProgress(tr, who).complete).map((tr) => tr.key);
     trainDoneMap(who)[url] = dateKey();
@@ -4341,28 +4424,75 @@ const App = (() => {
       const tr = after[0];
       banner(`🏅 ${who} — "${tr.name}" 완주!`, S.settings.trainReward || TRAIN_REWARD_DEFAULT);
       if ((S.settings.tgToken || '').trim() && (S.settings.tgChat || '').trim()) sendTelegram(`🎓 [${storeName()}] ${who} — "${tr.name}" 코스 완주! (${trackSteps(tr).length}편)`, 'train').catch(() => {});
-    } else banner('시청 완료로 기록했습니다', `${who} · ${(trainByUrl(url) || {}).title || ''}`);
+    } else banner(missionText ? `🎯 미션 등록: ${missionText}` : '시청 완료로 기록했습니다', `${who} · ${(trainByUrl(url) || {}).title || ''}`);
   }
-  function trainForm(x) {
-    const isNew = !x; x = x || { cat: TRAIN_CATS[0] };
-    modal(isNew ? '교육 자료 추가' : '교육 자료 수정', `
-      <div class="mlabel">분류</div>
-      <div class="roles wrap" id="trCats">${TRAIN_CATS.map((c) => `<button type="button" class="rl${c === x.cat ? ' on' : ''}" data-cat="${c}">${c}</button>`).join('')}</div>
-      <label>제목<input id="trT" value="${esc(x.title || '')}" placeholder="예: 손 씻기와 교차오염 예방"></label>
-      <label>주소 (URL)<input id="trU" value="${esc(x.url || '')}" placeholder="https://www.youtube.com/watch?v=… 또는 문서 주소" inputmode="url" autocomplete="off"></label>
-      <label>메모 <span class="opt">선택</span><textarea id="trM" rows="2" placeholder="직원에게 한 줄 (예: 신입 첫 주에 꼭 보기)">${esc(x.memo || '')}</textarea></label>
-      <label class="chk"><input type="checkbox" id="trP"${x.pin ? ' checked' : ''}> 필독 — 목록 맨 위에 고정</label>
-      ${isNew ? '' : `<div class="rowbtns"><button class="btn danger sm" data-act="trainDel" data-id="${x.id}">이 자료 삭제</button></div>`}
-    `, () => {
-      const title = $('#trT').value.trim(), url = $('#trU').value.trim();
-      if (!title) { alert('제목을 넣어 주세요.'); return false; }
-      if (!/^https?:\/\/\S+$/i.test(url)) { alert('주소는 https:// 로 시작하는 인터넷 주소여야 합니다.'); return false; }
-      const catSel = document.querySelector('#trCats .rl.on'), cat = catSel ? catSel.dataset.cat : TRAIN_CATS[0];
-      const rec = { id: x.id || newId('tr'), cat, title, url, memo: $('#trM').value.trim(), pin: $('#trP').checked, by: x.by || whoNow() || '', createdAt: x.createdAt || Date.now() };
-      if (x.id) S.training = trainList().map((t) => (t.id === x.id ? rec : t)); else trainList().push(rec);
+
+  /* ── 개인 미션 화면 ── */
+  let msMonth = null;
+  function vMissions(names) {
+    const m = msMonth || monthNow(), goal = missionGoal();
+    let h = `<div class="hd sub2"><h3>🎯 개인 미션 — ${monthLabel(m)}</h3>
+      <div class="mnav"><button class="dnav" data-act="msNav" data-d="-1">‹</button><button class="dnav" data-act="msNav" data-d="1">›</button>
+        <button class="btn sm" data-act="msGoal">월 목표 ${goal}개</button><button class="btn sm primary" data-act="msAdd">+ 미션 직접 추가</button></div></div>`;
+    h += `<p class="hint">교육 영상을 보고 적은 "내일 적용할 것 한 가지"가 여기에 쌓입니다. 해내면 <b>해냈어요</b> → 사장님 <b>확인</b> → 완료. 한 달에 ${goal}개를 해내면 그달 달성 🏆</p>`;
+    if (!names.length) return h + `<div class="notice"><b>직원 명단이 비어 있습니다.</b></div>`;
+    /* 팀 현황 */
+    const rows = names.map((n) => { const ms = missionsOf(n, m); return { n, total: ms.length, done: ms.filter((x) => x.status === 'done').length, wait: ms.filter((x) => x.status === 'claimed').length }; }).sort((p, q) => q.done - p.done || q.total - p.total);
+    h += `<div class="tkLogWrap"><table class="tkLog cList"><thead><tr><th>이름</th><th>이달 달성</th><th>확인 대기</th><th>등록</th><th></th></tr></thead><tbody>${rows.map((r) => `<tr class="${r.n === trainWho ? 'sel' : ''}">
+      <td><b>${esc(r.n)}</b>${r.done >= goal ? ' 🏆' : ''}</td><td><span class="stBar" style="display:inline-block;width:90px;vertical-align:middle"><i style="width:${Math.min(100, Math.round(r.done / goal * 100))}%"></i></span> ${r.done}/${goal}</td>
+      <td>${r.wait ? `<span class="chip crit">${r.wait}건</span>` : '<span class="mut">–</span>'}</td><td>${r.total}</td><td><button class="btn sm" data-act="trainWho" data-n="${esc(r.n)}">보기</button></td></tr>`).join('')}</tbody></table></div>`;
+    /* 선택한 사람의 미션 */
+    const list = missionsOf(trainWho, m).slice().sort((p, q) => ({ claimed: 0, open: 1, done: 2 }[p.status] - { claimed: 0, open: 1, done: 2 }[q.status]) || q.createdAt - p.createdAt);
+    const doneN = list.filter((x) => x.status === 'done').length;
+    h += `<div class="hd sub2" style="margin-top:16px"><h3>${esc(trainWho)}님의 ${monthLabel(m)} 미션 <span class="cnt">${doneN}/${goal}</span></h3></div>`;
+    if (!list.length) h += `<div class="notice"><b>아직 이달 미션이 없습니다.</b><div class="hint">🎓 학습 프로그램에서 영상을 보고 "적용할 것 한 가지"를 적으면 여기에 생깁니다. 사장님이 직접 넣을 수도 있습니다.</div></div>`;
+    h += list.map((x) => `<div class="msCard ${x.status}">
+      <div class="msTop"><span class="chip cat">${esc(x.cat)}</span><span class="chip ${x.status === 'done' ? 'ok' : x.status === 'claimed' ? 'crit' : ''}">${{ open: '진행 중', claimed: '확인 대기', done: '완료 ✓' }[x.status]}</span><span class="rcMeta" style="margin-left:auto">${new Date(x.createdAt).toLocaleDateString('ko-KR')}</span></div>
+      <div class="msText">${esc(x.text)}</div>
+      ${x.srcTitle ? `<div class="mut">📺 ${esc(x.srcTitle)}</div>` : ''}
+      ${x.note ? `<div class="msNote">사장님: ${esc(x.note)}</div>` : ''}
+      <div class="rowbtns" style="margin-top:8px">
+        ${x.status === 'open' ? `<button class="btn sm primary" data-act="msClaim" data-id="${x.id}">해냈어요</button>` : ''}
+        ${x.status === 'claimed' ? `<button class="btn sm primary" data-act="msApprove" data-id="${x.id}">사장님 확인</button><button class="btn sm ghost" data-act="msUnclaim" data-id="${x.id}">아직이에요</button>` : ''}
+        ${x.status === 'done' ? `<button class="btn sm ghost" data-act="msUnclaim" data-id="${x.id}">되돌리기</button>` : ''}
+        <button class="btn sm ghost" data-act="msEdit" data-id="${x.id}">수정</button></div></div>`).join('');
+    return h;
+  }
+  function missionForm(x) {
+    const isNew = !x; x = x || { who: trainWho, cat: MISSION_CATS[0] };
+    const names = S.staff.filter((s) => s.active).map((s) => s.name);
+    modal(isNew ? '미션 직접 추가' : '미션 수정', `
+      <label>누구<select id="msWho">${names.map((n) => `<option${n === x.who ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
+      <label>미션 한 줄<input id="msT" value="${esc(x.text || '')}" placeholder="예: 룸 손님 나갈 때 문 앞까지 배웅하기" autocomplete="off"></label>
+      <div class="mlabel">분류</div><div class="roles wrap sm" id="msCats">${MISSION_CATS.map((c) => `<button type="button" class="rl${c === x.cat ? ' on' : ''}" data-cat="${c}">${c}</button>`).join('')}</div>
+      ${isNew ? '' : `<div class="rowbtns"><button class="btn danger sm" data-act="msDel" data-id="${x.id}">삭제</button></div>`}`, () => {
+      const text = $('#msT').value.trim(); if (text.length < 5) { alert('미션을 5자 이상 적어 주세요.'); return false; }
+      const catSel = document.querySelector('#msCats .rl.on'); const cat = catSel ? catSel.dataset.cat : MISSION_CATS[0];
+      if (!S.missions) S.missions = [];
+      if (x.id) { const t = S.missions.find((q) => q.id === x.id); if (t) { t.text = text; t.cat = cat; t.who = $('#msWho').value; } }
+      else S.missions.push({ id: newId('ms'), who: $('#msWho').value, text, cat, month: msMonth || monthNow(), createdAt: Date.now(), status: 'open', by: whoNow() || '사장님' });
       save(); render();
     }, '저장');
-    $('#trCats').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return; $('#trCats').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); });
+    $('#msCats').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return; $('#msCats').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); });
+  }
+  function missionApprove(id) {
+    if (pinOk(S.settings.orderPin) && !orderUnlocked()) { banner('사장님 확인은 PIN 을 푼 뒤에', '할 일 화면의 "순서 바꾸기"와 같은 PIN 입니다.'); orderUnlockModal(); return; }
+    const x = (S.missions || []).find((q) => q.id === id); if (!x) return;
+    modal('미션 달성 확인', `<p class="mmemo"><b>${esc(x.who)}</b> — ${esc(x.text)}</p>
+      <label>확인하며 한마디 <span class="opt">선택</span><input id="msNote" value="${esc(x.note || '')}" placeholder="예: 어제 룸 손님 배웅 잘 봤어요" autocomplete="off"></label>
+      <p class="hint">확인하면 완료로 바뀌고, 텔레그램이 연결돼 있으면 방에 공유됩니다.</p>`, () => {
+      x.status = 'done'; x.doneAt = Date.now(); x.note = $('#msNote').value.trim() || undefined;
+      save(); render();
+      const doneN = missionsOf(x.who, x.month).filter((q) => q.status === 'done').length, goal = missionGoal();
+      const hasTg = (S.settings.tgToken || '').trim() && (S.settings.tgChat || '').trim();
+      if (doneN === goal) {
+        banner(`🏆 ${x.who} — ${monthLabel(x.month)} 미션 ${goal}개 달성!`, S.settings.trainReward || TRAIN_REWARD_DEFAULT);
+        if (hasTg) sendTelegram(`🏆 [${storeName()}] ${x.who} — ${monthLabel(x.month)} 개인 미션 ${goal}개 달성!\n마지막 미션: ${x.text}`, 'mission').catch(() => {});
+      } else {
+        banner(`✓ ${x.who} 미션 달성 확인 (${doneN}/${goal})`, x.text);
+        if (hasTg) sendTelegram(`🎯 [${storeName()}] ${x.who} — 미션 달성 (${doneN}/${goal})\n"${x.text}"${x.note ? '\n사장님: ' + x.note : ''}`, 'mission').catch(() => {});
+      }
+    }, '확인 · 완료');
   }
 
   /* ── 모달 ────────────────────────────────────────────────── */
@@ -4742,6 +4872,14 @@ const App = (() => {
         case 'trainOpen': trainOpen(b.dataset.u); break;
         case 'trainDone': { const who = trainWho || whoNow(); if (!who) { pickWho(); return; } trainMarkDone(b.dataset.u, who); break; }
         case 'trainUndo': { const who = trainWho; if (who && S.trainDone && S.trainDone[who]) { delete S.trainDone[who][b.dataset.u]; save(); render(); } break; }
+        case 'msNav': msMonth = monthShiftKey(msMonth || monthNow(), Number(b.dataset.d)); render(); break;
+        case 'msGoal': { const v = prompt('한 달 목표 미션 개수', String(missionGoal())); if (v === null) return; const n = Number(v); if (n >= 1 && n <= 20) { S.settings.missionGoal = n; save(); render(); } break; }
+        case 'msAdd': missionForm(null); break;
+        case 'msEdit': closeModal(); missionForm((S.missions || []).find((q) => q.id === id)); break;
+        case 'msDel': { if (!confirm('이 미션을 삭제할까요?')) return; S.missions = (S.missions || []).filter((q) => q.id !== id); save(); closeModal(); render(); break; }
+        case 'msClaim': { const x = (S.missions || []).find((q) => q.id === id); if (x) { x.status = 'claimed'; x.claimedAt = Date.now(); save(); render(); banner('사장님 확인을 기다립니다', x.text); } break; }
+        case 'msUnclaim': { const x = (S.missions || []).find((q) => q.id === id); if (x) { if (x.status === 'done' && pinOk(S.settings.orderPin) && !orderUnlocked()) { orderUnlockModal(); return; } x.status = 'open'; delete x.doneAt; save(); render(); } break; }
+        case 'msApprove': missionApprove(id); break;
         case 'trainReward': { const v = prompt('코스 완주 보상 문구 (직원에게 보입니다)', S.settings.trainReward || TRAIN_REWARD_DEFAULT); if (v === null) return; S.settings.trainReward = v.trim() || undefined; save(); render(); break; }
         case 'trainDel': { if (!confirm('이 교육 자료를 삭제할까요?')) return; S.training = trainList().filter((t) => t.id !== id); save(); closeModal(); render(); break; }
         case 'recipeAdd': recipeForm(null); break;

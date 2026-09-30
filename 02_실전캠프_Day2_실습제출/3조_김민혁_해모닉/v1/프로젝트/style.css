@@ -1154,3 +1154,16 @@ table.tkLog td small{display:block;font-size:11px;color:var(--muted);font-weight
 .chip.ok{background:var(--accent-soft);color:var(--accent)}
 .mnav .btn{white-space:nowrap}
 @media (max-width:640px){.hd{flex-wrap:wrap}.hd .mnav{width:100%;justify-content:flex-start;flex-wrap:wrap}}
+
+/* 개인 미션 · 재생 확인 */
+.wBar{height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden;margin-top:8px}
+.wBar i{display:block;height:100%;background:var(--accent);width:0;transition:width .5s}
+#msText:disabled{opacity:.5}
+.msCard{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.msCard.claimed{border-color:var(--crit)}
+.msCard.done{background:var(--surface-2)}
+.msTop{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.msText{font-size:15px;line-height:1.5;margin:8px 0 4px;word-break:keep-all}
+.msCard.done .msText{color:var(--muted)}
+.msNote{font-size:13px;color:var(--accent);margin-top:4px}
+.tkLog tr.sel td{background:var(--accent-soft)}
