@@ -2,6 +2,7 @@ import { EXCLUDED_MAJOR, EXPENSE_MAJORS, OWNER_DRAW, isHall, type Major } from "
 import { feeOf, round1 } from "./channels";
 import type { ChannelSale, Transaction } from "./types";
 import type { LaborEstimate } from "./labor";
+import { totalFixedGap, type FixedCostGap } from "./fixedCosts";
 
 export interface PnlLine {
   label: string;
@@ -24,6 +25,8 @@ export interface Pnl {
   excluded: { in: number; out: number }; // "제외"로 분류한 돈(내 계좌 이체 등) — 손익에 안 넣음
   deliveryFee: number; // 배달앱 수수료 = 주문금액 − 입금액
   laborEstimated: boolean; // 노무관리비를 어림값(오늘 탭 근무 + 월 고정 인건비)으로 채웠나 — 급여가 통장에서 나가면 false
+  materialUnpaid: number; // 매입 영수증에는 있는데 아직 통장에서 안 나간 재료비 (주류 월말 결제, 거래처 외상 등)
+  fixedUnpaid: number; // 청구서는 왔는데 아직 통장에서 안 나간 고정비 (석쇠 대여비, 가스요금 등)
   unclassified: number; // 아직 분류 안 된 줄 수
   needsReview: number; // 확인 필요 표시가 남은 줄 수
 }
@@ -32,7 +35,11 @@ const pct = (amount: number, revenue: number) => (revenue > 0 ? round1((amount /
 
 // 손익 순서는 사장님 엑셀의 손익계산서 그대로, 단 임대료를 빠뜨리지 않는다.
 // 매출액 → 매출원가 → 매출총이익 → 가맹수수료 → 경영주수입 → 영업비·임대료·세금과공과·노무관리비·기타 → 영업이익
-export function computePnl(txs: Transaction[], sales: ChannelSale[], estimate?: LaborEstimate): Pnl {
+//  materialPurchases: 그 달 매입 영수증의 재료비 합계(원재료비 + 기타재료비).
+//    통장에서 나간 재료비보다 많으면 그 차이를 "아직 안 낸 재료비"로 매출원가에 더한다.
+//    9월에 받은 재료값을 10월에 내더라도 그 재료비는 9월 원가여서 그렇다 (인건비를 어림으로 채우는 것과 같은 이치).
+//  fixedGaps: 매달 나가는 고정비 중 아직 통장에서 안 나간 몫 (lib/fixedCosts.ts)
+export function computePnl(txs: Transaction[], sales: ChannelSale[], estimate?: LaborEstimate, materialPurchases = 0, fixedGaps: FixedCostGap[] = []): Pnl {
   const hasSales = sales.some((s) => s.orders > 0);
 
   // 통장 입금: 채널이 붙은 줄은 대조용. 채널 입력이 있으면 매출로 다시 더하지 않는다(중복 방지).
@@ -86,6 +93,24 @@ export function computePnl(txs: Transaction[], sales: ChannelSale[], estimate?: 
     m.set("아직 안 나간 인건비 (어림)", (m.get("아직 안 나간 인건비 (어림)") ?? 0) + laborGap);
     byMajor.set("노무관리비", m);
   }
+  // 아직 안 낸 재료비 (주류 월말 결제, 거래처 외상, 다음 달 10일에 내는 대금).
+  // 매입 영수증에는 있는데 통장에서 아직 안 나간 몫을 그 달 원가로 더한다.
+  const paidMaterial = [...(byMajor.get("매출원가")?.values() ?? [])].reduce((a, b) => a + b, 0);
+  const materialUnpaid = Math.max(0, Math.round(materialPurchases - paidMaterial));
+  if (materialUnpaid > 0) {
+    const m = byMajor.get("매출원가") ?? new Map<string, number>();
+    m.set("아직 안 낸 재료비 (외상)", (m.get("아직 안 낸 재료비 (외상)") ?? 0) + materialUnpaid);
+    byMajor.set("매출원가", m);
+  }
+
+  // 청구서는 왔는데 아직 안 낸 고정비 (다음 달 초에 나가는 석쇠 대여비·가스요금 등)
+  for (const g of fixedGaps) {
+    if (g.gap <= 0) continue;
+    const m = byMajor.get(g.cost.major) ?? new Map<string, number>();
+    m.set(g.cost.minor, (m.get(g.cost.minor) ?? 0) + g.gap);
+    byMajor.set(g.cost.major, m);
+  }
+
   if (deliveryFee !== 0) {
     const m = byMajor.get("영업비") ?? new Map<string, number>();
     m.set("배달앱 수수료", (m.get("배달앱 수수료") ?? 0) + deliveryFee);
@@ -130,6 +155,8 @@ export function computePnl(txs: Transaction[], sales: ChannelSale[], estimate?: 
     ownerDraw,
     excluded,
     laborEstimated,
+    materialUnpaid,
+    fixedUnpaid: totalFixedGap(fixedGaps),
     deliveryFee,
     unclassified: txs.filter((t) => !t.major).length,
     needsReview: txs.filter((t) => t.review).length,

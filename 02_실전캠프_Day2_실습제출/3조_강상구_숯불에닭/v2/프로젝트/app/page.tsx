@@ -16,6 +16,7 @@ import { getStore } from "@/lib/storage";
 import { monthSummary } from "@/lib/daily";
 import { dayTotals } from "@/lib/weekday";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
+import { fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "@/lib/fixedCosts";
 import { PURCHASES_KEY_PREFIX, type Purchase } from "@/lib/costing/purchases";
 import { buildTaxSheets, taxFileName } from "@/lib/taxExport";
 import type { Transaction } from "@/lib/types";
@@ -28,10 +29,28 @@ export default function PnlPage() {
   const [open, setOpen] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const [fixedLabor, setFixedLabor] = useState<FixedLabor>(EMPTY_FIXED_LABOR);
+  // 그 달 매입 영수증의 재료비 합계 — 통장에서 아직 안 나간 몫을 원가에 더하려고
+  const [materialPurchases, setMaterialPurchases] = useState(0);
+  const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
   useEffect(() => {
     getStore()
       .getSetting<FixedLabor>(FIXED_LABOR_KEY)
       .then((v) => v && setFixedLabor(v))
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    getStore()
+      .getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + month)
+      .then((ps) => {
+        const sum = (ps ?? []).reduce((a, p) => a + (p.lines ?? []).filter((l) => l.category === "원재료비" || l.category === "기타재료비").reduce((x, l) => x + l.amount, 0), 0);
+        setMaterialPurchases(sum);
+      })
+      .catch(() => setMaterialPurchases(0));
+  }, [month]);
+  useEffect(() => {
+    getStore()
+      .getSetting<FixedCost[]>(FIXED_COSTS_KEY)
+      .then((v) => setFixedCosts(v ?? []))
       .catch(() => {});
   }, []);
 
@@ -40,7 +59,7 @@ export default function PnlPage() {
 
   const hourlyLabor = monthSummary(month, daily.sales, daily.shifts, daily.staff).labor;
   const openDays = dayTotals(daily.sales, daily.channels).length; // 매출이 있었던 날 = 영업일
-  const pnl = computePnl(ledger.txs, settlement.effectiveSales, { hourly: hourlyLabor, salary: fixedLabor.salary, insurance: fixedLabor.insurance });
+  const pnl = computePnl(ledger.txs, settlement.effectiveSales, { hourly: hourlyLabor, salary: fixedLabor.salary, insurance: fixedLabor.insurance }, materialPurchases, fixedCostGaps(fixedCosts, ledger.txs));
   const hasPrev = ledger.prevTxs.length > 0 || ledger.prevSales.length > 0;
   const diff = compareLines(pnl, hasPrev ? computePnl(ledger.prevTxs, ledger.prevSales) : null);
   const closed = isClosed(ledger.closing);
@@ -122,6 +141,16 @@ export default function PnlPage() {
         <p className="mb-1 rounded-lg bg-stone-50 px-2 py-1.5 text-xs text-stone-600">
           기준 — <b>매출·배달앱 수수료</b>: 주문이 발생한 달 · <b>비용</b>: 통장에서 돈이 나간 날. 다른 달에 결제한 비용은 지출추가 탭에서 날짜를 맞춰 넣을 수 있어요.
         </p>
+        {pnl.fixedUnpaid > 0 && (
+          <p className="mb-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+            <b>아직 안 낸 고정비 {won(pnl.fixedUnpaid)}도 넣어 뒀어요</b> — 청구서는 왔는데 다음 달 초에 나가는 돈이에요(석쇠 대여비·가스요금 등). 금액은 <Link href="/rules" className="font-bold underline">규칙 탭</Link>에서 매달 고쳐요.
+          </p>
+        )}
+        {pnl.materialUnpaid > 0 && (
+          <p className="mb-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+            <b>매출원가에 아직 안 낸 재료비 {won(pnl.materialUnpaid)}이 들어 있어요</b> — 매입 영수증에는 있는데 통장에서 아직 안 나간 돈이에요(주류 월말 결제, 거래처 외상, 다음 달 10일에 내는 대금). 9월에 받은 재료는 9월 원가라서 미리 넣어 둬요. 실제로 나가면 그 금액으로 바뀌어요.
+          </p>
+        )}
         {pnl.laborEstimated && (
           <p className="mb-1 rounded-lg bg-violet-50 px-2 py-1.5 text-xs text-violet-900">
             <b>노무관리비는 어림값</b>이에요 — 급여가 아직 통장에서 안 나가서 오늘 탭 근무(시간 × 시급)와 월 고정 인건비(월급·4대보험, 오늘 탭 “직원·채널 설정”)로 채웠어요. 급여가 나가 통장을 올리면 실제 금액으로 바뀌어요.

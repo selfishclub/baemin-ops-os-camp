@@ -11,6 +11,8 @@ import { getStore, storageMode } from "@/lib/storage";
 import { exportBackup, importBackup } from "@/lib/storage/backup";
 import type { Rule } from "@/lib/types";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, parsePayDays } from "@/lib/paydays";
+import { emptyFixedCost, fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "@/lib/fixedCosts";
+import { num, parseNum, won } from "@/lib/format";
 
 export default function RulesPage() {
   const { month } = useMonth();
@@ -32,6 +34,17 @@ export default function RulesPage() {
       })
       .catch(() => setPayDaysSaved(DEFAULT_PAY_DAYS));
   }, []);
+  const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
+  useEffect(() => {
+    getStore()
+      .getSetting<FixedCost[]>(FIXED_COSTS_KEY)
+      .then((v) => setFixedCosts(v ?? []))
+      .catch(() => {});
+  }, []);
+  async function saveFixedCosts(next: FixedCost[]) {
+    setFixedCosts(next);
+    await getStore().saveSetting(FIXED_COSTS_KEY, next);
+  }
   async function savePayDays() {
     const days = parsePayDays(payDaysText);
     await getStore().saveSetting(PAY_DAYS_KEY, days);
@@ -105,6 +118,44 @@ export default function RulesPage() {
             저장
           </button>
         </div>
+      </section>
+
+      <section className="card space-y-2">
+        <h2 className="text-base font-bold">
+          매달 나가는 고정비 <span className="text-xs font-normal text-stone-500">다음 달에 내는 돈 — 청구서 보고 금액만 고쳐요</span>
+        </h2>
+        <p className="text-xs text-stone-600">
+          석쇠 대여비·가스요금처럼 <b>이 달에 쓰고 다음 달 초에 내는 돈</b>이에요. 금액을 적어 두면 통장에서 나가기 전에도 이 달 손익에 들어가고, <b>실제로 나가면 자동으로 빠져요</b>(두 번 세지 않아요).
+        </p>
+        <ul className="space-y-2">
+          {fixedCosts.map((c, idx) => {
+            const g = fixedCostGaps([c], ledger.txs)[0];
+            return (
+              <li key={c.id} className="rounded-xl bg-stone-50 p-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input aria-label={`고정비 ${idx + 1} 이름`} className="field w-32" placeholder="이름 (석쇠 대여)" value={c.name} onChange={(e) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)))} />
+                  <input aria-label={`고정비 ${idx + 1} 거래처`} className="field w-28" placeholder="통장 거래처" value={c.payeeKeyword} onChange={(e) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, payeeKeyword: e.target.value } : x)))} />
+                  <input aria-label={`고정비 ${idx + 1} 금액`} className="field num w-24 text-right" inputMode="numeric" placeholder="0" value={c.amount ? num(c.amount) : ""} onChange={(e) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, amount: parseNum(e.target.value) } : x)))} />
+                  <button className="btn-ghost px-2 py-1 text-xs" onClick={() => saveFixedCosts(fixedCosts.filter((x) => x.id !== c.id))}>
+                    지우기
+                  </button>
+                </div>
+                <div className="mt-2">
+                  <CategorySelect idPrefix={c.id} major={c.major} minor={c.minor} onChange={(major, minor) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, major: major as Major, minor } : x)))} />
+                </div>
+                {g && (
+                  <p className="mt-1 text-xs text-stone-500">
+                    {monthLabel(month)}: {g.paid > 0 ? <>통장에서 {won(g.paid)} 나갔고 </> : "통장에서 아직 안 나갔어요 — "}
+                    {g.gap > 0 ? <b className="text-amber-700">{won(g.gap)}을 손익에 미리 넣었어요</b> : <b className="text-emerald-700">손익은 통장 금액 그대로예요</b>}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <button className="btn-ghost w-full text-xs" onClick={() => saveFixedCosts([...fixedCosts, emptyFixedCost()])}>
+          + 고정비 추가
+        </button>
       </section>
 
       <section className="card space-y-3">
