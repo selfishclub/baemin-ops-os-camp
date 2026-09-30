@@ -3016,6 +3016,9 @@ const App = (() => {
 
     h += acctSettings();
     h += serverSettings();
+    h += `<div class="hd sub2"><h3>앱 주소</h3></div>
+      <div class="setrow"><span>이 앱의 주소 <span class="hint" style="margin:0">아이패드 · 폰 홈 화면에 이 주소로 바로가기</span></span>
+        <span class="v"><code>${esc(location.origin)}</code> <button class="btn sm" data-act="copyUrl">복사</button></span></div>`;
     h += `<div class="hd sub2"><h3>백업</h3></div>
       <div class="setrow"><span>마지막 백업</span><span class="v">${S.settings.lastBackup || '없음'}</span></div>
       <div class="rowbtns">
@@ -5127,6 +5130,7 @@ const App = (() => {
         case 'toggleSound': S.settings.sound = !S.settings.sound; save(); render(); break;
         case 'toggleAskWho': S.settings.askWho = !S.settings.askWho; save(); render(); break;
         case 'orderUnlock': orderUnlockModal(); break;
+        case 'copyUrl': { const u = location.origin + '/'; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => banner('주소를 복사했습니다', u)).catch(() => alert('주소: ' + u)); break; }
         case 'tplNew': newTplModal(); break;
         case 'rtScope': rtScope = b.dataset.s; render(); break;
         case 'cardTime': if (orderUnlocked()) timeModal(id); break;
