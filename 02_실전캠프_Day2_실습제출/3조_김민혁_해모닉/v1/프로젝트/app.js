@@ -4087,33 +4087,124 @@ const App = (() => {
   let trainCat = 'all';
   /* 추천 영상 — 2026-09-18 확인한 공식·전문 채널 영상. 처음 열 때 넣고, "추천 영상 넣기"로 다시 넣을 수 있다 */
   const TRAIN_SEED = [
-    { cat: '위생', title: '조리종사자 식중독 예방 교육 (식약처)', url: 'https://www.youtube.com/watch?v=Xq7kBre2YpQ', memo: '주방·홀 모두 필수. 식중독 이해와 조리종사자 위생관리 요령', pin: true },
-    { cat: '위생', title: '손씻기 6단계 수칙 (질병관리청)', url: 'https://www.youtube.com/watch?v=wd6XR9Q1IM8', memo: '출근 직후 · 화장실 후 · 생물 만진 뒤 30초', pin: true },
-    { cat: '위생', title: '식품 위생 관리 방안과 사례 (식약처)', url: 'https://www.youtube.com/watch?v=ELIrOXSHS-Q', memo: '제조·가공업소 대상 영상이지만 교차오염·보관 원칙은 같음' },
-    { cat: '위생', title: 'HACCP 교육 동영상 — 음식점편 (식약처 홈페이지)', url: 'https://www.mfds.go.kr/brd/m_232/view.do?seq=517', memo: '손씻기 · 위생복장 · 교차오염 예방 세 가지' },
-    { cat: '위생', title: '기존 영업자 온라인 위생교육 수강 방법 (한국외식업중앙회)', url: 'https://www.youtube.com/watch?v=O5uMAWiJJHk', memo: '사장님용 · 매년 받는 위생교육(3시간) 온라인 수강 절차' },
-    { cat: '위생', title: '신규 영업자 집합 위생교육 수강 방법 (한국외식업중앙회)', url: 'https://www.youtube.com/watch?v=HWJG_KbzwTE', memo: '새 매장 열 때' },
-    { cat: '서비스', title: '고객 응대 시 직원의 금기행동 5가지 (박강사TV)', url: 'https://www.youtube.com/watch?v=SYIaY9kL_Do', memo: '홀 신입 첫 주 필독', pin: true },
-    { cat: '서비스', title: '클레임 대응 STAR 기법 — 불만 처리 절차와 응대 멘트 (박강사TV)', url: 'https://www.youtube.com/watch?v=IhyDt3K1B-w', memo: '컴플레인 났을 때 순서대로' },
-    { cat: '서비스', title: '컴플레인과 클레임의 차이, 사례로 보는 응대 기법 (박강사TV)', url: 'https://www.youtube.com/watch?v=nBTmGw4p2eE', memo: '' },
-    { cat: '서비스', title: '세대별 고객 소통 — MZ 고객 응대 기법 (박강사TV)', url: 'https://www.youtube.com/watch?v=eliBweBCONs', memo: '' },
-    { cat: '서비스', title: '악성 고객 대응과 감정노동 직원 보호 교육 (박강사TV)', url: 'https://www.youtube.com/watch?v=Rpx3Ing7AvQ', memo: '무리한 요구·폭언 손님을 만났을 때. 혼자 버티지 말고 책임자에게 넘기기' },
-    /* 관계·소통 — 함께 일하는 사람과의 관계 (2026-09-21 추가) */
-    { cat: '관계·소통', title: '직장 내 괴롭힘 예방 교육 (고용노동부)', url: 'https://www.youtube.com/watch?v=YFnojqczG6E', memo: '무엇이 괴롭힘인지, 왜 금지하는지. 전 직원 필독 — 우리 룰 "상호 존중과 바른 언어"의 근거', pin: true },
-    { cat: '관계·소통', title: '직장 내 성희롱 예방 교육 — 사업장 교육용 (고용노동부)', url: 'https://www.youtube.com/watch?v=qT3C4G9HCDE', memo: '법으로 매년 1회 해야 하는 교육(약 51분). 본 날짜를 적어 두세요', pin: true },
-    { cat: '관계·소통', title: '말 그릇을 키우는 비법 — 김윤나 (세바시)', url: 'https://www.youtube.com/watch?v=IQJzVFUbGU4', memo: '15분. 같은 말도 상대가 받아들이게 하는 법' },
-    { cat: '관계·소통', title: '나의 마음을 어떻게 말할 것인가 — 김윤나 (세바시 대학)', url: 'https://www.youtube.com/watch?v=WdxVQcQ9DOI', memo: '서운함·화를 상처 주지 않고 말하기' },
-    { cat: '관계·소통', title: '행복이 꽃피는 대화법 모아보기 — 김창옥 · 정혜신 외 (세바시)', url: 'https://www.youtube.com/watch?v=E57fs5f7mB4', memo: '긴 영상. 쉬는 시간에 나눠 보기' },
-    { cat: '관계·소통', title: '직장 동료 때문에 힘들다면 (박상미라디오 · 1분)', url: 'https://www.youtube.com/shorts/KKTiUJW7F4w', memo: '짧게 보는 영상' },
-    { cat: '관계·소통', title: '직장 내 괴롭힘 예방·조치 교육자료 — 사용자용·근로자용 (고용노동부 자료실)', url: 'https://www.moel.go.kr/policy/policydata/view.do?bbs_seq=20240102075', memo: '인쇄해서 게시할 수 있는 PPT/PDF' },
-    { cat: '안전', title: '안전보건공단 공식 채널 — "음식업" "주방"으로 검색', url: 'https://www.youtube.com/@koshamovie', memo: '화상 · 베임 · 미끄러짐 예방 영상 모음' },
+    /* ── 위생 ── */
+    { cat: '위생', sub: '손·복장', min: 3, title: '손씻기 6단계 수칙 (질병관리청)', url: 'https://www.youtube.com/watch?v=wd6XR9Q1IM8', memo: '출근 직후 · 화장실 후 · 생물 만진 뒤 30초', pin: true },
+    { cat: '위생', sub: '손·복장', min: 5, title: '개인위생관리 — 복장·손·건강 (아워홈 위생안전팀)', url: 'https://www.youtube.com/watch?v=JjUrJLU73-o', memo: '위생모·앞치마·손톱·장신구. 급식업체 직원 교육 영상' },
+    { cat: '위생', sub: '식중독', min: 10, title: '조리종사자 식중독 예방 교육 (식약처)', url: 'https://www.youtube.com/watch?v=Xq7kBre2YpQ', memo: '주방·홀 모두 필수. 식중독 이해와 조리종사자 위생관리 요령', pin: true },
+    { cat: '위생', sub: '교차오염', min: 6, title: '교차오염 예방법 — 외식 정기 위생교육 (위플)', url: 'https://www.youtube.com/watch?v=HEjTpjthpYk', memo: '생물과 익힌 것, 도구·손·행주로 옮겨가는 세균을 끊는 법' },
+    { cat: '위생', sub: '교차오염', min: 8, title: '칼 · 행주 · 도마 · 작업대 위생관리 방법 (이권복 마스터셰프)', url: 'https://www.youtube.com/watch?v=yZJt6lqXcgI', memo: '식재료별 칼·도마 구분, 행주 소독 주기' },
+    { cat: '위생', sub: '보관·온도', min: 6, title: '냉장 · 냉동고 온도 관리 (학교급식 위생교육자료)', url: 'https://www.youtube.com/watch?v=XUO277em4xQ', memo: '냉장 5℃ 이하 · 냉동 -18℃ 이하, 온도 기록, 문 여닫기' },
+    { cat: '위생', sub: '수산물', min: 10, title: '수산물 유통·판매자가 꼭 지켜야 할 위생수칙 (식약처)', url: 'https://www.youtube.com/watch?v=3c9Slq1dGbk', memo: '갑각류·활어를 다루는 우리 매장에 직접 해당' },
+    { cat: '위생', sub: '알레르기·이물', min: 3, title: '식품 알레르기 이해하기 (서울시교육청 보건안전진흥원)', url: 'https://www.youtube.com/watch?v=mi_BWE9HlIM', memo: '갑각류는 대표 알레르기 원료 — 손님이 물으면 정확히 답하기' },
+    { cat: '위생', sub: '알레르기·이물', min: 3, title: '알레르기 반응 대처하기 (서울시교육청 보건안전진흥원)', url: 'https://www.youtube.com/watch?v=S9vzkLlvGrk', memo: '증상 발견 즉시 할 일 · 119' },
+    { cat: '위생', sub: '점검·법', min: 8, title: '불시 위생점검 대비 — 이 다섯 가지만 (나혼장)', url: 'https://www.youtube.com/watch?v=Xpqj74E_bj4', noEmbed: true, memo: '점검 나오면 보는 곳. 평소에 지켜 두면 걱정 없음' },
+    { cat: '위생', sub: '점검·법', min: 6, title: '소규모 식품업체 위생관리 가이드 — 법령 준수사항편 (식약처)', url: 'https://www.youtube.com/watch?v=BRmLLA1kzOY', memo: '영업자가 법으로 지켜야 하는 것 요약' },
+    { cat: '위생', sub: '점검·법', min: 45, title: '식품접객업 위생 관리 방안과 사례 (식약처)', url: 'https://www.youtube.com/watch?v=UKOspf9kHjA', memo: '음식점 대상 정식 교육 영상. 관리자 · 사장님용' },
+    { cat: '위생', sub: '점검·법', min: 45, title: '식품 위생 관리 방안과 사례 — 제조·가공업소편 (식약처)', url: 'https://www.youtube.com/watch?v=ELIrOXSHS-Q', memo: '제조·가공업소 대상이지만 교차오염·보관 원칙은 같음' },
+    { cat: '위생', sub: '점검·법', title: 'HACCP 교육 동영상 — 음식점편 (식약처 홈페이지)', url: 'https://www.mfds.go.kr/brd/m_232/view.do?seq=517', memo: '손씻기 · 위생복장 · 교차오염 예방 세 가지' },
+    { cat: '위생', sub: '점검·법', min: 3, title: '기존 영업자 온라인 위생교육 수강 방법 (한국외식업중앙회)', url: 'https://www.youtube.com/watch?v=O5uMAWiJJHk', memo: '사장님용 · 매년 받는 위생교육(3시간) 온라인 수강 절차' },
+    { cat: '위생', sub: '점검·법', min: 3, title: '신규 영업자 집합 위생교육 수강 방법 (한국외식업중앙회)', url: 'https://www.youtube.com/watch?v=HWJG_KbzwTE', memo: '새 매장 열 때' },
+    /* ── 서비스 ── */
+    { cat: '서비스', sub: '첫인상·인사', min: 9, title: '서비스 태도 — 인사 잘하는 방법 (박강사TV)', url: 'https://www.youtube.com/watch?v=Se7GQXciFgs', memo: '들어올 때 3초가 그날 평가를 정한다', pin: true },
+    { cat: '서비스', sub: '첫인상·인사', min: 9, title: '좋은 인상 만들기 — 표정관리 · 미소 훈련 (박강사TV)', url: 'https://www.youtube.com/watch?v=0xaTQFFXkOE', memo: '전직 승무원의 미소 연습법' },
+    { cat: '서비스', sub: '첫인상·인사', min: 6, title: '친절한 직원은 몸짓 · 손짓 · 태도가 다르다 (박강사TV)', url: 'https://www.youtube.com/watch?v=bTW-iwE3tZM', memo: '안내할 때 손 모양, 서 있는 자세' },
+    { cat: '서비스', sub: '말투·화법', min: 4, title: '서비스직 화법 — 같은 말도 예쁘게 하기 (병원언니TV)', url: 'https://www.youtube.com/watch?v=BjyWhBtd5wg', memo: '4분. "안 돼요" 대신 쓰는 말' },
+    { cat: '서비스', sub: '말투·화법', min: 5, title: '쿠션어 + 청유형 — 고객에게 부탁하는 감성 대화법 (세마컨설팅)', url: 'https://www.youtube.com/watch?v=2aTZwy7fYqo', memo: '"죄송하지만 · 괜찮으시다면 · ~해 주시겠어요?"' },
+    { cat: '서비스', sub: '말투·화법', min: 11, title: '고객의 마음을 사로잡는 호감 가는 말투 BTS 기법 (박강사TV)', url: 'https://www.youtube.com/watch?v=MdHttbFtrdE', memo: '' },
+    { cat: '서비스', sub: '말투·화법', min: 7, title: '고객응대 화법 — 맞장구 잘 치는 법 (박강사TV)', url: 'https://www.youtube.com/watch?v=L9_qWIiBr-k', memo: '손님 말에 반응하는 법' },
+    { cat: '서비스', sub: '주문·추천', min: 9, title: '정확하게 주문받기 (루나TV · 식당서비스의 모든것)', url: 'https://www.youtube.com/watch?v=wQMuxsNsATo', noEmbed: true, memo: '되묻기 · 복창 · 특이사항 메모. 주문 실수는 여기서 끝낸다' },
+    { cat: '서비스', sub: '주문·추천', min: 3, title: '"뭐가 제일 맛있어요?"에 대답하는 법 (딸에게 들려주는 식당이야기)', url: 'https://www.youtube.com/watch?v=5-TIK8J3sV0', memo: '3분. 대게·킹크랩 추천 멘트를 이 틀에 맞춰 준비' },
+    { cat: '서비스', sub: '고객 유형', min: 8, title: '배려와 행동으로 노인 고객 응대하기 (소확성)', url: 'https://www.youtube.com/watch?v=W16SZL_imXE', memo: '어르신 손님이 많은 날 — 속도 · 목소리 · 메뉴 설명' },
+    { cat: '서비스', sub: '고객 유형', min: 10, title: '응대하기 힘든 불만 고객 유형별 대처법 (박강사TV)', url: 'https://www.youtube.com/watch?v=bBPVn8f__bc', memo: '' },
+    { cat: '서비스', sub: '고객 유형', min: 9, title: '세대별 고객 소통 — MZ 고객 응대 기법 (박강사TV)', url: 'https://www.youtube.com/watch?v=eliBweBCONs', memo: '' },
+    { cat: '서비스', sub: '컴플레인', min: 8, title: '고객 응대 시 직원의 금기행동 5가지 (박강사TV)', url: 'https://www.youtube.com/watch?v=SYIaY9kL_Do', memo: '홀 신입 첫 주 필독', pin: true },
+    { cat: '서비스', sub: '컴플레인', min: 2, title: '음식에 이물질이 나왔을 때 — 홀 응대 순서 (딸에게 들려주는 식당이야기)', url: 'https://www.youtube.com/watch?v=8Nl8vfKQwWE', memo: '2분. 사과 → 즉시 회수 → 책임자 보고 → 새로 제공' },
+    { cat: '서비스', sub: '컴플레인', min: 10, title: '클레임 대응 STAR 기법 — 불만 처리 절차와 응대 멘트 (박강사TV)', url: 'https://www.youtube.com/watch?v=IhyDt3K1B-w', memo: '컴플레인 났을 때 순서대로' },
+    { cat: '서비스', sub: '컴플레인', min: 8, title: '화난 사람에게 제대로 사과하는 방법 (박강사TV)', url: 'https://www.youtube.com/watch?v=-_Eap-ixtLU', memo: '변명 없이, 구체적으로, 다음 행동까지' },
+    { cat: '서비스', sub: '컴플레인', min: 12, title: '우기고 떼쓰는 고객 대처 방법 (박강사TV)', url: 'https://www.youtube.com/watch?v=B1mJHSY3tn8', memo: '' },
+    { cat: '서비스', sub: '컴플레인', min: 9, title: '컴플레인과 클레임의 차이, 사례로 보는 응대 기법 (박강사TV)', url: 'https://www.youtube.com/watch?v=nBTmGw4p2eE', memo: '' },
+    { cat: '서비스', sub: '컴플레인', min: 10, title: '악성 고객 대응과 감정노동 직원 보호 교육 (박강사TV)', url: 'https://www.youtube.com/watch?v=Rpx3Ing7AvQ', memo: '무리한 요구·폭언 손님을 만났을 때. 혼자 버티지 말고 책임자에게 넘기기' },
+    { cat: '서비스', sub: '단골 만들기', min: 8, title: '다 인사는 하는데 왜 그 사람 인사만 기억날까 — 고객경험 CX (박강사TV)', url: 'https://www.youtube.com/watch?v=xl_36BdQP2w', memo: '배웅 인사에서 재방문이 결정된다' },
+    { cat: '서비스', sub: '단골 만들기', min: 12, title: '불만 고객을 내 편으로 — 서비스 회복 기법 (박강사TV)', url: 'https://www.youtube.com/watch?v=S5uPZYGhn28', memo: '잘 풀린 컴플레인은 단골을 만든다' },
+    { cat: '서비스', sub: '단골 만들기', min: 9, title: '고객은 이런 서비스를 절대 잊지 못한다 — 고객 중심 마인드셋 (박강사TV)', url: 'https://www.youtube.com/watch?v=31T0jtc9Bls', memo: '' },
+    /* ── 관계·소통 — 함께 일하는 사람과의 관계 ── */
+    { cat: '관계·소통', sub: '존중·예방', min: 20, title: '직장 내 괴롭힘 예방 교육 (고용노동부)', url: 'https://www.youtube.com/watch?v=YFnojqczG6E', memo: '무엇이 괴롭힘인지, 왜 금지하는지. 전 직원 필독 — 우리 룰 "상호 존중과 바른 언어"의 근거', pin: true },
+    { cat: '관계·소통', sub: '존중·예방', min: 51, title: '직장 내 성희롱 예방 교육 — 사업장 교육용 (고용노동부)', url: 'https://www.youtube.com/watch?v=qT3C4G9HCDE', memo: '법으로 매년 1회 해야 하는 교육(약 51분). 본 날짜를 적어 두세요', pin: true },
+    { cat: '관계·소통', sub: '듣기·말하기', min: 9, title: '말 그릇을 키우는 듣기의 기술 — 김윤나 (세바시)', url: 'https://www.youtube.com/watch?v=ATKTwnfmdAI', memo: '9분. 동료 말을 끝까지 듣는 연습' },
+    { cat: '관계·소통', sub: '듣기·말하기', min: 21, title: '말 그릇을 키우는 비법 — 김윤나 (세바시)', url: 'https://www.youtube.com/watch?v=IQJzVFUbGU4', memo: '같은 말도 상대가 받아들이게 하는 법' },
+    { cat: '관계·소통', sub: '듣기·말하기', min: 15, title: '나의 마음을 어떻게 말할 것인가 — 김윤나 (세바시 대학)', url: 'https://www.youtube.com/watch?v=WdxVQcQ9DOI', memo: '서운함·화를 상처 주지 않고 말하기' },
+    { cat: '관계·소통', sub: '듣기·말하기', min: 23, title: '‘나’와 ‘너’의 균형을 만드는 대화법 — 박재연 (세바시)', url: 'https://www.youtube.com/watch?v=ZEk_eMZ6Sjo', memo: '내 요구도 지키고 상대도 지키는 말하기' },
+    { cat: '관계·소통', sub: '칭찬·인정', min: 16, title: '한국인이 꼭 알아야 할 칭찬의 방법 — 김경일 (세바시)', url: 'https://www.youtube.com/watch?v=3Ktf6NkgXtI', memo: '결과가 아니라 과정을, 비교하지 않고' },
+    { cat: '관계·소통', sub: '칭찬·인정', min: 8, title: '아부가 아닌 진심이 느껴지는 칭찬의 기술 (희렌최널)', url: 'https://www.youtube.com/watch?v=PjTZ9ChbpTU', memo: '오늘 동료 한 명에게 써 보기' },
+    { cat: '관계·소통', sub: '갈등·어려운 동료', min: 21, title: '껄끄러운 직장 동료도 내 편으로 만드는 대화법 — 이민영 (세바시)', url: 'https://www.youtube.com/watch?v=jOFkx5_CFes', memo: '' },
+    { cat: '관계·소통', sub: '갈등·어려운 동료', min: 17, title: '무례한 사람들로부터 나를 지키며 일하는 법 — 유꽃비 (세바시)', url: 'https://www.youtube.com/watch?v=Ath5x8l_wQs', memo: '선 긋기와 예의를 동시에' },
+    { cat: '관계·소통', sub: '갈등·어려운 동료', min: 9, title: '동료와의 갈등으로 힘드신가요? — 김재환 (세바시 대학)', url: 'https://www.youtube.com/watch?v=zAKuCxHHWGY', memo: '' },
+    { cat: '관계·소통', sub: '갈등·어려운 동료', min: 1, title: '직장 동료 때문에 힘들다면 (박상미라디오 · 1분)', url: 'https://www.youtube.com/shorts/KKTiUJW7F4w', memo: '짧게 보는 영상' },
+    { cat: '관계·소통', sub: '세대·팀', min: 15, title: '시대와 세대를 넘어 소통 잘하는 기술 — 이호선 (세바시)', url: 'https://www.youtube.com/watch?v=xDF93wL-v4A', memo: '나이 차이 나는 동료와 일할 때' },
+    { cat: '관계·소통', sub: '세대·팀', min: 16, title: '행복한 직장의 비밀 — 박지영 (세바시)', url: 'https://www.youtube.com/watch?v=YlCOLLMGX8A', memo: '좋은 팀은 무엇이 다른가' },
+    { cat: '관계·소통', sub: '세대·팀', min: 45, title: '행복이 꽃피는 대화법 모아보기 — 김창옥 · 정혜신 외 (세바시)', url: 'https://www.youtube.com/watch?v=E57fs5f7mB4', memo: '긴 영상. 쉬는 시간에 나눠 보기' },
+    { cat: '관계·소통', sub: '마음 돌보기', min: 5, title: '[5분] 스트레스를 다스리는 기술 — 김병수 정신건강의학과 (세바시)', url: 'https://www.youtube.com/watch?v=TjqegE9ngaU', memo: '바쁜 날 5분' },
+    { cat: '관계·소통', sub: '마음 돌보기', min: 7, title: '감정노동자 편 — 갑질에 버티는 방법 (강북삼성병원 마음치유 고민상담소)', url: 'https://www.youtube.com/watch?v=6P6OQE0noPA', memo: '손님에게 상처받은 날' },
+    { cat: '관계·소통', sub: '마음 돌보기', min: 14, title: '일의 스트레스를 다스리는 기술 — 김병수 (세바시)', url: 'https://www.youtube.com/watch?v=sdXLaaqUKVY', memo: '' },
+    { cat: '관계·소통', sub: '존중·예방', title: '직장 내 괴롭힘 예방·조치 교육자료 — 사용자용·근로자용 (고용노동부 자료실)', url: 'https://www.moel.go.kr/policy/policydata/view.do?bbs_seq=20240102075', memo: '인쇄해서 게시할 수 있는 PPT/PDF' },
+    /* ── 조리 · 상품 지식 ── */
+    { cat: '조리', sub: '갑각류', min: 13, title: '20년 전문가가 알려주는 킹크랩 · 대게 손질법 (입질의추억TV)', url: 'https://www.youtube.com/watch?v=6efThNF4bn4', memo: '우리 주력 상품. 손님 질문에 답하려면 손질 순서를 알아야 한다' },
+    { cat: '조리', sub: '갑각류', min: 1, title: '대게 손질 1분 마스터 (크랩원)', url: 'https://www.youtube.com/watch?v=geUoY0VH-bU', memo: '' },
+    { cat: '조리', sub: '갑각류', min: 3, title: '킹크랩 손질하는 법 2분 핵심 (크랩원)', url: 'https://www.youtube.com/watch?v=IjJuqbJnYA0', memo: '' },
+    /* ── 안전 ── */
+    { cat: '안전', sub: '주방 안전', min: 2, title: '[재해사례] 조리실 바닥에서 미끄러짐 (안전보건공단)', url: 'https://www.youtube.com/watch?v=kFPPSHMN2L0', memo: '2분. 물기 · 기름 · 신발' },
+    { cat: '안전', sub: '주방 안전', min: 5, title: '급식시설 조리실 재해사례 VR (안전보건공단)', url: 'https://www.youtube.com/watch?v=ss2Z3CpN92g', memo: '화상 · 베임 · 넘어짐이 어떻게 일어나는지' },
+    { cat: '안전', sub: '가스', min: 4, title: '식당 등 가스사용시설 가스사고 예방 교육 (한국가스안전공사)', url: 'https://www.youtube.com/watch?v=Co8OmnrI-gw', memo: '마감 때 가스 최종 확인의 이유' },
+    { cat: '안전', sub: '가스', min: 3, title: '식당 가스 점검 — 당신의 선택은? (한국가스안전공사)', url: 'https://www.youtube.com/watch?v=nfAtpav6L1k', memo: '' },
+    { cat: '안전', sub: '직원 보호', min: 3, title: '고객응대근로자, 누군가의 소중한 가족입니다 (안전보건공단)', url: 'https://www.youtube.com/watch?v=srO2SpLKPto', memo: '폭언 손님 앞에서 직원을 지키는 것도 안전' },
+    { cat: '안전', sub: '주방 안전', title: '안전보건공단 공식 채널 — "음식업" "주방"으로 검색', url: 'https://www.youtube.com/@koshamovie', memo: '화상 · 베임 · 미끄러짐 예방 영상 모음' },
   ];
+  /* 학습 프로그램 — 한 사람이 어떤 순서로 보고, 단계마다 무엇이 달라지는지. 영상은 위 목록의 url 로 가리킨다 */
+  const TRAIN_TRACKS = [
+    { key: 'start', icon: '🚀', name: '첫 출근 3일 필수 코스', who: '모든 신입 · 첫 주 안에', goal: '첫 주에 위생 · 인사 · 안전의 기본을 몸에 붙여 "신입 티" 없이 일한다',
+      stages: [
+        { name: '1단계 · 위생 기본', effect: '출근 첫날부터 손 · 복장 · 식중독 원칙을 지킨다 → 위생 지적 0건', steps: ['https://www.youtube.com/watch?v=wd6XR9Q1IM8', 'https://www.youtube.com/watch?v=JjUrJLU73-o', 'https://www.youtube.com/watch?v=Xq7kBre2YpQ'] },
+        { name: '2단계 · 첫 손님 앞에서', effect: '인사와 금기행동을 알고 서면 첫 손님부터 실수 없이 응대한다', steps: ['https://www.youtube.com/watch?v=Se7GQXciFgs', 'https://www.youtube.com/watch?v=SYIaY9kL_Do', 'https://www.youtube.com/watch?v=BjyWhBtd5wg'] },
+        { name: '3단계 · 다치지 않고 존중하며', effect: '미끄러짐 · 가스 사고를 피하고, 동료에게 상처 주는 말을 하지 않는다', steps: ['https://www.youtube.com/watch?v=kFPPSHMN2L0', 'https://www.youtube.com/watch?v=nfAtpav6L1k', 'https://www.youtube.com/watch?v=YFnojqczG6E'] },
+      ] },
+    { key: 'service', icon: '🤝', name: '고객 서비스 마스터', who: '홀 · 갑각류 관리자 · 2주 목표', goal: '손님이 "여기 직원 참 좋다"고 기억하고 다시 오게 만든다',
+      stages: [
+        { name: '1단계 · 첫인상', effect: '표정 · 자세 · 인사가 자연스러워져 손님이 편하게 들어온다', steps: ['https://www.youtube.com/watch?v=0xaTQFFXkOE', 'https://www.youtube.com/watch?v=bTW-iwE3tZM', 'https://www.youtube.com/watch?v=xl_36BdQP2w'] },
+        { name: '2단계 · 말투', effect: '"안 돼요" 대신 쿠션어가 나온다 → 같은 상황에서 불만이 줄어든다', steps: ['https://www.youtube.com/watch?v=2aTZwy7fYqo', 'https://www.youtube.com/watch?v=MdHttbFtrdE', 'https://www.youtube.com/watch?v=L9_qWIiBr-k'] },
+        { name: '3단계 · 주문과 추천', effect: '주문 실수가 사라지고, 대게 · 킹크랩 추천 멘트로 객단가가 오른다', steps: ['https://www.youtube.com/watch?v=wQMuxsNsATo', 'https://www.youtube.com/watch?v=5-TIK8J3sV0', 'https://www.youtube.com/watch?v=W16SZL_imXE', 'https://www.youtube.com/watch?v=eliBweBCONs'] },
+        { name: '4단계 · 컴플레인을 스스로 마무리', effect: '이물 · 불만 상황을 순서대로 처리하고 사과까지 혼자 끝낸다 → 사장님 호출이 준다', steps: ['https://www.youtube.com/watch?v=8Nl8vfKQwWE', 'https://www.youtube.com/watch?v=IhyDt3K1B-w', 'https://www.youtube.com/watch?v=-_Eap-ixtLU', 'https://www.youtube.com/watch?v=bBPVn8f__bc', 'https://www.youtube.com/watch?v=B1mJHSY3tn8', 'https://www.youtube.com/watch?v=Rpx3Ing7AvQ'] },
+        { name: '5단계 · 단골 만들기', effect: '잘 풀린 컴플레인과 배웅 인사가 재방문으로 이어진다', steps: ['https://www.youtube.com/watch?v=S5uPZYGhn28', 'https://www.youtube.com/watch?v=nBTmGw4p2eE', 'https://www.youtube.com/watch?v=31T0jtc9Bls'] },
+      ] },
+    { key: 'hygiene', icon: '🧼', name: '위생 지킴이', who: '주방 · 갑각류 관리자 · 1주 목표', goal: '위생점검이 언제 와도 걱정 없는 주방, 식중독 · 알레르기 사고 0건',
+      stages: [
+        { name: '1단계 · 옮기지 않기', effect: '생물과 익힌 것, 칼 · 도마 · 행주를 구분해 교차오염을 끊는다', steps: ['https://www.youtube.com/watch?v=HEjTpjthpYk', 'https://www.youtube.com/watch?v=yZJt6lqXcgI'] },
+        { name: '2단계 · 보관과 수산물', effect: '냉장 · 냉동 온도를 기록하고 갑각류 · 활어를 위생 기준대로 다룬다', steps: ['https://www.youtube.com/watch?v=XUO277em4xQ', 'https://www.youtube.com/watch?v=3c9Slq1dGbk'] },
+        { name: '3단계 · 손님 안전', effect: '알레르기 질문에 정확히 답하고 반응이 나면 바로 대처한다', steps: ['https://www.youtube.com/watch?v=mi_BWE9HlIM', 'https://www.youtube.com/watch?v=S9vzkLlvGrk'] },
+        { name: '4단계 · 점검 대비', effect: '점검관이 보는 다섯 곳과 법 준수사항을 알고 평소에 지킨다', steps: ['https://www.youtube.com/watch?v=Xpqj74E_bj4', 'https://www.youtube.com/watch?v=BRmLLA1kzOY'] },
+      ] },
+    { key: 'team', icon: '💛', name: '좋은 동료 코스', who: '전 직원 · 한 달 동안 천천히', goal: '바쁜 날에도 서로 탓하지 않고, 말 한마디로 분위기를 지키는 팀',
+      stages: [
+        { name: '1단계 · 듣기와 말하기', effect: '동료 말을 끝까지 듣고, 서운함을 상처 주지 않고 말한다', steps: ['https://www.youtube.com/watch?v=ATKTwnfmdAI', 'https://www.youtube.com/watch?v=IQJzVFUbGU4', 'https://www.youtube.com/watch?v=WdxVQcQ9DOI', 'https://www.youtube.com/watch?v=ZEk_eMZ6Sjo'] },
+        { name: '2단계 · 칭찬과 인정', effect: '하루 한 번 동료의 과정을 칭찬한다 → 팀 분위기가 눈에 띄게 달라진다', steps: ['https://www.youtube.com/watch?v=3Ktf6NkgXtI', 'https://www.youtube.com/watch?v=PjTZ9ChbpTU'] },
+        { name: '3단계 · 어려운 관계', effect: '안 맞는 동료 · 무례한 사람 앞에서도 선을 지키며 일한다', steps: ['https://www.youtube.com/watch?v=jOFkx5_CFes', 'https://www.youtube.com/watch?v=Ath5x8l_wQs', 'https://www.youtube.com/watch?v=zAKuCxHHWGY', 'https://www.youtube.com/watch?v=xDF93wL-v4A'] },
+        { name: '4단계 · 내 마음 돌보기', effect: '손님에게 상처받은 날 5분 만에 회복하는 나만의 방법이 생긴다', steps: ['https://www.youtube.com/watch?v=TjqegE9ngaU', 'https://www.youtube.com/watch?v=6P6OQE0noPA', 'https://www.youtube.com/watch?v=sdXLaaqUKVY'] },
+        { name: '5단계 · 법이 정한 교육', effect: '괴롭힘 · 성희롱 예방 교육을 마쳐 법정 의무를 채운다 (매년 1회)', steps: ['https://www.youtube.com/watch?v=YlCOLLMGX8A', 'https://www.youtube.com/watch?v=qT3C4G9HCDE'] },
+      ] },
+    { key: 'crab', icon: '🦀', name: '갑각류 전문가', who: '갑각류 관리자 · 주방', goal: '손님의 어떤 질문에도 대게 · 킹크랩을 자신 있게 설명하고 안전하게 다룬다',
+      stages: [
+        { name: '1단계 · 손질과 상품 지식', effect: '부위 · 손질 순서 · 찜 시간을 설명할 수 있다 → 추천 판매가 자연스러워진다', steps: ['https://www.youtube.com/watch?v=6efThNF4bn4', 'https://www.youtube.com/watch?v=geUoY0VH-bU', 'https://www.youtube.com/watch?v=IjJuqbJnYA0'] },
+        { name: '2단계 · 수산물 위생과 안전', effect: '갑각류 위생 기준과 주방 사고 유형을 알고 예방한다', steps: ['https://www.youtube.com/watch?v=3c9Slq1dGbk', 'https://www.youtube.com/watch?v=ss2Z3CpN92g', 'https://www.youtube.com/watch?v=Co8OmnrI-gw'] },
+      ] },
+  ];
+  const TRAIN_REWARD_DEFAULT = '코스를 완주하면 사장님께 말씀해 주세요 — 완주 배지와 함께 작은 보상을 드립니다. 배운 것을 매장에서 실제로 적용해 성과가 나면 더 큰 보상이 있습니다.';
   function seedTraining(onlyNew) {
     const list = (S.training = S.training || []), seen = (S.trainSeen = S.trainSeen || []);
     let n = 0;
-    TRAIN_SEED.forEach((t) => { if (list.some((x) => x.url === t.url)) { if (!seen.includes(t.url)) seen.push(t.url); return; }
+    TRAIN_SEED.forEach((t) => {
+      const ex = list.find((x) => x.url === t.url);
+      if (ex) { if (!seen.includes(t.url)) seen.push(t.url); if (t.sub && !ex.sub) ex.sub = t.sub; if (t.min && !ex.min) ex.min = t.min; if (t.noEmbed) ex.noEmbed = true; if (ex.seed && t.title && ex.title !== t.title && !ex.editedTitle) ex.title = t.title; return; }
       if (onlyNew && seen.includes(t.url)) return;
-      seen.push(t.url); list.push({ id: newId('tr'), cat: t.cat, title: t.title, url: t.url, memo: t.memo || '', pin: !!t.pin, by: '추천', createdAt: Date.now() + n, seed: true }); n++; });
+      seen.push(t.url); list.push({ id: newId('tr'), cat: t.cat, sub: t.sub, min: t.min, noEmbed: t.noEmbed || undefined, title: t.title, url: t.url, memo: t.memo || '', pin: !!t.pin, by: '추천', createdAt: Date.now() + n, seed: true }); n++; });
     return n;
   }
   const trainList = () => { if (!Array.isArray(S.training)) S.training = []; if ((S.trainSeen || []).length < TRAIN_SEED.length && seedTraining(true)) save(); return S.training; };
@@ -4122,27 +4213,135 @@ const App = (() => {
     return null;
   }
   const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return ''; } };
+  let trainTab = 'program', trainWho = null;
+  const trainByUrl = (url) => trainList().find((x) => x.url === url) || TRAIN_SEED.find((x) => x.url === url) || null;
+  const trainDoneMap = (name) => { if (!S.trainDone) S.trainDone = {}; if (!S.trainDone[name]) S.trainDone[name] = {}; return S.trainDone[name]; };
+  const trackSteps = (tr) => tr.stages.flatMap((s) => s.steps);
+  function trackProgress(tr, name) {
+    const done = name ? (S.trainDone || {})[name] || {} : {};
+    const steps = trackSteps(tr), n = steps.filter((u) => done[u]).length;
+    return { n, total: steps.length, pct: steps.length ? Math.round(n / steps.length * 100) : 0, complete: steps.length > 0 && n === steps.length, next: steps.find((u) => !done[u]) || null };
+  }
+  const allTrackUrls = () => [...new Set(TRAIN_TRACKS.flatMap(trackSteps))];
+  function personSummary(name) {
+    const done = (S.trainDone || {})[name] || {}, urls = allTrackUrls();
+    const n = urls.filter((u) => done[u]).length;
+    const badges = TRAIN_TRACKS.filter((tr) => trackProgress(tr, name).complete);
+    const mins = urls.filter((u) => done[u]).reduce((acc, u) => acc + ((trainByUrl(u) || {}).min || 0), 0);
+    return { n, total: urls.length, pct: urls.length ? Math.round(n / urls.length * 100) : 0, badges, mins };
+  }
   function vTraining() {
-    let list = trainList().slice().sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0) || (b.createdAt || 0) - (a.createdAt || 0));
-    if (trainCat !== 'all') list = list.filter((x) => x.cat === trainCat);
-    let h = `<div class="hd"><div><h2>교육 자료</h2><div class="sub">서비스 · 위생 · 관계·소통 · 조리 · 안전 교육 영상이나 문서 주소를 넣어 두면 직원이 여기서 바로 봅니다. 유튜브는 앱 안에서 재생됩니다.</div></div>
+    trainList();
+    const names = S.staff.filter((s) => s.active).map((s) => s.name);
+    if (!trainWho || !names.includes(trainWho)) trainWho = (names.includes(whoNow()) ? whoNow() : names[0]) || null;
+    let h = `<div class="hd"><div><h2>교육 자료</h2><div class="sub">서비스 · 위생 · 동료 관계 · 조리 · 안전. 순서대로 보는 <b>학습 프로그램</b>과 전체 자료 목록이 있습니다. 유튜브는 앱 안에서 재생됩니다.</div></div>
       <div class="mnav"><button class="btn" data-act="trainSeed">추천 영상 넣기</button><button class="btn primary" data-act="trainAdd">+ 자료 추가</button></div></div>`;
-    h += `<div class="filters">${['all', ...TRAIN_CATS].map((c) => `<button class="fl${trainCat === c ? ' on' : ''}" data-act="trainCat" data-c="${c}">${c === 'all' ? '전체' : c}</button>`).join('')}</div>`;
+    h += `<div class="filters">${[['program', '🎓 학습 프로그램'], ['board', '🏅 직원별 진행'], ['all', '📚 자료 전체 ' + trainList().length]].map(([k, n]) => `<button class="fl${trainTab === k ? ' on' : ''}" data-act="trainTab" data-t="${k}">${n}</button>`).join('')}</div>`;
+    if (trainTab === 'program') return h + vTrainProgram(names);
+    if (trainTab === 'board') return h + vTrainBoard(names);
+    return h + vTrainAll();
+  }
+  function vTrainProgram(names) {
+    let h = '';
+    const reward = S.settings.trainReward || TRAIN_REWARD_DEFAULT;
+    h += `<div class="notice ok"><b>🎁 보상</b> ${esc(reward)} <button class="btn sm ghost" data-act="trainReward">문구 고치기</button></div>`;
+    if (!names.length) return h + `<div class="notice"><b>직원 명단이 비어 있습니다.</b><div class="hint">직원 › 직원 명단에 이름을 넣으면 사람별로 진행을 기록할 수 있습니다.</div></div>`;
+    h += `<div class="mlabel">누구의 진행인가요?</div><div class="roles wrap" style="margin-bottom:12px">${names.map((n) => `<button class="rl${n === trainWho ? ' on' : ''}" data-act="trainWho" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
+    const ps = personSummary(trainWho);
+    const nextTr = TRAIN_TRACKS.find((tr) => trackProgress(tr, trainWho).next);
+    const nextUrl = nextTr ? trackProgress(nextTr, trainWho).next : null, nextItem = nextUrl ? trainByUrl(nextUrl) : null;
+    h += `<div class="progCard${ps.pct === 100 ? ' done' : ''}"><div class="pcTop"><div><b>${esc(trainWho)}님의 학습</b>
+        <div class="pcSub">본 영상 <b>${ps.n}</b> / ${ps.total}편 · 누적 ${ps.mins}분 · 완주 배지 ${ps.badges.length ? ps.badges.map((b) => b.icon).join(' ') : '아직 없음'}</div></div>
+        <div class="pcNum">${ps.pct}<small>%</small></div></div><div class="bar"><i style="width:${ps.pct}%"></i></div>
+      ${nextItem ? `<div class="trNext"><span class="chip wk">다음에 볼 영상</span> <b>${esc(nextItem.title)}</b>${nextItem.min ? ` <span class="mut">· ${nextItem.min}분</span>` : ''} <span class="mut">· ${esc(nextTr.name)}</span>
+        <button class="btn sm primary" data-act="trainOpen" data-u="${esc(nextUrl)}">지금 보기</button></div>` : `<div class="trNext">🎉 모든 코스를 마쳤습니다. 사장님께 알려 주세요!</div>`}</div>`;
+    TRAIN_TRACKS.forEach((tr) => {
+      const pr = trackProgress(tr, trainWho), done = trainDoneMap(trainWho);
+      const mins = trackSteps(tr).reduce((acc, u) => acc + ((trainByUrl(u) || {}).min || 0), 0);
+      let idx = 0;
+      h += `<details class="grp trTrack${pr.complete ? ' complete' : ''}" data-k="tr:${tr.key}"${attrOpen('tr:' + tr.key, !!pr.next && tr === nextTr)}>
+        <summary><h3>${tr.icon} ${esc(tr.name)} ${pr.complete ? '<span class="chip ok">완주 🏅</span>' : `<span class="cnt">${pr.n}/${pr.total}</span>`}</h3>
+          <div class="trTrackSub"><span>${esc(tr.who)} · ${pr.total}편 · 약 ${mins}분</span><span class="stBar"><i style="width:${pr.pct}%"></i></span></div>
+          <div class="trGoal">🎯 ${esc(tr.goal)}</div></summary>
+        ${tr.stages.map((st) => {
+          const sDone = st.steps.every((u) => done[u]);
+          return `<div class="trStage${sDone ? ' done' : ''}"><div class="trStageHead"><b>${esc(st.name)}</b>${sDone ? '<span class="chip ok">완료</span>' : ''}</div>
+            <div class="trEffect">✨ 이 단계를 마치면 — ${esc(st.effect)}</div>
+            ${st.steps.map((u) => { idx++; const it = trainByUrl(u); if (!it) return ''; const d = done[u]; const isNext = u === pr.next;
+              return `<div class="trStep${d ? ' done' : ''}${isNext ? ' next' : ''}"><span class="trNo">${d ? '✓' : idx}</span>
+                <div class="trStepMain"><div class="trStepTitle">${esc(it.title)}</div><div class="mut">${esc(it.cat)}${it.sub ? ' · ' + esc(it.sub) : ''}${it.min ? ' · ' + it.min + '분' : ''}${d ? ' · ' + d + ' 시청' : ''}${isNext ? ' · <b>다음 차례</b>' : ''}</div></div>
+                <span class="rowbtns" style="margin:0"><button class="btn sm${isNext ? ' primary' : ''}" data-act="trainOpen" data-u="${esc(u)}">보기</button>${d ? `<button class="btn sm ghost" data-act="trainUndo" data-u="${esc(u)}">취소</button>` : `<button class="btn sm ghost" data-act="trainDone" data-u="${esc(u)}">봤어요</button>`}</span></div>`; }).join('')}
+          </div>`; }).join('')}
+      </details>`;
+    });
+    return h;
+  }
+  function vTrainBoard(names) {
+    if (!names.length) return `<div class="notice"><b>직원 명단이 비어 있습니다.</b></div>`;
+    const rows = names.map((n) => ({ name: n, ...personSummary(n) })).sort((p, q) => q.pct - p.pct || q.mins - p.mins);
+    const medal = ['🥇', '🥈', '🥉'];
+    let h = `<div class="hd sub2"><h3>직원별 진행</h3><span class="hint" style="margin:0">함께 보면 서로 끌어 줍니다 · 코스 완주 = 배지</span></div>`;
+    h += `<div class="tkLogWrap"><table class="tkLog cList"><thead><tr><th></th><th>이름</th><th>진행</th><th>본 영상</th><th>누적</th><th>완주 배지</th></tr></thead><tbody>${rows.map((r, i) => `<tr>
+      <td>${i < 3 && r.n > 0 ? medal[i] : ''}</td><td><b>${esc(r.name)}</b></td>
+      <td style="min-width:140px"><span class="stBar" style="display:block"><i style="width:${r.pct}%"></i></span><span class="mut">${r.pct}%</span></td>
+      <td>${r.n}/${r.total}</td><td>${r.mins}분</td>
+      <td>${r.badges.length ? r.badges.map((b) => `<span class="chip ok" title="${esc(b.name)}">${b.icon} ${esc(b.name)}</span>`).join(' ') : '<span class="mut">–</span>'}</td></tr>`).join('')}</tbody></table></div>`;
+    h += `<div class="hd sub2" style="margin-top:18px"><h3>코스별 완주 현황</h3></div><div class="trainGrid">${TRAIN_TRACKS.map((tr) => { const fin = names.filter((n) => trackProgress(tr, n).complete), ing = names.filter((n) => { const p = trackProgress(tr, n); return p.n > 0 && !p.complete; });
+      return `<div class="trCard"><div class="rcName">${tr.icon} ${esc(tr.name)}</div><div class="mut">${esc(tr.who)}</div>
+        <div style="margin-top:8px"><b>완주 ${fin.length}명</b> ${fin.map(esc).join(', ') || '<span class="mut">아직 없음</span>'}</div>
+        <div class="mut">진행 중 ${ing.length}명 ${ing.map(esc).join(', ')}</div></div>`; }).join('')}</div>`;
+    return h;
+  }
+  function vTrainAll() {
+    let list = trainList().slice().sort((a2, b2) => (b2.pin ? 1 : 0) - (a2.pin ? 1 : 0) || (b2.createdAt || 0) - (a2.createdAt || 0));
+    if (trainCat !== 'all') list = list.filter((x) => x.cat === trainCat);
+    let h = `<div class="filters">${['all', ...TRAIN_CATS].map((c) => `<button class="fl${trainCat === c ? ' on' : ''}" data-act="trainCat" data-c="${c}">${c === 'all' ? '전체' : c} ${c === 'all' ? '' : trainList().filter((x) => x.cat === c).length}</button>`).join('')}</div>`;
     if (!list.length) {
       h += `<div class="notice"><b>아직 등록한 교육 자료가 없습니다.</b>
-        <div class="hint">예: 손 씻기 · 교차오염 예방(위생), 룸 안내와 주문 받기(서비스), 대게 찜 시간(조리). 유튜브 주소를 붙여 넣으면 화면에서 바로 재생됩니다.</div>
-        <div class="hint">참고할 만한 곳 — 식품안전나라(foodsafetykorea.go.kr) 위생교육 자료, 한국외식업중앙회(foodservice.or.kr) 위생교육, 유튜브의 접객 서비스 교육 영상.</div></div>`;
-    } else {
-      h += `<div class="trainGrid">${list.map((x) => { const id = ytId(x.url); return `<div class="trCard${x.pin ? ' pin' : ''}">
-        <div class="rcTop"><span class="chip cat">${esc(x.cat)}</span>${x.pin ? '<span class="chip crit">필독</span>' : ''}<span class="rcMeta" style="margin-left:auto">${esc(hostOf(x.url))}</span></div>
+        <div class="hint">예: 손 씻기 · 교차오염 예방(위생), 룸 안내와 주문 받기(서비스), 대게 찜 시간(조리). 유튜브 주소를 붙여 넣으면 화면에서 바로 재생됩니다.</div></div>`;
+      return h;
+    }
+    /* 세부 분류(sub)로 묶어서 보여준다 */
+    const groups = [];
+    list.forEach((x) => { const key = (x.cat || '기타') + ' › ' + (x.sub || '기타'); let g = groups.find((g2) => g2.key === key); if (!g) { g = { key, cat: x.cat || '기타', sub: x.sub || '기타', items: [] }; groups.push(g); } g.items.push(x); });
+    // 분류 순서 → 추천 목록에 나온 세부 분류 순서대로
+    const subOrder = TRAIN_SEED.map((t) => (t.cat + ' › ' + (t.sub || '기타')));
+    groups.sort((g1, g2) => (TRAIN_CATS.indexOf(g1.cat) - TRAIN_CATS.indexOf(g2.cat)) || ((subOrder.indexOf(g1.key) + 1 || 999) - (subOrder.indexOf(g2.key) + 1 || 999)));
+    const doneAny = (u) => Object.entries(S.trainDone || {}).filter(([, m]) => m[u]).map(([n]) => n);
+    groups.forEach((g) => {
+      h += `<div class="hd sub2"><h3>${esc(g.key)}</h3><span class="hint" style="margin:0">${g.items.length}편</span></div>`;
+      h += `<div class="trainGrid">${g.items.map((x) => { const id = x.noEmbed ? null : ytId(x.url); const seenBy = doneAny(x.url); return `<div class="trCard${x.pin ? ' pin' : ''}">
+        <div class="rcTop"><span class="chip cat">${esc(x.cat)}</span>${x.pin ? '<span class="chip crit">필독</span>' : ''}${x.min ? `<span class="chip">${x.min}분</span>` : ''}<span class="rcMeta" style="margin-left:auto">${esc(hostOf(x.url))}</span></div>
         <div class="rcName">${esc(x.title)}</div>
         ${x.memo ? `<div class="nbody">${esc(x.memo)}</div>` : ''}
         ${id ? `<div class="ytBox"><iframe src="https://www.youtube-nocookie.com/embed/${esc(id)}" title="${esc(x.title)}" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : ''}
         <div class="rowbtns"><a class="btn sm primary" href="${esc(x.url)}" target="_blank" rel="noopener">${id ? '유튜브에서 열기' : '열기'}</a>
+          <button class="btn sm" data-act="trainDone" data-u="${esc(x.url)}">봤어요</button>
           <button class="btn sm ghost" data-act="trainEdit" data-id="${x.id}">수정</button></div>
-        <div class="rcMeta">${esc(x.by || '')}${x.createdAt ? ' · ' + new Date(x.createdAt).toLocaleDateString('ko-KR') : ''}</div></div>`; }).join('')}</div>`;
-    }
+        <div class="rcMeta">${seenBy.length ? '본 사람: ' + seenBy.map(esc).join(', ') : '아직 본 사람 없음'}</div></div>`; }).join('')}</div>`;
+    });
     return h;
+  }
+  /* 영상 보기 창 — 앱 안에서 재생하고 "시청 완료"로 기록 */
+  function trainOpen(url) {
+    const it = trainByUrl(url); if (!it) return;
+    const id = it.noEmbed ? null : ytId(url), who = trainWho || whoNow();
+    modal(it.title, `${id ? `<div class="ytBox"><iframe src="https://www.youtube-nocookie.com/embed/${esc(id)}?autoplay=1" title="${esc(it.title)}" allow="autoplay; accelerometer; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : `<p><a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener">새 창에서 열기</a></p>`}
+      ${it.noEmbed ? `<p class="hint">이 영상은 제작자가 다른 사이트 재생을 막아 두어 유튜브에서 열립니다.</p>` : ''}
+      ${it.memo ? `<p class="mmemo">${esc(it.memo)}</p>` : ''}
+      <p class="hint">${who ? `<b>${esc(who)}</b>님의 기록으로 남습니다. 다 보고 나서 아래 "시청 완료"를 누르세요.` : '위에서 이름을 먼저 고르세요.'}</p>`, () => { trainMarkDone(url, who); }, '시청 완료');
+  }
+  function trainMarkDone(url, who) {
+    if (!who) { alert('누구의 기록인지 이름을 먼저 고르세요.'); return; }
+    const before = TRAIN_TRACKS.filter((tr) => trackProgress(tr, who).complete).map((tr) => tr.key);
+    trainDoneMap(who)[url] = dateKey();
+    save(); render();
+    const after = TRAIN_TRACKS.filter((tr) => trackProgress(tr, who).complete && !before.includes(tr.key));
+    if (after.length) {
+      const tr = after[0];
+      banner(`🏅 ${who} — "${tr.name}" 완주!`, S.settings.trainReward || TRAIN_REWARD_DEFAULT);
+      if ((S.settings.tgToken || '').trim() && (S.settings.tgChat || '').trim()) sendTelegram(`🎓 [${storeName()}] ${who} — "${tr.name}" 코스 완주! (${trackSteps(tr).length}편)`, 'train').catch(() => {});
+    } else banner('시청 완료로 기록했습니다', `${who} · ${(trainByUrl(url) || {}).title || ''}`);
   }
   function trainForm(x) {
     const isNew = !x; x = x || { cat: TRAIN_CATS[0] };
@@ -4538,6 +4737,12 @@ const App = (() => {
         case 'trainSeed': { const n = seedTraining(); save(); render(); banner(n ? `추천 영상 ${n}개를 넣었습니다` : '추천 영상이 이미 다 들어 있습니다', '식약처 · 질병관리청 · 고용노동부 · 한국외식업중앙회 · 세바시 · 박강사TV'); break; }
         case 'trainEdit': closeModal(); trainForm(trainList().find((t) => t.id === id)); break;
         case 'trainCat': trainCat = b.dataset.c; render(); break;
+        case 'trainTab': trainTab = b.dataset.t; render(); break;
+        case 'trainWho': trainWho = b.dataset.n; render(); break;
+        case 'trainOpen': trainOpen(b.dataset.u); break;
+        case 'trainDone': { const who = trainWho || whoNow(); if (!who) { pickWho(); return; } trainMarkDone(b.dataset.u, who); break; }
+        case 'trainUndo': { const who = trainWho; if (who && S.trainDone && S.trainDone[who]) { delete S.trainDone[who][b.dataset.u]; save(); render(); } break; }
+        case 'trainReward': { const v = prompt('코스 완주 보상 문구 (직원에게 보입니다)', S.settings.trainReward || TRAIN_REWARD_DEFAULT); if (v === null) return; S.settings.trainReward = v.trim() || undefined; save(); render(); break; }
         case 'trainDel': { if (!confirm('이 교육 자료를 삭제할까요?')) return; S.training = trainList().filter((t) => t.id !== id); save(); closeModal(); render(); break; }
         case 'recipeAdd': recipeForm(null); break;
         case 'recipeOpen': recipeShow(id); break;

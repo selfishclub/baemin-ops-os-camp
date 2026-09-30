@@ -1130,3 +1130,27 @@ table.tkLog td small{display:block;font-size:11px;color:var(--muted);font-weight
 .tcard.auto .ck{background:var(--wk-soft);color:var(--wk);border-color:var(--wk-soft)}
 .tcBy.auto{color:var(--wk)}
 .chip.scope{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--rule)}
+
+/* 교육 — 학습 프로그램 */
+.trNext{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--surface-2);display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13.5px}
+.trTrack{margin-top:12px}
+.trTrack summary h3{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.trTrackSub{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted);margin-top:4px}
+.trTrackSub .stBar{flex:1;max-width:220px}
+.trGoal{font-size:13px;color:var(--ink-2);margin-top:6px}
+.trTrack.complete summary h3{color:var(--ok)}
+.trStage{border:1px solid var(--rule);border-radius:10px;padding:10px 12px;margin:10px 0;background:var(--surface)}
+.trStage.done{border-color:var(--ok);background:var(--surface-2)}
+.trStageHead{display:flex;align-items:center;gap:8px;font-size:14px}
+.trEffect{font-size:12.5px;color:var(--ink-2);margin:4px 0 8px;padding:6px 10px;border-left:3px solid var(--wk);background:var(--wk-soft);border-radius:6px}
+.trStep{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--rule-soft)}
+.trStep.next{background:var(--accent-soft);margin:0 -12px;padding:8px 12px;border-radius:8px}
+.trStep.done .trStepTitle{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--rule)}
+.trNo{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--surface-2);color:var(--ink-2)}
+.trStep.done .trNo{background:var(--ok);color:#fff}
+.trStep.next .trNo{background:var(--accent);color:#fff}
+.trStepMain{flex:1;min-width:0}
+.trStepTitle{font-size:13.5px;line-height:1.45;word-break:keep-all}
+.chip.ok{background:var(--accent-soft);color:var(--accent)}
+.mnav .btn{white-space:nowrap}
+@media (max-width:640px){.hd{flex-wrap:wrap}.hd .mnav{width:100%;justify-content:flex-start;flex-wrap:wrap}}
