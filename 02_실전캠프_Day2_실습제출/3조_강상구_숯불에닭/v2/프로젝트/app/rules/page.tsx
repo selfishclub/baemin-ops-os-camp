@@ -12,6 +12,8 @@ import { exportBackup, importBackup } from "@/lib/storage/backup";
 import type { Rule } from "@/lib/types";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, parsePayDays } from "@/lib/paydays";
 import { emptyFixedCost, fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "@/lib/fixedCosts";
+import PhotoStrip from "@/components/PhotoStrip";
+import { deletePhotosOf } from "@/lib/photos";
 import { num, parseNum, won } from "@/lib/format";
 
 export default function RulesPage() {
@@ -136,12 +138,21 @@ export default function RulesPage() {
                   <input aria-label={`고정비 ${idx + 1} 이름`} className="field w-32" placeholder="이름 (석쇠 대여)" value={c.name} onChange={(e) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)))} />
                   <input aria-label={`고정비 ${idx + 1} 거래처`} className="field w-28" placeholder="통장 거래처" value={c.payeeKeyword} onChange={(e) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, payeeKeyword: e.target.value } : x)))} />
                   <input aria-label={`고정비 ${idx + 1} 금액`} className="field num w-24 text-right" inputMode="numeric" placeholder="0" value={c.amount ? num(c.amount) : ""} onChange={(e) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, amount: parseNum(e.target.value) } : x)))} />
-                  <button className="btn-ghost px-2 py-1 text-xs" onClick={() => saveFixedCosts(fixedCosts.filter((x) => x.id !== c.id))}>
+                  <button
+                    className="btn-ghost px-2 py-1 text-xs"
+                    onClick={async () => {
+                      await deletePhotosOf(c.id); // 붙여 둔 청구서 사진도 같이 지운다
+                      await saveFixedCosts(fixedCosts.filter((x) => x.id !== c.id));
+                    }}
+                  >
                     지우기
                   </button>
                 </div>
                 <div className="mt-2">
                   <CategorySelect idPrefix={c.id} major={c.major} minor={c.minor} onChange={(major, minor) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, major: major as Major, minor } : x)))} />
+                </div>
+                <div className="mt-2">
+                  <PhotoStrip ownerId={c.id} />
                 </div>
                 {g && (
                   <p className="mt-1 text-xs text-stone-500">
