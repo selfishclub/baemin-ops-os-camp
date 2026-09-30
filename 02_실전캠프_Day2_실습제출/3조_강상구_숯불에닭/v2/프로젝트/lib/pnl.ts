@@ -3,6 +3,7 @@ import { feeOf, round1 } from "./channels";
 import type { ChannelSale, Transaction } from "./types";
 import type { LaborEstimate } from "./labor";
 import { totalFixedGap, type FixedCostGap } from "./fixedCosts";
+import { expandSplits } from "./txSplit";
 
 export interface PnlLine {
   label: string;
@@ -39,7 +40,9 @@ const pct = (amount: number, revenue: number) => (revenue > 0 ? round1((amount /
 //    통장에서 나간 재료비보다 많으면 그 차이를 "아직 안 낸 재료비"로 매출원가에 더한다.
 //    9월에 받은 재료값을 10월에 내더라도 그 재료비는 9월 원가여서 그렇다 (인건비를 어림으로 채우는 것과 같은 이치).
 //  fixedGaps: 매달 나가는 고정비 중 아직 통장에서 안 나간 몫 (lib/fixedCosts.ts)
-export function computePnl(txs: Transaction[], sales: ChannelSale[], estimate?: LaborEstimate, materialPurchases = 0, fixedGaps: FixedCostGap[] = []): Pnl {
+export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: LaborEstimate, materialPurchases = 0, fixedGaps: FixedCostGap[] = []): Pnl {
+  // 나눠 분류한 줄은 몫마다 한 줄로 펴서 센다
+  const txs = expandSplits(all);
   const hasSales = sales.some((s) => s.orders > 0);
 
   // 통장 입금: 채널이 붙은 줄은 대조용. 채널 입력이 있으면 매출로 다시 더하지 않는다(중복 방지).
@@ -158,8 +161,8 @@ export function computePnl(txs: Transaction[], sales: ChannelSale[], estimate?: 
     materialUnpaid,
     fixedUnpaid: totalFixedGap(fixedGaps),
     deliveryFee,
-    unclassified: txs.filter((t) => !t.major).length,
-    needsReview: txs.filter((t) => t.review).length,
+    unclassified: all.filter((t) => !t.major).length,
+    needsReview: all.filter((t) => t.review).length,
   };
 }
 

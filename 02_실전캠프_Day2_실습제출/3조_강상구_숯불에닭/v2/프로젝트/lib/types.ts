@@ -1,4 +1,5 @@
 import type { ChannelId, Major } from "./categories";
+import type { TxSplit } from "./txSplit";
 export type { Channel, ChannelKind } from "./categories";
 
 export type Month = string; // "2026-08"
@@ -22,6 +23,8 @@ export interface Transaction extends BankRow {
   channel: ChannelId | null; // 입금 줄이 어느 채널 정산인지 (대조용)
   review: ReviewReason | null; // null이면 확인 끝
   payMethod?: "현금" | "카드"; // 직접 추가한 지출만
+  // 한 줄에 성격이 다른 돈이 섞였을 때 나눠 적은 몫 (lib/txSplit.ts). 없으면 major·minor로 센다
+  splits?: TxSplit[];
 }
 
 // 거래처 이름에 keyword가 들어 있으면 이 항목으로 분류

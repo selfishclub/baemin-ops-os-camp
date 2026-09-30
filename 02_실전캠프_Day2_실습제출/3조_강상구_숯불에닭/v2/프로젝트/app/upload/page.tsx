@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
-import { CategorySelect, Notice } from "@/components/ui";
+import { CategorySelect, MoneyInput, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
 import ExpenseSection from "@/components/ExpenseSection";
 import { BankParseError, parseBankSheet } from "@/lib/bank/parse";
@@ -12,6 +12,7 @@ import { num, won } from "@/lib/format";
 import { findOverlap, monthLabel, monthsBetween, newBankRowsOnly, prevMonth } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 import type { Transaction } from "@/lib/types";
+import { splitCheck, type TxSplit } from "@/lib/txSplit";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, isPrevMonthDefault } from "@/lib/paydays";
 import { monthsToLoad, quickRange, searchTxs, shiftDays, txTotals, type TxOrder } from "@/lib/txSearch";
 import { todayStr } from "@/lib/daily";
@@ -298,6 +299,9 @@ function ReviewCard({ tx, ledger, payDays, editing = false, onDone }: { tx: Tran
   }, [major, payDays]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // 한 줄에 성격이 다른 돈이 섞였을 때 나눠 적기
+  const [splits, setSplits] = useState<TxSplit[]>(tx.splits ?? []);
+  const check = splitCheck(tx, splits);
 
   async function confirm() {
     if (!major) return;
@@ -318,7 +322,8 @@ function ReviewCard({ tx, ledger, payDays, editing = false, onDone }: { tx: Tran
     const store = getStore();
     const ch = isIncome && channel ? channel : null;
     const monthOf = (t: Transaction) => (lastMonth ? prevMonth(t.date.slice(0, 7)) : t.date.slice(0, 7));
-    const updated: Transaction[] = [{ ...tx, month: monthOf(tx), major, minor, channel: ch, review: null }];
+    const clean = splits.length && check.ok ? splits : undefined;
+    const updated: Transaction[] = [{ ...tx, month: monthOf(tx), major, minor, channel: ch, review: null, splits: clean }];
 
     if (remember && !hasRule) {
       await store.saveRule(ruleFromChoice(tx, major, minor, ch, false, lastMonth));
@@ -394,6 +399,51 @@ function ReviewCard({ tx, ledger, payDays, editing = false, onDone }: { tx: Tran
           </span>
         </label>
       )}
+      {/* 한 줄에 성격이 다른 돈이 섞였을 때 (마트에서 재료비와 개인 물품, 관리비 고지서의 관리비·전기·수도) */}
+      <div className="rounded-xl bg-stone-50 p-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold text-stone-600">
+            나눠서 분류 {splits.length > 0 && <span className="num text-stone-500">{splits.length}개</span>}
+          </p>
+          {splits.length === 0 ? (
+            <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setSplits([{ major: (major || "매출원가") as Major, minor: minor || "원재료비", amount: tx.out > 0 ? tx.out : tx.in }])}>
+              + 이 줄을 나누기
+            </button>
+          ) : (
+            <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setSplits([])}>
+              나누기 그만두기
+            </button>
+          )}
+        </div>
+        {splits.length === 0 ? (
+          <p className="mt-1 text-xs text-stone-500">한 번 결제에 재료비와 개인 물품이 섞였거나, 관리비 고지서에 전기·수도가 같이 있으면 나눠서 적어요. 통장 줄은 그대로 두고 손익만 나눠 셉니다.</p>
+        ) : (
+          <div className="mt-2 space-y-2">
+            {splits.map((sp, i) => (
+              <div key={i} className="rounded-lg bg-white p-2 ring-1 ring-stone-200">
+                <div className="flex items-center gap-2">
+                  <MoneyInput label={`나눈 금액 ${i + 1}`} value={sp.amount} onChange={(v) => setSplits(splits.map((x, j) => (j === i ? { ...x, amount: v ?? 0 } : x)))} />
+                  <button className="btn-ghost shrink-0 px-2 py-1 text-xs" onClick={() => setSplits(splits.filter((_, j) => j !== i))}>
+                    빼기
+                  </button>
+                </div>
+                <div className="mt-1">
+                  <CategorySelect idPrefix={`${tx.id}-sp${i}`} major={sp.major} minor={sp.minor} includeIncome={isIncome} onChange={(m, n) => setSplits(splits.map((x, j) => (j === i ? { ...x, major: m as Major, minor: n } : x)))} />
+                </div>
+              </div>
+            ))}
+            <div className="flex items-center justify-between gap-2">
+              <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setSplits([...splits, { major: (major || "영업비") as Major, minor: "잡비", amount: Math.max(0, check.gap) }])}>
+                + 줄 더하기
+              </button>
+              <p className={`num text-xs font-semibold ${check.ok ? "text-emerald-700" : "text-amber-700"}`}>
+                {check.ok ? `합계 ${won(check.total)} — 딱 맞아요` : `${won(check.total)} / ${won(check.target)} · ${check.gap > 0 ? "모자라요" : "넘어요"} ${won(Math.abs(check.gap))}`}
+              </p>
+            </div>
+            {!check.ok && <p className="text-xs text-amber-700">금액이 딱 맞아야 나눠서 저장돼요. 안 맞으면 위에서 고른 하나로만 들어가요.</p>}
+          </div>
+        )}
+      </div>
       {err && <Notice tone="error">저장하지 못했어요 — {err}</Notice>}
       <div className="flex items-center justify-between gap-3">
         {hasRule && editing ? (
