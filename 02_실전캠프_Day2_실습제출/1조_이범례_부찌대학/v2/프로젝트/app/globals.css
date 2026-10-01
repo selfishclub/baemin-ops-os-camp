@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f4f5f2;
+  --surface: #ffffff;
+  --ink: #1c2321;
+  --muted: #5d6663;
+  --line: #dce0db;
+  --accent: #c23b22;
+  --accent-soft: #f7e3de;
+  --info: #2c5c86;
+  --info-soft: #e1eaf3;
+  --ok: #2f7a4f;
+  --ok-soft: #e0f0e6;
+  --warn: #a5610f;
+  --warn-soft: #fbedd3;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+}
+
+input, select, textarea, button {
+  font: inherit;
+}
+
+@layer components {
+  .card { @apply rounded-lg border border-line bg-surface p-4; }
+  .btn-primary { @apply inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition bg-accent text-white hover:opacity-90 disabled:opacity-40; }
+  .btn-ghost { @apply inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition border border-line bg-surface text-ink hover:bg-bg disabled:opacity-40; }
+  .btn-sm { @apply min-h-9 px-3 py-1 text-sm; }
+  .input { @apply min-h-11 w-full rounded-md border border-line bg-surface px-3 py-2 text-ink focus:border-info focus:outline-none; }
+  .label { @apply mb-1 block text-xs font-medium text-muted; }
+  .num { font-variant-numeric: tabular-nums; }
+  .chip { @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium; }
+}
