@@ -1,0 +1,8 @@
+Ingredient icons:
+Lucide Lab: pig-head, cow-head. ISC license; https://github.com/lucide-icons/lucide-lab
+Hugeicons: fish, shrimp, egg, milk-bottle, wheat, bean, pepper, star. MIT license; https://hugeicons.com/
+Microsoft Fluent Emoji High Contrast: chicken, squid. MIT license; https://github.com/microsoft/fluentui-emoji
+Game-icons.net: sesame. CC BY 3.0; https://game-icons.net/ https://creativecommons.org/licenses/by/3.0/
+Lucide interface icons: ISC license. See lucide-license.txt.
+Additional MIT notices: icon-mit-license.txt. All SVGs bundled locally via Iconify and rendered in the brand colour.
+Favicon: original official Gayoungene square logo, unmodified. Recommendation badge: labelled Hugeicons star.
