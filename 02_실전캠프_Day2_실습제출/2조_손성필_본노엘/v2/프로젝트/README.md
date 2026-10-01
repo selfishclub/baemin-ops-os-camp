@@ -21,7 +21,7 @@
 
 - **데이터베이스**: Supabase 프로젝트(`caetlljnyxsusswqhtci`)의 `manual_categories`, `manuals`, `manual_branches`, `manual_staff`, `manual_confirmations`, `manual_supplies`, `manual_quiz_questions` 테이블. `manual_staff`는 같은 프로젝트의 운영 앱(bonnoel-ops)과 같이 씀 — `hire_on`(입사일)·`active`(재직 여부)는 그쪽에서 채워짐
 - **사진 저장**: Supabase Storage `manual-photos` 버킷 (public)
-- `index.html`에 박혀 있는 Supabase URL과 `anon`/`publishable` 키는 공개되어도 안전한 값입니다(Row Level Security 정책으로 접근을 제어). **`service_role` 키는 절대 이 파일에 넣지 마세요.**
+- `index.html`에 박혀 있는 Supabase URL과 `anon`/`publishable` 키는 공개되어도 안전한 값입니다(Row Level Security 정책으로 접근을 제어). **관리자용 비밀 키는 절대 이 파일에 넣지 마세요.**
 
 ## 처음 한 번만 하면 되는 준비 작업
 
