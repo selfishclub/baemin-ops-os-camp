@@ -1,0 +1,9 @@
+# 실제 카드 내역·금액. 어떤 경우에도 밖으로 내보내지 않는다
+data/
+
+# 12명이 함께 쓰는 별도 저장소. 이 앱과 무관하다
+baemin-ops-os-camp/
+
+node_modules/
+.next/
+.next-build/

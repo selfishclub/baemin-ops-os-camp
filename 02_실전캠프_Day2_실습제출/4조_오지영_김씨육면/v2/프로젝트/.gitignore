@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+.next-build
+
+# 실제 정산 데이터 — 공개 저장소에 올리지 않음 (fixtures/의 가짜 시연 파일은 올림)
+# 카드 내역·가계부·쿠팡 전표 전부. 확장자를 늘리지 말고 폴더째 막는다.
+data/*
+!data/.gitkeep
+
+# 캠프 공용 저장소 — 별도 git 저장소다. 여기서 추적하지 않는다.
+baemin-ops-os-camp/
+.vercel

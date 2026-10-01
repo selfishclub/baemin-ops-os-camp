@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "accounts", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3177 }
+  ]
+}
