@@ -1,0 +1,15 @@
+.sites-runtime/
+node_modules/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.log
+.vercel/
+*.zip
+.DS_Store
+
+# This project directly authors deployable static source in dist.
+!dist/
+!dist/**

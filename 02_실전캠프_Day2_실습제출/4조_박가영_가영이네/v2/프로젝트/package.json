@@ -1,0 +1,13 @@
+{
+  "name": "gayoungene-menu-finder",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests.mjs && node ui-tests.mjs",
+    "dev": "vite dist --host 0.0.0.0"
+  },
+  "devDependencies": {
+    "jsdom": "^30.1.1",
+    "vite": "^7.3.1"
+  }
+}
