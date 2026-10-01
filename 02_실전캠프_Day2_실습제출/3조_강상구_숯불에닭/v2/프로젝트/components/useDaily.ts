@@ -37,7 +37,11 @@ export function useDaily(month: Month): Daily {
         store.listStaff(),
         store.getSetting<Channel[]>(CHANNELS_KEY),
       ]);
-      setState({ loading: false, error: null, sales, shifts, staff, channels: channels?.length ? channels : DEFAULT_CHANNELS });
+      // 나중에 생긴 기본 채널(현금영수증·계좌이체 등)은 저장해 둔 목록에 더해 준다
+      const merged = channels?.length
+        ? [...channels, ...DEFAULT_CHANNELS.filter((d) => !channels.some((c) => c.id === d.id))]
+        : DEFAULT_CHANNELS;
+      setState({ loading: false, error: null, sales, shifts, staff, channels: merged });
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e instanceof Error ? e.message : String(e) }));
     }

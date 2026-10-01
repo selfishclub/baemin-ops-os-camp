@@ -51,7 +51,7 @@ describe("세무사용 엑셀", () => {
 
   it("매출(일별): 카드사 → 현금 → 배달앱 순서, 합계 줄", () => {
     const rows = sheet("매출(일별)");
-    expect(rows[0]).toEqual(["날짜", channelName("card_kb"), "홀 현금", "배달의민족", "합계"]);
+    expect(rows[0]).toEqual(["날짜", channelName("card_kb"), "홀 현금(실물)", "배달의민족", "합계"]);
     expect(rows[1]).toEqual(["2026-08-02", 300000, 50000, 200000, 550000]);
     expect(rows[rows.length - 1]).toEqual(["합계", 400000, 50000, 200000, 650000]);
   });

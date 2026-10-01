@@ -48,6 +48,8 @@ export function addBusinessDays(date: string, n: number, holidays: string[] = []
 
 // 그 매출일의 돈이 들어올 날
 export function payoutDate(saleDate: string, rule: SettlementRule, holidays: string[] = []): string {
+  // +0영업일은 "그날 바로"라는 뜻이라 주말·공휴일로 밀지 않는다 (손님 계좌이체는 토·일에도 그 자리에서 들어온다)
+  if (rule.mode === "days" && rule.days === 0) return saleDate;
   if (rule.mode === "days") return addBusinessDays(saleDate, rule.days, holidays);
   if (rule.mode === "calendar") {
     // 달력으로 N일 뒤, 그날이 주말·공휴일이면 다음 영업일 (삼성카드: 금·토 매출이 월요일에 한 번에)
@@ -313,6 +315,7 @@ export function prevMonthPayoutsInto(month: Month, rule: SettlementRule, prevDai
 // 기본 규칙 — 각 사가 공개한 정산 안내를 기준으로 (2026-09-19 조사). 실제 입금과 다르면 정산 탭에서 고친다.
 export const DEFAULT_RULES: SettlementRule[] = [
   { channel: "hall_card", mode: "days", days: 2, weekday: 0 }, // 카드사 일반: 매출일 + 2영업일
+  { channel: "hall_transfer", mode: "days", days: 0, weekday: 0 }, // 손님 계좌이체: 그날 바로 들어온다
   { channel: "baemin", mode: "days", days: 3, weekday: 0 }, // 배민: 주문(구매확정)일 + 3영업일 (2022.2~)
   { channel: "coupang", mode: "days", days: 4, weekday: 0, manual: true }, // 쿠팡이츠: 매출 발생일 + 4영업일에 정산되지만 사장님이 직접 출금 신청해야 통장에 들어온다 (2026-09-19)
   { channel: "yogiyo", mode: "days", days: 5, weekday: 0 }, // 요기요: 결제일 + 5영업일 (2024.8~ 일 단위)

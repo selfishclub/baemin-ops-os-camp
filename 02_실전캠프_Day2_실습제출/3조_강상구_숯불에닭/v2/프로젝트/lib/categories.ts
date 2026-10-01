@@ -55,7 +55,8 @@ export function isValidCategory(major: string, minor: string): boolean {
 //  - card: 홀 카드. 카드사가 며칠 뒤에 수수료를 떼고 입금 (정산 규칙 대상)
 //  - cash: 홀 현금. 통장 입금 없음, 수수료 없음
 //  - delivery: 배달앱. 앱이 수수료를 떼고 정산 주기대로 입금 (정산 규칙 대상)
-export type ChannelKind = "card" | "cash" | "delivery";
+//  - transfer: 손님 계좌이체. 수수료 없이 그날 통장에 그대로 들어온다 (정산 규칙 대상 — 통장과 짝이 맞는지 보려고)
+export type ChannelKind = "card" | "cash" | "delivery" | "transfer";
 export type ChannelId = string;
 
 export interface Channel {
@@ -67,7 +68,9 @@ export interface Channel {
 
 export const DEFAULT_CHANNELS: Channel[] = [
   { id: "hall_card", name: "홀 카드", kind: "card", active: true },
-  { id: "hall_cash", name: "홀 현금", kind: "cash", active: true },
+  { id: "hall_cash", name: "홀 현금(실물)", kind: "cash", active: true }, // 현금영수증 안 끊고 받은 돈. 통장에 안 들어온다
+  { id: "hall_cash_receipt", name: "현금영수증", kind: "cash", active: true }, // 현금으로 받고 영수증을 끊은 것 — 포스 매출에 찍힌다
+  { id: "hall_transfer", name: "계좌이체", kind: "transfer", active: true }, // 손님이 통장으로 보낸 돈. 그날 바로 들어와서 통장과 짝이 맞는다
   { id: "baemin", name: "배달의민족", kind: "delivery", active: true },
   { id: "coupang", name: "쿠팡이츠", kind: "delivery", active: true },
   { id: "yogiyo", name: "요기요", kind: "delivery", active: true },
@@ -116,10 +119,12 @@ export function groupChannels(channels: Channel[], amounts: Record<string, numbe
   return {
     card: active.filter((c) => c.kind === "card"),
     cash: active.filter((c) => c.kind === "cash"),
+    transfer: active.filter((c) => c.kind === "transfer"),
     delivery: active.filter((c) => c.kind === "delivery"),
     cardTotal: sum("card"),
     cashTotal: sum("cash"),
+    transferTotal: sum("transfer"),
     deliveryTotal: sum("delivery"),
-    total: sum("card") + sum("cash") + sum("delivery"),
+    total: sum("card") + sum("cash") + sum("transfer") + sum("delivery"),
   };
 }

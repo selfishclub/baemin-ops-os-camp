@@ -136,7 +136,7 @@ export default function TodayPage() {
 
   const cardTotal = cardRows.reduce((a, r) => a + r.amount, 0);
   const groups = groupChannels(daily.channels, amounts);
-  const dayTotal = cardTotal + groups.cashTotal + groups.deliveryTotal;
+  const dayTotal = cardTotal + groups.cashTotal + groups.transferTotal + groups.deliveryTotal;
   const cardLabel = (id: string) => (id === "hall_card" || id === "hall" ? "카드 전체 / 기타" : CARD_PRESETS.find((p) => p.id === id)?.name ?? daily.channels.find((c) => c.id === id)?.name ?? id);
   const dayLabor = rows.reduce((a, r) => a + r.hours * (daily.staff.find((s) => s.id === r.staffId)?.wage ?? 0), 0);
 
@@ -386,6 +386,7 @@ export default function TodayPage() {
           {(
             [
               { title: "현금", list: groups.cash, total: groups.cashTotal, showTotal: false },
+              { title: "계좌이체 (손님이 통장으로 보낸 것)", list: groups.transfer, total: groups.transferTotal, showTotal: false },
               { title: "배달앱", list: groups.delivery, total: groups.deliveryTotal, showTotal: groups.delivery.length > 1 },
             ] as const
           ).map((g) =>
@@ -426,7 +427,7 @@ export default function TodayPage() {
           )}
           <p className="num mt-1 text-right text-sm">
             오늘 매출 <b>{won(dayTotal)}</b>
-            <span className="ml-2 text-xs text-stone-500">(카드 {num(cardTotal)} · 현금 {num(groups.cashTotal)} · 배달 {num(groups.deliveryTotal)})</span>
+            <span className="ml-2 text-xs text-stone-500">(카드 {num(cardTotal)} · 현금 {num(groups.cashTotal)}{groups.transferTotal > 0 ? ` · 이체 ${num(groups.transferTotal)}` : ""} · 배달 {num(groups.deliveryTotal)})</span>
           </p>
         </div>
 
@@ -826,7 +827,7 @@ function SettingsDialog({ daily, onClose }: { daily: ReturnType<typeof useDaily>
             {channels.map((c) => (
               <li key={c.id} className="flex items-center justify-between py-1.5">
                 <span className={c.active ? "" : "text-stone-400"}>
-                  {c.name} <span className="text-[11px] text-stone-400">{{ card: "카드", cash: "현금", delivery: "배달앱" }[c.kind]}</span>
+                  {c.name} <span className="text-[11px] text-stone-400">{{ card: "카드", cash: "현금", transfer: "계좌이체", delivery: "배달앱" }[c.kind]}</span>
                 </span>
                 <button className="btn-ghost px-2 py-1 text-xs" onClick={() => saveChannels(channels.map((x) => (x.id === c.id ? { ...x, active: !x.active } : x)))}>
                   {c.active ? "끄기" : "켜기"}
@@ -840,6 +841,7 @@ function SettingsDialog({ daily, onClose }: { daily: ReturnType<typeof useDaily>
               <option value="card">카드</option>
               <option value="delivery">배달앱</option>
               <option value="cash">현금</option>
+              <option value="transfer">계좌이체</option>
             </select>
             <button
               className="btn-primary px-2"

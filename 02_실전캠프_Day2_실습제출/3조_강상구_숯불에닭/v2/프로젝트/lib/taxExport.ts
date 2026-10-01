@@ -99,9 +99,10 @@ export function buildTaxSheets(month: string, txs: Transaction[], sales: DailySa
 function channelOrder(id: string): number {
   if (id.startsWith("card_") && id !== "card_easy" && id !== "card_zeropay") return 0;
   if (id === "card_easy" || id === "card_zeropay" || id === "hall_card") return 1;
-  if (id === "hall_cash") return 2;
-  if (["baemin", "coupang", "yogiyo", "etc"].includes(id)) return 3;
-  return 4;
+  if (id === "hall_cash" || id === "hall_cash_receipt") return 2;
+  if (id === "hall_transfer") return 3; // 계좌이체 (현금 다음, 배달앱 앞)
+  if (["baemin", "coupang", "yogiyo", "etc"].includes(id)) return 4;
+  return 5;
 }
 
 export const taxFileName = (month: string) => `숯불에닭_세무사용_${month}.xlsx`;
