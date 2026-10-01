@@ -31,6 +31,8 @@ export function YearDashboard({
           action={<Btn tone="primary" onClick={onGoSettlement}>월 정산으로 가기</Btn>}
         >
           달마다 카드 파일을 올리고 매출을 넣으면, 이 화면에서 연간 흐름과 계정과목 누적을 한눈에 봅니다.
+          <br />
+          <b>처음 둘러보시는 거라면</b> 월 정산 → 1단계 불러오기에 <b>시연 자료 넣기</b>가 있습니다. 가짜 자료입니다.
         </Empty>
       </main>
     );

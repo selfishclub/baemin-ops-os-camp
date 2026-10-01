@@ -22,6 +22,7 @@ import { guessChannel } from "@/lib/depositMap";
 import { matchCoupang, parseCoupangPdf, type CoupangReceipt } from "@/lib/parseCoupang";
 import type { DepositKind } from "@/lib/store";
 import type { RevenueLine, Transaction } from "@/lib/types";
+import { DEMO_FILE_NAME, demoCardCsv, demoDeposits, demoSales } from "@/lib/demo";
 import { Btn, Field } from "../ui";
 
 /** 실제로 쓰는 것만 둔다. 목록이 길면 고르다 틀린다. */
@@ -63,8 +64,34 @@ export function UploadStep({
     }));
   }
 
-  function readCard(text: string, encoding: string, fileName: string, manual?: { headerRow: number; map: FieldMap }) {
-    const r = parseCardCsv(text, manual ? { manual, card } : { card });
+  /**
+   * 둘러보기용 가짜 자료를 넣는다.
+   *
+   * 자료가 각자 브라우저에 있어, 다른 사장님이 주소를 열면 빈 화면이 뜬다.
+   * 그러면 "단계를 따라갈 수 있나"를 물어볼 수가 없다.
+   *
+   * 자료가 하나도 없는 달에만 보인다 — 쓰던 달을 덮어쓰지 않기 위해서다.
+   */
+  function putDemo() {
+    if (!confirm(`${state.month}에 시연용 가짜 자료를 넣습니다.\n실제 자료가 아닙니다. 상단 ⌫(이 달 지우기)로 언제든 지울 수 있습니다.`)) return;
+    if (!readCard(demoCardCsv(state.month), "UTF-8", DEMO_FILE_NAME, undefined, "현대카드")) return;
+    update((s) => ({
+      ...s,
+      bankDeposits: [...demoDeposits(s.month), ...(s.bankDeposits ?? [])],
+      dailySales: (s.dailySales ?? []).length ? s.dailySales : demoSales(s.month),
+    }));
+  }
+
+  function readCard(
+    text: string,
+    encoding: string,
+    fileName: string,
+    manual?: { headerRow: number; map: FieldMap },
+    /** 시연 자료처럼 카드 구분이 정해져 있는 경우. 비우면 화면에서 고른 것을 쓴다. */
+    as?: string
+  ) {
+    const from = as ?? card;
+    const r = parseCardCsv(text, manual ? { manual, card: from } : { card: from });
     if (r.month && r.month !== state.month) {
       setError(`이 파일은 ${r.month} 내역입니다. 상단에서 해당 월로 바꾼 뒤 올려 주세요.`);
       return false;
@@ -72,7 +99,7 @@ export function UploadStep({
     setError(null);
     // 지난 달에 배운 규칙을 올리는 즉시 입힌다. 그래야 "카드 파일만 넣으면 분류돼 있다"가 된다.
     const rules = activeRules();
-    const rows = toTransactions(r, state.month, card).map((t) => {
+    const rows = toTransactions(r, state.month, from).map((t) => {
       const c = classify({ merchant: t.merchant, rawAccount: null, rawSub: null }, rules);
       return {
         ...t,
@@ -88,7 +115,7 @@ export function UploadStep({
     });
     ingest(rows, [], r.warnings, {
       name: fileName,
-      kind: `${card} · 거래 ${r.rows.length}건${manual ? " (열 직접 지정)" : ""}`,
+      kind: `${from} · 거래 ${r.rows.length}건${manual ? " (열 직접 지정)" : ""}`,
       encoding,
       recon: r.recon ?? undefined,
       headerRow: r.headerRow,
@@ -292,6 +319,13 @@ export function UploadStep({
 
   const last = state.imports[state.imports.length - 1];
 
+  /** 이 달에 아무것도 없을 때만 시연 자료를 권한다. 쓰던 달을 덮어쓰지 않기 위해서다. */
+  const empty =
+    !state.transactions.length &&
+    !state.imports.length &&
+    !(state.bankDeposits ?? []).length &&
+    !(state.dailySales ?? []).length;
+
   return (
     <div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-end" }}>
@@ -312,6 +346,15 @@ export function UploadStep({
           />
         </Field>
       </div>
+
+      {empty && (
+        <div className="okbox" style={{ marginTop: 12, alignItems: "center" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <b>처음이시면 둘러보세요.</b> 가짜 카드 내역 한 달치가 들어갑니다. 실제 자료가 아닙니다
+          </div>
+          <Btn onClick={putDemo}>시연 자료 넣기</Btn>
+        </div>
+      )}
 
       <p className="note-line" style={{ marginTop: 10 }}>
         카드사에서 <b>승인일(이용일) 기준</b>으로 1일~말일을 지정해 내려받으세요. 청구기간은 무시합니다.
