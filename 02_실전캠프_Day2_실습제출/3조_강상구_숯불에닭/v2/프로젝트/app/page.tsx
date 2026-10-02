@@ -182,6 +182,14 @@ export default function PnlPage() {
 
       <RatioCard pnl={pnl} />
 
+      <Link href="/year" className="card flex items-center justify-between">
+        <span>
+          <span className="block text-sm font-bold">📅 1년 한눈에 보기</span>
+          <span className="block text-xs text-stone-500">월별 매출·영업이익 막대 · 한 해 비용 구성 · 월별 표</span>
+        </span>
+        <span className="text-orange-700">→</span>
+      </Link>
+
       <WeekdayCard month={month} sales={daily.sales} channels={daily.channels} />
 
       <BreakevenCard month={month} pnl={pnl} openDays={openDays} />

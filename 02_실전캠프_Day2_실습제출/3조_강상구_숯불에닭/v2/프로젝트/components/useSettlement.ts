@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { useDaily } from "@/components/useDaily";
 import type { useLedger } from "@/components/useLedger";
 import { effectiveChannelSales } from "@/lib/effective";
-import { HOLIDAYS_KEY, SETTLEMENT_ADJUSTMENTS_KEY, SETTLEMENT_RULES_KEY, settleChannel, type ChannelSettlementSummary, type SettlementAdjustment, type SettlementRule } from "@/lib/settlement";
+import { monthSettlements } from "@/lib/monthPnl";
+import { HOLIDAYS_KEY, SETTLEMENT_ADJUSTMENTS_KEY, SETTLEMENT_RULES_KEY, type ChannelSettlementSummary, type SettlementAdjustment, type SettlementRule } from "@/lib/settlement";
 import { getStore } from "@/lib/storage";
 import type { ChannelSale } from "@/lib/types";
 
@@ -63,15 +64,10 @@ export function useSettlement(month: string, ledger: ReturnType<typeof useLedger
   );
 
   const txsAll = useMemo(() => [...ledger.txs, ...ledger.nextTxs], [ledger.txs, ledger.nextTxs]);
-  const hasDaily = daily.sales.some((s) => s.date.startsWith(month));
-
-  const results = useMemo(() => {
-    if (!hasDaily) return [];
-    const settleable = daily.channels.filter((c) => c.active && c.kind !== "cash");
-    return rules
-      .filter((r) => settleable.some((c) => c.id === r.channel))
-      .map((r) => settleChannel(r.channel, month, r, daily.sales, txsAll, ledger.lastBankDate, holidays, adjustments));
-  }, [rules, hasDaily, daily.channels, daily.sales, month, txsAll, ledger.lastBankDate, holidays, adjustments]);
+  const results = useMemo(
+    () => monthSettlements(month, rules, daily.channels, daily.sales, txsAll, ledger.lastBankDate, holidays, adjustments),
+    [rules, daily.channels, daily.sales, month, txsAll, ledger.lastBankDate, holidays, adjustments],
+  );
 
   const effectiveSales = useMemo(
     () => (ledger.loading || daily.loading ? [] : effectiveChannelSales(month, ledger.sales, daily.sales, daily.channels, results)),
