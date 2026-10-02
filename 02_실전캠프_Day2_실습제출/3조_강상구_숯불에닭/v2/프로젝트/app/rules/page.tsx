@@ -11,7 +11,7 @@ import { getStore, storageMode } from "@/lib/storage";
 import { exportBackup, importBackup } from "@/lib/storage/backup";
 import type { Rule } from "@/lib/types";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, parsePayDays } from "@/lib/paydays";
-import { emptyFixedCost, fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "@/lib/fixedCosts";
+import { amountFor, emptyFixedCost, fixedCostGaps, FIXED_COSTS_KEY, setAmountFor, type FixedCost } from "@/lib/fixedCosts";
 import PhotoStrip from "@/components/PhotoStrip";
 import { deletePhotosOf } from "@/lib/photos";
 import { num, parseNum, won } from "@/lib/format";
@@ -131,13 +131,23 @@ export default function RulesPage() {
         </p>
         <ul className="space-y-2">
           {fixedCosts.map((c, idx) => {
-            const g = fixedCostGaps([c], ledger.txs)[0];
+            const g = fixedCostGaps([c], ledger.txs, month)[0];
+            const amt = amountFor(c, month);
+            const before = !!c.since && month < c.since;
             return (
               <li key={c.id} className="rounded-xl bg-stone-50 p-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <input aria-label={`고정비 ${idx + 1} 이름`} className="field w-32" placeholder="이름 (석쇠 대여)" value={c.name} onChange={(e) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)))} />
                   <input aria-label={`고정비 ${idx + 1} 거래처`} className="field w-28" placeholder="통장 거래처" value={c.payeeKeyword} onChange={(e) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, payeeKeyword: e.target.value } : x)))} />
-                  <input aria-label={`고정비 ${idx + 1} 금액`} className="field num w-24 text-right" inputMode="numeric" placeholder="0" value={c.amount ? num(c.amount) : ""} onChange={(e) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, amount: parseNum(e.target.value) } : x)))} />
+                  <input
+                    aria-label={`고정비 ${idx + 1} ${monthLabel(month)} 금액`}
+                    className="field num w-24 text-right"
+                    inputMode="numeric"
+                    placeholder="0"
+                    disabled={before}
+                    value={amt ? num(amt) : ""}
+                    onChange={(e) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? setAmountFor(x, month, parseNum(e.target.value)) : x)))}
+                  />
                   <button
                     className="btn-ghost px-2 py-1 text-xs"
                     onClick={async () => {
@@ -148,6 +158,21 @@ export default function RulesPage() {
                     지우기
                   </button>
                 </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-600">
+                  <label className="flex items-center gap-1">
+                    적용 시작 월
+                    <input
+                      aria-label={`고정비 ${idx + 1} 적용 시작 월`}
+                      type="month"
+                      className={`field num w-36 py-1 ${c.since ? "" : "ring-2 ring-amber-300"}`}
+                      value={c.since ?? ""}
+                      onChange={(e) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, since: e.target.value || undefined } : x)))}
+                    />
+                  </label>
+                  {!c.since && <span className="text-amber-800">정해 주세요 — 안 정하면 지난 모든 달(마감한 달 포함)에도 이 금액이 채워져요</span>}
+                  {before && <span>{monthLabel(month)}은 시작 전이라 채우지 않아요</span>}
+                </div>
+                <p className="mt-1 text-[11px] text-stone-400">금액은 위에서 고른 {monthLabel(month)} 청구서 금액이에요. 다른 달 금액은 그대로 둬요.</p>
                 <div className="mt-2">
                   <CategorySelect idPrefix={c.id} major={c.major} minor={c.minor} onChange={(major, minor) => saveFixedCosts(fixedCosts.map((x) => (x.id === c.id ? { ...x, major: major as Major, minor } : x)))} />
                 </div>
@@ -164,7 +189,7 @@ export default function RulesPage() {
             );
           })}
         </ul>
-        <button className="btn-ghost w-full text-xs" onClick={() => saveFixedCosts([...fixedCosts, emptyFixedCost()])}>
+        <button className="btn-ghost w-full text-xs" onClick={() => saveFixedCosts([...fixedCosts, emptyFixedCost(month)])}>
           + 고정비 추가
         </button>
       </section>

@@ -59,9 +59,9 @@ export function useMonthPnl(month: Month) {
         settlement.effectiveSales,
         { hourly: summary.labor, salary: fixedLabor.salary, insurance: fixedLabor.insurance },
         materialPurchases,
-        fixedCostGaps(fixedCosts, ledger.txs),
+        fixedCostGaps(fixedCosts, ledger.txs, month),
       ),
-    [ledger.txs, settlement.effectiveSales, summary.labor, fixedLabor, materialPurchases, fixedCosts],
+    [ledger.txs, settlement.effectiveSales, summary.labor, fixedLabor, materialPurchases, fixedCosts, month],
   );
   const empty = ledger.txs.length === 0 && settlement.effectiveSales.length === 0;
 
