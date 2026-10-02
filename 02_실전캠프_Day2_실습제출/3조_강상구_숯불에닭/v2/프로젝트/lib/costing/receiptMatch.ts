@@ -60,13 +60,14 @@ export function matchCardReceipts(txs: Transaction[], purchases: Purchase[], exe
   const pays = cards.filter((t) => t.out > 0 && !used.has(t.id));
   out.cardCount = pays.length + out.cancelled.length;
 
-  // 2) 영수증이 필요 없는 결제
+  // 2) 영수증이 필요 없는 결제 — 다만 나중에 영수증을 넣으면 영수증이 이긴다 (아래 4번)
   const need: Transaction[] = [];
+  const skipped: CardMatch["exempt"] = [];
   for (const t of pays) {
-    if (exempt.txIds.includes(t.id)) out.exempt.push({ tx: t, reason: "이 결제는 필요 없음", manual: true });
-    else if (exempt.payees.includes(cardPayee(t.payee))) out.exempt.push({ tx: t, reason: "늘 필요 없는 거래처", manual: true });
-    else if (t.major === "제외") out.exempt.push({ tx: t, reason: "손익에 안 넣음 (개인 등)", manual: false });
-    else if (t.minor && BILL_MINORS.includes(t.minor)) out.exempt.push({ tx: t, reason: "청구서로 대신", manual: false });
+    if (exempt.txIds.includes(t.id)) skipped.push({ tx: t, reason: "이 결제는 필요 없음", manual: true });
+    else if (exempt.payees.includes(cardPayee(t.payee))) skipped.push({ tx: t, reason: "늘 필요 없는 거래처", manual: true });
+    else if (t.major === "제외") skipped.push({ tx: t, reason: "손익에 안 넣음 (개인 등)", manual: false });
+    else if (t.minor && BILL_MINORS.includes(t.minor)) skipped.push({ tx: t, reason: "청구서로 대신", manual: false });
     else need.push(t);
   }
 
@@ -76,27 +77,38 @@ export function matchCardReceipts(txs: Transaction[], purchases: Purchase[], exe
     pool
       .filter((x) => !x.taken && Math.abs(dayDiff(x.p.date, t.date)) <= WINDOW_DAYS)
       .sort((a, b) => Math.abs(dayDiff(a.p.date, t.date)) - Math.abs(dayDiff(b.p.date, t.date)) || nameScore(t.payee, b.p.vendor) - nameScore(t.payee, a.p.vendor));
-  const left: Transaction[] = [];
-  for (const t of need) {
-    const one = cands(t).find((x) => x.total === t.out);
-    if (one) {
-      one.taken = true;
-      out.matched.push({ tx: t, purchases: [one.p] });
-    } else left.push(t);
-  }
-  for (const t of left) {
-    const c = cands(t).slice(0, 12);
-    let found: typeof c | null = null;
-    for (let i = 0; i < c.length && !found; i++)
-      for (let j = i + 1; j < c.length && !found; j++) {
-        if (c[i].total + c[j].total === t.out) found = [c[i], c[j]];
-        for (let k = j + 1; k < c.length && !found; k++) if (c[i].total + c[j].total + c[k].total === t.out) found = [c[i], c[j], c[k]];
-      }
-    if (found) {
-      found.forEach((x) => (x.taken = true));
-      out.matched.push({ tx: t, purchases: found.map((x) => x.p) });
-    } else out.missing.push(t);
-  }
+  // 짝을 찾은 결제는 matched에 넣고, 못 찾은 것만 돌려준다
+  const matchAll = (list: Transaction[]): Transaction[] => {
+    const left: Transaction[] = [];
+    for (const t of list) {
+      const one = cands(t).find((x) => x.total === t.out);
+      if (one) {
+        one.taken = true;
+        out.matched.push({ tx: t, purchases: [one.p] });
+      } else left.push(t);
+    }
+    const still: Transaction[] = [];
+    for (const t of left) {
+      const c = cands(t).slice(0, 12);
+      let found: typeof c | null = null;
+      for (let i = 0; i < c.length && !found; i++)
+        for (let j = i + 1; j < c.length && !found; j++) {
+          if (c[i].total + c[j].total === t.out) found = [c[i], c[j]];
+          for (let k = j + 1; k < c.length && !found; k++) if (c[i].total + c[j].total + c[k].total === t.out) found = [c[i], c[j], c[k]];
+        }
+      if (found) {
+        found.forEach((x) => (x.taken = true));
+        out.matched.push({ tx: t, purchases: found.map((x) => x.p) });
+      } else still.push(t);
+    }
+    return still;
+  };
+  out.missing.push(...matchAll(need));
+
+  // 4) "필요 없음"으로 둔 결제도 남은 영수증과 맞춰 본다 — 나중에 영수증을 넣었으면 "영수증과 맞음"으로 (영수증이 먼저 필요한 결제부터 다 쓴 뒤)
+  const leftIds = new Set(matchAll(skipped.map((s) => s.tx)).map((t) => t.id));
+  out.exempt.push(...skipped.filter((s) => leftIds.has(s.tx.id)));
+
   out.matched.sort((a, b) => (a.tx.date < b.tx.date ? -1 : 1));
   return out;
 }

@@ -86,3 +86,21 @@ describe("시연용 가짜 자료", () => {
     expect(r.missing.map((t) => cardPayee(t.payee))).toEqual(["가짜편의점", "가짜철물", "가짜주차"]);
   });
 });
+
+describe("필요 없음으로 둔 결제에 나중에 영수증을 넣으면", () => {
+  it("영수증이 이긴다 — '영수증과 맞음'으로 옮겨 간다", () => {
+    const once = tx("2026-08-10", "NH체크 가짜식당", 47000, { major: "노무관리비", minor: "복리후생비" });
+    const r = matchCardReceipts([once], [buy("p9", "2026-08-10", "가짜식당", 47000)], { txIds: [once.id], payees: [] });
+    expect(r.matched.map((m) => m.tx.id)).toEqual([once.id]);
+    expect(r.exempt).toEqual([]);
+  });
+
+  it("영수증이 먼저 필요한 결제가 영수증을 먼저 가져간다", () => {
+    const need = tx("2026-08-12", "NH체크 가짜마트", 9600);
+    const skipped = tx("2026-08-12", "NH체크 가짜마트", 9600);
+    const r = matchCardReceipts([skipped, need], [buy("p10", "2026-08-12", "가짜마트", 9600)], { txIds: [skipped.id], payees: [] });
+    expect(r.matched.map((m) => m.tx.id)).toEqual([need.id]);
+    expect(r.exempt.map((e) => e.tx.id)).toEqual([skipped.id]);
+    expect(r.missing).toEqual([]);
+  });
+});

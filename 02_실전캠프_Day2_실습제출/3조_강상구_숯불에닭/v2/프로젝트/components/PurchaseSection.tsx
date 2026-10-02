@@ -447,7 +447,9 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
 
 function PurchaseEditor({ purchase, items, onChange, onSave, onCancel }: { purchase: Purchase; items: Item[]; onChange: (p: Purchase) => void; onSave: () => void; onCancel: () => void }) {
   const p = purchase;
+  const [missingName, setMissingName] = useState(false);
   const setLine = (i: number, patch: Partial<PurchaseLine>) => {
+    if ("name" in patch && patch.name?.trim()) setMissingName(false);
     const lines = p.lines.map((l, j) => {
       if (j !== i) return l;
       const next = { ...l, ...patch };
@@ -542,11 +544,19 @@ function PurchaseEditor({ purchase, items, onChange, onSave, onCancel }: { purch
 
         <PhotoStrip ownerId={p.id} />
 
+        {/* 저장이 막히는 까닭은 창 안에서 보여 준다 (창 뒤에 뜨면 안 보인다) */}
+        {missingName && <Notice tone="warn">상품명을 한 줄 이상 적어 주세요. 상품명과 금액이 있는 줄만 저장돼요.</Notice>}
         <div className="flex gap-2">
           <button className="btn-ghost flex-1" onClick={onCancel}>
             취소
           </button>
-          <button className="btn-primary flex-1" onClick={onSave}>
+          <button
+            className="btn-primary flex-1"
+            onClick={() => {
+              if (!p.lines.some((l) => l.name.trim() && l.amount > 0)) return setMissingName(true);
+              onSave();
+            }}
+          >
             저장
           </button>
         </div>
@@ -1120,7 +1130,14 @@ function CardReceiptCheck({
   onAddReceipt: (t: Transaction) => void;
 }) {
   const [showDone, setShowDone] = useState(false);
+  const [showExempt, setShowExempt] = useState(false);
   const r = useMemo(() => matchCardReceipts(txs, purchases, exempt), [txs, purchases, exempt]);
+  // "필요 없음"을 되돌린다 — 이 결제만 뺀 것이면 그 결제만, "늘 필요 없는 거래처"면 그 거래처 표시를 푼다
+  const undoExempt = (e: (typeof r.exempt)[number]) =>
+    void onExempt({
+      txIds: exempt.txIds.filter((id) => id !== e.tx.id),
+      payees: e.reason.startsWith("늘") ? exempt.payees.filter((p) => p !== cardPayee(e.tx.payee)) : exempt.payees,
+    });
   if (r.cardCount === 0)
     return (
       <section className="card space-y-1">
@@ -1186,6 +1203,47 @@ function CardReceiptCheck({
         </>
       )}
 
+      {r.exempt.length > 0 && (
+        <div className="rounded-xl bg-stone-50 p-2">
+          <button className="flex w-full items-center justify-between text-left text-xs" onClick={() => setShowExempt((v) => !v)} aria-expanded={showExempt}>
+            <span>
+              <b>필요 없음으로 둔 결제 {r.exempt.length}건</b> · {won(r.exempt.reduce((a, e) => a + e.tx.out, 0))}
+            </span>
+            <span className="font-bold text-orange-700 underline">{showExempt ? "접기" : "고치기"}</span>
+          </button>
+          {showExempt && (
+            <>
+              <ul className="mt-2 divide-y divide-stone-200 text-sm">
+                {r.exempt.map((e) => (
+                  <li key={e.tx.id} className="grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-1 py-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold">
+                        <span className="num">{md(e.tx.date)}</span> {cardPayee(e.tx.payee)}
+                      </p>
+                      <p className="text-xs text-stone-500">{e.reason}</p>
+                    </div>
+                    <span className="num whitespace-nowrap text-right font-bold">{won(e.tx.out)}</span>
+                    <div className="col-span-2 flex flex-wrap gap-1.5">
+                      <button className="btn-primary whitespace-nowrap px-2 py-1 text-xs" onClick={() => onAddReceipt(e.tx)}>
+                        영수증 넣기
+                      </button>
+                      {e.manual && (
+                        <button className="btn-ghost whitespace-nowrap px-2 py-1 text-xs" onClick={() => undoExempt(e)}>
+                          {e.reason.startsWith("늘") ? "이 거래처 ‘늘 필요 없음’ 풀기" : "필요 없음 되돌리기"}
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-[11px] text-stone-500">
+                영수증을 넣으면 금액이 맞는 결제는 저절로 “영수증과 맞음”으로 옮겨 가요. “손익에 안 넣음”·“청구서로 대신”은 올리기 탭에서 분류를 바꾸면 풀려요.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
       <button className="text-xs text-stone-500 underline" onClick={() => setShowDone((v) => !v)}>
         {showDone ? "맞춘 결과 접기" : "맞춘 결과 보기 (영수증과 맞음 · 필요 없음 · 취소)"}
       </button>
@@ -1207,36 +1265,7 @@ function CardReceiptCheck({
               </ul>
             </div>
           )}
-          {r.exempt.length > 0 && (
-            <div>
-              <p className="mb-1 font-semibold text-stone-500">영수증 필요 없음 {r.exempt.length}건</p>
-              <ul className="num divide-y divide-stone-100">
-                {r.exempt.map((e) => (
-                  <li key={e.tx.id} className="flex items-center justify-between gap-2 py-1">
-                    <span>
-                      {md(e.tx.date)} {cardPayee(e.tx.payee)} <span className="text-stone-400">· {e.reason}</span>
-                    </span>
-                    <span className="flex items-center gap-2">
-                      {won(e.tx.out)}
-                      {e.manual && (
-                        <button
-                          className="btn-ghost px-1.5 py-0.5 text-xs"
-                          onClick={() =>
-                            void onExempt({
-                              txIds: exempt.txIds.filter((id) => id !== e.tx.id),
-                              payees: e.reason.startsWith("늘") ? exempt.payees.filter((p) => p !== cardPayee(e.tx.payee)) : exempt.payees,
-                            })
-                          }
-                        >
-                          되돌리기
-                        </button>
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {r.exempt.length > 0 && <p className="text-stone-500">영수증 필요 없음 {r.exempt.length}건은 위 “필요 없음으로 둔 결제 — 고치기”에서 보고 고쳐요.</p>}
           {r.cancelled.length > 0 && (
             <div>
               <p className="mb-1 font-semibold text-stone-500">카드 취소로 빠진 결제 {r.cancelled.length}건</p>
