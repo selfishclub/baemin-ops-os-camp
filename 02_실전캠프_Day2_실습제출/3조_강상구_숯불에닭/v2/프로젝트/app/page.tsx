@@ -8,6 +8,7 @@ import { useLedger } from "@/components/useLedger";
 import { BreakevenCard } from "@/components/BreakevenCard";
 import { WeekdayCard } from "@/components/WeekdayCard";
 import { FindingsCard } from "@/components/FindingsCard";
+import { RatioCard } from "@/components/RatioCard";
 import { useDaily } from "@/components/useDaily";
 import { useSettlement } from "@/components/useSettlement";
 import { num, pctText, signed, won } from "@/lib/format";
@@ -170,6 +171,8 @@ export default function PnlPage() {
           ))}
         </ul>
       </section>
+
+      <RatioCard pnl={pnl} />
 
       <WeekdayCard month={month} sales={daily.sales} channels={daily.channels} />
 
