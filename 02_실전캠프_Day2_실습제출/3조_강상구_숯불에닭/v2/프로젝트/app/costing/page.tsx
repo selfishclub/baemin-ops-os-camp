@@ -5,6 +5,7 @@ import { useMonth } from "@/components/AppShell";
 import { MoneyInput, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
 import PurchaseSection from "@/components/PurchaseSection";
+import { PriceTrendCard } from "@/components/PriceTrendCard";
 import { newId } from "@/lib/classify";
 import { buildCostRateReport, recipeUnitCost } from "@/lib/costing/costRate";
 import { PURCHASES_KEY_PREFIX, costFromPurchases, type Purchase } from "@/lib/costing/purchases";
@@ -274,6 +275,7 @@ export default function CostingPage() {
       )}
 
       {view === "purchases" && <PurchaseSection month={month} items={items} onItemsChange={load} />}
+      {view === "purchases" && <PriceTrendCard month={month} items={items} />}
       {view === "setup" && <Setup items={items} menus={menus} recipes={recipes} onChange={load} />}
     </>
   );
