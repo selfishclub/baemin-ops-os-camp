@@ -8,6 +8,7 @@ import { BreakevenCard } from "@/components/BreakevenCard";
 import { WeekdayCard } from "@/components/WeekdayCard";
 import { FindingsCard } from "@/components/FindingsCard";
 import { RatioCard } from "@/components/RatioCard";
+import { SummaryCopyCard } from "@/components/SummaryCopyCard";
 import { useMonthPnl } from "@/components/useMonthPnl";
 import { num, pctText, signed, won } from "@/lib/format";
 import { closeMonth, isClosed, monthLabel, prevMonth } from "@/lib/month";
@@ -218,6 +219,15 @@ export default function PnlPage() {
           </>
         )}
       </section>
+
+      <SummaryCopyCard
+        monthName={monthLabel(month).slice(6)}
+        prevName={monthLabel(prevMonth(month)).slice(6)}
+        pnl={pnl}
+        prevProfit={hasPrev ? prev.pnl.operatingProfit : null}
+        closed={closed}
+        missingDays={missingSales}
+      />
 
       <TaxExportCard month={month} txs={ledger.txs} needsReview={pnl.needsReview} closed={closed} />
 
