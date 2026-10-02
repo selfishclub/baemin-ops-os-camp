@@ -9,15 +9,20 @@ export const UNUSUAL_TIMES = 3;
 
 export const newId = () => crypto.randomUUID();
 
+// 금액 조건이 붙은 규칙(같은 거래처로 성격이 다른 돈이 나갈 때 — 본사 원재료 대금 vs 로열티 결제)은
+// 금액까지 맞아야 쓰고, 맞으면 키워드만 맞는 규칙보다 먼저 쓴다.
 export function findRule(row: BankRow, rules: Rule[]): Rule | null {
   const direction = row.in > 0 ? "in" : "out";
   const payee = row.payee.replace(/\s/g, "");
+  const amount = row.out || row.in;
+  const score = (r: Rule) => (r.amount ? 1000 : 0) + r.keyword.replace(/\s/g, "").length; // 금액까지 맞는 규칙 > 긴 키워드
   let best: Rule | null = null;
   for (const r of rules) {
     if (r.direction !== direction) continue;
     const k = r.keyword.replace(/\s/g, "");
     if (!k || !payee.includes(k)) continue;
-    if (!best || k.length > best.keyword.replace(/\s/g, "").length) best = r; // 긴 키워드가 더 정확
+    if (r.amount && r.amount !== amount) continue;
+    if (!best || score(r) > score(best)) best = r;
   }
   return best;
 }

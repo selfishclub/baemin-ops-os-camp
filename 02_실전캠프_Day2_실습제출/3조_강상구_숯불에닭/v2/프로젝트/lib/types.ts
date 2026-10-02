@@ -37,6 +37,7 @@ export interface Rule {
   channel: ChannelId | null;
   ambiguous?: boolean; // 마트처럼 매번 확인이 필요한 거래처
   prev_month?: boolean; // 급여·거래처 대금처럼 다음 달 10일에 내는 돈: 통장에서 나간 달이 아니라 지난달 비용으로 잡는다 (Supabase 열 이름과 같게 snake_case)
+  amount?: number; // 이 금액일 때만 (같은 거래처로 성격이 다른 돈이 나갈 때 — 본사 원재료 대금 vs 로열티 결제). 내 PC 모드 전용 (시연 DB 표에는 이 열이 없다)
 }
 
 export interface ChannelSale {

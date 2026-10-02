@@ -275,3 +275,19 @@ describe("어림 인건비", () => {
     expect(computePnl([], []).laborEstimated).toBe(false);
   });
 });
+
+describe("금액 조건이 붙은 규칙 (본사 원재료 대금 vs 로열티 결제)", () => {
+  const rules: import("./types").Rule[] = [
+    { id: "a", keyword: "주식회사그루온", direction: "out", major: "매출원가", minor: "원재료비", channel: null },
+    { id: "b", keyword: "그루온", direction: "out", major: "제외", minor: "손익에 안 넣음", channel: null, amount: 1_001_880 },
+  ];
+  const row = (out: number) => ({ date: "2026-10-10", payee: "NH콕송금 주식회사그루온", out, in: 0 });
+
+  it("금액이 맞으면 키워드가 짧아도 금액 규칙이 이긴다", () => {
+    expect(findRule(row(1_001_880), rules)?.id).toBe("b");
+  });
+
+  it("금액이 다르면 원래대로 원재료비", () => {
+    expect(findRule(row(731_390), rules)?.id).toBe("a");
+  });
+});
