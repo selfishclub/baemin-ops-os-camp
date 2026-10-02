@@ -1,79 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, Notice } from "@/components/ui";
-import { useLedger } from "@/components/useLedger";
 import { BreakevenCard } from "@/components/BreakevenCard";
 import { WeekdayCard } from "@/components/WeekdayCard";
 import { FindingsCard } from "@/components/FindingsCard";
 import { RatioCard } from "@/components/RatioCard";
-import { useDaily } from "@/components/useDaily";
-import { useSettlement } from "@/components/useSettlement";
+import { useMonthPnl } from "@/components/useMonthPnl";
 import { num, pctText, signed, won } from "@/lib/format";
-import { closeMonth, isClosed, monthLabel } from "@/lib/month";
-import { compareLines, computePnl, type PnlLine } from "@/lib/pnl";
+import { closeMonth, isClosed, monthLabel, prevMonth } from "@/lib/month";
+import { compareLines, type Pnl, type PnlLine } from "@/lib/pnl";
 import { getStore } from "@/lib/storage";
-import { monthSummary, todayStr } from "@/lib/daily";
 import { monthFindings, monthSources, type FindingsInput } from "@/lib/findings";
+import { missingFixedCosts } from "@/lib/missingFixed";
 import { dayTotals } from "@/lib/weekday";
-import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
-import { fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "@/lib/fixedCosts";
 import { PURCHASES_KEY_PREFIX, type Purchase } from "@/lib/costing/purchases";
 import { buildTaxSheets, taxFileName } from "@/lib/taxExport";
 import type { Transaction } from "@/lib/types";
 
 export default function PnlPage() {
   const { month } = useMonth();
-  const ledger = useLedger(month);
-  const daily = useDaily(month);
-  const settlement = useSettlement(month, ledger, daily);
+  const cur = useMonthPnl(month);
+  const prev = useMonthPnl(prevMonth(month)); // 지난달도 같은 잣대로 계산해서 비교한다
+  const { ledger, daily, settlement, summary, pnl, purchaseCount, today } = cur;
   const [open, setOpen] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
-  const [fixedLabor, setFixedLabor] = useState<FixedLabor>(EMPTY_FIXED_LABOR);
-  // 그 달 매입 영수증의 재료비 합계 — 통장에서 아직 안 나간 몫을 원가에 더하려고
-  const [materialPurchases, setMaterialPurchases] = useState(0);
-  const [purchaseCount, setPurchaseCount] = useState(0); // 그 달 매입 영수증 수 — "자료 다 들어왔나" 체크용
-  const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
-  useEffect(() => {
-    getStore()
-      .getSetting<FixedLabor>(FIXED_LABOR_KEY)
-      .then((v) => v && setFixedLabor(v))
-      .catch(() => {});
-  }, []);
-  useEffect(() => {
-    getStore()
-      .getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + month)
-      .then((ps) => {
-        const sum = (ps ?? []).reduce((a, p) => a + (p.lines ?? []).filter((l) => l.category === "원재료비" || l.category === "기타재료비").reduce((x, l) => x + l.amount, 0), 0);
-        setMaterialPurchases(sum);
-        setPurchaseCount((ps ?? []).length);
-      })
-      .catch(() => {
-        setMaterialPurchases(0);
-        setPurchaseCount(0);
-      });
-  }, [month]);
-  useEffect(() => {
-    getStore()
-      .getSetting<FixedCost[]>(FIXED_COSTS_KEY)
-      .then((v) => setFixedCosts(v ?? []))
-      .catch(() => {});
-  }, []);
 
-  if (ledger.loading || daily.loading || !settlement.loaded) return <p className="py-10 text-center text-sm text-stone-500">불러오는 중…</p>;
+  if (cur.loading || prev.loading) return <p className="py-10 text-center text-sm text-stone-500">불러오는 중…</p>;
   if (ledger.error) return <Notice tone="error">{ledger.error}</Notice>;
 
-  const today = todayStr();
-  const summary = monthSummary(month, daily.sales, daily.shifts, daily.staff, today);
-  const hourlyLabor = summary.labor;
   const openDays = dayTotals(daily.sales, daily.channels).length; // 매출이 있었던 날 = 영업일
-  const pnl = computePnl(ledger.txs, settlement.effectiveSales, { hourly: hourlyLabor, salary: fixedLabor.salary, insurance: fixedLabor.insurance }, materialPurchases, fixedCostGaps(fixedCosts, ledger.txs));
-  const hasPrev = ledger.prevTxs.length > 0 || ledger.prevSales.length > 0;
-  const diff = compareLines(pnl, hasPrev ? computePnl(ledger.prevTxs, ledger.prevSales) : null);
+  const hasPrev = !prev.empty;
+  const diff = compareLines(pnl, hasPrev ? prev.pnl : null);
   const closed = isClosed(ledger.closing);
-  const empty = ledger.txs.length === 0 && settlement.effectiveSales.length === 0;
+  const empty = cur.empty;
+  const missingFixed = missingFixedCosts(ledger.prevTxs, ledger.txs, ledger.rules, ledger.lastBankDate, cur.fixedCosts);
   const findingsInput: FindingsInput = {
     month,
     today,
@@ -87,6 +50,19 @@ export default function PnlPage() {
     nameOf: (id) => daily.channels.find((c) => c.id === id)?.name ?? id,
     purchaseCount,
     laborEstimated: pnl.laborEstimated,
+    extra: missingFixed.length
+      ? [
+          {
+            level: "warn",
+            text: `지난달엔 나갔는데 이번 달 통장엔 없는 고정비 ${missingFixed.length}건: ${missingFixed
+              .slice(0, 3)
+              .map((m) => `${m.label} ${num(m.prevAmount)}원`)
+              .join(", ")}${missingFixed.length > 3 ? " …" : ""} — 빠진 건 아닌지 보세요`,
+            href: "/upload",
+            action: "올리기 탭",
+          },
+        ]
+      : [],
   };
 
   async function close() {
@@ -114,10 +90,14 @@ export default function PnlPage() {
         <div className={`card col-span-2 ${pnl.operatingProfit >= 0 ? "" : "ring-red-300"}`}>
           <p className="text-xs font-semibold text-stone-500">이번 달 실제로 남은 돈 (영업이익)</p>
           <p className={`num mt-1 text-3xl font-extrabold ${pnl.operatingProfit >= 0 ? "text-emerald-700" : "text-red-600"}`}>{won(pnl.operatingProfit)}</p>
-          <p className="num mt-1 text-sm text-stone-600">
-            이익률 {pctText(pnl.operatingMargin)}
-            {diff["영업이익"] !== null && diff["영업이익"] !== undefined && <span className="ml-2 text-xs">지난달 대비 {signed(diff["영업이익"]!)}</span>}
-          </p>
+          <p className="num mt-1 text-sm text-stone-600">이익률 {pctText(pnl.operatingMargin)}</p>
+          {hasPrev && (
+            <p className="num mt-0.5 text-xs text-stone-500">
+              {monthLabel(prevMonth(month)).slice(6)} {won(prev.pnl.operatingProfit)} → {monthLabel(month).slice(6)} {won(pnl.operatingProfit)}{" "}
+              <span className={diff["영업이익"]! >= 0 ? "text-emerald-700" : "text-red-600"}>({signed(diff["영업이익"] ?? 0)})</span>
+            </p>
+          )}
+          <Formula pnl={pnl} />
         </div>
         <div className="card">
           <p className="text-xs font-semibold text-stone-500">총매출</p>
@@ -216,6 +196,23 @@ export default function PnlPage() {
   );
 }
 
+// 영업이익이 어떻게 나왔는지 금액으로 풀어 쓴 식 (해모닉에서 따옴) — 숫자를 믿고 볼 수 있게
+function Formula({ pnl }: { pnl: Pnl }) {
+  const costs = pnl.lines.filter((l) => l.kind === "cost" && l.amount !== 0);
+  return (
+    <p className="num mt-2 rounded-lg bg-stone-50 px-2 py-1.5 text-[11px] leading-5 text-stone-600">
+      총매출 {num(pnl.revenue)}
+      {costs.map((l) => (
+        <span key={l.label}>
+          {" "}
+          {l.amount > 0 ? "−" : "+"} {l.label} {num(Math.abs(l.amount))}
+        </span>
+      ))}{" "}
+      = <b className="text-stone-800">영업이익 {num(pnl.operatingProfit)}</b>
+    </p>
+  );
+}
+
 function PnlRow({ line, diff, open, onToggle, estimated = false }: { line: PnlLine; diff: number | null; open: boolean; onToggle: () => void; estimated?: boolean }) {
   const strong = line.kind !== "cost";
   const canOpen = line.kind === "cost" && (line.minors?.length ?? 0) > 0;
@@ -233,10 +230,13 @@ function PnlRow({ line, diff, open, onToggle, estimated = false }: { line: PnlLi
           {estimated && <span className="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-bold text-violet-900">어림</span>}
           {canOpen && <span className="ml-1 text-[11px] text-stone-400">{open ? "▲" : "▼"}</span>}
         </span>
-        <span className="num flex items-baseline gap-2 text-right">
-          {diff !== null && diff !== 0 && <span className="hidden text-xs text-stone-400 sm:inline">{signed(diff)}</span>}
-          <span className={`text-sm ${strong ? "font-bold" : ""}`}>{num(line.amount)}</span>
-          <span className="w-12 text-xs text-stone-500">{pctText(line.pct)}</span>
+        <span className="num flex flex-col items-end text-right sm:flex-row sm:items-baseline sm:gap-2">
+          {/* 지난달 대비 — 폰에서는 금액 밑에, 넓은 화면에서는 금액 앞에 */}
+          <span className="order-2 text-[11px] text-stone-400 sm:order-1 sm:text-xs">{diff !== null && diff !== 0 ? `지난달 ${signed(diff)}` : ""}</span>
+          <span className="order-1 flex items-baseline gap-2 sm:order-2">
+            <span className={`text-sm ${strong ? "font-bold" : ""}`}>{num(line.amount)}</span>
+            <span className="w-12 text-xs text-stone-500">{pctText(line.pct)}</span>
+          </span>
         </span>
       </button>
       {open && (
