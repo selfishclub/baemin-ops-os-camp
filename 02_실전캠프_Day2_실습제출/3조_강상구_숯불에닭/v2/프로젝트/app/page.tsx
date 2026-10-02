@@ -7,13 +7,15 @@ import { ConfirmDialog, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
 import { BreakevenCard } from "@/components/BreakevenCard";
 import { WeekdayCard } from "@/components/WeekdayCard";
+import { FindingsCard } from "@/components/FindingsCard";
 import { useDaily } from "@/components/useDaily";
 import { useSettlement } from "@/components/useSettlement";
 import { num, pctText, signed, won } from "@/lib/format";
 import { closeMonth, isClosed, monthLabel } from "@/lib/month";
 import { compareLines, computePnl, type PnlLine } from "@/lib/pnl";
 import { getStore } from "@/lib/storage";
-import { monthSummary } from "@/lib/daily";
+import { monthSummary, todayStr } from "@/lib/daily";
+import { monthFindings, monthSources, type FindingsInput } from "@/lib/findings";
 import { dayTotals } from "@/lib/weekday";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
 import { fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "@/lib/fixedCosts";
@@ -31,6 +33,7 @@ export default function PnlPage() {
   const [fixedLabor, setFixedLabor] = useState<FixedLabor>(EMPTY_FIXED_LABOR);
   // 그 달 매입 영수증의 재료비 합계 — 통장에서 아직 안 나간 몫을 원가에 더하려고
   const [materialPurchases, setMaterialPurchases] = useState(0);
+  const [purchaseCount, setPurchaseCount] = useState(0); // 그 달 매입 영수증 수 — "자료 다 들어왔나" 체크용
   const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
   useEffect(() => {
     getStore()
@@ -44,8 +47,12 @@ export default function PnlPage() {
       .then((ps) => {
         const sum = (ps ?? []).reduce((a, p) => a + (p.lines ?? []).filter((l) => l.category === "원재료비" || l.category === "기타재료비").reduce((x, l) => x + l.amount, 0), 0);
         setMaterialPurchases(sum);
+        setPurchaseCount((ps ?? []).length);
       })
-      .catch(() => setMaterialPurchases(0));
+      .catch(() => {
+        setMaterialPurchases(0);
+        setPurchaseCount(0);
+      });
   }, [month]);
   useEffect(() => {
     getStore()
@@ -57,13 +64,29 @@ export default function PnlPage() {
   if (ledger.loading || daily.loading || !settlement.loaded) return <p className="py-10 text-center text-sm text-stone-500">불러오는 중…</p>;
   if (ledger.error) return <Notice tone="error">{ledger.error}</Notice>;
 
-  const hourlyLabor = monthSummary(month, daily.sales, daily.shifts, daily.staff).labor;
+  const today = todayStr();
+  const summary = monthSummary(month, daily.sales, daily.shifts, daily.staff, today);
+  const hourlyLabor = summary.labor;
   const openDays = dayTotals(daily.sales, daily.channels).length; // 매출이 있었던 날 = 영업일
   const pnl = computePnl(ledger.txs, settlement.effectiveSales, { hourly: hourlyLabor, salary: fixedLabor.salary, insurance: fixedLabor.insurance }, materialPurchases, fixedCostGaps(fixedCosts, ledger.txs));
   const hasPrev = ledger.prevTxs.length > 0 || ledger.prevSales.length > 0;
   const diff = compareLines(pnl, hasPrev ? computePnl(ledger.prevTxs, ledger.prevSales) : null);
   const closed = isClosed(ledger.closing);
   const empty = ledger.txs.length === 0 && settlement.effectiveSales.length === 0;
+  const findingsInput: FindingsInput = {
+    month,
+    today,
+    lastBankDate: ledger.lastBankDate,
+    needsReview: pnl.needsReview,
+    unclassified: pnl.unclassified,
+    revenueBasis: pnl.revenueBasis,
+    missingDays: summary.missingDays,
+    enteredDays: summary.enteredDays,
+    settlements: settlement.results,
+    nameOf: (id) => daily.channels.find((c) => c.id === id)?.name ?? id,
+    purchaseCount,
+    laborEstimated: pnl.laborEstimated,
+  };
 
   async function close() {
     setAsking(false);
@@ -116,22 +139,7 @@ export default function PnlPage() {
         </div>
       </section>
 
-      {pnl.revenueBasis === "입금액" && (
-        <Notice tone="warn">
-          실매출 미입력 — 지금 매출은 <b>통장 입금액 기준</b>이라 배달앱 수수료가 안 보여요.{" "}
-          <Link href="/channels" className="font-bold underline">
-            배달앱 탭에서 입력
-          </Link>
-        </Notice>
-      )}
-      {pnl.needsReview > 0 && (
-        <Notice tone="warn">
-          확인이 필요한 줄이 <b>{pnl.needsReview}줄</b> 남았어요{pnl.unclassified > 0 && ` (그중 ${pnl.unclassified}줄은 아직 손익에 안 들어갔어요)`}.{" "}
-          <Link href="/upload" className="font-bold underline">
-            올리기 탭에서 확인
-          </Link>
-        </Notice>
-      )}
+      <FindingsCard sources={monthSources(findingsInput)} findings={monthFindings(findingsInput)} />
 
       <section className="card">
         <div className="mb-2 flex items-baseline justify-between">
