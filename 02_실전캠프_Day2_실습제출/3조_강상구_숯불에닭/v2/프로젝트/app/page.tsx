@@ -36,6 +36,8 @@ export default function PnlPage() {
   const diff = compareLines(pnl, hasPrev ? prev.pnl : null);
   const closed = isClosed(ledger.closing);
   const empty = cur.empty;
+  const estimateTotal = pnl.estimates.reduce((a, e) => a + e.amount, 0); // 확정 아닌 몫 (어림·청구서 금액)
+  const missingSales = pnl.revenueBasis === "실매출" ? summary.missingDays.length : 0; // 빈 날은 0원이 아니라 "미입력"
   const missingFixed = missingFixedCosts(ledger.prevTxs, ledger.txs, ledger.rules, ledger.lastBankDate, cur.fixedCosts);
   const findingsInput: FindingsInput = {
     month,
@@ -98,6 +100,12 @@ export default function PnlPage() {
             </p>
           )}
           <Formula pnl={pnl} />
+          {(estimateTotal > 0 || missingSales > 0) && (
+            <p className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+              {estimateTotal > 0 && <span className="rounded bg-violet-100 px-1.5 py-0.5 font-bold text-violet-900">어림 {won(estimateTotal)} 섞임 — 확정 아님</span>}
+              {missingSales > 0 && <span className="rounded bg-stone-100 px-1.5 py-0.5 font-bold text-stone-700">매출 미입력 {missingSales}일 — 넣으면 이익이 바뀌어요</span>}
+            </p>
+          )}
         </div>
         <div className="card">
           <p className="text-xs font-semibold text-stone-500">총매출</p>
@@ -130,24 +138,44 @@ export default function PnlPage() {
         <p className="mb-1 rounded-lg bg-stone-50 px-2 py-1.5 text-xs text-stone-600">
           기준 — <b>매출·배달앱 수수료</b>: 주문이 발생한 달 · <b>비용</b>: 통장에서 돈이 나간 날. 다른 달에 결제한 비용은 지출추가 탭에서 날짜를 맞춰 넣을 수 있어요.
         </p>
-        {pnl.fixedUnpaid > 0 && (
-          <p className="mb-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
-            <b>아직 안 낸 고정비 {won(pnl.fixedUnpaid)}도 넣어 뒀어요</b> — 청구서는 왔는데 다음 달 초에 나가는 돈이에요(석쇠 대여비·가스요금 등). 금액은 <Link href="/rules" className="font-bold underline">규칙 탭</Link>에서 매달 고쳐요.
-          </p>
-        )}
-        {pnl.materialUnpaid > 0 && (
-          <p className="mb-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
-            <b>매출원가에 아직 안 낸 재료비 {won(pnl.materialUnpaid)}이 들어 있어요</b> — 매입 영수증에는 있는데 통장에서 아직 안 나간 돈이에요(주류 월말 결제, 거래처 외상, 다음 달 10일에 내는 대금). 9월에 받은 재료는 9월 원가라서 미리 넣어 둬요. 실제로 나가면 그 금액으로 바뀌어요.
-          </p>
-        )}
-        {pnl.laborEstimated && (
-          <p className="mb-1 rounded-lg bg-violet-50 px-2 py-1.5 text-xs text-violet-900">
-            <b>노무관리비는 어림값</b>이에요 — 급여가 아직 통장에서 안 나가서 오늘 탭 근무(시간 × 시급)와 월 고정 인건비(월급·4대보험, 오늘 탭 “직원·채널 설정”)로 채웠어요. 급여가 나가 통장을 올리면 실제 금액으로 바뀌어요.
-          </p>
+        {pnl.estimates.length > 0 && (
+          <details className="mb-1 rounded-lg bg-violet-50 px-2 py-1.5 text-xs text-violet-900">
+            <summary className="cursor-pointer">
+              <b>어림값 {won(estimateTotal)}</b>이 들어 있어요 — 통장에서 아직 안 나간 돈이라 미리 채웠어요. 나가면 실제 금액으로 바뀌어요. <span className="underline">자세히</span>
+            </summary>
+            <ul className="mt-1.5 space-y-1.5">
+              {pnl.laborUnpaid > 0 && (
+                <li>
+                  <b>인건비 {won(pnl.laborUnpaid)}</b> — 급여가 아직 안 나가서 오늘 탭 근무(시간 × 시급)와 월 고정 인건비(월급·4대보험, 오늘 탭 “직원·채널 설정”)로 채웠어요.
+                </li>
+              )}
+              {pnl.materialUnpaid > 0 && (
+                <li>
+                  <b>외상 재료비 {won(pnl.materialUnpaid)}</b> — 매입 영수증에는 있는데 통장에서 아직 안 나간 돈이에요(주류 월말 결제, 거래처 외상, 다음 달 10일 대금). {monthLabel(month).slice(6)}에 받은 재료는 {monthLabel(month).slice(6)} 원가라서 미리 넣어 둬요.
+                </li>
+              )}
+              {pnl.fixedUnpaid > 0 && (
+                <li>
+                  <b>고정비 {won(pnl.fixedUnpaid)}</b> ({pnl.estimates.filter((e) => e.kind === "fixed").map((e) => e.what).join(", ")}) — 청구서는 왔는데 다음 달 초에 나가는 돈이에요. 금액은{" "}
+                  <Link href="/rules" className="font-bold underline">
+                    규칙 탭
+                  </Link>
+                  에서 매달 고쳐요.
+                </li>
+              )}
+            </ul>
+          </details>
         )}
         <ul className="divide-y divide-stone-100">
           {pnl.lines.map((line) => (
-            <PnlRow key={line.label} line={line} diff={diff[line.label] ?? null} open={open === line.label} onToggle={() => setOpen(open === line.label ? null : line.label)} estimated={line.label === "노무관리비" && pnl.laborEstimated} />
+            <PnlRow
+              key={line.label}
+              line={line}
+              diff={diff[line.label] ?? null}
+              open={open === line.label}
+              onToggle={() => setOpen(open === line.label ? null : line.label)}
+              estimated={pnl.estimates.some((e) => e.major === line.label)}
+            />
           ))}
         </ul>
       </section>

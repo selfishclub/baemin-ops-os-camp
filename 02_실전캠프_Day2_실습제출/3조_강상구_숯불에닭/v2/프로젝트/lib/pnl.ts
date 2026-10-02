@@ -13,6 +13,13 @@ export interface PnlLine {
   minors?: { label: string; amount: number }[];
 }
 
+export interface PnlEstimate {
+  kind: "labor" | "material" | "fixed";
+  major: Major; // 손익표 어느 줄에 들어갔나
+  what: string; // "아직 안 나간 인건비", "아직 안 낸 재료비 (외상)", 고정비 이름
+  amount: number;
+}
+
 export interface Pnl {
   revenue: number;
   revenueBasis: "실매출" | "입금액"; // 채널 입력이 없으면 통장 입금액 기준
@@ -28,6 +35,9 @@ export interface Pnl {
   laborEstimated: boolean; // 노무관리비를 어림값(오늘 탭 근무 + 월 고정 인건비)으로 채웠나 — 급여가 통장에서 나가면 false
   materialUnpaid: number; // 매입 영수증에는 있는데 아직 통장에서 안 나간 재료비 (주류 월말 결제, 거래처 외상 등)
   fixedUnpaid: number; // 청구서는 왔는데 아직 통장에서 안 나간 고정비 (석쇠 대여비, 가스요금 등)
+  laborUnpaid: number; // 아직 안 나간 인건비 어림 금액
+  // 통장에 아직 없어서 어림·청구서 금액으로 채운 몫 (확정 아님). 영업이익에 이만큼 "어림"이 섞여 있다
+  estimates: PnlEstimate[];
   unclassified: number; // 아직 분류 안 된 줄 수
   needsReview: number; // 확인 필요 표시가 남은 줄 수
 }
@@ -160,6 +170,12 @@ export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: 
     laborEstimated,
     materialUnpaid,
     fixedUnpaid: totalFixedGap(fixedGaps),
+    laborUnpaid: laborGap,
+    estimates: [
+      ...(laborGap > 0 ? [{ kind: "labor" as const, major: "노무관리비" as Major, what: "아직 안 나간 인건비", amount: laborGap }] : []),
+      ...(materialUnpaid > 0 ? [{ kind: "material" as const, major: "매출원가" as Major, what: "아직 안 낸 재료비 (외상)", amount: materialUnpaid }] : []),
+      ...fixedGaps.filter((g) => g.gap > 0).map((g) => ({ kind: "fixed" as const, major: g.cost.major, what: g.cost.name || g.cost.minor, amount: g.gap })),
+    ],
     deliveryFee,
     unclassified: all.filter((t) => !t.major).length,
     needsReview: all.filter((t) => t.review).length,

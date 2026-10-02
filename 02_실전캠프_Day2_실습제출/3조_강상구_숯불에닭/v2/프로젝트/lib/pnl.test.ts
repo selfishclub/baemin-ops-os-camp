@@ -97,3 +97,25 @@ describe("나눠 분류한 줄로 손익 내기", () => {
     expect(p.excluded.out).toBe(6_480);
   });
 });
+
+describe("어림값 목록 (확정 아님)", () => {
+  const tx = (payee: string, out: number, major: Major, minor: string): Transaction => ({
+    id: payee, month: "2026-09", date: "2026-09-10", payee, out, in: 0, source: "bank", major, minor, channel: null, review: null,
+  });
+  const sales: ChannelSale[] = [{ month: "2026-09", channel: "hall_card", name: "홀", orders: 10_000_000, deposit: 9_900_000, count: 100 }];
+
+  it("인건비·외상 재료비·고정비 어림을 줄마다 모은다", () => {
+    const gas = { id: "g", name: "도시가스", payeeKeyword: "도시가스", major: "영업비" as Major, minor: "수도광열비", amount: 300_000, active: true };
+    const p = computePnl([tx("가나식품", 1_000_000, "매출원가", "원재료비")], sales, { hourly: 1_500_000, salary: 0, insurance: 0 }, 1_200_000, [{ cost: gas, paid: 0, gap: 300_000 }]);
+    expect(p.estimates).toEqual([
+      { kind: "labor", major: "노무관리비", what: "아직 안 나간 인건비", amount: 1_500_000 },
+      { kind: "material", major: "매출원가", what: "아직 안 낸 재료비 (외상)", amount: 200_000 },
+      { kind: "fixed", major: "영업비", what: "도시가스", amount: 300_000 },
+    ]);
+    expect(p.laborUnpaid).toBe(1_500_000);
+  });
+
+  it("다 통장에 있으면 어림이 없다", () => {
+    expect(computePnl([tx("가나식품", 1_000_000, "매출원가", "원재료비")], sales).estimates).toEqual([]);
+  });
+});
