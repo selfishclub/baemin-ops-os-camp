@@ -387,7 +387,7 @@
   }
   function renderChecklist(kind, m, s) {
     var lists = itemsFor(s, m.store, kind), src = { items: lists.all }, label = KIND_LABEL[kind], detail = kind === 'open' ? 4 : 10, date = today();
-    var products = (kind === 'close') ? (s.products || []) : [];
+    var products = (kind === 'close') ? (s.products || []) : [], wasteOn = kind === 'close';
     var h = '<div class="crumb"><a href="#/">첫 화면</a> › 체크리스트</div>';
     h += '<h1>' + (kind === 'open' ? '☀️' : '🌙') + ' ' + label + ' 체크리스트</h1>';
     h += '<div class="card who-line"><span>' + (m.store ? '<strong>' + esc(m.store) + '</strong> · ' : '') + esc(m.staff) + ' · ' + koDate(date) + '</span><a href="#/who?next=' + encodeURIComponent('#/check/' + kind) + '">바꾸기</a></div>';
@@ -407,13 +407,16 @@
         body += '<li class="' + (on ? 'done' : '') + '"><label><input type="checkbox" data-i="' + i + '"' + (on ? ' checked' : '') + '><span>' + esc(t) + '</span><em class="when">' + (on ? hhmm(run.items[String(i)]) : '') + '</em></label></li>';
       });
       body += '</ul>';
-      if (products.length) {
+      if (wasteOn) {
         run.waste = run.waste || {};
         body += '<div class="card waste"><div class="title">🗑️ 오늘 폐기 <span id="waste-sum" class="muted small"></span></div>';
-        body += '<p class="muted small">폐기가 있었던 떡만 눌러서 개수를 적어 주세요. 하나도 없으면 "오늘 폐기 없음".</p>';
-        body += '<div class="choice" id="waste-pick">' + products.map(function (p) { return '<button type="button" class="choice-btn' + (run.waste[p] > 0 ? ' on' : '') + '" data-p="' + esc(p) + '">' + esc(p) + '</button>'; }).join('') + '</div>';
+        body += '<p class="muted small">' + (products.length ? '폐기가 있었던 떡만 눌러서 개수를 적어 주세요. 하나도 없으면 "오늘 폐기 없음".' : '폐기한 떡 이름을 적고 "추가"를 누른 뒤 개수를 맞춰 주세요. 하나도 없으면 "오늘 폐기 없음".') + '</p>';
+        if (products.length) body += '<div class="choice" id="waste-pick">' + products.map(function (p) { return '<button type="button" class="choice-btn' + (run.waste[p] > 0 ? ' on' : '') + '" data-p="' + esc(p) + '">' + esc(p) + '</button>'; }).join('') + '</div>';
+        body += '<div class="waste-add"><input type="text" id="waste-new" class="text-input" placeholder="' + (products.length ? '목록에 없는 떡 이름' : '떡 이름 (예: 인절미)') + '" maxlength="30"><button type="button" class="btn" id="waste-add">추가</button></div>';
         body += '<div id="waste-rows"></div>';
-        body += '<button type="button" class="btn' + (run.waste._none ? ' primary' : '') + '" id="waste-none">' + (run.waste._none ? '✓ 오늘 폐기 없음' : '오늘 폐기 없음') + '</button></div>';
+        body += '<button type="button" class="btn' + (run.waste._none ? ' primary' : '') + '" id="waste-none">' + (run.waste._none ? '✓ 오늘 폐기 없음' : '오늘 폐기 없음') + '</button>';
+        if (!products.length) body += '<p class="muted small" style="margin-top:8px">사장님께: 점검표 → 목록에서 떡 종류를 등록하면 직원이 버튼으로 고를 수 있어요.</p>';
+        body += '</div>';
       }
       body += '<label class="field">특이사항 (선택) <span class="muted small">— 재고 부족, 기기 이상, 손님 특이사항 등. 사장님 화면에 함께 보입니다</span><textarea id="cl-note-text" rows="3" placeholder="예: 흑임자 재고 2팩 남음 / 제빙기 소리 이상">' + esc(run.note || '') + '</textarea></label>';
       body += '<button type="button" class="btn primary wide" id="cl-complete">' + label + ' 완료 제출</button>';
@@ -465,8 +468,8 @@
           saving(); saveRun(run).then(note);
         });
       });
-      // 폐기 입력 (마감, 제품 목록이 있을 때)
-      if (products.length) {
+      // 폐기 입력 (마감 때 항상. 떡 목록이 있으면 버튼으로, 없으면 이름을 직접 적어서)
+      if (wasteOn) {
         var wasteTimer = null;
         function wasteSave() { saving(); clearTimeout(wasteTimer); wasteTimer = setTimeout(function () { run.staff = m.staff; saveRun(run).then(note); }, 500); }
         function wasteCount() { return Object.keys(run.waste).filter(function (k) { return k !== '_none' && run.waste[k] > 0; }); }
@@ -484,6 +487,14 @@
         app.querySelectorAll('#waste-pick .choice-btn').forEach(function (b) {
           b.addEventListener('click', function () { var p = b.dataset.p; if (run.waste[p] > 0) delete run.waste[p]; else run.waste[p] = 1; delete run.waste._none; renderWaste(); wasteSave(); });
         });
+        function addTyped() {
+          var inp = document.getElementById('waste-new'), p = inp.value.trim().replace(/\s+/g, ' ');
+          if (!p) { inp.focus(); return; }
+          if (p === '_none') return;
+          run.waste[p] = (run.waste[p] || 0) + 1; delete run.waste._none; inp.value = ''; renderWaste(); wasteSave();
+        }
+        document.getElementById('waste-add').addEventListener('click', addTyped);
+        document.getElementById('waste-new').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addTyped(); } });
         document.getElementById('waste-none').addEventListener('click', function () {
           if (wasteCount().length && !confirm('적어 둔 폐기 개수를 지우고 "폐기 없음"으로 할까요?')) return;
           run.waste = { _none: true }; renderWaste(); wasteSave();
@@ -492,9 +503,9 @@
       }
       document.getElementById('cl-complete').addEventListener('click', function () {
         var done = Object.keys(run.items).length;
-        if (products.length) {
+        if (wasteOn) {
           var hasWaste = Object.keys(run.waste || {}).some(function (k) { return k === '_none' || run.waste[k] > 0; });
-          if (!hasWaste) { alert('오늘 폐기 수량을 아직 적지 않았어요.\n폐기가 있으면 떡을 눌러 개수를 적고, 없으면 "오늘 폐기 없음"을 눌러 주세요.'); document.querySelector('.waste').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+          if (!hasWaste) { alert('오늘 폐기 수량을 아직 적지 않았어요.\n폐기가 있으면 떡 이름과 개수를 적고, 없으면 "오늘 폐기 없음"을 눌러 주세요.'); document.querySelector('.waste').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
         }
         if (done < run.total && !confirm((run.total - done) + '개가 아직 체크 안 됐어요. 그래도 ' + label + ' 완료로 저장할까요?')) return;
         var now = new Date().toISOString();
@@ -507,7 +518,7 @@
         if (!confirm('오늘 ' + storeLabel(run.store) + ' ' + label + ' 체크를 모두 지울까요? (완료 표시도 지워져요)')) return;
         run.items = {}; run.completed_at = null; run.first_completed_at = null; run.waste = {};
         inputs.forEach(function (inp) { inp.checked = false; inp.closest('li').classList.remove('done'); inp.closest('li').querySelector('.when').textContent = ''; });
-        refresh(); saving(); saveRun(run).then(function (res) { note(res); if (products.length) renderChecklist(kind, m, s); });
+        refresh(); saving(); saveRun(run).then(function (res) { note(res); if (wasteOn) renderChecklist(kind, m, s); });
       });
       refresh();
     });
@@ -605,7 +616,7 @@
     function detailFor(run, k, st, s, dateS) {
       var items = itemsFor(s, st, k, dateS).all, stt = runStatus(run, items.length), missing = [];
       var wasteKeys = Object.keys(run.waste || {}).filter(function (x) { return x !== '_none' && run.waste[x] > 0; });
-      var wasteHtml = k !== 'close' ? null : (wasteKeys.length ? '<ul class="miss-list waste-list">' + wasteKeys.map(function (p) { return '<li>' + esc(p) + ' <strong>' + run.waste[p] + '</strong>개</li>'; }).join('') + '</ul>' : (run.waste && run.waste._none ? '<span class="ok-text">없음 (폐기 없음으로 입력)</span>' : ((s.products || []).length ? '<span class="warn">미입력</span>' : '<span class="muted">제품 목록 미등록</span>')));
+      var wasteHtml = k !== 'close' ? null : (wasteKeys.length ? '<ul class="miss-list waste-list">' + wasteKeys.map(function (p) { return '<li>' + esc(p) + ' <strong>' + run.waste[p] + '</strong>개</li>'; }).join('') + '</ul>' : (run.waste && run.waste._none ? '<span class="ok-text">없음 (폐기 없음으로 입력)</span>' : '<span class="warn">미입력</span>'));
       items.forEach(function (t, i) { if (!run.items[String(i)]) missing.push(t); });
       var d = '<div class="card detail" id="d-' + encodeURIComponent(st) + '-' + k + '">';
       d += '<div class="title">' + esc(storeLabel(st)) + ' · ' + KIND_LABEL[k] + ' <span class="pill ' + stt.cls + '">' + stt.label + '</span></div>';
