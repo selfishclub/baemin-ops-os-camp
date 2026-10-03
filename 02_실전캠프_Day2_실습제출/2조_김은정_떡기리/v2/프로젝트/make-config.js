@@ -11,14 +11,14 @@ if (fs.existsSync(envFile)) {
   }
 }
 
-const url = process.env.SUPABASE_URL || '';
-const anon = process.env.SUPABASE_ANON_KEY || '';
+const demo = process.env.DEMO === '1';            // 데모판: 서버 없이 가짜 데이터가 자동으로 채워짐
+const url = demo ? '' : (process.env.SUPABASE_URL || '');
+const anon = demo ? '' : (process.env.SUPABASE_ANON_KEY || '');
 const pin = process.env.OWNER_PIN || '0000';
 
-if (!url || !anon) {
-  console.warn('[make-config] SUPABASE_URL / SUPABASE_ANON_KEY 가 비어 있습니다. 서버 저장 없이(폰 저장만) 동작합니다.');
-}
+if (demo) console.log('[make-config] DEMO=1 — 데모판(가짜 데이터, 서버 없음)으로 만듭니다.');
+else if (!url || !anon) console.warn('[make-config] SUPABASE_URL / SUPABASE_ANON_KEY 가 비어 있습니다. 서버 저장 없이(폰 저장만) 동작합니다.');
 const out = '/* 자동 생성. .env.local 또는 환경변수에서 만듦. git에 올리지 않음 */\n' +
-  'window.SB = ' + JSON.stringify({ url: url, anon: anon, ownerPin: pin }) + ';\n';
+  'window.SB = ' + JSON.stringify({ url: url, anon: anon, ownerPin: pin, demo: demo }) + ';\n';
 fs.writeFileSync(path.join(__dirname, 'config.js'), out);
 console.log('[make-config] config.js 생성 완료' + (url ? ' (서버 연결 켜짐)' : ' (서버 연결 없음)'));

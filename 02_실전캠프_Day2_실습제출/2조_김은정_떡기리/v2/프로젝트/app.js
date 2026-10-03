@@ -214,6 +214,52 @@
     return html;
   }
 
+  // ---------- 데모판: 가짜 데이터 채우기 (서버 없음, 이 브라우저 안에서만) ----------
+  var DEMO = !!SB.demo;
+  function demoSeed(force) {
+    if (!DEMO) return;
+    if (!force && store.get('demo_seeded')) return;
+    try { Object.keys(localStorage).forEach(function (k) { if (/^(run:|train:|settings$|me$|ch:|demo_seeded)/.test(k)) localStorage.removeItem(k); }); } catch (e) {}
+    var stores = ['데모 1호점', '데모 2호점'], staff = ['알바 A', '알바 B', '매니저 C'];
+    var products = ['인절미', '꿀떡', '흑임자 인절미', '약식', '송편'];
+    var settings = {
+      stores: stores, staff: staff, products: products,
+      staff_meta: { '알바 A': { hire_on: shiftDate(today(), -12) }, '알바 B': { hire_on: shiftDate(today(), -3) } },
+      store_items: { '데모 1호점': { open: ['테라스 의자 펴기'], close: ['테라스 의자 접고 묶기', '제빙기 내부 세척 (매주 월)', '소화기 점검 (매월 1일)'] }, '데모 2호점': { open: ['외부 배너 세우기'], close: ['외부 배너 들여놓기'] } }
+    };
+    store.set('settings', JSON.stringify(settings));
+    function iso(dateS, hh, mm) { var p = dateS.split('-'); return new Date(+p[0], +p[1] - 1, +p[2], hh, mm).toISOString(); }
+    var notes = ['', '', '흑임자 재고 2팩 남음', '', '제빙기 소리 이상', '', '손님 문의: 선물세트 예약 1건', ''];
+    for (var d = 14; d >= 0; d--) {
+      var ds = shiftDate(today(), -d);
+      stores.forEach(function (st, si) {
+        ['open', 'close'].forEach(function (kind) {
+          var total = LISTS[kind].items.length + (settings.store_items[st][kind] || []).filter(function (t) { return scheduledOn(t, ds); }).length;
+          // 오늘은 1호점 오픈만 완료, 2호점은 진행 중 — 사장 점검표에서 색이 갈리게
+          if (d === 0 && kind === 'close') return;
+          if (d === 0 && kind === 'open' && si === 1) total = total;
+          var skip = (d + si) % 9 === 0 && kind === 'close' && d > 0;    // 가끔 마감 기록이 없는 날
+          if (skip) return;
+          var done = (d === 0 && si === 1) ? Math.max(1, total - 4) : (d % 5 === 0 && kind === 'close' ? total - 1 : total);
+          var hh = kind === 'open' ? 9 : 21, mm = (d * 7 + si * 11) % 50;
+          var items = {}; for (var i = 0; i < done; i++) items[String(i)] = iso(ds, hh, Math.min(59, mm + i));
+          var who = staff[(d + si) % staff.length];
+          var waste = {}; if (kind === 'close') { if (d % 3 === 0) waste._none = true; else { waste[products[d % products.length]] = 1 + (d % 3); if (d % 4 === 0) waste[products[(d + 2) % products.length]] = 2; } }
+          var run = { run_date: ds, store: st, kind: kind, staff: who, items: items, total: total, done_count: done, note: kind === 'close' ? notes[d % notes.length] : '', waste: waste,
+            first_completed_at: (d === 0 && si === 1) ? null : iso(ds, hh, Math.min(59, mm + done + 1)), completed_at: (d === 0 && si === 1) ? null : iso(ds, hh, Math.min(59, mm + done + 1)), updated_at: iso(ds, hh, Math.min(59, mm + done + 1)), id: 1000 + d * 10 + si * 2 + (kind === 'open' ? 0 : 1) };
+          store.set(runKey(ds, st, kind), JSON.stringify(run));
+        });
+      });
+    }
+    var steps = STEPS.map(function (s) { return s.day; });
+    store.set('train:알바 A', JSON.stringify([
+      { staff: '알바 A', store: '데모 1호점', step: steps[0], read_at: iso(shiftDate(today(), -11), 15, 0), confirmed_at: iso(shiftDate(today(), -11), 18, 0) },
+      { staff: '알바 A', store: '데모 1호점', step: steps[1], read_at: iso(shiftDate(today(), -9), 15, 0), confirmed_at: null }
+    ]));
+    store.set('train:알바 B', JSON.stringify([{ staff: '알바 B', store: '데모 2호점', step: steps[0], read_at: iso(shiftDate(today(), -2), 15, 0), confirmed_at: null }]));
+    store.set('demo_seeded', '1');
+  }
+
   // ---------- 화면 ----------
   var book = parseBook(window.BOOK_MD || '');
   var LISTS = { open: checklistItems(findAppendix(book, '②')), close: checklistItems(findAppendix(book, '③')) };
@@ -221,6 +267,7 @@
   var TODOS = todoItems(book);
   STEPS = trainingRows(book);
   var app = document.getElementById('app');
+  demoSeed(false);
   function empty(title, sub) { return '<div class="empty"><strong>' + esc(title) + '</strong>' + esc(sub) + '</div>'; }
   function chapterLink(num) { var c = book.chapters.filter(function (x) { return x.num === num; })[0]; return c ? '#/ch/' + num : '#/'; }
   function me() { var v = store.get('me'); if (!v) return null; try { return JSON.parse(v); } catch (e) { return null; } }
@@ -278,7 +325,7 @@
           '<span class="pill ' + o.cls + '">오픈 ' + o.label + (ro && ro.completed_at ? ' ' + hhmm(ro.completed_at) : (o.done ? ' ' + o.done + '/' + o.total : '')) + '</span>' +
           '<span class="pill ' + c.cls + '">마감 ' + c.label + (rc && rc.completed_at ? ' ' + hhmm(rc.completed_at) : (c.done ? ' ' + c.done + '/' + c.total : '')) + '</span></div>';
       });
-      if (!sbOn()) html += '<div class="muted small">서버 연결 없음 — 이 폰에만 저장돼요</div>';
+      if (!sbOn() && !DEMO) html += '<div class="muted small">서버 연결 없음 — 이 폰에만 저장돼요</div>';
       el.className = ''; el.innerHTML = html;
       if (m) {
         var mo = runStatus(find(m.store || '', 'open'), itemsFor(s, m.store, 'open').all.length), mc = runStatus(find(m.store || '', 'close'), itemsFor(s, m.store, 'close').all.length);
@@ -397,6 +444,7 @@
       }
       function note(res) {
         var n = document.getElementById('cl-note'), s = document.getElementById('cl-save-status');
+        if (res.ok && res.local && DEMO) { n.hidden = true; if (s) { s.className = 'save-status ok'; s.textContent = '✓ 저장됨 (데모)'; } return; }
         if (res.ok && !res.local) {
           n.hidden = true;
           if (s) { s.className = 'save-status ok'; s.textContent = '✓ 서버에 저장됨 ' + hhmm(new Date().toISOString()); clearTimeout(saveTimer); saveTimer = setTimeout(function () { s.textContent = '✓ 저장됨'; }, 3000); }
@@ -485,8 +533,11 @@
     h += '<div id="owner-body" class="muted">불러오는 중…</div>';
     h += '<p class="section-title">🎓 신입 교육 진도</p><div id="owner-train" class="muted">불러오는 중…</div>';
     h += '<p class="section-title">설정</p><a class="card link" href="#/owner-lists"><div class="title">매장·이름 목록 고치기</div><div class="sub">직원 이름·입사일, 떡 종류, 매장별 항목</div></a>';
-    if (!sbOn()) h += '<div class="save-note">서버 연결이 없어 이 폰의 기록만 보여요. config.js(열쇠)를 확인해 주세요.</div>';
+    if (DEMO) h += '<div class="card soft-card"><strong>데모판</strong><div class="muted small">가짜 데이터가 이 브라우저 안에만 들어 있어요. 마음껏 눌러 보세요.</div><button type="button" class="btn" id="demo-reset" style="margin-top:8px">예시 데이터 다시 채우기</button></div>';
+    else if (!sbOn()) h += '<div class="save-note">서버 연결이 없어 이 폰의 기록만 보여요. config.js(열쇠)를 확인해 주세요.</div>';
     app.innerHTML = h;
+    var dr = document.getElementById('demo-reset');
+    if (dr) dr.addEventListener('click', function () { if (!confirm('예시 데이터를 처음 상태로 다시 채울까요?')) return; demoSeed(true); settingsCache = null; location.hash = '#/'; });
     Promise.all([loadSettings(), fetchRunsForDate(date), fetchTrainingAll()]).then(function (r) {
       var s = r[0], runs = r[1] || [], trainAll = r[2] || [];
       renderOwnerTraining(s, trainAll);
@@ -695,7 +746,7 @@
           var st = document.getElementById('tr-save'); st.className = 'save-status'; st.textContent = '저장 중…';
           var rowData = { staff: m.staff, store: m.store || '', step: inp.dataset.step, read_at: inp.checked ? new Date().toISOString() : null, confirmed_at: null, updated_at: new Date().toISOString() };
           saveTraining(rowData).then(function (res) {
-            st.className = 'save-status ' + (res.ok ? 'ok' : 'err'); st.textContent = res.ok ? (res.local ? '이 폰에만 저장됨' : '✓ 서버에 저장됨') : '❌ 저장 안 됨';
+            st.className = 'save-status ' + (res.ok ? 'ok' : 'err'); st.textContent = res.ok ? (res.local ? (DEMO ? '✓ 저장됨 (데모)' : '이 폰에만 저장됨') : '✓ 서버에 저장됨') : '❌ 저장 안 됨';
             setTimeout(function () { viewTraining(); }, 400);
           });
         });
@@ -747,6 +798,12 @@
   }
   document.getElementById('search-form').addEventListener('submit', function (e) { e.preventDefault(); location.hash = '#/search?q=' + encodeURIComponent(document.getElementById('search-input').value.trim()); });
   window.addEventListener('hashchange', route);
+  if (DEMO) {
+    var demoBar = document.createElement('div');
+    demoBar.className = 'inapp-banner demo-banner';
+    demoBar.innerHTML = '<span>🧪 <strong>데모판</strong> — 가짜 매장·직원·기록이 들어 있어요. 사장 점검표 PIN은 <strong>' + esc(SB.ownerPin || '0000') + '</strong>. 눌러 본 내용은 이 브라우저에만 남아요.</span>';
+    document.body.insertBefore(demoBar, document.body.firstChild);
+  }
   (function inAppBanner() {
     var ua = navigator.userAgent || '', isKakao = /KAKAOTALK/i.test(ua), isOther = /Instagram|FBAN|FBAV|NAVER\(inapp|Line\//i.test(ua);
     if (!isKakao && !isOther) return;

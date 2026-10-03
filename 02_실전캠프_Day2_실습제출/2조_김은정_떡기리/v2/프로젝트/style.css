@@ -241,3 +241,5 @@ p.save-status { margin: 8px 0 0; font-size: 14px; }
 .hire-row input { font-size: 15px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
 .soft-card { background: var(--brand-soft); border-color: transparent; }
 .soft-card code { background: #fff; }
+.demo-banner { background: #e8f0fe; color: #1a3d7c; }
+.demo-banner strong { color: #0b2e6b; }
