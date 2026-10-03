@@ -298,7 +298,7 @@
       run.total = src.items.length;
       var body = '';
       body += '<div class="done-msg" id="cl-done" hidden></div>';
-      body += '<div id="cl-progress" style="font-weight:700"></div><div class="progress-bar"><div id="cl-bar" style="width:0"></div></div>';
+      body += '<div class="progress-row"><div id="cl-progress" style="font-weight:700"></div><span id="cl-save-status" class="save-status">' + (run.id ? '✓ 저장됨' : '') + '</span></div><div class="progress-bar"><div id="cl-bar" style="width:0"></div></div>';
       body += '<div id="cl-note" class="save-note" hidden></div>';
       body += '<ul class="checklist">';
       src.items.forEach(function (t, i) {
@@ -326,11 +326,21 @@
       document.getElementById('cl-note-text').addEventListener('input', function (e) {
         run.note = e.target.value; run.staff = m.staff;
         clearTimeout(noteTimer);
-        noteTimer = setTimeout(function () { saveRun(run).then(note); }, 800);
+        saving(); noteTimer = setTimeout(function () { saveRun(run).then(note); }, 800);
       });
+      var saveTimer = null;
+      function saving() {
+        var s = document.getElementById('cl-save-status'); if (!s) return;
+        s.className = 'save-status'; s.textContent = '저장 중…';
+      }
       function note(res) {
-        var n = document.getElementById('cl-note');
-        if (res.ok && !res.local) { n.hidden = true; return; }
+        var n = document.getElementById('cl-note'), s = document.getElementById('cl-save-status');
+        if (res.ok && !res.local) {
+          n.hidden = true;
+          if (s) { s.className = 'save-status ok'; s.textContent = '✓ 서버에 저장됨 ' + hhmm(new Date().toISOString()); clearTimeout(saveTimer); saveTimer = setTimeout(function () { s.textContent = '✓ 저장됨'; }, 3000); }
+          return;
+        }
+        if (s) { s.className = 'save-status err'; s.textContent = res.local ? '이 폰에만 저장됨' : '❌ 저장 안 됨'; }
         n.hidden = false;
         n.textContent = res.local ? '서버 연결이 없어 이 폰에만 저장됐어요.' : '저장 안 됨 — 인터넷 연결 후 다시 눌러 주세요. (' + res.error + ')';
       }
@@ -342,7 +352,7 @@
           inp.closest('li').classList.toggle('done', inp.checked);
           inp.closest('li').querySelector('.when').textContent = inp.checked ? hhmm(run.items[i]) : '';
           refresh();
-          saveRun(run).then(note);
+          saving(); saveRun(run).then(note);
         });
       });
       document.getElementById('cl-complete').addEventListener('click', function () {
@@ -352,7 +362,7 @@
         if (!run.first_completed_at) run.first_completed_at = now;
         run.completed_at = now; run.staff = m.staff; run.note = document.getElementById('cl-note-text').value;
         refresh();
-        saveRun(run).then(function (res) { note(res); if (res.ok) window.scrollTo(0, 0); });
+        saving(); saveRun(run).then(function (res) { note(res); if (res.ok) window.scrollTo(0, 0); });
       });
       document.getElementById('cl-reset').addEventListener('click', function () {
         if (!confirm('오늘 ' + storeLabel(run.store) + ' ' + label + ' 체크를 모두 지울까요? (완료 표시도 지워져요)')) return;
@@ -467,9 +477,17 @@
       }
       ['stores', 'staff'].forEach(function (id) { var lb = id === 'stores' ? '매장' : '이름'; preview(id, lb); document.getElementById(id).addEventListener('input', function () { preview(id, lb); }); });
       document.getElementById('lists-save').addEventListener('click', function () {
-        var st = lines('stores'), sf = lines('staff');
+        var st = lines('stores'), sf = lines('staff'), btn = document.getElementById('lists-save'), n = document.getElementById('lists-note');
+        btn.disabled = true; btn.textContent = '저장 중…'; n.className = 'save-status'; n.textContent = '서버에 저장하는 중…';
         store.del('me');
-        Promise.all([saveSetting('stores', st), saveSetting('staff', sf)]).then(function () { document.getElementById('lists-note').textContent = '저장했어요.'; }, function (e) { document.getElementById('lists-note').textContent = '저장 안 됨: ' + e.message; });
+        Promise.all([saveSetting('stores', st), saveSetting('staff', sf)]).then(function () {
+          btn.disabled = false; btn.textContent = '✅ 저장됨'; n.className = 'save-status ok';
+          n.textContent = '✅ 저장됐어요 — 매장 ' + st.length + '곳, 이름 ' + sf.length + '명. 직원 폰에서 바로 보입니다.';
+          setTimeout(function () { btn.textContent = '저장'; }, 2500);
+        }, function (e) {
+          btn.disabled = false; btn.textContent = '저장'; n.className = 'save-status err';
+          n.textContent = '❌ 저장 안 됨 — 인터넷을 확인하고 다시 눌러 주세요. (' + e.message + ')';
+        });
       });
     });
   }
