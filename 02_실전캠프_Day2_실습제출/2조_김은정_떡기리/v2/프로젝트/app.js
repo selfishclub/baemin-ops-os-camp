@@ -40,23 +40,63 @@
   var settingsCache = null;
   function loadSettings() {
     if (settingsCache) return Promise.resolve(settingsCache);
-    var base = { stores: DEFAULT_STORES.slice(), staff: DEFAULT_STAFF.slice() };
+    var base = { stores: DEFAULT_STORES.slice(), staff: DEFAULT_STAFF.slice(), products: [], store_items: {} };
     var cached = store.get('settings'); if (cached) { try { base = JSON.parse(cached); } catch (e) {} }
+    base.stores = base.stores || []; base.staff = base.staff || []; base.products = base.products || []; base.store_items = base.store_items || {}; base.staff_meta = base.staff_meta || {};
     if (!sbOn()) { settingsCache = base; return Promise.resolve(base); }
     return sbFetch('settings?select=key,value').then(function (rows) {
       (rows || []).forEach(function (r) {
-        if ((r.key === 'stores' || r.key === 'staff') && Array.isArray(r.value)) base[r.key] = r.value;
+        if ((r.key === 'stores' || r.key === 'staff' || r.key === 'products') && Array.isArray(r.value)) base[r.key] = r.value;
+        if ((r.key === 'store_items' || r.key === 'staff_meta') && r.value && typeof r.value === 'object') base[r.key] = r.value;
         if (r.key === 'owner_pin_hash' && typeof r.value === 'string') base.owner_pin_hash = r.value;
       });
       settingsCache = base; store.set('settings', JSON.stringify(base)); return base;
     }).catch(function () { settingsCache = base; return base; });
   }
+  // 체크 항목 = 공통(온라인북 요약본) + 매장별 추가 항목(사장이 등록). 매장별 항목은 공통 뒤에 이어 붙는다.
+  // 주기 표시: 항목 끝에 "(매주 월)", "(매주 월·목)", "(매월 1일)", "(격주 월)" 처럼 쓰면 그날에만 보인다. 없으면 매일.
+  var DOW = '일월화수목금토';
+  function scheduledOn(text, dateS) {
+    var m = text.match(/\((매주|격주|매월)\s*([^)]*)\)\s*$/);
+    if (!m) return true;
+    var p = dateS.split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]);
+    if (m[1] === '매월') { var day = parseInt(m[2], 10); return !isNaN(day) && d.getDate() === day; }
+    var days = m[2].replace(/요일/g, '').split(/[·,\s\/]+/).filter(Boolean).map(function (x) { return DOW.indexOf(x[0]); }).filter(function (i) { return i >= 0; });
+    if (!days.length || days.indexOf(d.getDay()) < 0) return false;
+    if (m[1] === '격주') { var week = Math.floor((Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000 + 4) / 7); return week % 2 === 0; }
+    return true;
+  }
+  function itemsFor(s, storeName, kind, dateS) {
+    var si = s.store_items || {}, entry = si[storeName || ''];
+    if (!entry && s.stores.length <= 1) entry = si[''] || si[s.stores[0] || ''];   // 매장 하나면 이름이 바뀌어도 그대로 이어 씀
+    var extra = ((entry && entry[kind]) || []).filter(function (t) { return scheduledOn(t, dateS || today()); });
+    return { common: LISTS[kind].items, extra: extra, all: LISTS[kind].items.concat(extra) };
+  }
+  // ---------- 신입 교육 진도 (서버) ----------
+  var STEPS = []; // trainingRows 로 채움
+  function fetchTraining(staffName) {
+    if (!sbOn()) { var v = store.get('train:' + staffName); try { return Promise.resolve(v ? JSON.parse(v) : []); } catch (e) { return Promise.resolve([]); } }
+    return sbFetch('training_progress?select=*&staff=eq.' + encodeURIComponent(staffName)).catch(function () { return []; });
+  }
+  function fetchTrainingAll() {
+    if (!sbOn()) { var out = []; try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf('train:') === 0) out = out.concat(JSON.parse(localStorage.getItem(k))); } } catch (e) {} return Promise.resolve(out); }
+    return sbFetch('training_progress?select=*').catch(function () { return []; });
+  }
+  function saveTraining(row) {
+    if (!sbOn()) {
+      var k = 'train:' + row.staff, arr = []; try { arr = JSON.parse(store.get(k) || '[]'); } catch (e) {}
+      arr = arr.filter(function (x) { return x.step !== row.step; }); arr.push(row); store.set(k, JSON.stringify(arr)); return Promise.resolve({ ok: true, local: true });
+    }
+    return sbFetch('training_progress?on_conflict=staff,step', { method: 'POST', prefer: 'resolution=merge-duplicates', body: [row] }).then(function () { return { ok: true }; }).catch(function (e) { return { ok: false, error: e.message }; });
+  }
+  function daysSince(hireOn) { if (!hireOn) return null; var p = hireOn.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]); return Math.floor((new Date() - d) / 86400000) + 1; }
   // 매장이 0~1개면 매장 선택은 보이지 않는다. 1개면 그 이름을 쓰고, 0개면 빈 이름("매장"으로 표시).
   function storeLabel(s) { return s ? s : '매장'; }
   function singleStore(settings) { return settings.stores.length <= 1 ? (settings.stores[0] || '') : null; }
   function saveSetting(key, value) {
-    settingsCache = null; store.del('settings');
-    if (!sbOn()) { var b = JSON.parse(store.get('settings') || '{}'); b[key] = value; store.set('settings', JSON.stringify(b)); return Promise.resolve(); }
+    settingsCache = null;
+    if (!sbOn()) { var b = {}; try { b = JSON.parse(store.get('settings') || '{}'); } catch (e) {} b[key] = value; store.set('settings', JSON.stringify(b)); return Promise.resolve(); }
+    store.del('settings');
     return sbFetch('settings?on_conflict=key', { method: 'POST', prefer: 'resolution=merge-duplicates', body: [{ key: key, value: value, updated_at: new Date().toISOString() }] });
   }
   function runKey(date, storeName, kind) { return 'run:' + date + ':' + storeName + ':' + kind; }
@@ -80,7 +120,7 @@
     run.updated_at = new Date().toISOString();
     saveLocalRun(run);
     if (!sbOn()) return Promise.resolve({ ok: true, local: true });
-    var body = { run_date: run.run_date, store: run.store, kind: run.kind, staff: run.staff, items: run.items, total: run.total, done_count: run.done_count, note: run.note || '', first_completed_at: run.first_completed_at || null, completed_at: run.completed_at || null, updated_at: run.updated_at };
+    var body = { run_date: run.run_date, store: run.store, kind: run.kind, staff: run.staff, items: run.items, total: run.total, done_count: run.done_count, note: run.note || '', waste: run.waste || {}, first_completed_at: run.first_completed_at || null, completed_at: run.completed_at || null, updated_at: run.updated_at };
     return sbFetch('checklist_runs?on_conflict=run_date,store,kind', { method: 'POST', prefer: 'resolution=merge-duplicates,return=representation', body: [body] })
       .then(function (rows) { if (rows && rows[0]) { run.id = rows[0].id; saveLocalRun(run); } return { ok: true }; })
       .catch(function (e) { return { ok: false, error: e.message }; });
@@ -179,6 +219,7 @@
   var LISTS = { open: checklistItems(findAppendix(book, '②')), close: checklistItems(findAppendix(book, '③')) };
   var KIND_LABEL = { open: '오픈', close: '마감' };
   var TODOS = todoItems(book);
+  STEPS = trainingRows(book);
   var app = document.getElementById('app');
   function empty(title, sub) { return '<div class="empty"><strong>' + esc(title) + '</strong>' + esc(sub) + '</div>'; }
   function chapterLink(num) { var c = book.chapters.filter(function (x) { return x.num === num; })[0]; return c ? '#/ch/' + num : '#/'; }
@@ -206,7 +247,7 @@
   function viewHome() {
     var m = me(), h = '';
     h += '<h1>무엇을 찾으세요?</h1>';
-    h += '<div id="home-status" class="card status-card">' + (m ? '<div class="sub">' + esc(m.store) + ' · ' + esc(m.staff) + ' <a href="#/who">바꾸기</a></div><div class="muted">오늘 상태 불러오는 중…</div>' : '<div class="sub">아직 이름을 고르지 않았어요.</div><a class="btn primary" href="#/who">매장·이름 고르기</a>') + '</div>';
+    h += '<div id="home-status" class="card status-card">' + (m ? '<div class="sub">' + (m.store ? esc(m.store) + ' · ' : '') + esc(m.staff) + ' <a href="#/who">바꾸기</a></div>' : '<div class="sub">아직 이름을 고르지 않았어요.</div><a class="btn primary" href="#/who">이름 고르기</a>') + '<div id="home-today" class="muted small">오늘 상태 불러오는 중…</div></div>';
     h += '<div class="grid2">';
     h += '<a class="big-btn" href="#/check/open">☀️ 오픈 체크리스트<small id="home-open">' + LISTS.open.items.length + '항목</small></a>';
     h += '<a class="big-btn alt" href="#/check/close">🌙 마감 체크리스트<small id="home-close">' + LISTS.close.items.length + '항목</small></a>';
@@ -223,17 +264,28 @@
     h += '</div>';
     h += '<p class="section-title">사장님용</p><a class="card link" href="#/owner"><div class="title">📋 사장 점검표</div><div class="sub">오늘 3매장 오픈·마감이 됐는지 한눈에 (PIN)</div></a>';
     app.innerHTML = h;
-    if (m) {
-      Promise.all([fetchRun(today(), m.store, 'open'), fetchRun(today(), m.store, 'close')]).then(function (rs) {
-        var o = runStatus(rs[0], LISTS.open.items.length), c = runStatus(rs[1], LISTS.close.items.length);
-        var el = document.getElementById('home-status'); if (!el) return;
-        el.innerHTML = '<div class="sub">' + esc(m.store) + ' · ' + esc(m.staff) + ' <a href="#/who">바꾸기</a></div>' +
-          '<div class="status-line"><span class="pill ' + o.cls + '">오픈 ' + o.label + (o.done ? ' ' + o.done + '/' + o.total : '') + '</span><span class="pill ' + c.cls + '">마감 ' + c.label + (c.done ? ' ' + c.done + '/' + c.total : '') + '</span></div>' +
-          (sbOn() ? '' : '<div class="muted small">서버 연결 없음 — 이 폰에만 저장돼요</div>');
-        var ho = document.getElementById('home-open'); if (ho) ho.textContent = o.label + (o.done ? ' ' + o.done + '/' + o.total : '');
-        var hc = document.getElementById('home-close'); if (hc) hc.textContent = c.label + (c.done ? ' ' + c.done + '/' + c.total : '');
+    // 오늘 매장별 오픈·마감 상태 (이름을 안 골랐어도 보임)
+    Promise.all([loadSettings(), fetchRunsForDate(today())]).then(function (r) {
+      var s = r[0], runs = r[1] || [], el = document.getElementById('home-today'); if (!el) return;
+      var stores = s.stores.slice(); runs.forEach(function (x) { var st = x.store || ''; if (stores.indexOf(st) < 0) stores.push(st); });
+      if (!stores.length) stores = [''];
+      function find(st, k) { return runs.filter(function (x) { return (x.store || '') === st && x.kind === k; })[0]; }
+      var html = '<div class="today-title">오늘 ' + koDate(today()) + '</div>';
+      stores.forEach(function (st) {
+        var o = runStatus(find(st, 'open'), itemsFor(s, st, 'open').all.length), c = runStatus(find(st, 'close'), itemsFor(s, st, 'close').all.length);
+        var ro = find(st, 'open'), rc = find(st, 'close');
+        html += '<div class="today-row"><span class="today-store">' + esc(storeLabel(st)) + '</span>' +
+          '<span class="pill ' + o.cls + '">오픈 ' + o.label + (ro && ro.completed_at ? ' ' + hhmm(ro.completed_at) : (o.done ? ' ' + o.done + '/' + o.total : '')) + '</span>' +
+          '<span class="pill ' + c.cls + '">마감 ' + c.label + (rc && rc.completed_at ? ' ' + hhmm(rc.completed_at) : (c.done ? ' ' + c.done + '/' + c.total : '')) + '</span></div>';
       });
-    }
+      if (!sbOn()) html += '<div class="muted small">서버 연결 없음 — 이 폰에만 저장돼요</div>';
+      el.className = ''; el.innerHTML = html;
+      if (m) {
+        var mo = runStatus(find(m.store || '', 'open'), itemsFor(s, m.store, 'open').all.length), mc = runStatus(find(m.store || '', 'close'), itemsFor(s, m.store, 'close').all.length);
+        var ho = document.getElementById('home-open'); if (ho) ho.textContent = mo.label + (mo.done ? ' ' + mo.done + '/' + mo.total : '');
+        var hc = document.getElementById('home-close'); if (hc) hc.textContent = mc.label + (mc.done ? ' ' + mc.done + '/' + mc.total : '');
+      }
+    });
   }
 
   // 매장·이름 고르기
@@ -283,11 +335,12 @@
       var storeOk = single === null ? s.stores.indexOf(m.store) >= 0 : true;
       if (!staffOk || !storeOk) { store.del('me'); location.hash = next; return; }
       if (single !== null && m.store !== single) { m.store = single; store.set('me', JSON.stringify(m)); }
-      renderChecklist(kind, m);
+      renderChecklist(kind, m, s);
     });
   }
-  function renderChecklist(kind, m) {
-    var src = LISTS[kind], label = KIND_LABEL[kind], detail = kind === 'open' ? 4 : 10, date = today();
+  function renderChecklist(kind, m, s) {
+    var lists = itemsFor(s, m.store, kind), src = { items: lists.all }, label = KIND_LABEL[kind], detail = kind === 'open' ? 4 : 10, date = today();
+    var products = (kind === 'close') ? (s.products || []) : [];
     var h = '<div class="crumb"><a href="#/">첫 화면</a> › 체크리스트</div>';
     h += '<h1>' + (kind === 'open' ? '☀️' : '🌙') + ' ' + label + ' 체크리스트</h1>';
     h += '<div class="card who-line"><span>' + (m.store ? '<strong>' + esc(m.store) + '</strong> · ' : '') + esc(m.staff) + ' · ' + koDate(date) + '</span><a href="#/who?next=' + encodeURIComponent('#/check/' + kind) + '">바꾸기</a></div>';
@@ -303,9 +356,18 @@
       body += '<ul class="checklist">';
       src.items.forEach(function (t, i) {
         var on = !!run.items[String(i)];
+        if (i === lists.common.length) body += '<li class="list-sep">🏪 ' + esc(storeLabel(m.store)) + ' 항목</li>';
         body += '<li class="' + (on ? 'done' : '') + '"><label><input type="checkbox" data-i="' + i + '"' + (on ? ' checked' : '') + '><span>' + esc(t) + '</span><em class="when">' + (on ? hhmm(run.items[String(i)]) : '') + '</em></label></li>';
       });
       body += '</ul>';
+      if (products.length) {
+        run.waste = run.waste || {};
+        body += '<div class="card waste"><div class="title">🗑️ 오늘 폐기 <span id="waste-sum" class="muted small"></span></div>';
+        body += '<p class="muted small">폐기가 있었던 떡만 눌러서 개수를 적어 주세요. 하나도 없으면 "오늘 폐기 없음".</p>';
+        body += '<div class="choice" id="waste-pick">' + products.map(function (p) { return '<button type="button" class="choice-btn' + (run.waste[p] > 0 ? ' on' : '') + '" data-p="' + esc(p) + '">' + esc(p) + '</button>'; }).join('') + '</div>';
+        body += '<div id="waste-rows"></div>';
+        body += '<button type="button" class="btn' + (run.waste._none ? ' primary' : '') + '" id="waste-none">' + (run.waste._none ? '✓ 오늘 폐기 없음' : '오늘 폐기 없음') + '</button></div>';
+      }
       body += '<label class="field">특이사항 (선택) <span class="muted small">— 재고 부족, 기기 이상, 손님 특이사항 등. 사장님 화면에 함께 보입니다</span><textarea id="cl-note-text" rows="3" placeholder="예: 흑임자 재고 2팩 남음 / 제빙기 소리 이상">' + esc(run.note || '') + '</textarea></label>';
       body += '<button type="button" class="btn primary wide" id="cl-complete">' + label + ' 완료 제출</button>';
       body += '<div class="chapter-tools"><a class="btn" href="' + chapterLink(detail) + '">' + detail + '장 자세히 보기</a><button type="button" class="btn danger" id="cl-reset">오늘 체크 지우기</button></div>';
@@ -355,8 +417,37 @@
           saving(); saveRun(run).then(note);
         });
       });
+      // 폐기 입력 (마감, 제품 목록이 있을 때)
+      if (products.length) {
+        var wasteTimer = null;
+        function wasteSave() { saving(); clearTimeout(wasteTimer); wasteTimer = setTimeout(function () { run.staff = m.staff; saveRun(run).then(note); }, 500); }
+        function wasteCount() { return Object.keys(run.waste).filter(function (k) { return k !== '_none' && run.waste[k] > 0; }); }
+        function renderWaste() {
+          var keys = wasteCount(), rows = document.getElementById('waste-rows'), sum = document.getElementById('waste-sum'), noneBtn = document.getElementById('waste-none');
+          rows.innerHTML = keys.map(function (p) { return '<div class="waste-row"><span class="waste-name">' + esc(p) + '</span><button type="button" class="step" data-p="' + esc(p) + '" data-d="-1">−</button><strong class="waste-n">' + run.waste[p] + '</strong><button type="button" class="step" data-p="' + esc(p) + '" data-d="1">+</button></div>'; }).join('');
+          var total = keys.reduce(function (a, p) { return a + run.waste[p]; }, 0);
+          sum.textContent = keys.length ? '— ' + keys.length + '종 ' + total + '개' : (run.waste._none ? '— 없음' : '— 아직 입력 안 함');
+          noneBtn.className = 'btn' + (run.waste._none ? ' primary' : ''); noneBtn.textContent = run.waste._none ? '✓ 오늘 폐기 없음' : '오늘 폐기 없음';
+          app.querySelectorAll('#waste-pick .choice-btn').forEach(function (b) { b.classList.toggle('on', run.waste[b.dataset.p] > 0); });
+          rows.querySelectorAll('.step').forEach(function (b) {
+            b.addEventListener('click', function () { var p = b.dataset.p, v = (run.waste[p] || 0) + parseInt(b.dataset.d, 10); if (v <= 0) delete run.waste[p]; else run.waste[p] = v; delete run.waste._none; renderWaste(); wasteSave(); });
+          });
+        }
+        app.querySelectorAll('#waste-pick .choice-btn').forEach(function (b) {
+          b.addEventListener('click', function () { var p = b.dataset.p; if (run.waste[p] > 0) delete run.waste[p]; else run.waste[p] = 1; delete run.waste._none; renderWaste(); wasteSave(); });
+        });
+        document.getElementById('waste-none').addEventListener('click', function () {
+          if (wasteCount().length && !confirm('적어 둔 폐기 개수를 지우고 "폐기 없음"으로 할까요?')) return;
+          run.waste = { _none: true }; renderWaste(); wasteSave();
+        });
+        renderWaste();
+      }
       document.getElementById('cl-complete').addEventListener('click', function () {
         var done = Object.keys(run.items).length;
+        if (products.length) {
+          var hasWaste = Object.keys(run.waste || {}).some(function (k) { return k === '_none' || run.waste[k] > 0; });
+          if (!hasWaste) { alert('오늘 폐기 수량을 아직 적지 않았어요.\n폐기가 있으면 떡을 눌러 개수를 적고, 없으면 "오늘 폐기 없음"을 눌러 주세요.'); document.querySelector('.waste').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+        }
         if (done < run.total && !confirm((run.total - done) + '개가 아직 체크 안 됐어요. 그래도 ' + label + ' 완료로 저장할까요?')) return;
         var now = new Date().toISOString();
         if (!run.first_completed_at) run.first_completed_at = now;
@@ -366,9 +457,9 @@
       });
       document.getElementById('cl-reset').addEventListener('click', function () {
         if (!confirm('오늘 ' + storeLabel(run.store) + ' ' + label + ' 체크를 모두 지울까요? (완료 표시도 지워져요)')) return;
-        run.items = {}; run.completed_at = null; run.first_completed_at = null;
+        run.items = {}; run.completed_at = null; run.first_completed_at = null; run.waste = {};
         inputs.forEach(function (inp) { inp.checked = false; inp.closest('li').classList.remove('done'); inp.closest('li').querySelector('.when').textContent = ''; });
-        refresh(); saveRun(run).then(note);
+        refresh(); saving(); saveRun(run).then(function (res) { note(res); if (products.length) renderChecklist(kind, m, s); });
       });
       refresh();
     });
@@ -392,11 +483,13 @@
     var h = '<div class="crumb"><a href="#/">첫 화면</a> › 사장 점검표</div><h1>📋 사장 점검표</h1>';
     h += '<div class="date-nav"><a class="btn" href="#/owner?d=' + shiftDate(date, -1) + '">‹ 전날</a><strong>' + koDate(date) + (date === today() ? ' 오늘' : '') + '</strong><a class="btn" href="#/owner?d=' + shiftDate(date, 1) + '">다음날 ›</a></div>';
     h += '<div id="owner-body" class="muted">불러오는 중…</div>';
-    h += '<p class="section-title">설정</p><a class="card link" href="#/owner-lists"><div class="title">매장·이름 목록 고치기</div><div class="sub">직원이 고르는 목록입니다</div></a>';
+    h += '<p class="section-title">🎓 신입 교육 진도</p><div id="owner-train" class="muted">불러오는 중…</div>';
+    h += '<p class="section-title">설정</p><a class="card link" href="#/owner-lists"><div class="title">매장·이름 목록 고치기</div><div class="sub">직원 이름·입사일, 떡 종류, 매장별 항목</div></a>';
     if (!sbOn()) h += '<div class="save-note">서버 연결이 없어 이 폰의 기록만 보여요. config.js(열쇠)를 확인해 주세요.</div>';
     app.innerHTML = h;
-    Promise.all([loadSettings(), fetchRunsForDate(date)]).then(function (r) {
-      var s = r[0], runs = r[1] || [];
+    Promise.all([loadSettings(), fetchRunsForDate(date), fetchTrainingAll()]).then(function (r) {
+      var s = r[0], runs = r[1] || [], trainAll = r[2] || [];
+      renderOwnerTraining(s, trainAll);
       function find(st, k) { return runs.filter(function (x) { return (x.store || '') === st && x.kind === k; })[0]; }
       // 등록된 매장 + 그날 기록에 있는 매장(등록 전 기록이나 이름이 바뀐 매장도 빠지지 않게)
       var storesToShow = s.stores.slice();
@@ -409,7 +502,7 @@
       storesToShow.forEach(function (st) {
         b += '<div class="og-store">' + esc(storeLabel(st)) + '</div>';
         ['open', 'close'].forEach(function (k) {
-          var run = find(st, k), stt = runStatus(run, LISTS[k].items.length), miss = stt.total - stt.done;
+          var run = find(st, k), stt = runStatus(run, itemsFor(s, st, k, date).all.length), miss = stt.total - stt.done;
           b += '<a class="og-cell ' + stt.cls + '" href="#d-' + encodeURIComponent(st) + '-' + k + '">' +
             '<span class="og-label">' + stt.label + '</span>' +
             (run ? '<span class="og-meta">' + esc(run.staff) + '</span><span class="og-meta">' + (run.completed_at ? hhmm(run.completed_at) : '완료 안 누름') + (miss ? ' · 미완료 ' + miss : ' · ' + stt.done + '/' + stt.total) + (run.note ? ' · 📝' : '') + '</span>' : '<span class="og-meta">기록 없음</span>') + '</a>';
@@ -418,15 +511,50 @@
       b += '</div>';
       // 아래: 기록마다 담당자·완료시간·상태·미완료 항목·특이사항 카드
       var anyRun = false;
-      storesToShow.forEach(function (st) { ['open', 'close'].forEach(function (k) { var run = find(st, k); if (run) { anyRun = true; b += detailFor(run, k, st); } }); });
+      storesToShow.forEach(function (st) { ['open', 'close'].forEach(function (k) { var run = find(st, k); if (run) { anyRun = true; b += detailFor(run, k, st, s, date); } }); });
       if (!anyRun) b += '<div class="empty"><strong>' + koDate(date) + ' 기록이 없어요.</strong>직원이 체크를 시작하면 여기에 바로 나타납니다.</div>';
       document.getElementById('owner-body').innerHTML = b;
       app.querySelectorAll('.og-cell').forEach(function (cell) {
         cell.addEventListener('click', function (e) { e.preventDefault(); var id = cell.getAttribute('href').slice(1); var el = document.getElementById(id); if (el) { el.classList.add('hl'); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
       });
     });
-    function detailFor(run, k, st) {
-      var items = LISTS[k].items, stt = runStatus(run, items.length), missing = [];
+    // 신입 교육 진도 카드 + 7일 넘었는데 못 끝낸 직원 배지 + 사수 확인 버튼
+    function renderOwnerTraining(s, all) {
+      var el = document.getElementById('owner-train'); if (!el) return;
+      if (!s.staff.length) { el.innerHTML = '<div class="card"><div class="muted">이름 목록을 등록하면 직원별 교육 진도가 여기에 보여요.</div></div>'; el.className = ''; return; }
+      var late = [], html = '';
+      s.staff.forEach(function (name) {
+        var meta = (s.staff_meta || {})[name] || {}, days = daysSince(meta.hire_on);
+        var rowsFor = all.filter(function (x) { return x.staff === name; });
+        var read = 0, confirmed = 0;
+        var stepsHtml = STEPS.map(function (stp) {
+          var p = rowsFor.filter(function (x) { return x.step === stp.day; })[0];
+          var r = !!(p && p.read_at), c = !!(p && p.confirmed_at);
+          if (r) read++; if (c) confirmed++;
+          return '<div class="tr-step"><span class="tr-day">' + esc(stp.day) + '</span><span class="pill ' + (c ? 'done' : r ? 'partial' : 'none') + '">' + (c ? '사수 확인 ✓' : r ? '읽음 ' + koDate(p.read_at.slice(0, 10)) : '아직') + '</span>' + (r && !c ? '<button type="button" class="btn small-btn tr-confirm" data-name="' + esc(name) + '" data-step="' + esc(stp.day) + '">사수 확인</button>' : '') + '</div>';
+        }).join('');
+        var pct = STEPS.length ? Math.round(read / STEPS.length * 100) : 0;
+        var isLate = days !== null && days > 7 && confirmed < STEPS.length;
+        if (isLate) late.push(name);
+        var done = STEPS.length && confirmed === STEPS.length;
+        html += '<div class="card tr-card' + (isLate ? ' late' : '') + '"><div class="title">' + esc(name) + (days ? ' <span class="muted small">입사 ' + days + '일째</span>' : ' <span class="muted small">입사일 미등록</span>') + (done ? ' <span class="pill done">교육 완료</span>' : isLate ? ' <span class="pill none">7일 지남 · 미완료</span>' : '') + '</div>';
+        html += '<div class="progress-bar"><div style="width:' + pct + '%"></div></div><div class="muted small">읽음 ' + read + '/' + STEPS.length + ' · 사수 확인 ' + confirmed + '/' + STEPS.length + '</div>' + stepsHtml + '</div>';
+      });
+      el.className = '';
+      el.innerHTML = (late.length ? '<div class="save-note">⚠️ 입사 7일이 지났는데 교육을 못 끝낸 직원 <strong>' + late.length + '명</strong>: ' + late.map(esc).join(', ') + '</div>' : '') + html;
+      el.querySelectorAll('.tr-confirm').forEach(function (b) {
+        b.addEventListener('click', function () {
+          b.disabled = true; b.textContent = '저장 중…';
+          var p = all.filter(function (x) { return x.staff === b.dataset.name && x.step === b.dataset.step; })[0] || {};
+          saveTraining({ staff: b.dataset.name, store: p.store || '', step: b.dataset.step, read_at: p.read_at || new Date().toISOString(), confirmed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .then(function () { return fetchTrainingAll(); }).then(function (all2) { renderOwnerTraining(s, all2); });
+        });
+      });
+    }
+    function detailFor(run, k, st, s, dateS) {
+      var items = itemsFor(s, st, k, dateS).all, stt = runStatus(run, items.length), missing = [];
+      var wasteKeys = Object.keys(run.waste || {}).filter(function (x) { return x !== '_none' && run.waste[x] > 0; });
+      var wasteHtml = k !== 'close' ? null : (wasteKeys.length ? '<ul class="miss-list waste-list">' + wasteKeys.map(function (p) { return '<li>' + esc(p) + ' <strong>' + run.waste[p] + '</strong>개</li>'; }).join('') + '</ul>' : (run.waste && run.waste._none ? '<span class="ok-text">없음 (폐기 없음으로 입력)</span>' : ((s.products || []).length ? '<span class="warn">미입력</span>' : '<span class="muted">제품 목록 미등록</span>')));
       items.forEach(function (t, i) { if (!run.items[String(i)]) missing.push(t); });
       var d = '<div class="card detail" id="d-' + encodeURIComponent(st) + '-' + k + '">';
       d += '<div class="title">' + esc(storeLabel(st)) + ' · ' + KIND_LABEL[k] + ' <span class="pill ' + stt.cls + '">' + stt.label + '</span></div>';
@@ -434,6 +562,7 @@
       d += '<tr><th>완료시간</th><td>' + (run.completed_at ? hhmm(run.completed_at) + (run.first_completed_at && run.first_completed_at !== run.completed_at ? ' <span class="muted small">(처음 제출 ' + hhmm(run.first_completed_at) + ')</span>' : '') : '<span class="warn">완료 제출 안 함</span>') + '</td></tr>';
       d += '<tr><th>체크</th><td>' + stt.done + '/' + stt.total + (run.updated_at ? ' <span class="muted small">(마지막 ' + hhmm(run.updated_at) + ')</span>' : '') + '</td></tr>';
       d += '<tr><th>미완료 항목</th><td>' + (missing.length ? '<ul class="miss-list">' + missing.map(function (t) { return '<li>⬜ ' + esc(t) + '</li>'; }).join('') + '</ul>' : '<span class="ok-text">없음 — 모두 체크됨</span>') + '</td></tr>';
+      if (wasteHtml !== null) d += '<tr><th>오늘 폐기</th><td>' + wasteHtml + '</td></tr>';
       d += '<tr><th>특이사항</th><td>' + (run.note ? esc(run.note).replace(/\n/g, '<br>') : '<span class="muted">없음</span>') + '</td></tr></table>';
       d += '<details class="times"><summary>항목별 체크 시각</summary><ul class="detail-list">';
       items.forEach(function (t, i) { var at = run.items[String(i)]; d += '<li class="' + (at ? 'ok' : 'miss') + '">' + (at ? '✅ ' + hhmm(at) : '⬜ 빠짐') + ' · ' + esc(t) + '</li>'; });
@@ -448,6 +577,21 @@
       var h = '<div class="crumb"><a href="#/owner">사장 점검표</a> › 목록</div><h1>매장·이름 목록</h1><p class="muted"><strong>한 줄에 한 명(한 곳)씩</strong> 적습니다. 엔터로 줄을 바꾸거나 쉼표(,)로 나눠도 됩니다. 실명 대신 별칭(알바 A 등)도 됩니다.</p>';
       h += '<label class="field">매장 (지점) <span class="muted small">— 하나뿐이면 하나만. 두 개 이상일 때만 직원 화면에 매장 선택이 나와요</span><textarea id="stores" rows="3" placeholder="예: 본점">' + esc(s.stores.join('\n')) + '</textarea></label><p class="preview muted small" id="stores-preview"></p>';
       h += '<label class="field">직원 이름 <span class="muted small">— 비워 두면 직원이 직접 이름을 적습니다</span><textarea id="staff" rows="6" placeholder="예:\n김하나\n이두리\n알바 A">' + esc(s.staff.join('\n')) + '</textarea></label><p class="preview muted small" id="staff-preview"></p>';
+      if (s.staff.length) {
+        h += '<div class="card"><div class="title">입사일 <span class="muted small">— 적으면 "입사 N일째"와 7일 넘은 신입 배지가 보여요 (대략이어도 됨)</span></div>';
+        s.staff.forEach(function (name, i) { var meta = (s.staff_meta || {})[name] || {}; h += '<div class="hire-row"><span>' + esc(name) + '</span><input type="date" id="hire-' + i + '" data-name="' + esc(name) + '" value="' + esc(meta.hire_on || '') + '"></div>'; });
+        h += '<p class="muted small">이름을 새로 추가했으면 먼저 저장한 뒤 입사일을 적어 주세요.</p></div>';
+      }
+      h += '<label class="field">떡 종류 (폐기 입력용) <span class="muted small">— 마감 때 직원이 폐기 있는 떡을 골라 개수를 적습니다. 비워 두면 폐기 칸이 안 나와요</span><textarea id="products" rows="6" placeholder="예:\n인절미\n흑임자 인절미\n꿀떡">' + esc((s.products || []).join('\n')) + '</textarea></label><p class="preview muted small" id="products-preview"></p>';
+      var extraStores = s.stores.length ? s.stores : [''];
+      h += '<p class="section-title">매장별 추가 체크 항목 <span class="muted small">— 공통 항목(오픈 7·마감 6) 뒤에 그 매장 직원에게만 보입니다. 한 줄에 하나</span></p>';
+      h += '<div class="card soft-card"><strong>매일이 아닌 항목은 끝에 주기를 적어요</strong><div class="muted small">예: <code>제빙기 내부 세척 (매주 월)</code> · <code>냉장고 전체 세척 (격주 월)</code> · <code>소화기 점검 (매월 1일)</code> · <code>행주 살균 (매주 월·목)</code> — 그날에만 체크리스트에 나옵니다. 주기를 안 적으면 매일.</div></div>';
+      extraStores.forEach(function (st, i) {
+        var si = (s.store_items && s.store_items[st]) || {};
+        h += '<div class="card"><div class="title">' + esc(storeLabel(st)) + '</div>';
+        h += '<label class="field">☀️ 오픈 추가 항목<textarea id="xo-' + i + '" data-store="' + esc(st) + '" rows="3" placeholder="예: 테라스 의자 펴기">' + esc((si.open || []).join('\n')) + '</textarea></label>';
+        h += '<label class="field">🌙 마감 추가 항목<textarea id="xc-' + i + '" data-store="' + esc(st) + '" rows="3" placeholder="예: 테라스 의자 접고 묶기">' + esc((si.close || []).join('\n')) + '</textarea></label></div>';
+      });
       h += '<button type="button" class="btn primary wide" id="lists-save">저장</button><p id="lists-note" class="muted small"></p>';
       h += '<p class="section-title">사장님 번호(PIN) 바꾸기</p><div class="card"><p class="muted small">점검표를 여는 숫자예요. 처음 값은 ' + (s.owner_pin_hash ? '이미 바꿨습니다' : '설치할 때 정한 값(기본 0000)') + '. 바꾼 번호는 서버에 암호화(해시)해서 저장됩니다.</p>';
       h += '<label class="field">새 번호 (숫자 4~8자리)<input type="password" inputmode="numeric" maxlength="8" id="pin1" class="text-input" autocomplete="new-password"></label>';
@@ -475,14 +619,28 @@
         var spaced = arr.filter(function (x) { return x.indexOf(' ') >= 0; });
         if (spaced.length) el.innerHTML += '<br><span class="warn">띄어쓰기가 있는 이름이 있어요: ' + spaced.map(esc).join(', ') + ' — 두 사람이면 엔터나 쉼표로 나눠 주세요.</span>';
       }
-      ['stores', 'staff'].forEach(function (id) { var lb = id === 'stores' ? '매장' : '이름'; preview(id, lb); document.getElementById(id).addEventListener('input', function () { preview(id, lb); }); });
+      // 매장별 항목은 줄바꿈으로만 나눈다 (항목 문구에 쉼표가 들어갈 수 있음)
+      function linesNL(el) { var out = []; el.value.split('\n').forEach(function (x) { x = x.trim(); if (x && out.indexOf(x) < 0) out.push(x); }); return out; }
+      ['stores', 'staff', 'products'].forEach(function (id) { var lb = id === 'stores' ? '매장' : id === 'staff' ? '이름' : '떡 종류'; preview(id, lb); document.getElementById(id).addEventListener('input', function () { preview(id, lb); }); });
       document.getElementById('lists-save').addEventListener('click', function () {
-        var st = lines('stores'), sf = lines('staff'), btn = document.getElementById('lists-save'), n = document.getElementById('lists-note');
+        var st = lines('stores'), sf = lines('staff'), pr = lines('products'), btn = document.getElementById('lists-save'), n = document.getElementById('lists-note');
+        var storeItems = {};
+        app.querySelectorAll('textarea[id^="xo-"], textarea[id^="xc-"]').forEach(function (ta) {
+          var idx = parseInt(ta.id.split('-')[1], 10);
+          // 같은 화면에서 매장 이름을 새로 적거나 바꿨으면, 그 순서의 새 이름으로 저장한다
+          var key = st[idx] !== undefined ? st[idx] : (ta.dataset.store || ''), kind = ta.id.indexOf('xo-') === 0 ? 'open' : 'close', arr = linesNL(ta);
+          if (!storeItems[key]) storeItems[key] = {};
+          if (arr.length) storeItems[key][kind] = arr;
+        });
+        var staffMeta = {};
+        app.querySelectorAll('input[id^="hire-"]').forEach(function (inp) { if (inp.value && sf.indexOf(inp.dataset.name) >= 0) staffMeta[inp.dataset.name] = { hire_on: inp.value }; });
+        Object.keys(s.staff_meta || {}).forEach(function (nm) { if (sf.indexOf(nm) >= 0 && !staffMeta[nm] && !app.querySelector('input[id^="hire-"][data-name="' + nm.replace(/"/g, '\\"') + '"]')) staffMeta[nm] = s.staff_meta[nm]; });
         btn.disabled = true; btn.textContent = '저장 중…'; n.className = 'save-status'; n.textContent = '서버에 저장하는 중…';
         store.del('me');
-        Promise.all([saveSetting('stores', st), saveSetting('staff', sf)]).then(function () {
+        Promise.all([saveSetting('stores', st), saveSetting('staff', sf), saveSetting('products', pr), saveSetting('store_items', storeItems), saveSetting('staff_meta', staffMeta)]).then(function () {
           btn.disabled = false; btn.textContent = '✅ 저장됨'; n.className = 'save-status ok';
-          n.textContent = '✅ 저장됐어요 — 매장 ' + st.length + '곳, 이름 ' + sf.length + '명. 직원 폰에서 바로 보입니다.';
+          var extraCount = Object.keys(storeItems).reduce(function (a, k) { return a + ((storeItems[k].open || []).length + (storeItems[k].close || []).length); }, 0);
+          n.textContent = '✅ 저장됐어요 — 매장 ' + st.length + '곳, 이름 ' + sf.length + '명, 떡 ' + pr.length + '종, 매장별 항목 ' + extraCount + '개. 직원 폰에서 바로 보입니다.';
           setTimeout(function () { btn.textContent = '저장'; }, 2500);
         }, function (e) {
           btn.disabled = false; btn.textContent = '저장'; n.className = 'save-status err';
@@ -511,17 +669,38 @@
     refresh();
     if (hl !== undefined) { var el = app.querySelector('[data-line="' + hl + '"]'); if (el) { el.classList.add('hl'); setTimeout(function () { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 50); } }
   }
+  // 신입 교육표 — 이름별로 서버에 저장. 사수 확인은 사장 점검표에서.
   function viewTraining() {
-    var rows = trainingRows(book);
-    var h = '<div class="crumb"><a href="#/">첫 화면</a> › 신입 교육표</div><h1>🎓 신입 교육표</h1><p class="muted">그날 읽을 장을 누르고, 다 읽으면 "읽었어요"에 체크하세요. 관리자 확인은 사수에게 말로 받으세요.</p>';
-    if (!rows.length) h += empty('교육표가 없어요.', '12장에 표가 있는지 확인해 주세요.');
-    rows.forEach(function (r, i) {
-      var key = 'train:' + i, on = store.get(key) === '1', links = '', seen = {};
-      r.content.replace(/(\d+)장/g, function (all, n) { if (!seen[n]) { seen[n] = 1; links += '<a href="' + chapterLink(parseInt(n, 10)) + '">' + n + '장</a>'; } return all; });
-      h += '<div class="card train-row"><div class="day">' + esc(r.day) + '</div><div>' + inline(r.content) + '</div><div class="links">' + links + '</div><label class="read"><input type="checkbox" data-key="' + key + '"' + (on ? ' checked' : '') + '><span>읽었어요' + (on ? ' ✓' : '') + '</span></label><div class="admin">' + esc(r.confirm) + '</div></div>';
+    var m = me(), rows = STEPS;
+    if (!m) { location.hash = '#/who?next=' + encodeURIComponent('#/train'); return; }
+    app.innerHTML = '<div class="crumb"><a href="#/">첫 화면</a> › 신입 교육표</div><h1>🎓 신입 교육표</h1><div class="muted">불러오는 중…</div>';
+    Promise.all([loadSettings(), fetchTraining(m.staff)]).then(function (r) {
+      var s = r[0], prog = r[1] || [], meta = (s.staff_meta || {})[m.staff] || {}, days = daysSince(meta.hire_on);
+      function row(step) { return prog.filter(function (x) { return x.step === step; })[0]; }
+      var readCount = rows.filter(function (x) { var p = row(x.day); return p && p.read_at; }).length;
+      var h = '<div class="crumb"><a href="#/">첫 화면</a> › 신입 교육표</div><h1>🎓 신입 교육표</h1>';
+      h += '<div class="card who-line"><span><strong>' + esc(m.staff) + '</strong>' + (days ? ' · 입사 ' + days + '일째' : '') + '</span><a href="#/who?next=' + encodeURIComponent('#/train') + '">바꾸기</a></div>';
+      h += '<div class="progress-row"><div style="font-weight:700">교육 진행 ' + readCount + '/' + rows.length + '</div><span id="tr-save" class="save-status"></span></div><div class="progress-bar"><div style="width:' + (rows.length ? Math.round(readCount / rows.length * 100) : 0) + '%"></div></div>';
+      h += '<p class="muted small">그날 읽을 장을 눌러 읽고, 다 읽으면 "읽었어요"를 누르세요. 사수가 확인하면 "사수 확인 ✓"로 바뀝니다.</p>';
+      if (!rows.length) h += empty('교육표가 없어요.', '12장에 표가 있는지 확인해 주세요.');
+      rows.forEach(function (r) {
+        var p = row(r.day), on = !!(p && p.read_at), ok = !!(p && p.confirmed_at), links = '', seen = {};
+        r.content.replace(/(\d+)장/g, function (all, n) { if (!seen[n]) { seen[n] = 1; links += '<a href="' + chapterLink(parseInt(n, 10)) + '">' + n + '장</a>'; } return all; });
+        h += '<div class="card train-row' + (ok ? ' confirmed' : '') + '"><div class="day">' + esc(r.day) + (ok ? ' <span class="pill done">사수 확인 ✓ ' + hhmm(p.confirmed_at) + '</span>' : (on ? ' <span class="pill partial">읽음 · 사수 확인 대기</span>' : '')) + '</div><div>' + inline(r.content) + '</div><div class="links">' + links + '</div>';
+        h += '<label class="read"><input type="checkbox" data-step="' + esc(r.day) + '"' + (on ? ' checked' : '') + (ok ? ' disabled' : '') + '><span>읽었어요' + (on ? ' ✓ ' + (p.read_at ? koDate(p.read_at.slice(0, 10)) : '') : '') + '</span></label></div>';
+      });
+      app.innerHTML = h;
+      app.querySelectorAll('input[data-step]').forEach(function (inp) {
+        inp.addEventListener('change', function () {
+          var st = document.getElementById('tr-save'); st.className = 'save-status'; st.textContent = '저장 중…';
+          var rowData = { staff: m.staff, store: m.store || '', step: inp.dataset.step, read_at: inp.checked ? new Date().toISOString() : null, confirmed_at: null, updated_at: new Date().toISOString() };
+          saveTraining(rowData).then(function (res) {
+            st.className = 'save-status ' + (res.ok ? 'ok' : 'err'); st.textContent = res.ok ? (res.local ? '이 폰에만 저장됨' : '✓ 서버에 저장됨') : '❌ 저장 안 됨';
+            setTimeout(function () { viewTraining(); }, 400);
+          });
+        });
+      });
     });
-    app.innerHTML = h;
-    app.querySelectorAll('input[data-key]').forEach(function (inp) { inp.addEventListener('change', function () { store.set(inp.dataset.key, inp.checked ? '1' : '0'); inp.nextElementSibling.textContent = '읽었어요' + (inp.checked ? ' ✓' : ''); }); });
   }
   function viewTodo() {
     var h = '<div class="crumb"><a href="#/">첫 화면</a> › 확인 필요</div><h1>📝 확인 필요 ' + TODOS.length + '곳</h1><p class="muted">아직 매장 기준이 정해지지 않아 비워 둔 곳이에요.</p>';
