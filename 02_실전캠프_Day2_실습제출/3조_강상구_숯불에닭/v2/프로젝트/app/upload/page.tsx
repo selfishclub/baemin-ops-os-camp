@@ -29,7 +29,6 @@ export default function UploadPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "warn" | "info"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [popbill, setPopbill] = useState<{ ready: boolean; test?: boolean; account?: string } | null>(null);
   const [need, setNeed] = useState<{ next: NextFetch | null; missing: { from: string; to: string }[] } | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -67,7 +66,7 @@ export default function UploadPage() {
   );
   const searchedTotals = txTotals(searched);
 
-  // 팝빌 계좌조회로 통장을 바로 가져온다. 열쇠는 서버(.env.local)에만 있고, 설정이 없으면 단추가 안 보인다.
+  // 통장을 어디까지 받았나 — 다음에 받아야 할 기간을 알려 주려고
   useEffect(() => {
     let alive = true;
     void getStore().listUploads().then((ups) => {
@@ -78,31 +77,8 @@ export default function UploadPage() {
     return () => { alive = false; };
   }, [ledger.txs.length, month]);
 
-  useEffect(() => {
-    fetch("/api/popbill/status").then((r) => r.json()).then(setPopbill).catch(() => setPopbill({ ready: false }));
-  }, []);
 
-  async function fetchFromPopbill() {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const to = new Date().toISOString().slice(0, 10);
-      const last = (await getStore().listUploads()).map((u) => u.to).sort().at(-1);
-      // 마지막으로 받은 날 다음부터. 처음이면 이번 달 1일부터
-      const from = last && last < to ? new Date(new Date(last + "T00:00:00Z").getTime() + 864e5).toISOString().slice(0, 10) : to.slice(0, 8) + "01";
-      const res = await fetch("/api/popbill/bank", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from, to }) });
-      const data = await res.json();
-      if (!res.ok) { setMessage({ tone: "error", text: data.error ?? "통장을 가져오지 못했어요." }); return; }
-      if (!data.rows?.length) { setMessage({ tone: "info", text: `${from} ~ ${to}에 새 거래가 없어요.` }); return; }
-      await ingest(data.rows, data.from, data.to, `통장 자동 가져오기 (팝빌`);
-    } catch (e) {
-      setMessage({ tone: "error", text: `통장을 가져오지 못했어요. (${e instanceof Error ? e.message : e})` });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // 통장 줄을 장부에 넣는 공통 길 — 엑셀로 올리든 팝빌로 가져오든 여기로 모인다.
+  // 통장 줄을 장부에 넣는 공통 길
   //  이미 있는 줄 빼기 → 자동 분류 → 저장 → 올린 기록 남기기
   async function ingest(all: BankRow[], from: string, to: string, label: string) {
     const store = getStore();
@@ -207,21 +183,10 @@ export default function UploadPage() {
               가짜 {s.label} 파일로 해 보기
             </button>
           ))}
-          {popbill?.ready && (
-            <button className="btn-primary" disabled={busy} onClick={fetchFromPopbill}>
-              통장 자동 가져오기
-            </button>
-          )}
           <a className="btn-ghost" href={SAMPLES[0].file} download>
             예시 파일 받기
           </a>
         </div>
-        {popbill?.ready && (
-          <p className="text-xs text-stone-500">
-            팝빌 계좌조회가 연결돼 있어요{popbill.account ? ` (${popbill.account})` : ""}
-            {popbill.test ? " · 테스트 서버" : ""} — “통장 자동 가져오기”를 누르면 마지막으로 받은 날 다음부터 가져와요.
-          </p>
-        )}
         {busy && <Notice tone="info">읽는 중…</Notice>}
         {message && <Notice tone={message.tone}>{message.text}</Notice>}
       </section>

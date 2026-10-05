@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog, MoneyInput, Notice } from "@/components/ui";
 import { newId } from "@/lib/classify";
-import { toDrafts, usedConfirmNums } from "@/lib/popbill/taxinvoice";
 import { ITEMS_KEY, type Item } from "@/lib/costing/types";
 import { RECEIPT_EXEMPT_KEY, cardPayee, emptyExempt, matchCardReceipts, type ReceiptExempt } from "@/lib/costing/receiptMatch";
 import { SAMPLE_PURCHASES, SAMPLE_PURCHASES_MONTH } from "@/lib/costing/samplePurchases";
@@ -59,7 +58,6 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
   const [note, setNote] = useState<{ tone: "ok" | "info" | "warn"; text: string } | null>(null);
   const [bankTxs, setBankTxs] = useState<Transaction[]>([]);
   const [exempt, setExempt] = useState<ReceiptExempt>(emptyExempt());
-  const [popbill, setPopbill] = useState<{ ready: boolean } | null>(null);
   const key = PURCHASES_KEY_PREFIX + month;
 
   // 이 달부터 이번 달까지의 매입 영수증 (기준단가를 바꿀 때 "더 최근에 산 기록"이 있는지 보려고)
@@ -105,33 +103,6 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month]);
-
-  useEffect(() => {
-    fetch("/api/popbill/status").then((r) => r.json()).then(setPopbill).catch(() => setPopbill({ ready: false }));
-  }, []);
-
-  // 홈택스 매입 전자세금계산서를 가져와 영수증 초안으로. 품목은 세금계산서에 안 와서 금액만 채운다.
-  async function fetchTaxinvoices() {
-    setNote(null);
-    try {
-      const [y, m] = month.split("-").map(Number);
-      const from = `${month}-01`;
-      const to = `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
-      const res = await fetch("/api/popbill/taxinvoice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from, to }) });
-      const data = await res.json();
-      if (!res.ok) { setNote({ tone: "warn", text: data.error ?? "세금계산서를 가져오지 못했어요." }); return; }
-      const { drafts, skipped } = toDrafts(data.list ?? [], usedConfirmNums(purchases), () => `pu_${newId().slice(0, 10)}`);
-      if (drafts.length === 0) {
-        setNote({ tone: "info", text: skipped ? `새로 가져올 세금계산서가 없어요 (이미 들어온 ${skipped}장).` : `${monthLabel(month)}에 받은 매입 세금계산서가 없어요.` });
-        return;
-      }
-      await getStore().saveSetting(key, [...purchases, ...drafts]);
-      await load();
-      setNote({ tone: "ok", text: `세금계산서 ${drafts.length}장을 영수증 초안으로 넣었어요${skipped ? ` (이미 있던 ${skipped}장은 건너뜀)` : ""}. 품목은 영수증을 보고 채워 주세요.` });
-    } catch (e) {
-      setNote({ tone: "warn", text: `세금계산서를 가져오지 못했어요. (${e instanceof Error ? e.message : e})` });
-    }
-  }
 
   async function save(p: Purchase) {
     const clean: Purchase = { ...p, vendor: p.vendor.trim() || "거래처", lines: p.lines.filter((l) => l.name.trim() && l.amount > 0) };
@@ -319,11 +290,6 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
             🍺 주류 매출원장
           </button>
           <input ref={liquorRef} type="file" accept=".xlsx,.xls" aria-label="주류 매출원장 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readLiquorFile(e.target.files[0])} />
-          {popbill?.ready && (
-            <button className="underline hover:text-stone-700" onClick={() => void fetchTaxinvoices()}>
-              📄 전자세금계산서 가져오기
-            </button>
-          )}
         </div>
         <details className="text-sm text-stone-700">
           <summary className="cursor-pointer text-sm font-semibold text-stone-600">? 어떻게 넣나 (누르면 펼쳐져요)</summary>
