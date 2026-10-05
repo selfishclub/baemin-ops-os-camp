@@ -57,7 +57,9 @@ export interface MenuCostRow {
 
 export interface CostRateReport {
   month: string;
-  salesAmount: number; // 포스 매출 합계 (원가율 분모)
+  salesAmount: number; // 포스 매출 합계 (이론 원가율 분모)
+  revenueAmount: number; // 실제 원가율 분모 — 포스에 안 찍히는 매출(배달앱·계좌이체·실물현금·제로페이)까지 더한 그 달 총매출
+  offPos: number; // 그중 포스에 안 찍힌 몫 (안내용)
   coveredAmount: number; // 레시피가 있는 메뉴의 매출
   coverage: number | null; // coveredAmount ÷ salesAmount %
   theoreticalCost: number; // 레시피 있는 메뉴의 이론 재료비
@@ -90,7 +92,9 @@ function giveawayOf(menu: Menu | null, quantity: number, amount: number) {
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const pct = (a: number, b: number) => (b > 0 ? r1((a / b) * 100) : null);
 
-export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes: Recipe[], items: Item[], actualCost: number): CostRateReport {
+//  totalRevenue: 그 달 총매출(모든 채널). 통장 재료비는 배달앱 음식까지 만든 값이라
+//    포스 매출만 분모로 쓰면 실제 원가율이 부풀어 보인다. 안 넘기면 포스 매출을 쓴다.
+export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes: Recipe[], items: Item[], actualCost: number, totalRevenue?: number): CostRateReport {
   const byCode = new Map(menus.filter((m) => m.posCode).map((m) => [m.posCode!, m]));
   const byName = new Map(menus.map((m) => [m.name.replace(/\s+/g, ""), m]));
   const recipeBy = pickRecipes(recipes, pos.periodEnd);
@@ -122,8 +126,10 @@ export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes:
   const coveredAmount = covered.reduce((a, r) => a + r.amount, 0);
   const theoreticalCost = Math.round(covered.reduce((a, r) => a + r.theoreticalCost, 0));
   const theoreticalRate = pct(theoreticalCost, coveredAmount);
-  const estimatedTotalCost = theoreticalRate === null ? theoreticalCost : Math.round((pos.totalAmount * theoreticalRate) / 100);
-  const actualRate = pct(actualCost, pos.totalAmount);
+  // 실제 재료비는 포스에 안 찍히는 매출(배달앱 등)의 음식까지 만든 값이라 그 매출도 분모에 넣는다
+  const revenueAmount = totalRevenue && totalRevenue > pos.totalAmount ? totalRevenue : pos.totalAmount;
+  const estimatedTotalCost = theoreticalRate === null ? theoreticalCost : Math.round((revenueAmount * theoreticalRate) / 100);
+  const actualRate = pct(actualCost, revenueAmount);
   const priced = rows.filter((r) => r.listPrice !== null);
   const giveaway = priced.reduce((a, r) => a + (r.giveaway ?? 0), 0);
   const giveawayFull = priced.reduce((a, r) => a + r.listPrice! * r.quantity, 0);
@@ -131,6 +137,8 @@ export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes:
   return {
     month: pos.month,
     salesAmount: pos.totalAmount,
+    revenueAmount,
+    offPos: revenueAmount - pos.totalAmount,
     coveredAmount,
     coverage: pct(coveredAmount, pos.totalAmount),
     theoreticalCost,

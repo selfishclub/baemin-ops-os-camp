@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { MoneyInput, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
+import { useDaily } from "@/components/useDaily";
 import PurchaseSection from "@/components/PurchaseSection";
 import { PriceTrendCard } from "@/components/PriceTrendCard";
 import { newId } from "@/lib/classify";
@@ -22,6 +23,7 @@ const UNITS: BaseUnit[] = ["g", "kg", "ml", "L", "ea"];
 export default function CostingPage() {
   const { month, setMonth } = useMonth();
   const ledger = useLedger(month);
+  const daily = useDaily(month);
   const [items, setItems] = useState<Item[]>([]);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -55,7 +57,12 @@ export default function CostingPage() {
 
   // 통장의 실제 재료비 = 매출원가 대분류 출금 합계
   const actualCost = useMemo(() => ledger.txs.filter((t) => t.major === "매출원가").reduce((a, t) => a + t.out - t.in, 0), [ledger.txs]); // 환급 입금은 뺀다
-  const report = useMemo(() => (pos && menus.length ? buildCostRateReport(pos, menus, recipes, items, actualCost) : null), [pos, menus, recipes, items, actualCost]);
+  // 그 달 총매출 (모든 채널). 통장 재료비는 배달앱 음식까지 만든 값이라 분모에 같이 넣는다
+  const totalRevenue = useMemo(() => daily.sales.reduce((a, s) => a + s.amount, 0), [daily.sales]);
+  const report = useMemo(
+    () => (pos && menus.length ? buildCostRateReport(pos, menus, recipes, items, actualCost, totalRevenue) : null),
+    [pos, menus, recipes, items, actualCost, totalRevenue],
+  );
 
   async function handleFile(file: Blob, name: string) {
     setBusy(true);
@@ -173,6 +180,12 @@ export default function CostingPage() {
               tone={report.gapRate === null ? undefined : report.gapRate > 3 ? "bad" : report.gapRate < -3 ? "good" : undefined}
             />
           </section>
+          {report.offPos > 0 && (
+            <Notice tone="info">
+              실제 원가율은 <b>그 달 총매출 {won(report.revenueAmount)}</b> 기준이에요. 포스에 안 찍히는 매출(배달앱·손님 계좌이체·실물 현금·제로페이) <b>{won(report.offPos)}</b>도
+              그 음식을 만든 재료가 통장에서 나갔으니 같이 넣습니다. 포스 매출({won(report.salesAmount)})로만 나누면 원가율이 실제보다 높아 보여요.
+            </Notice>
+          )}
           {report.coverage !== null && report.coverage < 100 && (
             <Notice tone={report.coverage < 70 ? "warn" : "info"}>
               레시피가 있는 메뉴가 매출의 <b>{report.coverage}%</b>예요. 나머지({report.unmapped.length}개 메뉴, {won(report.salesAmount - report.coveredAmount)})는 같은 원가율로 어림해서 “차이”를 계산했어요. 레시피를 더 넣을수록 정확해져요.
