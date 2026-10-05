@@ -44,3 +44,21 @@
 .history td[data-state="none"] { color: #b4462f; }
 .history tr[data-selected="true"] { background: #f4f1e8; }
 .history td button { border: 0; background: none; color: #2f6b47; font-weight: 800; cursor: pointer; text-decoration: underline; }
+
+/* 숫자 입력 · 주기 · 기한 (2026-10-06) */
+.card li[data-skipped="true"] button { opacity: .55; }
+.card li[data-skipped="true"] .box { border-style: dashed; color: #9a9a92; }
+.card li[data-late="true"] button { border-color: #e6b8ad; background: #fff7f5; }
+.tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #ece9df; color: #5b6359; font-size: 11px; font-style: normal; font-weight: 800; vertical-align: middle; }
+.tag[data-late="true"] { background: #fde2dc; color: #9a3b2c; }
+.lateCount { color: #9a3b2c; }
+.measure { display: flex; gap: 6px; margin: 6px 0 2px 40px; }
+.measure input { width: 120px; padding: 8px 10px; border: 1px solid #c9c2b2; border-radius: 8px; font-size: 14px; }
+.measure button { padding: 8px 12px; border: 1px solid #2f6b47; border-radius: 999px; background: #2f6b47; color: white; font-size: 12px; font-weight: 800; cursor: pointer; }
+.measure button:disabled { opacity: .5; cursor: default; }
+.measure .cancel { background: white; color: #4d5a50; border-color: #c9c2b2; }
+.itemError { margin: 4px 0 0 40px; color: #9a3b2c; font-size: 12px; }
+.howto { margin-top: 28px; padding: 16px 18px; border: 1px solid #e1c985; border-radius: 14px; background: #fff8dc; }
+.howto h2 { margin: 0 0 8px; font-size: 14px; color: #173f31; }
+.howto ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.8; color: #4d5a50; }
+.howto code { padding: 1px 5px; border-radius: 4px; background: rgba(0, 0, 0, .06); }

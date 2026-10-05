@@ -319,6 +319,8 @@ create table if not exists public.daily_checks (
   unique (check_date, doc_id, item_key)
 );
 create index if not exists idx_daily_checks_date on public.daily_checks (check_date desc);
+-- (2026-10-06) 숫자 입력 항목의 값 (냉장고 온도, 폐기 수량 …). 글에 [숫자: 단위] 가 있으면 값이 있어야 체크됨
+alter table public.daily_checks add column if not exists value text not null default '';
 
 grant select, insert, delete on public.daily_checks to authenticated;
 grant usage, select on sequence public.daily_checks_id_seq to authenticated;

@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { allowedSections, lockedResponse } from "../../../db/portal-store";
 import { addCheck, readDailyRows, readDailyRowsSince, removeCheck } from "../../../db/check-store";
 import { readPublishedContent } from "../../../db/recipe-store";
-import { buildCheckDocs, buildDaySummaries, checkItemKey, isCheckDate, lastDates, signoffItemKey, todayInSeoul } from "../../checks/check-data";
+import { buildCheckDocs, buildDaySummaries, checkItemKey, isCheckDate, isScheduledOn, lastDates, normalizeMeasure, parseCheckStep, signoffItemKey, todayInSeoul } from "../../checks/check-data";
 import { manualSectionIds, readableManuals } from "../../manual/manual-data";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +21,9 @@ async function view(db: SupabaseClient, viewer: Viewer, requestedDate: string | 
   return {
     date,
     today,
-    docs: buildCheckDocs(docs, rows, viewer.id),
+    docs: buildCheckDocs(docs, rows, viewer.id, { date, today }),
     // 사장만: 최근 14일 요약
-    history: isOwner ? buildDaySummaries(docs, await readDailyRowsSince(db, dates[dates.length - 1]), dates) : [],
+    history: isOwner ? buildDaySummaries(docs, await readDailyRowsSince(db, dates[dates.length - 1]), dates, today) : [],
   };
 }
 
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const ctx = await requireViewerApi();
   if ("error" in ctx) return ctx.error;
-  const body = await request.json().catch(() => ({})) as { docId?: string; itemKey?: string; checked?: boolean; signoff?: boolean; date?: string };
+  const body = await request.json().catch(() => ({})) as { docId?: string; itemKey?: string; checked?: boolean; signoff?: boolean; date?: string; value?: string };
   try {
     const allowed = await allowedSections({ mode: "auth", viewer: ctx.viewer, db: ctx.db }, ["checks", ...manualSectionIds]);
     if (!allowed.has("checks")) return lockedResponse();
@@ -61,9 +61,18 @@ export async function POST(request: Request) {
 
     const text = doc.steps.find((step) => checkItemKey(step) === body.itemKey);
     if (!text || body.itemKey === signoffItemKey) return Response.json({ error: "어떤 항목인지 없습니다." }, { status: 400 });
+    const parsedStep = parseCheckStep(text);
+    if (!isScheduledOn(parsedStep.schedule, today)) return Response.json({ error: "오늘은 해당 없는 항목이에요." }, { status: 400 });
+    // 숫자 입력 항목([숫자: 단위])은 값이 있어야 체크된다
+    let measure = "";
+    if (body.checked !== false && parsedStep.unit !== null) {
+      const normalized = normalizeMeasure(body.value);
+      if (normalized === null) return Response.json({ error: "숫자를 적어야 체크돼요." }, { status: 400 });
+      measure = normalized;
+    }
     // 체크는 오늘 것만 (지난 날짜를 나중에 채워 넣지 못하게)
     if (body.checked === false) await removeCheck(ctx.db, today, doc.id, body.itemKey!);
-    else await addCheck(ctx.db, { date: today, docId: doc.id, itemKey: body.itemKey!, itemText: text, userId: ctx.viewer.id, userName: ctx.viewer.displayName });
+    else await addCheck(ctx.db, { date: today, docId: doc.id, itemKey: body.itemKey!, itemText: text, userId: ctx.viewer.id, userName: ctx.viewer.displayName, value: measure });
     return Response.json(await view(ctx.db, ctx.viewer, null));
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "저장하지 못했습니다." }, { status: 503 });

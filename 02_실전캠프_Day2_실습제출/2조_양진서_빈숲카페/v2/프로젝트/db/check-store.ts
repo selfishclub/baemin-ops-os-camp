@@ -3,7 +3,7 @@ import type { DailyRow } from "../app/checks/check-data";
 
 // 오늘 체크 기록 저장 층. 표: daily_checks (하루·문서·항목마다 한 줄, 먼저 누른 사람 이름이 남는다)
 
-const columns = "check_date, doc_id, item_key, item_text, checked_by, checked_by_name, checked_at";
+const columns = "check_date, doc_id, item_key, item_text, checked_by, checked_by_name, checked_at, value";
 
 export async function readDailyRows(db: SupabaseClient, date: string): Promise<DailyRow[]> {
   const { data, error } = await db.from("daily_checks").select(columns).eq("check_date", date);
@@ -18,9 +18,9 @@ export async function readDailyRowsSince(db: SupabaseClient, fromDate: string) {
 }
 
 // 체크: 이미 누가 했으면 그대로 둔다 (먼저 한 사람의 기록을 덮어쓰지 않는다)
-export async function addCheck(db: SupabaseClient, row: { date: string; docId: string; itemKey: string; itemText: string; userId: string; userName: string }) {
+export async function addCheck(db: SupabaseClient, row: { date: string; docId: string; itemKey: string; itemText: string; userId: string; userName: string; value?: string }) {
   const { error } = await db.from("daily_checks").upsert(
-    { check_date: row.date, doc_id: row.docId, item_key: row.itemKey, item_text: row.itemText, checked_by: row.userId, checked_by_name: row.userName },
+    { check_date: row.date, doc_id: row.docId, item_key: row.itemKey, item_text: row.itemText, checked_by: row.userId, checked_by_name: row.userName, value: row.value ?? "" },
     { onConflict: "check_date,doc_id,item_key", ignoreDuplicates: true },
   );
   if (error) throw new Error(`체크를 저장하지 못했습니다: ${error.message}`);

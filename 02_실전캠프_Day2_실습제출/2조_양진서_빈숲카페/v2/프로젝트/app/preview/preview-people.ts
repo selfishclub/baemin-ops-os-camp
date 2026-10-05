@@ -4,7 +4,7 @@ import type { Recipe, RecipeContent } from "../recipes/recipe-data";
 import { manualNoticePrefix, readableManuals } from "../manual/manual-data";
 import { getTrainingPath, manualCheckPrefix } from "../manual/training-path";
 import { buildExamStatus, examCheckKey, examCheckPrefix, getExams } from "../exam/exam-data";
-import { buildCheckDocs, buildDaySummaries, checkItemKey, isCheckDate, lastDates, signoffItemKey, todayInSeoul, type DailyRow } from "../checks/check-data";
+import { buildCheckDocs, buildDaySummaries, checkItemKey, isCheckDate, isScheduledOn, lastDates, normalizeMeasure, parseCheckStep, signoffItemKey, todayInSeoul, type DailyRow } from "../checks/check-data";
 import type { ViewRow } from "../manage/views/view-data";
 import { breakdown, buildBoard, defaultLevels, emptyCounts, highlights, levelFor, periodStart, totalPoints, type ActivityCounts, type Period } from "../score/score-data";
 import { buildWeeklyQuests, countCleared, isCorrect, mergeProgress, previousWeekStart, weekStartSeoul, type QuestProgressRow } from "../quest/quest-data";
@@ -35,13 +35,13 @@ function daysAgo(days: number) {
   return new Date(Date.now() - days * 86_400_000).toISOString();
 }
 
-const openSteps = ["(예시) 출근 기록을 남긴다", "(예시) 전원·조명·기기 예열: ○○ 순서로", "(예시) 재료 상태 확인: ○○", "(예시) 진열·청결 확인", "(예시) 영업 시작 전 책임자에게 확인받는다"];
+const openSteps = ["(예시) 출근 기록을 남긴다", "(예시) 전원·조명·기기 예열: ○○ 순서로", "(예시) 재료 상태 확인: ○○", "(예시) 냉장고 온도 확인 [숫자: ℃]", "(예시) 진열·청결 확인", "(~09:30) (예시) 영업 시작 전 책임자에게 확인받는다"];
 
 function seedDaily(): DailyCheckRow[] {
   const today = todayInSeoul();
   const yesterday = lastDates(today, 2)[1];
   const at = (date: string, time: string) => new Date(`${date}T${time}:00+09:00`).toISOString();
-  const row = (date: string, text: string, by: string, name: string, time: string, key = checkItemKey(text)): DailyCheckRow => ({ check_date: date, doc_id: "demo-open-prep", item_key: key, item_text: text, checked_by: by, checked_by_name: name, checked_at: at(date, time) });
+  const row = (date: string, text: string, by: string, name: string, time: string, key = checkItemKey(text)): DailyCheckRow => ({ check_date: date, doc_id: "demo-open-prep", item_key: key, item_text: text, checked_by: by, checked_by_name: name, checked_at: at(date, time), value: text.includes("[숫자") ? "4" : "" });
   return [
     ...openSteps.map((text, index) => row(yesterday, text, staffId, "직원 A", `08:${String(10 + index * 7).padStart(2, "0")}`)),
     row(yesterday, "확인함", ownerId, "미리보기 사장", "09:05", signoffItemKey),
@@ -358,14 +358,14 @@ export async function handlePeople(path: string, method: string, url: string, bo
     const viewOf = (requested: string | null) => {
       const date = role === "owner" && isCheckDate(requested) ? requested : today;
       const dates = lastDates(today, 14);
-      return { date, today, docs: buildCheckDocs(docs, people.daily.filter((row) => row.check_date === date), me), history: role === "owner" ? buildDaySummaries(docs, people.daily, dates) : [] };
+      return { date, today, docs: buildCheckDocs(docs, people.daily.filter((row) => row.check_date === date), me, { date, today }), history: role === "owner" ? buildDaySummaries(docs, people.daily, dates, today) : [] };
     };
     if (method === "GET") return json(viewOf(new URL(url, window.location.origin).searchParams.get("date")));
     if (method === "POST") {
       const doc = docs.find((item) => item.id === body.docId && item.dailyCheck);
       if (!doc) return json({ error: "어떤 문서인지 없습니다." }, 400);
       const drop = (date: string, key: string, onlyMine: boolean) => { people.daily = people.daily.filter((row) => !(row.check_date === date && row.doc_id === doc.id && row.item_key === key && (!onlyMine || row.checked_by === me))); };
-      const add = (date: string, key: string, text: string) => { if (!people.daily.some((row) => row.check_date === date && row.doc_id === doc.id && row.item_key === key)) people.daily.push({ check_date: date, doc_id: doc.id, item_key: key, item_text: text, checked_by: me, checked_by_name: meName, checked_at: new Date().toISOString() }); };
+      const add = (date: string, key: string, text: string, value = "") => { if (!people.daily.some((row) => row.check_date === date && row.doc_id === doc.id && row.item_key === key)) people.daily.push({ check_date: date, doc_id: doc.id, item_key: key, item_text: text, checked_by: me, checked_by_name: meName, checked_at: new Date().toISOString(), value }); };
       if (typeof body.signoff === "boolean") {
         if (role !== "owner") return json({ error: "확인함은 사장님만 누를 수 있습니다." }, 403);
         const date = isCheckDate(String(body.date ?? "")) ? String(body.date) : today;
@@ -375,7 +375,15 @@ export async function handlePeople(path: string, method: string, url: string, bo
       }
       const text = doc.steps.find((step) => checkItemKey(step) === body.itemKey);
       if (!text) return json({ error: "어떤 항목인지 없습니다." }, 400);
-      if (body.checked === false) drop(today, String(body.itemKey), role !== "owner"); else add(today, String(body.itemKey), text);
+      const parsedStep = parseCheckStep(text);
+      if (!isScheduledOn(parsedStep.schedule, today)) return json({ error: "오늘은 해당 없는 항목이에요." }, 400);
+      let measure = "";
+      if (body.checked !== false && parsedStep.unit !== null) {
+        const normalized = normalizeMeasure(body.value);
+        if (normalized === null) return json({ error: "숫자를 적어야 체크돼요." }, 400);
+        measure = normalized;
+      }
+      if (body.checked === false) drop(today, String(body.itemKey), role !== "owner"); else add(today, String(body.itemKey), text, measure);
       save(people);
       return json(viewOf(null));
     }
