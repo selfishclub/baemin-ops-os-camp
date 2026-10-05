@@ -435,6 +435,38 @@ drop policy if exists "quest_update_self_or_owner" on public.quest_progress;
 create policy "quest_update_self_or_owner" on public.quest_progress
   for update to authenticated using ((user_id = auth.uid() and public.is_active_user()) or public.is_owner());
 
+-- 3-9) 칭찬 릴레이 (하루 한 장, 이름으로) ---------------------------------------------
+-- 재직 직원 모두 읽고, 자기 이름으로만 보낸다(자기 자신에게는 못 보냄). 고치기는 없고, 지우기는 사장만.
+create table if not exists public.praises (
+  id bigserial primary key,
+  from_user uuid not null references public.profiles (id) on delete cascade,
+  from_name text not null default '',
+  to_user uuid not null references public.profiles (id) on delete cascade,
+  to_name text not null default '',
+  text text not null check (char_length(text) between 1 and 120),
+  created_at timestamptz not null default now(),
+  check (from_user <> to_user)
+);
+create index if not exists idx_praises_created on public.praises (created_at desc);
+create index if not exists idx_praises_to on public.praises (to_user, created_at desc);
+
+grant select, insert, delete on public.praises to authenticated;
+revoke update on public.praises from authenticated;
+grant usage, select on sequence public.praises_id_seq to authenticated;
+alter table public.praises enable row level security;
+
+drop policy if exists "praise_select_active" on public.praises;
+create policy "praise_select_active" on public.praises
+  for select to authenticated using (public.is_active_user());
+
+drop policy if exists "praise_insert_self" on public.praises;
+create policy "praise_insert_self" on public.praises
+  for insert to authenticated with check (from_user = auth.uid() and public.is_active_user());
+
+drop policy if exists "praise_delete_owner" on public.praises;
+create policy "praise_delete_owner" on public.praises
+  for delete to authenticated using (public.is_owner());
+
 -- 3-7) 점수판·레벨 (재미와 격려용, 급여·승급 자동 반영 없음) ---------------------------
 -- 사람별로 "한 일"을 센다: 오늘 체크, 교육 체크(메뉴·매뉴얼), 실기 합격, 퀴즈·필기 통과, 바뀐 내용 확인, 열람.
 -- 직원은 남의 교육 기록을 못 읽지만(RLS) 점수판에는 남의 "합계 숫자"가 필요하므로, security definer 함수가 숫자만 준다.
@@ -446,7 +478,8 @@ returns table (
   practiced_recipes integer, confirmed_recipes integer,
   docs_read integer, docs_confirmed integer, exam_items integer,
   quiz_passed integer, exam_written integer, acks integer, reads integer,
-  quests_done integer, missions_done integer
+  quests_done integer, missions_done integer,
+  praises_received integer, praises_given integer
 )
 language sql
 stable
@@ -467,7 +500,9 @@ as $$
     (select count(*) from public.recipe_acks a where a.user_id = p.id and (since is null or a.acked_at >= since))::integer,
     (select count(*) from public.view_logs v where v.user_id = p.id and v.kind in ('recipe', 'manual') and (since is null or v.viewed_at >= since))::integer,
     (select count(*) from public.quest_progress x where x.user_id = p.id and x.status = 'done' and x.quest_id <> 'mission' and (since is null or x.done_at >= since))::integer,
-    (select count(*) from public.quest_progress x where x.user_id = p.id and x.status = 'confirmed' and (since is null or x.confirmed_at >= since))::integer
+    (select count(*) from public.quest_progress x where x.user_id = p.id and x.status = 'confirmed' and (since is null or x.confirmed_at >= since))::integer,
+    (select count(*) from public.praises pr where pr.to_user = p.id and (since is null or pr.created_at >= since))::integer,
+    (select count(*) from public.praises pr where pr.from_user = p.id and (since is null or pr.created_at >= since))::integer
   from public.profiles p
   where public.is_active_user()
   order by p.created_at;

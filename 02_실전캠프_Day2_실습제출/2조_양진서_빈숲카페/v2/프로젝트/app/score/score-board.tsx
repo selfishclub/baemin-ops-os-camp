@@ -21,6 +21,8 @@ const statColumns: { key: keyof ActivityCounts; label: string }[] = [
   { key: "exam_written", label: "필기 합격" },
   { key: "quests_done", label: "퀘스트" },
   { key: "missions_done", label: "미션" },
+  { key: "praises_received", label: "칭찬 받음" },
+  { key: "praises_given", label: "칭찬 보냄" },
   { key: "reads", label: "열람" },
 ];
 

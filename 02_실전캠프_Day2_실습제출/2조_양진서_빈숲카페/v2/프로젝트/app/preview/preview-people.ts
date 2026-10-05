@@ -8,6 +8,7 @@ import { buildCheckDocs, buildDaySummaries, checkItemKey, isCheckDate, lastDates
 import type { ViewRow } from "../manage/views/view-data";
 import { breakdown, buildBoard, defaultLevels, emptyCounts, highlights, levelFor, periodStart, totalPoints, type ActivityCounts, type Period } from "../score/score-data";
 import { buildWeeklyQuests, countCleared, isCorrect, mergeProgress, previousWeekStart, weekStartSeoul, type QuestProgressRow } from "../quest/quest-data";
+import { sentToday, shouldRelay, summarizePraise, validatePraise, type PraiseRow } from "../praise/praise-data";
 
 // 미리보기용 "사람" 데이터: 가짜 직원, 메뉴 체크리스트, 퀴즈 점수, 바뀐 레시피 알림과 확인 기록.
 // 전부 이 브라우저(localStorage)에만 있고 서버·데이터 창고로 가는 길은 없다. 실제 직원 이름은 쓰지 않는다.
@@ -27,7 +28,7 @@ type QuizRow = { id: number; user_id: string; score: number; total: number; crea
 type NoticeRow = { id: number; version: number; recipe_id: string; recipe_name: string; change_reason: string; published_by: string; created_at: string; acks: { user_id: string; acked_at: string }[] };
 type DailyCheckRow = DailyRow & { check_date: string };
 type QuestRow = QuestProgressRow & { user_id: string; week_start: string };
-type PreviewPeople = { staff: StaffRow[]; checks: CheckRow[]; quiz: QuizRow[]; notices: NoticeRow[]; daily: DailyCheckRow[]; views?: ViewRow[]; quests?: QuestRow[] };
+type PreviewPeople = { staff: StaffRow[]; checks: CheckRow[]; quiz: QuizRow[]; notices: NoticeRow[]; daily: DailyCheckRow[]; views?: ViewRow[]; quests?: QuestRow[]; praises?: PraiseRow[] };
 
 function daysAgo(days: number) {
   return new Date(Date.now() - days * 86_400_000).toISOString();
@@ -72,6 +73,10 @@ function freshPeople(recipes: Recipe[]): PreviewPeople {
   const [first, second, third] = recipes;
   return {
     views: seedViews(recipes),
+    praises: [
+      { id: 1, from_user: "preview-staff-b", from_name: "직원 B", to_user: staffId, to_name: "직원 A", text: "(예시) 피크 때 먼저 설거지 맡아 줘서 고마워요", created_at: daysAgo(1.2) },
+      { id: 2, from_user: ownerId, from_name: "미리보기 사장", to_user: "preview-staff-b", to_name: "직원 B", text: "(예시) 환불 손님을 침착하게 응대해서 좋았어요", created_at: daysAgo(0.4) },
+    ],
     quests: [{ user_id: "preview-staff-b", week_start: weekStartSeoul(), quest_id: "mission", status: "pending", attempts: 0, note: "(예시) 라떼 스팀 때 피처 온도계 꼭 꽂기", done_at: daysAgo(0.3), confirmed_at: null }],
     staff: [
       { id: ownerId, login_id: "owner", display_name: "미리보기 사장", role: "owner", active: true, created_at: daysAgo(90) },
@@ -121,6 +126,7 @@ function save(people: PreviewPeople) {
     people.daily = (people.daily ?? []).slice(-400);
     people.views = (people.views ?? []).slice(-300);
     people.quests = (people.quests ?? []).slice(-200);
+    people.praises = (people.praises ?? []).slice(-300);
     window.localStorage.setItem(storageKey, JSON.stringify(people));
   } catch {
     // 공간이 모자라면 저장을 건너뛴다
@@ -451,6 +457,8 @@ export async function handlePeople(path: string, method: string, url: string, bo
         reads: (people.views ?? seedViews(recipes)).filter((row) => row.user_id === person.id && (row.kind === "recipe" || row.kind === "manual") && after(row.viewed_at)).length,
         quests_done: (people.quests ?? []).filter((row) => row.user_id === person.id && row.status === "done" && row.quest_id !== "mission" && after(row.done_at)).length,
         missions_done: (people.quests ?? []).filter((row) => row.user_id === person.id && row.status === "confirmed" && after(row.confirmed_at)).length,
+        praises_received: (people.praises ?? []).filter((row) => row.to_user === person.id && after(row.created_at)).length,
+        praises_given: (people.praises ?? []).filter((row) => row.from_user === person.id && after(row.created_at)).length,
       };
     });
     const allTime = count(null);
@@ -467,6 +475,45 @@ export async function handlePeople(path: string, method: string, url: string, bo
     };
     if (role === "owner") payload.stats = { rows: periodRows.filter((row) => row.active), highlights: highlights(periodRows) };
     return json(payload);
+  }
+
+  // 칭찬 릴레이: 이 브라우저에만 저장
+  if (path === "/api/praise") {
+    const people = load(recipes);
+    people.praises ??= [];
+    const today = todayInSeoul();
+    const monthStart = periodStart("month") ?? "";
+    const rows = people.praises.filter((row) => row.created_at >= monthStart).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    const active = people.staff.filter((person) => person.active);
+    if (method === "GET") {
+      return json({
+        wall: rows.slice(0, 60),
+        summary: summarizePraise(rows, active),
+        people: active.filter((person) => person.id !== me).map((person) => ({ id: person.id, name: person.display_name, role: person.role })),
+        me: { id: me, sentToday: sentToday(rows, me, today), relay: shouldRelay(rows, me, today), role },
+      });
+    }
+    if (method === "POST") {
+      const toUserId = String(body.toUserId ?? "");
+      const text = String(body.text ?? "").trim();
+      const problem = validatePraise({ fromUser: me, toUser: toUserId, text });
+      if (problem) return json({ error: problem }, 400);
+      const target = active.find((person) => person.id === toUserId);
+      if (!target) return json({ error: "그 사람을 찾을 수 없어요." }, 404);
+      if (sentToday(people.praises, me, today)) return json({ error: "오늘 칭찬은 이미 보냈어요. 내일 또 이어가요!" }, 429);
+      const from = people.staff.find((person) => person.id === me);
+      const row: PraiseRow = { id: Math.max(0, ...people.praises.map((item) => item.id)) + 1, from_user: me, from_name: from?.display_name ?? "", to_user: target.id, to_name: target.display_name, text, created_at: new Date().toISOString() };
+      people.praises.push(row);
+      save(people);
+      return json({ praise: row }, 201);
+    }
+    if (method === "DELETE") {
+      if (role !== "owner") return ownerOnly();
+      const id = Number(new URL(url, window.location.origin).searchParams.get("id"));
+      people.praises = people.praises.filter((row) => row.id !== id);
+      save(people);
+      return json({ ok: true });
+    }
   }
 
   // 이번 주 퀘스트: 서버와 같은 규칙(직원 ID + 주 시작일 씨앗)으로 만들고, 진행만 이 브라우저에 남긴다

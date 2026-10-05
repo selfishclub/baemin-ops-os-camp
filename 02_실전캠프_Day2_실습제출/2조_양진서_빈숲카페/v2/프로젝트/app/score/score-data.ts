@@ -22,6 +22,8 @@ export type ActivityCounts = {
   reads: number;            // 레시피·매뉴얼 열람 (점수 아님, 통계용)
   quests_done: number;      // 이번 주 퀘스트 깸 (문제·만들기·읽기)
   missions_done: number;    // 적용 미션 사장 확인
+  praises_received: number; // 받은 칭찬
+  praises_given: number;    // 보낸 칭찬
 };
 
 export type ScoreCategory = { key: keyof ActivityCounts; label: string; points: number; unit: string };
@@ -39,6 +41,8 @@ export const scoreCategories: ScoreCategory[] = [
   { key: "exam_written", label: "필기 합격", points: 10, unit: "번" },
   { key: "quests_done", label: "퀘스트 깸", points: 3, unit: "개" },
   { key: "missions_done", label: "적용 미션 (사장 확인)", points: 5, unit: "개" },
+  { key: "praises_received", label: "받은 칭찬", points: 2, unit: "장" },
+  { key: "praises_given", label: "보낸 칭찬", points: 1, unit: "장" },
 ];
 
 export type LevelDef = { name: string; min: number; mark: string; note: string };
@@ -123,6 +127,8 @@ export function highlights(rows: ActivityCounts[]): Highlight[] {
     { key: "quiz_passed", label: "퀴즈를 제일 많이 통과" },
     { key: "quests_done", label: "퀘스트를 제일 많이 깸" },
     { key: "missions_done", label: "적용 미션을 제일 많이 해냄" },
+    { key: "praises_received", label: "칭찬을 제일 많이 받음" },
+    { key: "praises_given", label: "칭찬을 제일 많이 보냄" },
     { key: "reads", label: "레시피·매뉴얼을 제일 자주 열어 봄" },
   ];
   const staff = rows.filter((row) => row.active && row.role !== "owner");
@@ -151,5 +157,5 @@ export function periodStart(period: Period, now = new Date()): string | null {
 }
 
 export function emptyCounts(user: { id: string; display_name: string; login_id: string; role: "owner" | "staff"; active: boolean }): ActivityCounts {
-  return { user_id: user.id, display_name: user.display_name, login_id: user.login_id, role: user.role, active: user.active, checks: 0, signoffs: 0, practiced_recipes: 0, confirmed_recipes: 0, docs_read: 0, docs_confirmed: 0, exam_items: 0, quiz_passed: 0, exam_written: 0, acks: 0, reads: 0, quests_done: 0, missions_done: 0 };
+  return { user_id: user.id, display_name: user.display_name, login_id: user.login_id, role: user.role, active: user.active, checks: 0, signoffs: 0, practiced_recipes: 0, confirmed_recipes: 0, docs_read: 0, docs_confirmed: 0, exam_items: 0, quiz_passed: 0, exam_written: 0, acks: 0, reads: 0, quests_done: 0, missions_done: 0, praises_received: 0, praises_given: 0 };
 }

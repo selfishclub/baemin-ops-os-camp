@@ -30,6 +30,7 @@ export const portalSections: PortalSection[] = [
   { id: "exam", group: "사람·성장", status: "open", href: "/exam", title: "시험 · 인증", description: "단계별 필기(자동 채점)와 실기(책임자가 직접 보고 합격). 평소엔 잠가 두고 시험 볼 때만 열기" },
   { id: "notice", group: "사람·성장", status: "open", href: "/notices", title: "공지 · 변경 이력", description: "레시피·매뉴얼이 바뀌면 여기 모이고, 하나씩 ‘확인했어요’" },
   { id: "quest", group: "사람·성장", status: "open", href: "/quest", title: "이번 주 퀘스트", description: "매주 새 퀘스트 5개 — 사람마다 다른 문제, 메뉴 만들어 보기, 매뉴얼 읽기, 적용 미션. 깨면 점수" },
+  { id: "praise", group: "사람·성장", status: "open", href: "/praise", title: "칭찬 릴레이", description: "하루 한 장, 동료에게 이름으로 칭찬. 받으면 2점·보내면 1점, 받은 사람이 다음 사람에게 이어 줘요" },
   { id: "score", group: "사람·성장", status: "open", href: "/score", title: "레벨 · 점수판", description: "오늘 체크·매뉴얼 읽기·메뉴 연습·퀴즈가 점수가 되고 레벨이 올라요. 이번 주·이달 점수판, 사장은 누가 뭘 제일 많이 했는지" },
 
   { id: "menus", group: "관리", status: "open", ownerOnly: true, href: "/manage/menus", title: "메뉴 잠금 설정", description: "큰 메뉴마다 직원에게 열림/잠김 정하기" },
