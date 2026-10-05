@@ -20,6 +20,8 @@ export type ActivityCounts = {
   exam_written: number;     // 시험 필기 80% 이상
   acks: number;             // 바뀐 레시피·매뉴얼 "확인했어요"
   reads: number;            // 레시피·매뉴얼 열람 (점수 아님, 통계용)
+  quests_done: number;      // 이번 주 퀘스트 깸 (문제·만들기·읽기)
+  missions_done: number;    // 적용 미션 사장 확인
 };
 
 export type ScoreCategory = { key: keyof ActivityCounts; label: string; points: number; unit: string };
@@ -35,6 +37,8 @@ export const scoreCategories: ScoreCategory[] = [
   { key: "quiz_passed", label: "연습 퀴즈 통과", points: 3, unit: "번" },
   { key: "exam_items", label: "실기 합격", points: 5, unit: "항목" },
   { key: "exam_written", label: "필기 합격", points: 10, unit: "번" },
+  { key: "quests_done", label: "퀘스트 깸", points: 3, unit: "개" },
+  { key: "missions_done", label: "적용 미션 (사장 확인)", points: 5, unit: "개" },
 ];
 
 export type LevelDef = { name: string; min: number; mark: string; note: string };
@@ -117,6 +121,8 @@ export function highlights(rows: ActivityCounts[]): Highlight[] {
     { key: "docs_read", label: "매뉴얼을 제일 많이 읽음" },
     { key: "practiced_recipes", label: "메뉴를 제일 많이 만들어 봄" },
     { key: "quiz_passed", label: "퀴즈를 제일 많이 통과" },
+    { key: "quests_done", label: "퀘스트를 제일 많이 깸" },
+    { key: "missions_done", label: "적용 미션을 제일 많이 해냄" },
     { key: "reads", label: "레시피·매뉴얼을 제일 자주 열어 봄" },
   ];
   const staff = rows.filter((row) => row.active && row.role !== "owner");
@@ -145,5 +151,5 @@ export function periodStart(period: Period, now = new Date()): string | null {
 }
 
 export function emptyCounts(user: { id: string; display_name: string; login_id: string; role: "owner" | "staff"; active: boolean }): ActivityCounts {
-  return { user_id: user.id, display_name: user.display_name, login_id: user.login_id, role: user.role, active: user.active, checks: 0, signoffs: 0, practiced_recipes: 0, confirmed_recipes: 0, docs_read: 0, docs_confirmed: 0, exam_items: 0, quiz_passed: 0, exam_written: 0, acks: 0, reads: 0 };
+  return { user_id: user.id, display_name: user.display_name, login_id: user.login_id, role: user.role, active: user.active, checks: 0, signoffs: 0, practiced_recipes: 0, confirmed_recipes: 0, docs_read: 0, docs_confirmed: 0, exam_items: 0, quiz_passed: 0, exam_written: 0, acks: 0, reads: 0, quests_done: 0, missions_done: 0 };
 }

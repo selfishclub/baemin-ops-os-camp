@@ -374,6 +374,67 @@ drop policy if exists "views_insert_self" on public.view_logs;
 create policy "views_insert_self" on public.view_logs
   for insert to authenticated with check (user_id = auth.uid() and public.is_active_user());
 
+-- 3-8) 이번 주 퀘스트 (사람마다 다른 문제·미션, 깬 기록만 남긴다) -----------------------
+-- 퀘스트 자체는 저장하지 않고 "직원 ID + 주 시작일" 씨앗으로 매번 같은 걸 만든다(app/quest/quest-data.ts). 여기엔 진행만.
+-- status: open → done(문제 맞힘·자동 완료) / pending(미션 '해냈어요', 사장 확인 대기) → confirmed(사장 확인). 확인 칸은 사장만(트리거).
+create table if not exists public.quest_progress (
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  week_start date not null,
+  quest_id text not null,
+  status text not null default 'open' check (status in ('open', 'done', 'pending', 'confirmed')),
+  attempts integer not null default 0,
+  note text not null default '',
+  done_at timestamptz,
+  confirmed_by uuid references public.profiles (id) on delete set null,
+  confirmed_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, week_start, quest_id)
+);
+create index if not exists idx_quest_progress_week on public.quest_progress (week_start desc);
+
+grant select, insert, update on public.quest_progress to authenticated;
+revoke delete on public.quest_progress from authenticated;
+alter table public.quest_progress enable row level security;
+
+create or replace function public.guard_quest_confirm()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_owner() then
+    if tg_op = 'INSERT' then
+      new.confirmed_by := null;
+      new.confirmed_at := null;
+      if new.status = 'confirmed' then new.status := 'pending'; end if;
+    else
+      new.confirmed_by := old.confirmed_by;
+      new.confirmed_at := old.confirmed_at;
+      if new.status = 'confirmed' and old.status <> 'confirmed' then new.status := 'pending'; end if;
+    end if;
+  end if;
+  new.updated_at := now();
+  return new;
+end;
+$$;
+drop trigger if exists quest_progress_guard on public.quest_progress;
+create trigger quest_progress_guard
+  before insert or update on public.quest_progress
+  for each row execute function public.guard_quest_confirm();
+
+drop policy if exists "quest_select_self_or_owner" on public.quest_progress;
+create policy "quest_select_self_or_owner" on public.quest_progress
+  for select to authenticated using (user_id = auth.uid() or public.is_owner());
+
+drop policy if exists "quest_insert_self" on public.quest_progress;
+create policy "quest_insert_self" on public.quest_progress
+  for insert to authenticated with check (user_id = auth.uid() and public.is_active_user());
+
+drop policy if exists "quest_update_self_or_owner" on public.quest_progress;
+create policy "quest_update_self_or_owner" on public.quest_progress
+  for update to authenticated using ((user_id = auth.uid() and public.is_active_user()) or public.is_owner());
+
 -- 3-7) 점수판·레벨 (재미와 격려용, 급여·승급 자동 반영 없음) ---------------------------
 -- 사람별로 "한 일"을 센다: 오늘 체크, 교육 체크(메뉴·매뉴얼), 실기 합격, 퀴즈·필기 통과, 바뀐 내용 확인, 열람.
 -- 직원은 남의 교육 기록을 못 읽지만(RLS) 점수판에는 남의 "합계 숫자"가 필요하므로, security definer 함수가 숫자만 준다.
@@ -384,7 +445,8 @@ returns table (
   checks integer, signoffs integer,
   practiced_recipes integer, confirmed_recipes integer,
   docs_read integer, docs_confirmed integer, exam_items integer,
-  quiz_passed integer, exam_written integer, acks integer, reads integer
+  quiz_passed integer, exam_written integer, acks integer, reads integer,
+  quests_done integer, missions_done integer
 )
 language sql
 stable
@@ -403,7 +465,9 @@ as $$
     (select count(*) from public.quiz_results q where q.user_id = p.id and jsonb_typeof(q.detail_json) = 'array' and q.score * 10 >= q.total * 7 and (since is null or q.created_at >= since))::integer,
     (select count(*) from public.quiz_results q where q.user_id = p.id and jsonb_typeof(q.detail_json) = 'object' and q.score * 10 >= q.total * 8 and (since is null or q.created_at >= since))::integer,
     (select count(*) from public.recipe_acks a where a.user_id = p.id and (since is null or a.acked_at >= since))::integer,
-    (select count(*) from public.view_logs v where v.user_id = p.id and v.kind in ('recipe', 'manual') and (since is null or v.viewed_at >= since))::integer
+    (select count(*) from public.view_logs v where v.user_id = p.id and v.kind in ('recipe', 'manual') and (since is null or v.viewed_at >= since))::integer,
+    (select count(*) from public.quest_progress x where x.user_id = p.id and x.status = 'done' and x.quest_id <> 'mission' and (since is null or x.done_at >= since))::integer,
+    (select count(*) from public.quest_progress x where x.user_id = p.id and x.status = 'confirmed' and (since is null or x.confirmed_at >= since))::integer
   from public.profiles p
   where public.is_active_user()
   order by p.created_at;

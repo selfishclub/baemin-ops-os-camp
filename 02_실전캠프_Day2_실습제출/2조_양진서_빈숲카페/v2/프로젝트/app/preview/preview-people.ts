@@ -7,6 +7,7 @@ import { buildExamStatus, examCheckKey, examCheckPrefix, getExams } from "../exa
 import { buildCheckDocs, buildDaySummaries, checkItemKey, isCheckDate, lastDates, signoffItemKey, todayInSeoul, type DailyRow } from "../checks/check-data";
 import type { ViewRow } from "../manage/views/view-data";
 import { breakdown, buildBoard, defaultLevels, emptyCounts, highlights, levelFor, periodStart, totalPoints, type ActivityCounts, type Period } from "../score/score-data";
+import { buildWeeklyQuests, countCleared, isCorrect, mergeProgress, previousWeekStart, weekStartSeoul, type QuestProgressRow } from "../quest/quest-data";
 
 // 미리보기용 "사람" 데이터: 가짜 직원, 메뉴 체크리스트, 퀴즈 점수, 바뀐 레시피 알림과 확인 기록.
 // 전부 이 브라우저(localStorage)에만 있고 서버·데이터 창고로 가는 길은 없다. 실제 직원 이름은 쓰지 않는다.
@@ -25,7 +26,8 @@ type CheckRow = { user_id: string; recipe_id: string; practiced_at: string | nul
 type QuizRow = { id: number; user_id: string; score: number; total: number; created_at: string; examId?: string };
 type NoticeRow = { id: number; version: number; recipe_id: string; recipe_name: string; change_reason: string; published_by: string; created_at: string; acks: { user_id: string; acked_at: string }[] };
 type DailyCheckRow = DailyRow & { check_date: string };
-type PreviewPeople = { staff: StaffRow[]; checks: CheckRow[]; quiz: QuizRow[]; notices: NoticeRow[]; daily: DailyCheckRow[]; views?: ViewRow[] };
+type QuestRow = QuestProgressRow & { user_id: string; week_start: string };
+type PreviewPeople = { staff: StaffRow[]; checks: CheckRow[]; quiz: QuizRow[]; notices: NoticeRow[]; daily: DailyCheckRow[]; views?: ViewRow[]; quests?: QuestRow[] };
 
 function daysAgo(days: number) {
   return new Date(Date.now() - days * 86_400_000).toISOString();
@@ -70,6 +72,7 @@ function freshPeople(recipes: Recipe[]): PreviewPeople {
   const [first, second, third] = recipes;
   return {
     views: seedViews(recipes),
+    quests: [{ user_id: "preview-staff-b", week_start: weekStartSeoul(), quest_id: "mission", status: "pending", attempts: 0, note: "(예시) 라떼 스팀 때 피처 온도계 꼭 꽂기", done_at: daysAgo(0.3), confirmed_at: null }],
     staff: [
       { id: ownerId, login_id: "owner", display_name: "미리보기 사장", role: "owner", active: true, created_at: daysAgo(90) },
       { id: staffId, login_id: "staff-a", display_name: "직원 A", role: "staff", active: true, created_at: daysAgo(30) },
@@ -117,6 +120,7 @@ function save(people: PreviewPeople) {
     people.quiz = people.quiz.slice(-40);
     people.daily = (people.daily ?? []).slice(-400);
     people.views = (people.views ?? []).slice(-300);
+    people.quests = (people.quests ?? []).slice(-200);
     window.localStorage.setItem(storageKey, JSON.stringify(people));
   } catch {
     // 공간이 모자라면 저장을 건너뛴다
@@ -445,6 +449,8 @@ export async function handlePeople(path: string, method: string, url: string, bo
         exam_written: quiz.filter((row) => row.examId && row.score * 10 >= row.total * 8).length,
         acks: people.notices.reduce((sum, notice) => sum + notice.acks.filter((ack) => ack.user_id === person.id && after(ack.acked_at)).length, 0),
         reads: (people.views ?? seedViews(recipes)).filter((row) => row.user_id === person.id && (row.kind === "recipe" || row.kind === "manual") && after(row.viewed_at)).length,
+        quests_done: (people.quests ?? []).filter((row) => row.user_id === person.id && row.status === "done" && row.quest_id !== "mission" && after(row.done_at)).length,
+        missions_done: (people.quests ?? []).filter((row) => row.user_id === person.id && row.status === "confirmed" && after(row.confirmed_at)).length,
       };
     });
     const allTime = count(null);
@@ -461,6 +467,68 @@ export async function handlePeople(path: string, method: string, url: string, bo
     };
     if (role === "owner") payload.stats = { rows: periodRows.filter((row) => row.active), highlights: highlights(periodRows) };
     return json(payload);
+  }
+
+  // 이번 주 퀘스트: 서버와 같은 규칙(직원 ID + 주 시작일 씨앗)으로 만들고, 진행만 이 브라우저에 남긴다
+  if (path === "/api/quest") {
+    const people = load(recipes);
+    people.quests ??= [];
+    const weekStart = weekStartSeoul();
+    const lastWeek = previousWeekStart(weekStart);
+    const docs = readableManuals(content).filter((doc) => !lockedForMe.includes(doc.sectionId));
+    const mine = people.checks.filter((row) => row.user_id === me && row.practiced_at);
+    const done = {
+      practicedRecipeIds: new Set(mine.filter((row) => !row.recipe_id.startsWith(manualCheckPrefix) && !row.recipe_id.startsWith(examCheckPrefix)).map((row) => row.recipe_id)),
+      readDocIds: new Set(mine.filter((row) => row.recipe_id.startsWith(manualCheckPrefix)).map((row) => row.recipe_id.slice(manualCheckPrefix.length))),
+    };
+    const quests = buildWeeklyQuests({ userId: me, weekStart, content, docs, practicedRecipeIds: done.practicedRecipeIds, readDocIds: done.readDocIds });
+    const rowsOf = (week: string, user = me) => people.quests!.filter((row) => row.user_id === user && row.week_start === week);
+    if (method === "GET") {
+      const views = mergeProgress(quests, rowsOf(weekStart), done);
+      const lastQuests = buildWeeklyQuests({ userId: me, weekStart: lastWeek, content, docs, practicedRecipeIds: done.practicedRecipeIds, readDocIds: done.readDocIds });
+      const payload: Record<string, unknown> = { weekStart, quests: views, cleared: countCleared(views), lastWeek: { weekStart: lastWeek, cleared: countCleared(mergeProgress(lastQuests, rowsOf(lastWeek), done)), total: lastQuests.length } };
+      if (role === "owner") {
+        payload.missions = people.quests
+          .filter((row) => row.quest_id === "mission" && (row.status === "pending" || row.status === "confirmed") && [weekStart, lastWeek].includes(row.week_start))
+          .map((row) => ({ user_id: row.user_id, user_name: people.staff.find((person) => person.id === row.user_id)?.display_name ?? "", week_start: row.week_start, note: row.note, done_at: row.done_at, status: row.status }));
+      }
+      return json(payload);
+    }
+    const upsert = (user: string, week: string, questId: string, patch: Partial<QuestRow>) => {
+      let row = people.quests!.find((item) => item.user_id === user && item.week_start === week && item.quest_id === questId);
+      if (!row) {
+        row = { user_id: user, week_start: week, quest_id: questId, status: "open", attempts: 0, note: "", done_at: null, confirmed_at: null };
+        people.quests!.push(row);
+      }
+      Object.assign(row, patch);
+      save(people);
+      return row;
+    };
+    const now = () => new Date().toISOString();
+    if (body.action === "answer") {
+      const quest = quests.find((item) => item.id === body.questId && item.kind === "quiz");
+      if (!quest) return json({ error: "이번 주 퀘스트에 없는 문제예요." }, 404);
+      const choice = String(body.choice ?? "");
+      if (!quest.choices?.includes(choice)) return json({ error: "보기 중에서 골라 주세요." }, 400);
+      const existing = rowsOf(weekStart).find((row) => row.quest_id === quest.id);
+      if (existing?.status === "done") return json({ correct: true });
+      const correct = isCorrect(quest, choice);
+      upsert(me, weekStart, quest.id, { status: correct ? "done" : "open", attempts: (existing?.attempts ?? 0) + 1, note: choice, done_at: correct ? now() : null });
+      return json({ correct });
+    }
+    if (body.action === "mission" || body.action === "claim") {
+      const text = String(body.note ?? "").trim().slice(0, 200);
+      if (!text) return json({ error: "적용할 것을 한 줄 적어 주세요." }, 400);
+      upsert(me, weekStart, "mission", { status: body.action === "claim" ? "pending" : "open", note: text, done_at: body.action === "claim" ? now() : null });
+      return json({ ok: true });
+    }
+    if (body.action === "confirm") {
+      if (role !== "owner") return ownerOnly();
+      const row = people.quests.find((item) => item.user_id === String(body.userId ?? "") && item.week_start === String(body.weekStart ?? weekStart) && item.quest_id === "mission" && item.status === "pending");
+      if (row) upsert(row.user_id, row.week_start, "mission", { status: "confirmed", confirmed_at: now(), confirmed_by_name: "미리보기 사장" });
+      return json({ ok: true });
+    }
+    return json({ error: "알 수 없는 요청이에요." }, 400);
   }
 
   // 열람 기록: 이 브라우저에서 연 것만 더해진다 (가짜 사람 이름으로)
