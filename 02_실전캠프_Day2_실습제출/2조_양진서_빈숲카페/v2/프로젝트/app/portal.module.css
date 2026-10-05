@@ -101,3 +101,5 @@
 .tileStatus[data-status="locked"] { background: #7d1a14; color: white; }
 .tile[data-status="locked"] { border-color: #e0a9a3; background: #fff8f6; }
 .tile[data-status="locked"][aria-disabled="true"] strong { color: #8a8f88; }
+
+.accountLink { color: #2f6b47; font-size: 12px; font-weight: 700; text-decoration: none; }

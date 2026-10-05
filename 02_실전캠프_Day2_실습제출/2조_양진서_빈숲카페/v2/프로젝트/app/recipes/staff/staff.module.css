@@ -26,3 +26,12 @@
   .table tr { padding: 10px 0; border-bottom: 1px solid #e7e1d4; }
   .table td { padding: 4px 0; border: 0; }
 }
+
+.createForm { display: grid; gap: 10px; margin: 0 0 14px; }
+.createForm label { display: grid; gap: 4px; font-size: 12px; font-weight: 800; color: #4d5a50; }
+.createForm input { padding: 9px 10px; border: 1px solid #c9c2b2; border-radius: 8px; font-size: 14px; background: white; }
+.passwordRow { display: flex; gap: 6px; }
+.passwordRow input { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.passwordRow button, .createForm > button { padding: 9px 14px; border: 1px solid #2f6b47; border-radius: 999px; background: white; color: #2f6b47; font-size: 13px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.createForm > button { justify-self: start; background: #2f6b47; color: white; }
+.createForm > button:disabled { opacity: .5; cursor: default; }

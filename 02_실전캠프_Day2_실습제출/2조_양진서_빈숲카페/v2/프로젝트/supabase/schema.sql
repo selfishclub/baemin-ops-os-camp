@@ -14,7 +14,9 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
--- 계정이 만들어지면 프로필을 자동으로 만든다. 첫 계정은 사장(owner), 그 뒤는 직원(staff).
+-- 계정이 만들어지면 프로필을 자동으로 만든다. 첫 계정은 사장(owner)·재직, 그 뒤는 직원(staff)·**중지** 상태.
+-- (2026-09-24) 새 계정은 사장이 "직원 계정 관리"에서 켜 주기 전까지 아무것도 못 본다 — 누군가 몰래 가입해도 소용없게.
+-- 앱 안에서 사장이 만든 계정은 만드는 순간 앱이 바로 켜 준다.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -27,12 +29,13 @@ declare
 begin
   select count(*) into owner_count from public.profiles where role = 'owner';
   base_id := split_part(coalesce(new.email, new.id::text), '@', 1);
-  insert into public.profiles (id, login_id, display_name, role)
+  insert into public.profiles (id, login_id, display_name, role, active)
   values (
     new.id,
     base_id,
     coalesce(new.raw_user_meta_data ->> 'display_name', base_id),
-    case when owner_count = 0 then 'owner' else 'staff' end
+    case when owner_count = 0 then 'owner' else 'staff' end,
+    owner_count = 0
   )
   on conflict (id) do nothing;
   return new;
@@ -339,6 +342,74 @@ create policy "daily_delete_self_or_owner" on public.daily_checks
   for delete to authenticated using (
     public.is_owner() or (checked_by = auth.uid() and public.is_active_user() and item_key <> '__signoff__')
   );
+
+-- 3-6) 열람 기록 (유출 방지) ----------------------------------------------------
+-- 누가 언제 어떤 레시피·매뉴얼·사진을 열었는지, 챗봇에 무엇을 물었는지, 어디서(인터넷 주소·기기) 들어왔는지.
+-- 직원은 자기 기록만 남길 수 있고, 아무도 고치거나 지우지 못한다(수정·삭제 정책 없음). 읽는 건 사장뿐.
+create table if not exists public.view_logs (
+  id bigserial primary key,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  user_name text not null default '',
+  kind text not null check (kind in ('login', 'logout', 'recipe', 'manual', 'media', 'chat', 'blocked')),
+  target_id text not null default '',
+  target_name text not null default '',
+  ip text not null default '',
+  outside boolean not null default false,
+  device text not null default '',
+  viewed_at timestamptz not null default now()
+);
+create index if not exists idx_view_logs_at on public.view_logs (viewed_at desc);
+create index if not exists idx_view_logs_user on public.view_logs (user_id, viewed_at desc);
+
+grant select, insert on public.view_logs to authenticated;
+revoke update, delete on public.view_logs from authenticated;
+grant usage, select on sequence public.view_logs_id_seq to authenticated;
+alter table public.view_logs enable row level security;
+
+drop policy if exists "views_select_owner" on public.view_logs;
+create policy "views_select_owner" on public.view_logs
+  for select to authenticated using (public.is_owner());
+
+drop policy if exists "views_insert_self" on public.view_logs;
+create policy "views_insert_self" on public.view_logs
+  for insert to authenticated with check (user_id = auth.uid() and public.is_active_user());
+
+-- 3-7) 점수판·레벨 (재미와 격려용, 급여·승급 자동 반영 없음) ---------------------------
+-- 사람별로 "한 일"을 센다: 오늘 체크, 교육 체크(메뉴·매뉴얼), 실기 합격, 퀴즈·필기 통과, 바뀐 내용 확인, 열람.
+-- 직원은 남의 교육 기록을 못 읽지만(RLS) 점수판에는 남의 "합계 숫자"가 필요하므로, security definer 함수가 숫자만 준다.
+-- since 가 null 이면 전체 기간. 재직 직원(사장 포함)만 부를 수 있다.
+create or replace function public.activity_counts(since timestamptz default null)
+returns table (
+  user_id uuid, display_name text, login_id text, role text, active boolean,
+  checks integer, signoffs integer,
+  practiced_recipes integer, confirmed_recipes integer,
+  docs_read integer, docs_confirmed integer, exam_items integer,
+  quiz_passed integer, exam_written integer, acks integer, reads integer
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    p.id, p.display_name, p.login_id, p.role, p.active,
+    (select count(*) from public.daily_checks d where d.checked_by = p.id and d.item_key <> '__signoff__' and (since is null or d.checked_at >= since))::integer,
+    (select count(*) from public.daily_checks d where d.checked_by = p.id and d.item_key = '__signoff__' and (since is null or d.checked_at >= since))::integer,
+    (select count(*) from public.training_checks t where t.user_id = p.id and t.recipe_id not like 'manual:%' and t.recipe_id not like 'exam:%' and t.practiced_at is not null and (since is null or t.practiced_at >= since))::integer,
+    (select count(*) from public.training_checks t where t.user_id = p.id and t.recipe_id not like 'manual:%' and t.recipe_id not like 'exam:%' and t.confirmed_at is not null and (since is null or t.confirmed_at >= since))::integer,
+    (select count(*) from public.training_checks t where t.user_id = p.id and t.recipe_id like 'manual:%' and t.practiced_at is not null and (since is null or t.practiced_at >= since))::integer,
+    (select count(*) from public.training_checks t where t.user_id = p.id and t.recipe_id like 'manual:%' and t.confirmed_at is not null and (since is null or t.confirmed_at >= since))::integer,
+    (select count(*) from public.training_checks t where t.user_id = p.id and t.recipe_id like 'exam:%' and t.confirmed_at is not null and (since is null or t.confirmed_at >= since))::integer,
+    (select count(*) from public.quiz_results q where q.user_id = p.id and jsonb_typeof(q.detail_json) = 'array' and q.score * 10 >= q.total * 7 and (since is null or q.created_at >= since))::integer,
+    (select count(*) from public.quiz_results q where q.user_id = p.id and jsonb_typeof(q.detail_json) = 'object' and q.score * 10 >= q.total * 8 and (since is null or q.created_at >= since))::integer,
+    (select count(*) from public.recipe_acks a where a.user_id = p.id and (since is null or a.acked_at >= since))::integer,
+    (select count(*) from public.view_logs v where v.user_id = p.id and v.kind in ('recipe', 'manual') and (since is null or v.viewed_at >= since))::integer
+  from public.profiles p
+  where public.is_active_user()
+  order by p.created_at;
+$$;
+revoke all on function public.activity_counts(timestamptz) from public, anon;
+grant execute on function public.activity_counts(timestamptz) to authenticated;
 
 -- 4) 사진 파일함 (비공개) -------------------------------------------------------
 insert into storage.buckets (id, name, public)

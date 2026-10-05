@@ -3,6 +3,8 @@ import { getViewerSession, requireViewerApi } from "../../auth";
 import { checkSectionAccess, lockedResponse } from "../../../db/portal-store";
 import { readPublishedContent } from "../../../db/recipe-store";
 import { readableManuals } from "../../manual/manual-data";
+import { recordView } from "../../../db/view-store";
+import { requestOrigin } from "../../../lib/request-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -25,15 +27,22 @@ export async function GET(request: Request) {
   const session = await getViewerSession();
   const folder = key.split("/")[1];
   let sectionId = "recipes";
+  const content = await readPublishedContent(ctx.db);
+  let mediaOwnerName = "";
   if (folder.startsWith("manual-")) {
-    const doc = readableManuals(await readPublishedContent(ctx.db)).find((item) => safeFolder(`manual-${item.id}`) === folder);
+    const doc = readableManuals(content).find((item) => safeFolder(`manual-${item.id}`) === folder);
     // 공식본에 없는(아직 초안뿐이거나 지워진) 문서의 사진은 사장만 본다
     if (!doc && ctx.viewer.role !== "owner") return lockedResponse();
     sectionId = doc?.sectionId ?? "recipes";
+    mediaOwnerName = doc?.title ?? "";
+  } else {
+    mediaOwnerName = content.recipes.find((recipe) => safeFolder(recipe.id) === folder)?.name ?? "";
   }
   if (!(await checkSectionAccess(session, sectionId)).allowed) return lockedResponse();
   const { data, error } = await ctx.db.storage.from(mediaBucket).download(key);
   if (error || !data) return Response.json({ error: "이미지를 찾을 수 없습니다." }, { status: 404 });
+  // 열람 기록: 어느 메뉴·문서의 사진을 봤는지 (같은 폴더는 1분에 한 번만 남는다)
+  await recordView(ctx.db, ctx.viewer, { kind: "media", targetId: folder, targetName: mediaOwnerName }, await requestOrigin());
   return new Response(data, {
     headers: {
       "content-type": data.type || "application/octet-stream",

@@ -3,6 +3,9 @@ import { headers } from "next/headers";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { SecurityFooter, rightsHolder } from "./security-notice";
+import IdleLogout from "./idle-logout";
+import { hasSupabaseEnv } from "../lib/supabase/env";
+import { idleMinutes } from "../lib/request-origin";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -52,7 +55,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className={geist.variable}>{children}<SecurityFooter /></body>
+      <body className={geist.variable}>{children}<SecurityFooter />{hasSupabaseEnv() && <IdleLogout minutes={idleMinutes()} />}</body>
     </html>
   );
 }

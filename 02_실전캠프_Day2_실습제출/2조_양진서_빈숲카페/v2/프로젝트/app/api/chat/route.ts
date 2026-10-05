@@ -6,6 +6,8 @@ import { answerFromManuals } from "../../manual/manual-chat";
 import { manualLabels, manualSectionIds, readableManuals } from "../../manual/manual-data";
 import { portalSections } from "../../portal-sections";
 import { polishWithAi } from "./ai-answer";
+import { recordView } from "../../../db/view-store";
+import { requestOrigin } from "../../../lib/request-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +64,11 @@ export async function POST(request: Request) {
         material.push(`문서: ${doc.title}`, `${labels.purpose}: ${doc.purpose}`, ...part(labels.materials || "준비물", doc.materials), `${labels.steps}:`, ...doc.steps.map((step, index) => `${index + 1}. ${step}`), ...part(labels.doneCriteria, doc.doneCriteria), ...part(labels.donts, doc.donts), ...part(labels.reportWhen, doc.reportWhen), `최종 수정일: ${doc.updatedAt}`);
       }
       answer = await polishWithAi(question, ruleAnswer, material);
+    }
+    // 열람 기록: 무엇을 물었고 어떤 레시피·문서가 답으로 나갔는지 (로그인 모드에서만)
+    if (session.mode === "auth" && session.viewer) {
+      const target = answer.recipeId ?? answer.manualId ?? "";
+      await recordView(session.db, session.viewer, { kind: "chat", targetId: target, targetName: question.trim().slice(0, 120) }, await requestOrigin());
     }
     return Response.json({ answer });
   } catch {

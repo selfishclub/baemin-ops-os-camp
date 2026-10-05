@@ -29,9 +29,11 @@ export const portalSections: PortalSection[] = [
 
   { id: "exam", group: "사람·성장", status: "open", href: "/exam", title: "시험 · 인증", description: "단계별 필기(자동 채점)와 실기(책임자가 직접 보고 합격). 평소엔 잠가 두고 시험 볼 때만 열기" },
   { id: "notice", group: "사람·성장", status: "open", href: "/notices", title: "공지 · 변경 이력", description: "레시피·매뉴얼이 바뀌면 여기 모이고, 하나씩 ‘확인했어요’" },
+  { id: "score", group: "사람·성장", status: "open", href: "/score", title: "레벨 · 점수판", description: "오늘 체크·매뉴얼 읽기·메뉴 연습·퀴즈가 점수가 되고 레벨이 올라요. 이번 주·이달 점수판, 사장은 누가 뭘 제일 많이 했는지" },
 
   { id: "menus", group: "관리", status: "open", ownerOnly: true, href: "/manage/menus", title: "메뉴 잠금 설정", description: "큰 메뉴마다 직원에게 열림/잠김 정하기" },
   { id: "changes", group: "관리", status: "open", ownerOnly: true, href: "/recipes/changes", title: "확인 현황", description: "바뀐 레시피·매뉴얼을 누가 확인했고 누가 안 봤는지" },
-  { id: "staff", group: "관리", status: "open", ownerOnly: true, href: "/recipes/staff", title: "직원 계정 관리", description: "재직·중지, 역할" },
+  { id: "staff", group: "관리", status: "open", ownerOnly: true, href: "/recipes/staff", title: "직원 계정 관리", description: "새 계정 만들기, 재직·중지, 역할" },
+  { id: "views", group: "관리", status: "open", ownerOnly: true, href: "/manage/views", title: "열람 기록", description: "누가 언제 무엇을 봤는지, 어느 기기·어디서 들어왔는지. 매장 밖 접속 표시" },
   { id: "admin", group: "관리", status: "open", ownerOnly: true, href: "/recipes/admin", title: "관리자 편집", description: "레시피·매뉴얼·교육 경로·시험 편집, 표에서 가져오기, 게시, 버전 복구" },
 ];

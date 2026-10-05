@@ -14,6 +14,8 @@ export default function LoginForm({ next, reason }: { next: string; reason: stri
   const reasonMessage: Record<string, string> = {
     inactive: "사용이 중지된 계정입니다. 사장님께 문의해 주세요.",
     noprofile: "로그인은 됐지만 직원 정보를 읽지 못했습니다. 데이터 창고 권한 설정(supabase/schema.sql)을 확인한 뒤, 아래 로그아웃 후 다시 로그인해 주세요.",
+    idle: "한동안 쓰지 않아 자동으로 로그아웃됐어요. 다시 로그인해 주세요.",
+    outside: "매장 밖에서는 열 수 없어요. 매장 인터넷(와이파이)으로 다시 열어 주세요.",
   };
   const [message, setMessage] = useState(reasonMessage[reason] ?? "");
 
@@ -36,6 +38,8 @@ export default function LoginForm({ next, reason }: { next: string; reason: stri
       setMessage(error.message.includes("Invalid login") ? "아이디 또는 비밀번호가 맞지 않습니다." : `로그인하지 못했습니다: ${error.message}`);
       return;
     }
+    // 열람 기록에 "로그인" 한 줄 (어디서·어떤 기기로) — 실패해도 로그인은 그대로 진행
+    await fetch("/api/view", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "login" }) }).catch(() => {});
     router.replace(next);
     router.refresh();
   }

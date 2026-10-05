@@ -295,3 +295,8 @@ export async function restoreVersionToDraft(
 export async function logImageUpload(db: SupabaseClient, actor: AdminActor, details: unknown) {
   await audit(db, actor, "image_uploaded", details);
 }
+
+// 사장이 앱 안에서 직원 계정을 만들었을 때 (비밀번호는 절대 기록하지 않는다)
+export async function logStaffCreated(db: SupabaseClient, actor: AdminActor, details: { id: string; loginId: string }) {
+  await audit(db, actor, "staff_created", details);
+}

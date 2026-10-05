@@ -5,6 +5,8 @@ import { manualNoticePrefix, readableManuals } from "../manual/manual-data";
 import { getTrainingPath, manualCheckPrefix } from "../manual/training-path";
 import { buildExamStatus, examCheckKey, examCheckPrefix, getExams } from "../exam/exam-data";
 import { buildCheckDocs, buildDaySummaries, checkItemKey, isCheckDate, lastDates, signoffItemKey, todayInSeoul, type DailyRow } from "../checks/check-data";
+import type { ViewRow } from "../manage/views/view-data";
+import { breakdown, buildBoard, defaultLevels, emptyCounts, highlights, levelFor, periodStart, totalPoints, type ActivityCounts, type Period } from "../score/score-data";
 
 // 미리보기용 "사람" 데이터: 가짜 직원, 메뉴 체크리스트, 퀴즈 점수, 바뀐 레시피 알림과 확인 기록.
 // 전부 이 브라우저(localStorage)에만 있고 서버·데이터 창고로 가는 길은 없다. 실제 직원 이름은 쓰지 않는다.
@@ -23,7 +25,7 @@ type CheckRow = { user_id: string; recipe_id: string; practiced_at: string | nul
 type QuizRow = { id: number; user_id: string; score: number; total: number; created_at: string; examId?: string };
 type NoticeRow = { id: number; version: number; recipe_id: string; recipe_name: string; change_reason: string; published_by: string; created_at: string; acks: { user_id: string; acked_at: string }[] };
 type DailyCheckRow = DailyRow & { check_date: string };
-type PreviewPeople = { staff: StaffRow[]; checks: CheckRow[]; quiz: QuizRow[]; notices: NoticeRow[]; daily: DailyCheckRow[] };
+type PreviewPeople = { staff: StaffRow[]; checks: CheckRow[]; quiz: QuizRow[]; notices: NoticeRow[]; daily: DailyCheckRow[]; views?: ViewRow[] };
 
 function daysAgo(days: number) {
   return new Date(Date.now() - days * 86_400_000).toISOString();
@@ -44,10 +46,30 @@ function seedDaily(): DailyCheckRow[] {
   ];
 }
 
+// 미리보기 열람 기록 예시: 직원 A는 매장에서, 직원 B는 한 번 매장 밖에서 연 것으로
+function seedViews(recipes: Recipe[]): ViewRow[] {
+  const [first, second] = recipes;
+  const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+  const row = (id: number, user_id: string, user_name: string, kind: ViewRow["kind"], target_id: string, target_name: string, hours: number, outside = false, device = "아이폰 · Safari"): ViewRow =>
+    ({ id, user_id, user_name, kind, target_id, target_name, ip: outside ? "198.51.100.23" : "203.0.113.5", outside, device, viewed_at: hoursAgo(hours) });
+  return [
+    row(1, staffId, "직원 A", "login", "", "", 30),
+    ...(first ? [row(2, staffId, "직원 A", "recipe", first.id, first.name, 29.8)] : []),
+    row(3, staffId, "직원 A", "manual", "demo-open-prep", "예시 · 오픈 준비", 29.5),
+    row(4, staffId, "직원 A", "logout", "", "한동안 쓰지 않아 자동", 28.9),
+    row(5, "preview-staff-b", "직원 B", "login", "", "", 6, true, "안드로이드 · Chrome"),
+    ...(second ? [row(6, "preview-staff-b", "직원 B", "recipe", second.id, second.name, 5.9, true, "안드로이드 · Chrome")] : []),
+    row(7, "preview-staff-b", "직원 B", "chat", second?.id ?? "", "마감 순서 알려줘", 5.8, true, "안드로이드 · Chrome"),
+    row(8, "preview-staff-b", "직원 B", "login", "", "", 1.5, false, "윈도우 PC · Chrome"),
+    row(9, "preview-staff-b", "직원 B", "manual", "demo-close-closing", "예시 · 마감 순서", 1.4, false, "윈도우 PC · Chrome"),
+  ];
+}
+
 // 처음 열었을 때 화면이 비어 보이지 않게 넣어 두는 가짜 기록
 function freshPeople(recipes: Recipe[]): PreviewPeople {
   const [first, second, third] = recipes;
   return {
+    views: seedViews(recipes),
     staff: [
       { id: ownerId, login_id: "owner", display_name: "미리보기 사장", role: "owner", active: true, created_at: daysAgo(90) },
       { id: staffId, login_id: "staff-a", display_name: "직원 A", role: "staff", active: true, created_at: daysAgo(30) },
@@ -94,6 +116,7 @@ function save(people: PreviewPeople) {
     people.notices = people.notices.slice(-30);
     people.quiz = people.quiz.slice(-40);
     people.daily = (people.daily ?? []).slice(-400);
+    people.views = (people.views ?? []).slice(-300);
     window.localStorage.setItem(storageKey, JSON.stringify(people));
   } catch {
     // 공간이 모자라면 저장을 건너뛴다
@@ -398,10 +421,95 @@ export async function handlePeople(path: string, method: string, url: string, bo
     return json(examStatusOf(people, String(body.userId ?? "")));
   }
 
+  // 레벨 · 점수판: 이 브라우저의 가짜 기록을 서버와 같은 규칙으로 센다
+  if (path === "/api/score" && method === "GET") {
+    const raw = new URL(url, window.location.origin).searchParams.get("period");
+    const period: Period = raw === "week" || raw === "all" ? raw : "month";
+    const people = load(recipes);
+    const count = (since: string | null): ActivityCounts[] => people.staff.map((person) => {
+      const after = (at: string | null | undefined) => Boolean(at) && (!since || (at as string) >= since);
+      const mine = people.checks.filter((row) => row.user_id === person.id);
+      const plain = mine.filter((row) => !row.recipe_id.startsWith(manualCheckPrefix) && !row.recipe_id.startsWith(examCheckPrefix));
+      const docs = mine.filter((row) => row.recipe_id.startsWith(manualCheckPrefix));
+      const quiz = people.quiz.filter((row) => row.user_id === person.id && after(row.created_at));
+      return {
+        ...emptyCounts(person),
+        checks: (people.daily ?? []).filter((row) => row.checked_by === person.id && row.item_key !== signoffItemKey && after(row.checked_at)).length,
+        signoffs: (people.daily ?? []).filter((row) => row.checked_by === person.id && row.item_key === signoffItemKey && after(row.checked_at)).length,
+        practiced_recipes: plain.filter((row) => after(row.practiced_at)).length,
+        confirmed_recipes: plain.filter((row) => after(row.confirmed_at)).length,
+        docs_read: docs.filter((row) => after(row.practiced_at)).length,
+        docs_confirmed: docs.filter((row) => after(row.confirmed_at)).length,
+        exam_items: mine.filter((row) => row.recipe_id.startsWith(examCheckPrefix) && after(row.confirmed_at)).length,
+        quiz_passed: quiz.filter((row) => !row.examId && row.score * 10 >= row.total * 7).length,
+        exam_written: quiz.filter((row) => row.examId && row.score * 10 >= row.total * 8).length,
+        acks: people.notices.reduce((sum, notice) => sum + notice.acks.filter((ack) => ack.user_id === person.id && after(ack.acked_at)).length, 0),
+        reads: (people.views ?? seedViews(recipes)).filter((row) => row.user_id === person.id && (row.kind === "recipe" || row.kind === "manual") && after(row.viewed_at)).length,
+      };
+    });
+    const allTime = count(null);
+    const since = periodStart(period);
+    const periodRows = since ? count(since) : allTime;
+    const meAll = allTime.find((row) => row.user_id === me)!;
+    const mePeriod = periodRows.find((row) => row.user_id === me)!;
+    const total = totalPoints(meAll);
+    const payload: Record<string, unknown> = {
+      period,
+      levels: defaultLevels,
+      me: { id: me, name: meAll.display_name, role, allTime: total, period: totalPoints(mePeriod), level: levelFor(total), breakdown: breakdown(mePeriod), breakdownAll: breakdown(meAll) },
+      board: buildBoard(allTime, periodRows),
+    };
+    if (role === "owner") payload.stats = { rows: periodRows.filter((row) => row.active), highlights: highlights(periodRows) };
+    return json(payload);
+  }
+
+  // 열람 기록: 이 브라우저에서 연 것만 더해진다 (가짜 사람 이름으로)
+  if (path === "/api/view" && method === "POST") {
+    const kind = body.kind === "recipe" || body.kind === "manual" || body.kind === "login" ? body.kind : null;
+    if (!kind) return json({ error: "기록할 내용이 없습니다." }, 400);
+    const people = load(recipes);
+    people.views ??= seedViews(recipes);
+    const id = String(body.id ?? "");
+    const name = kind === "recipe" ? recipes.find((recipe) => recipe.id === id)?.name ?? "" : kind === "manual" ? readableManuals(content).find((doc) => doc.id === id)?.title ?? "" : "";
+    const person = people.staff.find((row) => row.id === me);
+    const last = people.views[people.views.length - 1];
+    if (!(last && last.user_id === me && last.kind === kind && last.target_id === id && Date.now() - new Date(last.viewed_at).getTime() < 60_000)) {
+      people.views.push({ id: Math.max(0, ...people.views.map((row) => row.id)) + 1, user_id: me, user_name: person?.display_name ?? "", kind, target_id: id, target_name: name, ip: "203.0.113.5", outside: false, device: "미리보기 브라우저", viewed_at: new Date().toISOString() });
+      save(people);
+    }
+    return json({ ok: true });
+  }
+
+  if (path === "/api/admin/views" && method === "GET") {
+    if (role !== "owner") return ownerOnly();
+    const params = new URL(url, window.location.origin).searchParams;
+    const days = Math.max(1, Math.min(90, Number(params.get("days") ?? 14) || 14));
+    const userId = params.get("user") ?? "";
+    const people = load(recipes);
+    const since = Date.now() - days * 86_400_000;
+    const rows = (people.views ?? seedViews(recipes)).filter((row) => new Date(row.viewed_at).getTime() >= since && (!userId || row.user_id === userId)).sort((a, b) => (a.viewed_at < b.viewed_at ? 1 : -1));
+    return json({ rows, staff: people.staff, days, settings: { shopIps: ["203.0.113.5"], blockOutsideStaff: false, idleMinutes: 30, myIp: "203.0.113.5", myDevice: "미리보기 브라우저", myOutside: false } });
+  }
+
   // 직원 계정 관리
   if (path === "/api/admin/staff" && method === "GET") {
     if (role !== "owner") return ownerOnly();
     return json({ staff: load(recipes).staff, me: ownerId });
+  }
+
+  if (path === "/api/admin/staff" && method === "POST") {
+    if (role !== "owner") return ownerOnly();
+    const loginId = String(body.loginId ?? "").trim().toLowerCase();
+    const displayName = String(body.displayName ?? "").trim().slice(0, 40);
+    if (!/^[a-z0-9][a-z0-9._-]{1,29}$/.test(loginId)) return json({ error: "아이디는 영문 소문자·숫자·점·밑줄·하이픈으로 2~30자 (예: alba-a)" }, 400);
+    if (String(body.password ?? "").length < 8) return json({ error: "임시 비밀번호는 8자 이상이어야 해요." }, 400);
+    if (!displayName) return json({ error: "화면에 보일 이름을 적어 주세요." }, 400);
+    const people = load(recipes);
+    if (people.staff.some((row) => row.login_id === loginId)) return json({ error: "이미 있는 아이디예요." }, 409);
+    const person: StaffRow = { id: `preview-${loginId}`, login_id: loginId, display_name: displayName, role: "staff", active: true, created_at: new Date().toISOString() };
+    people.staff.push(person);
+    save(people);
+    return json({ staff: person, warning: "" }, 201);
   }
 
   if (path === "/api/admin/staff" && method === "PATCH") {

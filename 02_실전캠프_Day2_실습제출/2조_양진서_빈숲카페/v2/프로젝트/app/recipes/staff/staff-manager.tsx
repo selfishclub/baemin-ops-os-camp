@@ -9,11 +9,45 @@ import PreviewBanner from "../../preview/preview-banner";
 
 type StaffRow = { id: string; login_id: string; display_name: string; role: "owner" | "staff"; active: boolean; created_at: string };
 
+// 헷갈리는 글자(0/O, 1/l)를 뺀 임시 비밀번호 10자
+function randomPassword() {
+  const letters = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(10);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => letters[byte % letters.length]).join("");
+}
+
 export default function StaffManager({ preview = false }: { preview?: boolean }) {
   const [rows, setRows] = useState<StaffRow[]>([]);
   const [me, setMe] = useState("");
   const [message, setMessage] = useState("직원 목록을 불러오는 중입니다.");
   const [busyId, setBusyId] = useState("");
+  const [newId, setNewId] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  async function create(event: React.FormEvent) {
+    event.preventDefault();
+    setCreating(true);
+    setMessage("");
+    const response = await apiFetch(preview, "/api/admin/staff", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ loginId: newId, displayName: newName, password: newPassword }),
+    });
+    const body = await response.json().catch(() => ({}));
+    setCreating(false);
+    if (!response.ok) {
+      setMessage(body.error ?? "계정을 만들지 못했습니다.");
+      return;
+    }
+    if (body.staff) setRows((current) => [...current.filter((row) => row.id !== body.staff.id), body.staff]);
+    setMessage(`${body.staff?.login_id ?? newId} 계정을 만들었습니다. 아이디와 임시 비밀번호를 직원에게 직접 알려 주세요.${body.warning ? ` ${body.warning}` : ""}`);
+    setNewId("");
+    setNewName("");
+    setNewPassword("");
+  }
 
   async function load() {
     const response = await apiFetch(preview, "/api/admin/staff", { cache: "no-store" });
@@ -101,11 +135,29 @@ export default function StaffManager({ preview = false }: { preview?: boolean })
 
       <section className={styles.howto}>
         <h2>새 직원 계정 만들기</h2>
+        <form className={styles.createForm} onSubmit={create}>
+          <label>
+            아이디 (영문·숫자)
+            <input value={newId} autoCapitalize="none" autoComplete="off" placeholder="예: alba-a" onChange={(event) => setNewId(event.target.value)} />
+          </label>
+          <label>
+            화면에 보일 이름
+            <input value={newName} autoComplete="off" placeholder="예: 직원 A" onChange={(event) => setNewName(event.target.value)} />
+          </label>
+          <label>
+            임시 비밀번호 (8자 이상)
+            <span className={styles.passwordRow}>
+              <input value={newPassword} autoComplete="new-password" onChange={(event) => setNewPassword(event.target.value)} />
+              <button type="button" onClick={() => setNewPassword(randomPassword())}>만들어 주기</button>
+            </span>
+          </label>
+          <button type="submit" disabled={creating}>{creating ? "만드는 중…" : "계정 만들기"}</button>
+        </form>
         <ol>
-          <li>Supabase 대시보드 → <strong>Authentication → Users → Add user → Create new user</strong></li>
-          <li>Email 칸에 <code>아이디@{loginEmailDomain}</code> (예: <code>alba-a@{loginEmailDomain}</code>), Password 칸에 임시 비밀번호</li>
-          <li><strong>Auto Confirm User</strong>를 켜고 만들기 → 이 화면을 새로고침하면 목록에 나타납니다 (기본 역할: 직원)</li>
-          <li>직원에게 아이디와 임시 비밀번호를 직접 전달합니다 (카톡에 남기지 않기)</li>
+          <li>만든 뒤 직원에게 아이디와 임시 비밀번호를 <strong>직접</strong> 알려 주세요 (카톡에 남기지 않기)</li>
+          <li>직원은 첫 로그인 뒤 홈의 <strong>비밀번호 바꾸기</strong>에서 자기 비밀번호로 바꿉니다</li>
+          <li>비밀번호를 잊으면 그 계정을 <strong>중지</strong>하고 새 아이디로 다시 만들어 주세요 (여기서는 남의 비밀번호를 바꿀 수 없어요)</li>
+          <li>데이터 창고(Supabase)에서 직접 만든 계정은 <strong>중지됨</strong>으로 시작합니다 — 이 목록에서 켜 주어야 볼 수 있어요. 그때 아이디는 <code>아이디@{loginEmailDomain}</code> 꼴로 적습니다</li>
         </ol>
       </section>
     </main>

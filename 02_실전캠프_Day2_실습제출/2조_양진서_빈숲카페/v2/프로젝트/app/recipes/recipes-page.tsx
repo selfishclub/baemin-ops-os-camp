@@ -31,7 +31,7 @@ import Link from "next/link";
 import ChatPanel from "./chat-panel";
 import HistoryPanel from "./history-panel";
 import { apiFetch } from "../preview/preview-api";
-import { VideoRecipeCard, Watermark } from "./media-parts";
+import { ProtectedImage, VideoRecipeCard, Watermark } from "./media-parts";
 import { todayInSeoul } from "../checks/check-data";
 import PreviewRoleSwitch from "../preview/preview-role-switch";
 
@@ -207,6 +207,13 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
     if (!storageReady) return;
     window.localStorage.setItem(favoriteKey, JSON.stringify(favorites));
   }, [favorites, storageReady]);
+
+  // 열람 기록: 레시피를 열 때마다 "누가 언제 무엇을" 남긴다 (미리보기에서는 브라우저 안에서 끝남)
+  useEffect(() => {
+    if (!selectedId) return;
+    apiFetch(demo, "/api/view", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "recipe", id: selectedId }), keepalive: true }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
   useEffect(() => {
     if (!storageReady) return;
@@ -770,7 +777,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
                 {activeImage ? (
                   <>
                     <figure className={styles.galleryHero}>
-                      <img src={activeImage.url} alt={activeImage.alt || selectedRecipe.name} draggable={false} onContextMenu={(event) => event.preventDefault()} />
+                      <ProtectedImage src={activeImage.url} alt={activeImage.alt || selectedRecipe.name} label={watermarkLabel} />
                       <Watermark label={watermarkLabel} />
                       {activeImage.caption && <figcaption>{activeImage.caption}</figcaption>}
                     </figure>
@@ -778,7 +785,7 @@ export default function RecipeCenter({ viewer, demo, lockedForStaff = false }: {
                       <div className={styles.galleryThumbs} aria-label="다른 음료 사진 선택">
                         {selectedRecipe.images?.map((image) => (
                           <button key={image.id} type="button" aria-pressed={image.id === activeImage.id} onClick={() => setActiveImageId(image.id)}>
-                            <img src={image.url} alt="" /><span className="sr-only">{image.alt || `${selectedRecipe.name} 사진`}</span>
+                            <ProtectedImage src={image.url} alt="" label={watermarkLabel} /><span className="sr-only">{image.alt || `${selectedRecipe.name} 사진`}</span>
                           </button>
                         ))}
                       </div>

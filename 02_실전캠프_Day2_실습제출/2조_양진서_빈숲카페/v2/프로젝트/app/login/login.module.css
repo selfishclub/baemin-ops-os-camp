@@ -48,3 +48,8 @@
 
 .message { margin: 0; padding: 10px 12px; border-radius: 10px; background: #fff0ec; color: #9a3b2c; font-size: 13px; font-weight: 700; }
 .note { margin: 6px 0 0; color: #7a8078; font-size: 12px; line-height: 1.6; }
+
+/* 내 계정 화면 */
+.message[data-ok="true"] { background: #eef7f1; color: #2f6b47; }
+.card a.secondary { justify-self: start; color: #2f6b47; font-size: 13px; font-weight: 700; text-decoration: none; }
+.card code { padding: 1px 5px; border-radius: 4px; background: rgba(0, 0, 0, .06); }

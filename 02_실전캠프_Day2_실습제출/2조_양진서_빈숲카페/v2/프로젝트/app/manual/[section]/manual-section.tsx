@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../preview/preview-api";
 import PreviewRoleSwitch from "../../preview/preview-role-switch";
 import ChatPanel from "../../recipes/chat-panel";
-import { VideoRecipeCard, Watermark } from "../../recipes/media-parts";
+import { ProtectedImage, VideoRecipeCard, Watermark } from "../../recipes/media-parts";
 import { todayInSeoul } from "../../checks/check-data";
 import { manualLabels, manualNoticePrefix, responseGroups, type ManualDoc } from "../manual-data";
 import styles from "../manual.module.css";
@@ -71,6 +71,12 @@ export default function ManualSection({ sectionId, title, description, role, vie
       cancelled = true;
     };
   }, [demo, sectionId]);
+
+  // 열람 기록: 문서를 열 때마다 "누가 언제 무엇을" 남긴다 (미리보기에서는 브라우저 안에서 끝남)
+  useEffect(() => {
+    if (!selectedId) return;
+    apiFetch(demo, "/api/view", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "manual", id: selectedId }), keepalive: true }).catch(() => {});
+  }, [demo, selectedId]);
 
   // 폰처럼 좁은 화면에서는 목록 아래에 문서가 있으므로, 고르면 문서로 내려가 준다
   function choose(id: string) {
@@ -182,7 +188,7 @@ export default function ManualSection({ sectionId, title, description, role, vie
                         <figure key={image.id}>
                           <div className={styles.photoStage}>
                             <Watermark label={watermark} />
-                            <img src={image.url} alt={image.alt} loading="lazy" draggable={false} onContextMenu={(event) => event.preventDefault()} />
+                            <ProtectedImage src={image.url} alt={image.alt} label={watermark} loading="lazy" />
                           </div>
                           {(image.caption || image.alt) && <figcaption>{image.caption || image.alt}</figcaption>}
                         </figure>

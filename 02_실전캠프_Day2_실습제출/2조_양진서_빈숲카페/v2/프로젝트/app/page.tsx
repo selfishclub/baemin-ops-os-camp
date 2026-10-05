@@ -42,9 +42,12 @@ export default async function PortalHome() {
           </p>
           {previewRole && <PreviewRoleSwitch role={previewRole} />}
           {viewer && (
-            <form action="/api/auth/logout" method="post">
-              <button type="submit">로그아웃</button>
-            </form>
+            <>
+              <Link href="/account" className={styles.accountLink}>비밀번호 바꾸기</Link>
+              <form action="/api/auth/logout" method="post">
+                <button type="submit">로그아웃</button>
+              </form>
+            </>
           )}
         </div>
       </header>
