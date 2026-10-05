@@ -11,7 +11,7 @@ import { classifyRows, findRule, newId, ruleFromChoice, usualAmounts } from "@/l
 import { num, won } from "@/lib/format";
 import { findOverlap, monthLabel, monthsBetween, newBankRowsOnly, prevMonth } from "@/lib/month";
 import { getStore } from "@/lib/storage";
-import type { Transaction } from "@/lib/types";
+import type { BankRow, Transaction } from "@/lib/types";
 import { splitCheck, type TxSplit } from "@/lib/txSplit";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, isPrevMonthDefault } from "@/lib/paydays";
 import { monthsToLoad, quickRange, searchTxs, shiftDays, txTotals, type TxOrder } from "@/lib/txSearch";
@@ -28,6 +28,7 @@ export default function UploadPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "warn" | "info"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [popbill, setPopbill] = useState<{ ready: boolean; test?: boolean; account?: string } | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [payDays, setPayDays] = useState<number[]>(DEFAULT_PAY_DAYS);
@@ -64,6 +65,61 @@ export default function UploadPage() {
   );
   const searchedTotals = txTotals(searched);
 
+  // 팝빌 계좌조회로 통장을 바로 가져온다. 열쇠는 서버(.env.local)에만 있고, 설정이 없으면 단추가 안 보인다.
+  useEffect(() => {
+    fetch("/api/popbill/status").then((r) => r.json()).then(setPopbill).catch(() => setPopbill({ ready: false }));
+  }, []);
+
+  async function fetchFromPopbill() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const to = new Date().toISOString().slice(0, 10);
+      const last = (await getStore().listUploads()).map((u) => u.to).sort().at(-1);
+      // 마지막으로 받은 날 다음부터. 처음이면 이번 달 1일부터
+      const from = last && last < to ? new Date(new Date(last + "T00:00:00Z").getTime() + 864e5).toISOString().slice(0, 10) : to.slice(0, 8) + "01";
+      const res = await fetch("/api/popbill/bank", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ from, to }) });
+      const data = await res.json();
+      if (!res.ok) { setMessage({ tone: "error", text: data.error ?? "통장을 가져오지 못했어요." }); return; }
+      if (!data.rows?.length) { setMessage({ tone: "info", text: `${from} ~ ${to}에 새 거래가 없어요.` }); return; }
+      await ingest(data.rows, data.from, data.to, `통장 자동 가져오기 (팝빌`);
+    } catch (e) {
+      setMessage({ tone: "error", text: `통장을 가져오지 못했어요. (${e instanceof Error ? e.message : e})` });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // 통장 줄을 장부에 넣는 공통 길 — 엑셀로 올리든 팝빌로 가져오든 여기로 모인다.
+  //  이미 있는 줄 빼기 → 자동 분류 → 저장 → 올린 기록 남기기
+  async function ingest(all: BankRow[], from: string, to: string, label: string) {
+    const store = getStore();
+    let rows = all;
+    let duplicates = 0;
+    const overlap = findOverlap(await store.listUploads(), from, to);
+    if (overlap) {
+      const existing = (await Promise.all(monthsBetween(from, to).map((m) => store.listTransactions(m)))).flat().filter((t) => t.source === "bank" && t.date >= from && t.date <= to);
+      ({ fresh: rows, duplicates } = newBankRowsOnly(all, existing));
+      if (rows.length === 0) {
+        setMessage({ tone: "info", text: `이미 다 들어 있는 거래예요 (${from} ~ ${to}, ${duplicates}줄). 새로 넣은 줄은 없어요.` });
+        return;
+      }
+    }
+    const rules = await store.listRules();
+    const txs = classifyRows(rows, rules, usualAmounts(ledger.txs.concat(ledger.prevTxs), rules));
+    await store.saveTransactions(txs);
+    const fileMonth = from.slice(0, 7);
+    await store.saveUpload({ id: newId(), month: fileMonth, from, to, rowCount: txs.length, uploadedAt: new Date().toISOString() });
+    await ledger.recordEdit(`${label}, ${txs.length}줄)`);
+    const auto = txs.filter((t) => t.major).length;
+    setMessage({
+      tone: "ok",
+      text: `${txs.length}줄 중 ${auto}줄을 자동으로 분류했어요. 확인이 필요한 줄은 ${txs.filter((t) => t.review).length}줄이에요. (${from} ~ ${to})${duplicates ? ` 이미 있던 ${duplicates}줄은 빼고 넣었어요.` : ""}`,
+    });
+    if (fileMonth !== month) setMonth(fileMonth);
+    else await ledger.reload();
+  }
+
   async function handleFile(file: File | Blob, name: string) {
     setBusy(true);
     setMessage(null);
@@ -72,42 +128,7 @@ export default function UploadPage() {
       const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
       const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true }) as never[][];
       const parsed = parseBankSheet(grid);
-
-      const store = getStore();
-      // 이미 올린 기간과 겹치면: 있는 줄은 빼고 새 줄만 넣는다 (은행에서 기간을 겹쳐 내려받는 일이 많다)
-      let rows = parsed.rows;
-      let duplicates = 0;
-      const overlap = findOverlap(await store.listUploads(), parsed.from, parsed.to);
-      if (overlap) {
-        const existing = (await Promise.all(monthsBetween(parsed.from, parsed.to).map((m) => store.listTransactions(m)))).flat().filter((t) => t.source === "bank" && t.date >= parsed.from && t.date <= parsed.to);
-        ({ fresh: rows, duplicates } = newBankRowsOnly(parsed.rows, existing));
-        if (rows.length === 0) {
-          setMessage({ tone: "info", text: `이미 다 들어 있는 거래예요 (${parsed.from} ~ ${parsed.to}, ${duplicates}줄). 새로 넣은 줄은 없어요.` });
-          return;
-        }
-      }
-
-      const rules = await store.listRules();
-      const txs = classifyRows(rows, rules, usualAmounts(ledger.txs.concat(ledger.prevTxs), rules));
-      await store.saveTransactions(txs);
-      const fileMonth = parsed.from.slice(0, 7);
-      await store.saveUpload({
-        id: newId(),
-        month: fileMonth,
-        from: parsed.from,
-        to: parsed.to,
-        rowCount: txs.length,
-        uploadedAt: new Date().toISOString(),
-      });
-      await ledger.recordEdit(`거래내역 파일 올림 (${name}, ${txs.length}줄)`);
-
-      const auto = txs.filter((t) => t.major).length;
-      setMessage({
-        tone: "ok",
-        text: `${txs.length}줄 중 ${auto}줄을 자동으로 분류했어요. 확인이 필요한 줄은 ${txs.filter((t) => t.review).length}줄이에요. (${parsed.from} ~ ${parsed.to})${duplicates ? ` 이미 있던 ${duplicates}줄은 빼고 넣었어요.` : ""}`,
-      });
-      if (fileMonth !== month) setMonth(fileMonth);
-      else await ledger.reload();
+      await ingest(parsed.rows, parsed.from, parsed.to, `거래내역 파일 올림 (${name}`);
     } catch (e) {
       setMessage({
         tone: "error",
@@ -149,10 +170,21 @@ export default function UploadPage() {
               가짜 {s.label} 파일로 해 보기
             </button>
           ))}
+          {popbill?.ready && (
+            <button className="btn-primary" disabled={busy} onClick={fetchFromPopbill}>
+              통장 자동 가져오기
+            </button>
+          )}
           <a className="btn-ghost" href={SAMPLES[0].file} download>
             예시 파일 받기
           </a>
         </div>
+        {popbill?.ready && (
+          <p className="text-xs text-stone-500">
+            팝빌 계좌조회가 연결돼 있어요{popbill.account ? ` (${popbill.account})` : ""}
+            {popbill.test ? " · 테스트 서버" : ""} — “통장 자동 가져오기”를 누르면 마지막으로 받은 날 다음부터 가져와요.
+          </p>
+        )}
         {busy && <Notice tone="info">읽는 중…</Notice>}
         {message && <Notice tone={message.tone}>{message.text}</Notice>}
       </section>
