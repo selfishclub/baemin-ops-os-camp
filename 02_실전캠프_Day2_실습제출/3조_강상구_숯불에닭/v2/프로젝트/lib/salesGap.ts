@@ -1,4 +1,4 @@
-import { payoutDate, type SettlementRule, type ChannelSettlementSummary } from "./settlement";
+import { payoutDate, type Settlement, type SettlementRule, type ChannelSettlementSummary } from "./settlement";
 import type { Channel, ChannelId } from "./categories";
 import type { DailySale } from "./types";
 
@@ -10,6 +10,10 @@ import type { DailySale } from "./types";
 //  찾는 법: 정산 탭이 이미 "매출 묶음과 짝이 안 맞는 입금"을 뽑아 둔다.
 //  그 입금이 며칠 주문분인지 정산 규칙을 거꾸로 풀고, 그날 그 채널 매출이 비어 있으면 빠뜨린 것으로 본다.
 //  주말·공휴일이 끼면 여러 날이 같은 날 입금되므로 후보가 여럿이다. 그중 하나라도 매출이 있으면 넘어간다.
+//
+//  헛경고 하나 — 카드사가 하루치를 두 번에 나눠 보내면 뒤쪽 입금이 떠돈다.
+//  (국민카드가 9/2 매출 94,000을 9/4에 44,663, 9/7에 48,633으로 나눠 보냄 — 2026-09)
+//  그래서 가까운 날 묶음이 그만큼 덜 들어왔으면 "나눠 보낸 것"으로 보고 넘어간다.
 
 export interface MissingSale {
   channel: ChannelId;
@@ -48,10 +52,25 @@ export function missingSales(
       const cands = saleDatesOf(d.date, rule, holidays).filter((c) => c.slice(0, 7) === month);
       if (cands.length === 0) continue; // 지난달 주문분은 지난달에서 본다
       if (cands.some((c) => sold.has(`${c}|${s.channel}`))) continue; // 한 날이라도 매출이 있으면 넘어간다
+      if (looksLikeSplitPayout(d.amount, d.date, s.settlements)) continue; // 카드사가 나눠 보낸 것
       out.push({ channel: s.channel, name: nameOf(s.channel), saleDates: cands, depositDate: d.date, deposit: d.amount });
     }
   }
   return out.sort((a, b) => (a.saleDates[0] < b.saleDates[0] ? -1 : a.saleDates[0] > b.saleDates[0] ? 1 : 0));
+}
+
+/** 이 입금이 가까운 날 묶음의 모자란 몫일 수 있나 (카드사가 나눠 보낸 경우) */
+export function looksLikeSplitPayout(deposit: number, depositDate: string, settlements: Settlement[], withinDays = 5): boolean {
+  const t = new Date(depositDate + "T00:00:00Z").getTime();
+  for (const b of settlements) {
+    if (b.status === "매출없음" || b.sales <= 0) continue;
+    const gap = b.sales - b.deposit; // 그 묶음이 덜 들어온 몫
+    if (gap <= 0) continue;
+    if (Math.abs(new Date(b.payout + "T00:00:00Z").getTime() - t) > withinDays * 864e5) continue;
+    // 모자란 몫이 이 입금과 엇비슷하면 (수수료만큼 차이) 나눠 보낸 것으로 본다
+    if (Math.abs(gap - deposit) <= Math.max(2000, deposit * 0.05)) return true;
+  }
+  return false;
 }
 
 export const totalMissing = (list: MissingSale[]) => list.reduce((a, m) => a + m.deposit, 0);

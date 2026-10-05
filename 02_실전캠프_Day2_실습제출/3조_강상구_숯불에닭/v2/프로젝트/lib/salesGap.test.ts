@@ -69,3 +69,44 @@ describe("통장엔 있는데 매출에 없는 날", () => {
     expect(totalMissing(found)).toBe(82948);
   });
 });
+
+import { looksLikeSplitPayout } from "./salesGap";
+import type { Settlement } from "./settlement";
+
+const bundle = (p: Partial<Settlement>): Settlement =>
+  ({ channel: "card_kb", from: "2026-09-02", to: "2026-09-02", sales: 94000, payout: "2026-09-04", deposit: 44663, fee: 49337, feeRate: null, status: "차이", ...p });
+
+describe("카드사가 하루치를 두 번에 나눠 보낸 경우", () => {
+  // 국민카드가 9/2 매출 94,000을 9/4에 44,663, 9/7에 48,633으로 나눠 보냄 (2026-09 실제)
+  it("가까운 날 묶음이 그만큼 덜 들어왔으면 나눠 보낸 것으로 본다", () => {
+    expect(looksLikeSplitPayout(48633, "2026-09-07", [bundle({})])).toBe(true);
+  });
+
+  it("9/3 국민카드는 매출이 없어도 경고하지 않는다", () => {
+    const sum: ChannelSettlementSummary = {
+      channel: "card_kb", sales: 94000, deposited: 44663, fee: 0, feeRate: null, pending: 0, missing: 0,
+      settlements: [bundle({})], unmatchedDeposits: [{ date: "2026-09-07", amount: 48633 }],
+    };
+    expect(missingSales([sum], [rule("card_kb", 2)], [], C, "2026-09")).toEqual([]);
+  });
+
+  it("묶음이 다 들어왔으면 나눠 보낸 게 아니다", () => {
+    expect(looksLikeSplitPayout(48633, "2026-09-07", [bundle({ deposit: 94000, status: "일치" })])).toBe(false);
+  });
+
+  it("날짜가 멀면 상관없는 입금으로 본다", () => {
+    expect(looksLikeSplitPayout(48633, "2026-09-20", [bundle({})])).toBe(false);
+  });
+
+  it("금액이 많이 다르면 나눠 보낸 게 아니다", () => {
+    expect(looksLikeSplitPayout(10000, "2026-09-07", [bundle({})])).toBe(false);
+  });
+
+  it("요기요처럼 묶음 자체가 없으면 그대로 집어낸다", () => {
+    const sum: ChannelSettlementSummary = {
+      channel: "yogiyo", sales: 0, deposited: 0, fee: 0, feeRate: null, pending: 0, missing: 0,
+      settlements: [], unmatchedDeposits: [{ date: "2026-10-02", amount: 24948 }],
+    };
+    expect(missingSales([sum], [rule("yogiyo", 5)], [], C, "2026-09")).toHaveLength(1);
+  });
+});
