@@ -10,6 +10,7 @@ import { FindingsCard } from "@/components/FindingsCard";
 import { RatioCard } from "@/components/RatioCard";
 import { SummaryCopyCard } from "@/components/SummaryCopyCard";
 import { useMonthPnl } from "@/components/useMonthPnl";
+import { missingSales as findMissingSales, totalMissing, type MissingSale } from "@/lib/salesGap";
 import { num, pctText, signed, won } from "@/lib/format";
 import { closeMonth, isClosed, monthLabel, prevMonth } from "@/lib/month";
 import { compareLines, type Pnl, type PnlLine } from "@/lib/pnl";
@@ -73,6 +74,9 @@ export default function PnlPage() {
     await getStore().saveClosing(closeMonth(month, ledger.closing));
     await ledger.reload();
   }
+
+  // 통장엔 들어왔는데 그날 매출이 비어 있는 채널 (포스에 안 찍히는 매출을 깜빡한 것)
+  const missing = findMissingSales(settlement.results, settlement.rules, daily.sales, daily.channels, month, settlement.holidays);
 
   if (empty) {
     return (
@@ -195,6 +199,23 @@ export default function PnlPage() {
 
       <BreakevenCard month={month} pnl={pnl} openDays={openDays} />
 
+      {missing.length > 0 && (
+        <div className="rounded-xl bg-rose-50 p-3 text-sm">
+          <p className="font-semibold text-rose-900">통장에 들어왔는데 매출에 없는 날이 {missing.length}건 있어요 ({won(totalMissing(missing))})</p>
+          <ul className="mt-2 space-y-1 text-rose-900">
+            {missing.map((m: MissingSale) => (
+              <li key={m.channel + m.depositDate} className="num">
+                · <b>{m.name}</b> {m.saleDates.length === 1 ? dayText(m.saleDates[0]) : `${dayText(m.saleDates[0])}~${dayText(m.saleDates[m.saleDates.length - 1])}`} 주문분 —
+                {" "}{dayText(m.depositDate)}에 {won(m.deposit)} 들어옴
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-rose-800">
+            포스에 안 찍히는 매출(손님 계좌이체·제로페이·배달앱)은 손으로 넣어야 해요. 오늘 탭에서 그날 매출을 채워 주세요.
+            입금액은 수수료를 뗀 뒤라 주문금액은 이보다 조금 많아요.
+          </p>
+        </div>
+      )}
       <section className="card space-y-2">
         {closed ? (
           <>
@@ -341,4 +362,9 @@ function TaxExportCard({ month, txs, needsReview, closed }: { month: string; txs
       {msg && <Notice tone="ok">{msg}</Notice>}
     </section>
   );
+}
+
+// "10/02" 처럼 짧게 — 경고 카드에서 날짜를 여러 개 늘어놓을 때
+function dayText(date: string): string {
+  return `${date.slice(5, 7).replace(/^0/, "")}/${date.slice(8, 10)}`;
 }
