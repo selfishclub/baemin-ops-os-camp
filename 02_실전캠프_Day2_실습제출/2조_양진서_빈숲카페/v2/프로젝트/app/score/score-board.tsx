@@ -23,6 +23,7 @@ const statColumns: { key: keyof ActivityCounts; label: string }[] = [
   { key: "missions_done", label: "미션" },
   { key: "praises_received", label: "칭찬 받음" },
   { key: "praises_given", label: "칭찬 보냄" },
+  { key: "handovers_written", label: "인수인계" },
   { key: "reads", label: "열람" },
 ];
 

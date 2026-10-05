@@ -467,6 +467,51 @@ drop policy if exists "praise_delete_owner" on public.praises;
 create policy "praise_delete_owner" on public.praises
   for delete to authenticated using (public.is_owner());
 
+-- 3-10) 인수인계 (교대 메모 + 읽음 확인) ---------------------------------------------
+-- 재직 직원 모두 읽고, 자기 이름으로 쓴다. 읽음은 본인만 남긴다. 고치기는 없고 지우기는 사장만.
+create table if not exists public.handovers (
+  id bigserial primary key,
+  author_id uuid not null references public.profiles (id) on delete cascade,
+  author_name text not null default '',
+  shift text not null check (shift in ('open', 'middle', 'close', 'other')),
+  text text not null check (char_length(text) between 1 and 500),
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_handovers_created on public.handovers (created_at desc);
+
+create table if not exists public.handover_reads (
+  handover_id bigint not null references public.handovers (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  user_name text not null default '',
+  read_at timestamptz not null default now(),
+  primary key (handover_id, user_id)
+);
+
+grant select, insert, delete on public.handovers to authenticated;
+revoke update on public.handovers from authenticated;
+grant select, insert on public.handover_reads to authenticated;
+revoke update, delete on public.handover_reads from authenticated;
+grant usage, select on sequence public.handovers_id_seq to authenticated;
+alter table public.handovers enable row level security;
+alter table public.handover_reads enable row level security;
+
+drop policy if exists "handover_select_active" on public.handovers;
+create policy "handover_select_active" on public.handovers
+  for select to authenticated using (public.is_active_user());
+drop policy if exists "handover_insert_self" on public.handovers;
+create policy "handover_insert_self" on public.handovers
+  for insert to authenticated with check (author_id = auth.uid() and public.is_active_user());
+drop policy if exists "handover_delete_owner" on public.handovers;
+create policy "handover_delete_owner" on public.handovers
+  for delete to authenticated using (public.is_owner());
+
+drop policy if exists "handover_reads_select_active" on public.handover_reads;
+create policy "handover_reads_select_active" on public.handover_reads
+  for select to authenticated using (public.is_active_user());
+drop policy if exists "handover_reads_insert_self" on public.handover_reads;
+create policy "handover_reads_insert_self" on public.handover_reads
+  for insert to authenticated with check (user_id = auth.uid() and public.is_active_user());
+
 -- 3-7) 점수판·레벨 (재미와 격려용, 급여·승급 자동 반영 없음) ---------------------------
 -- 사람별로 "한 일"을 센다: 오늘 체크, 교육 체크(메뉴·매뉴얼), 실기 합격, 퀴즈·필기 통과, 바뀐 내용 확인, 열람.
 -- 직원은 남의 교육 기록을 못 읽지만(RLS) 점수판에는 남의 "합계 숫자"가 필요하므로, security definer 함수가 숫자만 준다.
@@ -479,7 +524,8 @@ returns table (
   docs_read integer, docs_confirmed integer, exam_items integer,
   quiz_passed integer, exam_written integer, acks integer, reads integer,
   quests_done integer, missions_done integer,
-  praises_received integer, praises_given integer
+  praises_received integer, praises_given integer,
+  handovers_written integer, handovers_read integer
 )
 language sql
 stable
@@ -502,7 +548,9 @@ as $$
     (select count(*) from public.quest_progress x where x.user_id = p.id and x.status = 'done' and x.quest_id <> 'mission' and (since is null or x.done_at >= since))::integer,
     (select count(*) from public.quest_progress x where x.user_id = p.id and x.status = 'confirmed' and (since is null or x.confirmed_at >= since))::integer,
     (select count(*) from public.praises pr where pr.to_user = p.id and (since is null or pr.created_at >= since))::integer,
-    (select count(*) from public.praises pr where pr.from_user = p.id and (since is null or pr.created_at >= since))::integer
+    (select count(*) from public.praises pr where pr.from_user = p.id and (since is null or pr.created_at >= since))::integer,
+    (select count(*) from public.handovers h where h.author_id = p.id and (since is null or h.created_at >= since))::integer,
+    (select count(*) from public.handover_reads hr where hr.user_id = p.id and (since is null or hr.read_at >= since))::integer
   from public.profiles p
   where public.is_active_user()
   order by p.created_at;

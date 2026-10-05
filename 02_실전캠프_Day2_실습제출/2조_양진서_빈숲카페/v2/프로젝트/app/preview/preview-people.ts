@@ -9,6 +9,7 @@ import type { ViewRow } from "../manage/views/view-data";
 import { breakdown, buildBoard, defaultLevels, emptyCounts, highlights, levelFor, periodStart, totalPoints, type ActivityCounts, type Period } from "../score/score-data";
 import { buildWeeklyQuests, countCleared, isCorrect, mergeProgress, previousWeekStart, weekStartSeoul, type QuestProgressRow } from "../quest/quest-data";
 import { sentToday, shouldRelay, summarizePraise, validatePraise, type PraiseRow } from "../praise/praise-data";
+import { buildHandoverViews, handoverDays, unreadCount, validateHandover, type HandoverRow, type HandoverShift } from "../handover/handover-data";
 
 // 미리보기용 "사람" 데이터: 가짜 직원, 메뉴 체크리스트, 퀴즈 점수, 바뀐 레시피 알림과 확인 기록.
 // 전부 이 브라우저(localStorage)에만 있고 서버·데이터 창고로 가는 길은 없다. 실제 직원 이름은 쓰지 않는다.
@@ -28,7 +29,7 @@ type QuizRow = { id: number; user_id: string; score: number; total: number; crea
 type NoticeRow = { id: number; version: number; recipe_id: string; recipe_name: string; change_reason: string; published_by: string; created_at: string; acks: { user_id: string; acked_at: string }[] };
 type DailyCheckRow = DailyRow & { check_date: string };
 type QuestRow = QuestProgressRow & { user_id: string; week_start: string };
-type PreviewPeople = { staff: StaffRow[]; checks: CheckRow[]; quiz: QuizRow[]; notices: NoticeRow[]; daily: DailyCheckRow[]; views?: ViewRow[]; quests?: QuestRow[]; praises?: PraiseRow[] };
+type PreviewPeople = { staff: StaffRow[]; checks: CheckRow[]; quiz: QuizRow[]; notices: NoticeRow[]; daily: DailyCheckRow[]; views?: ViewRow[]; quests?: QuestRow[]; praises?: PraiseRow[]; handovers?: HandoverRow[] };
 
 function daysAgo(days: number) {
   return new Date(Date.now() - days * 86_400_000).toISOString();
@@ -73,6 +74,10 @@ function freshPeople(recipes: Recipe[]): PreviewPeople {
   const [first, second, third] = recipes;
   return {
     views: seedViews(recipes),
+    handovers: [
+      { id: 1, author_id: "preview-staff-b", author_name: "직원 B", shift: "close", text: "(예시) 우유 2팩 남음 — 내일 아침 발주 필요\n(예시) 2번 그라인더 분쇄도 한 칸 굵게 조정함", created_at: daysAgo(0.6), reads: [{ user_id: ownerId, user_name: "미리보기 사장", read_at: daysAgo(0.5) }] },
+      { id: 2, author_id: staffId, author_name: "직원 A", shift: "open", text: "(예시) 15시 단체 예약 6명 · 디카페인 원두 거의 떨어짐", created_at: daysAgo(1.3), reads: [{ user_id: "preview-staff-b", user_name: "직원 B", read_at: daysAgo(1.1) }] },
+    ],
     praises: [
       { id: 1, from_user: "preview-staff-b", from_name: "직원 B", to_user: staffId, to_name: "직원 A", text: "(예시) 피크 때 먼저 설거지 맡아 줘서 고마워요", created_at: daysAgo(1.2) },
       { id: 2, from_user: ownerId, from_name: "미리보기 사장", to_user: "preview-staff-b", to_name: "직원 B", text: "(예시) 환불 손님을 침착하게 응대해서 좋았어요", created_at: daysAgo(0.4) },
@@ -127,6 +132,7 @@ function save(people: PreviewPeople) {
     people.views = (people.views ?? []).slice(-300);
     people.quests = (people.quests ?? []).slice(-200);
     people.praises = (people.praises ?? []).slice(-300);
+    people.handovers = (people.handovers ?? []).slice(-200);
     window.localStorage.setItem(storageKey, JSON.stringify(people));
   } catch {
     // 공간이 모자라면 저장을 건너뛴다
@@ -459,6 +465,8 @@ export async function handlePeople(path: string, method: string, url: string, bo
         missions_done: (people.quests ?? []).filter((row) => row.user_id === person.id && row.status === "confirmed" && after(row.confirmed_at)).length,
         praises_received: (people.praises ?? []).filter((row) => row.to_user === person.id && after(row.created_at)).length,
         praises_given: (people.praises ?? []).filter((row) => row.from_user === person.id && after(row.created_at)).length,
+        handovers_written: (people.handovers ?? []).filter((row) => row.author_id === person.id && after(row.created_at)).length,
+        handovers_read: (people.handovers ?? []).reduce((sum, row) => sum + row.reads.filter((read) => read.user_id === person.id && after(read.read_at)).length, 0),
       };
     });
     const allTime = count(null);
@@ -475,6 +483,41 @@ export async function handlePeople(path: string, method: string, url: string, bo
     };
     if (role === "owner") payload.stats = { rows: periodRows.filter((row) => row.active), highlights: highlights(periodRows) };
     return json(payload);
+  }
+
+  // 인수인계: 이 브라우저에만 저장
+  if (path === "/api/handover") {
+    const people = load(recipes);
+    people.handovers ??= [];
+    const meName = people.staff.find((person) => person.id === me)?.display_name ?? "";
+    if (method === "GET") {
+      const since = new Date(Date.now() - handoverDays * 86_400_000).toISOString();
+      const rows = people.handovers.filter((row) => row.created_at >= since).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+      const views = buildHandoverViews(rows, me, people.staff);
+      return json({ notes: views, unread: unreadCount(views), me: { id: me, role } });
+    }
+    if (method === "POST") {
+      const text = String(body.text ?? "").trim();
+      const problem = validateHandover({ shift: body.shift, text });
+      if (problem) return json({ error: problem }, 400);
+      people.handovers.push({ id: Math.max(0, ...people.handovers.map((row) => row.id)) + 1, author_id: me, author_name: meName, shift: body.shift as HandoverShift, text, created_at: new Date().toISOString(), reads: [] });
+      save(people);
+      return json({ ok: true }, 201);
+    }
+    if (method === "PATCH") {
+      const row = people.handovers.find((item) => item.id === Number(body.id));
+      if (!row) return json({ error: "어느 인수인계인지 없어요." }, 400);
+      if (!row.reads.some((read) => read.user_id === me)) row.reads.push({ user_id: me, user_name: meName, read_at: new Date().toISOString() });
+      save(people);
+      return json({ ok: true });
+    }
+    if (method === "DELETE") {
+      if (role !== "owner") return ownerOnly();
+      const id = Number(new URL(url, window.location.origin).searchParams.get("id"));
+      people.handovers = people.handovers.filter((row) => row.id !== id);
+      save(people);
+      return json({ ok: true });
+    }
   }
 
   // 칭찬 릴레이: 이 브라우저에만 저장
