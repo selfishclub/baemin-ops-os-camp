@@ -12,6 +12,7 @@ import { num, won } from "@/lib/format";
 import { findOverlap, monthLabel, monthsBetween, newBankRowsOnly, prevMonth } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 import type { BankRow, Transaction } from "@/lib/types";
+import { missingRanges, nextFetch, type NextFetch } from "@/lib/uploadGap";
 import { splitCheck, type TxSplit } from "@/lib/txSplit";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, isPrevMonthDefault } from "@/lib/paydays";
 import { monthsToLoad, quickRange, searchTxs, shiftDays, txTotals, type TxOrder } from "@/lib/txSearch";
@@ -29,6 +30,7 @@ export default function UploadPage() {
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "warn" | "info"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [popbill, setPopbill] = useState<{ ready: boolean; test?: boolean; account?: string } | null>(null);
+  const [need, setNeed] = useState<{ next: NextFetch | null; missing: { from: string; to: string }[] } | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [payDays, setPayDays] = useState<number[]>(DEFAULT_PAY_DAYS);
@@ -66,6 +68,16 @@ export default function UploadPage() {
   const searchedTotals = txTotals(searched);
 
   // 팝빌 계좌조회로 통장을 바로 가져온다. 열쇠는 서버(.env.local)에만 있고, 설정이 없으면 단추가 안 보인다.
+  useEffect(() => {
+    let alive = true;
+    void getStore().listUploads().then((ups) => {
+      if (!alive) return;
+      const today = todayStr();
+      setNeed({ next: nextFetch(ups, today), missing: missingRanges(ups) });
+    });
+    return () => { alive = false; };
+  }, [ledger.txs.length, month]);
+
   useEffect(() => {
     fetch("/api/popbill/status").then((r) => r.json()).then(setPopbill).catch(() => setPopbill({ ready: false }));
   }, []);
@@ -155,6 +167,31 @@ export default function UploadPage() {
         <p className="text-sm text-stone-600">
           은행 사이트에서 내려받은 거래내역 엑셀을 그대로 올려 주세요. 파일은 이 화면 안에서만 읽고, 어디에도 보내지 않아요.
         </p>
+        {need?.next && (
+          <div className="rounded-xl bg-amber-50 p-3 text-sm">
+            <p className="font-semibold text-amber-900">
+              {need.next.lastTo
+                ? `통장을 ${dayLabel(need.next.lastTo)}까지 받아 뒀어요.`
+                : "아직 통장을 안 올렸어요."}
+            </p>
+            <p className="mt-1 text-amber-900">
+              은행에서{" "}
+              <b className="num">{need.next.days === 1 ? dayLabel(need.next.to) : `${dayLabel(need.next.from)} ~ ${dayLabel(need.next.to)}`}</b>
+              {need.next.days > 1 ? ` (${need.next.days}일치)` : ""}를 받아서 올려 주세요.
+            </p>
+            <p className="mt-1 text-xs text-amber-800">
+              은행 사이트에서 기간을 고를 때 이 날짜 그대로 넣으면 빠지는 날이 없어요. 겹쳐 받아도 괜찮아요 — 이미 있는 줄은 알아서 걸러요.
+            </p>
+          </div>
+        )}
+        {need && !need.next && (
+          <Notice tone="ok">오늘까지 통장을 다 받아 뒀어요.</Notice>
+        )}
+        {need?.missing.length ? (
+          <Notice tone="warn">
+            가운데가 비어 있어요 — {need.missing.map((m) => `${dayLabel(m.from)} ~ ${dayLabel(m.to)}`).join(", ")}. 그 기간도 받아서 올려 주세요.
+          </Notice>
+        ) : null}
         <input
           ref={fileRef}
           type="file"
