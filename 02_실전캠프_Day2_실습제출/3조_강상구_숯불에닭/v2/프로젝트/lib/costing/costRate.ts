@@ -8,6 +8,13 @@ const TO_BASE: Record<BaseUnit, number> = { kg: 1, g: 0.001, L: 1, ml: 0.001, ea
 
 export class UnitMismatchError extends Error {}
 
+/** 레시피에 쓸 1단위 원가 — 매입 단가를 수율로 나눈 값. 수율이 없으면 매입 단가 그대로 */
+export function usableCost(item: Item): number {
+  const y = item.yieldRate;
+  if (!y || y <= 0 || y > 1) return item.standardCost;
+  return item.standardCost / y;
+}
+
 export function convert(quantity: number, from: BaseUnit, to: BaseUnit): number {
   if (from === to) return quantity;
   if (DIM[from] !== DIM[to]) throw new UnitMismatchError(`단위를 바꿀 수 없어요: ${from} → ${to}`);
@@ -35,7 +42,7 @@ export function recipeUnitCost(recipe: Recipe, items: Item[]): { cost: number; m
       missing.push(l.itemId);
       continue;
     }
-    cost += convert(l.quantity, l.unit, item.baseUnit) * item.standardCost;
+    cost += convert(l.quantity, l.unit, item.baseUnit) * usableCost(item);
   }
   return { cost: Math.round(cost), missingItems: missing };
 }
@@ -113,7 +120,7 @@ export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes:
       const q = convert(rl.quantity, rl.unit, item.baseUnit) * l.quantity;
       const u = usage.get(item.id) ?? { quantity: 0, cost: 0 };
       u.quantity += q;
-      u.cost += q * item.standardCost;
+      u.cost += q * usableCost(item);
       usage.set(item.id, u);
     }
     const theoretical = cost * l.quantity;

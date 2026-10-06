@@ -341,6 +341,13 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
     await store.saveSetting(MENUS_KEY, menus.map((m) => (m.id === id ? { ...m, listPrice: price > 0 ? price : null } : m)));
     await onChange();
   }
+  // 수율 — 산 것 중 실제로 음식에 들어가는 몫(%). 뼈·껍질처럼 원래 버리는 몫을 로스와 갈라낸다
+  async function setYieldOf(id: string, percent: number) {
+    const y = percent > 0 && percent < 100 ? percent / 100 : undefined;
+    await store.saveSetting(ITEMS_KEY, items.map((i) => (i.id === id ? { ...i, yieldRate: y } : i)));
+    await onChange();
+  }
+
   async function setItemCostOf(id: string, cost: number) {
     await store.saveSetting(ITEMS_KEY, items.map((i) => (i.id === id ? { ...i, standardCost: cost } : i)));
     await onChange();
@@ -435,6 +442,22 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
               <label className="col-span-3 -mt-1 flex items-center gap-1 text-xs text-stone-500">
                 <input type="checkbox" className="h-3.5 w-3.5 accent-orange-600" checked={i.costMethod === "monthAvg"} onChange={(e) => setCostMethod(i.id, e.target.checked ? "monthAvg" : "latest")} />
                 매입 영수증으로 바꿀 때 그 달 평균으로 (여러 거래처에서 값이 다르게 들어오는 품목)
+              </label>
+              <label className="col-span-3 -mt-1 flex items-center gap-1 text-xs text-stone-500">
+                수율
+                <input
+                  aria-label={`${i.name} 수율`}
+                  inputMode="numeric"
+                  className="field num w-14 px-1.5 py-0.5 text-right text-xs"
+                  placeholder="100"
+                  defaultValue={i.yieldRate ? Math.round(i.yieldRate * 100) : ""}
+                  onBlur={(e) => {
+                    const v = parseNum(e.target.value);
+                    if (v !== Math.round((i.yieldRate ?? 1) * 100)) void setYieldOf(i.id, v);
+                  }}
+                />
+                % — 뼈·껍질처럼 버리는 몫이 있으면 넣으세요
+                {i.yieldRate ? <b className="num text-stone-700">쓰는 단가 {num(Math.round(i.standardCost / i.yieldRate))}원/{i.baseUnit}</b> : null}
               </label>
             </li>
           ))}

@@ -39,3 +39,33 @@ describe("포스에 안 찍히는 매출도 분모에 (배달앱 등)", () => {
     expect(r.revenueAmount).toBe(1_000_000);
   });
 });
+
+import { recipeUnitCost, usableCost } from "./costRate";
+
+describe("수율 — 산 것 중 실제로 쓰는 몫", () => {
+  const 원육 = (yieldRate?: number): Item => ({ id: "i1", name: "닭갈비 원육", baseUnit: "kg", standardCost: 8676, category: "meat", active: true, yieldRate });
+
+  it("수율이 없으면 매입 단가 그대로", () => {
+    expect(usableCost(원육())).toBe(8676);
+  });
+
+  it("수율 85%면 실제로 쓰는 1kg은 그만큼 비싸다", () => {
+    expect(Math.round(usableCost(원육(0.85)))).toBe(10207); // 8,676 ÷ 0.85
+  });
+
+  it("레시피 원가에 수율이 반영된다", () => {
+    const r: Recipe = { menuId: "m1", effectiveFrom: "2026-01-01", lines: [{ itemId: "i1", unit: "g", quantity: 350 }] };
+    expect(recipeUnitCost(r, [원육()]).cost).toBe(3037); // 350g × 8,676원/kg
+    expect(recipeUnitCost(r, [원육(0.85)]).cost).toBe(3572); // 손질 로스까지 치면
+  });
+
+  it("말이 안 되는 수율은 무시하고 매입 단가를 쓴다", () => {
+    expect(usableCost(원육(0))).toBe(8676);
+    expect(usableCost(원육(-0.5))).toBe(8676);
+    expect(usableCost(원육(1.5))).toBe(8676);
+  });
+
+  it("수율 100%는 안 넣은 것과 같다", () => {
+    expect(usableCost(원육(1))).toBe(8676);
+  });
+});
