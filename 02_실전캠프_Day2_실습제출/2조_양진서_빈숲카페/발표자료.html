@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>빈숲 OS 발표</title>
+<meta name="description" content="빈숲카페 양진서 — 10/14 성과 발표 자료. 묻지 않아도 알고, 실행하고, 기록하는 매장.">
+<style>
+  :root { --bg: #f4f1ea; --card: #fffdf8; --ink: #29332c; --deep: #173f31; --green: #2f6b47; --muted: #697269; --line: #e1d9c8; --warn: #9a3b2c; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif; }
+  .deck { max-width: 1100px; margin: 0 auto; padding: 24px 16px 80px; }
+  .slide { min-height: 92vh; display: flex; flex-direction: column; justify-content: center; padding: 48px clamp(20px, 6vw, 72px); margin: 0 0 24px; border: 1px solid var(--line); border-radius: 24px; background: var(--card); page-break-after: always; }
+  .slide small.step { color: var(--green); font-weight: 900; letter-spacing: .14em; font-size: 13px; }
+  .slide h1 { margin: 10px 0 18px; font-size: clamp(30px, 5vw, 56px); line-height: 1.2; color: var(--deep); letter-spacing: -.02em; }
+  .slide h2 { margin: 0 0 14px; font-size: clamp(26px, 4vw, 44px); line-height: 1.25; color: var(--deep); letter-spacing: -.02em; }
+  .slide p, .slide li { font-size: clamp(18px, 2.4vw, 28px); line-height: 1.6; margin: 0 0 10px; }
+  .slide ul { padding-left: 1.2em; margin: 0; }
+  .slide .big { font-size: clamp(34px, 6vw, 72px); font-weight: 900; color: var(--deep); line-height: 1.15; margin: 0 0 16px; }
+  .slide .muted { color: var(--muted); font-size: clamp(15px, 1.8vw, 20px); }
+  .slide .quote { padding: 18px 22px; border-left: 6px solid var(--green); background: #eef7f1; border-radius: 10px; font-weight: 800; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 10px; }
+  .tile { padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: white; }
+  .tile b { display: block; font-size: clamp(18px, 2.2vw, 24px); color: var(--deep); margin-bottom: 6px; }
+  .tile span { color: var(--muted); font-size: clamp(14px, 1.7vw, 18px); line-height: 1.5; }
+  .tag { display: inline-block; padding: 4px 12px; border-radius: 999px; background: #ece9df; color: #5b6359; font-size: 14px; font-weight: 800; margin-right: 6px; }
+  .tag.warn { background: #fde2dc; color: var(--warn); }
+  .cover { text-align: center; background: linear-gradient(135deg, #173f31, #2f6b47); color: white; border: 0; }
+  .cover h1, .cover .big { color: white; }
+  .cover .muted { color: rgba(255,255,255,.8); }
+  .url { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: clamp(16px, 2.2vw, 26px); color: var(--green); font-weight: 800; word-break: break-all; }
+  .nav { position: fixed; right: 16px; bottom: 16px; display: flex; gap: 6px; }
+  .nav button { padding: 10px 14px; border: 0; border-radius: 999px; background: var(--deep); color: white; font-weight: 800; cursor: pointer; }
+  .num { position: absolute; right: 24px; top: 18px; color: var(--muted); font-size: 13px; }
+  .slide { position: relative; }
+  @media print { .nav { display: none; } .slide { min-height: 0; margin: 0; border: 0; border-radius: 0; } body { background: white; } }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #14201a; --card: #1c2a22; --ink: #e8efe9; --deep: #dff3e6; --green: #7fc39a; --muted: #a9b7ad; --line: #2e3f35; } :root:not([data-theme="light"]) .tile { background: #22322a; } :root:not([data-theme="light"]) .quote { background: #223a2c; } :root:not([data-theme="light"]) .tag { background: #2e3f35; color: #cfe0d5; } }
+</style>
+</head>
+<body>
+<div class="deck">
+
+<section class="slide cover" id="s1">
+  <small class="step">배민 실전 캠프 · 10/14 성과 발표 · 빈숲카페</small>
+  <h1>빈숲 OS</h1>
+  <p class="big">묻지 않아도 알고,<br>실행하고, 기록하는 매장.</p>
+  <p class="muted">카페 직원 교육용 매뉴얼북 포털 — 레시피 · 운영 매뉴얼 · 응대북 · 오늘 체크 · 교육 · 시험 · 퀘스트 · 칭찬 · 인수인계 · 챗봇</p>
+</section>
+
+<section class="slide" id="s2">
+  <span class="num">1 / 10</span>
+  <small class="step">① 우리 가게 이야기</small>
+  <h2>빈숲카페, 그리고 AI 장사스쿨 전의 나</h2>
+  <ul>
+    <li>작은 카페. 레시피와 매뉴얼은 제 머리와 종이, 카톡에 흩어져 있었습니다.</li>
+    <li>AI는 "글 써 주는 것" 정도로 생각했습니다. 프로그램을 만들 수 있다고는 생각 못 했습니다.</li>
+    <li class="muted">(사장님 한 줄 — 캠프 전 AI에 대한 생각, 솔직하게)</li>
+  </ul>
+</section>
+
+<section class="slide" id="s3">
+  <span class="num">2 / 10</span>
+  <small class="step">② 우리 가게의 문제</small>
+  <h2>"사장님, 이거 몇 ml예요?"</h2>
+  <div class="grid">
+    <div class="tile"><b>직원이 매번 저에게 묻습니다</b><span>정량, 순서, 손님 응대… 제가 없으면 멈춥니다.</span></div>
+    <div class="tile"><b>사람마다 레시피가 달라집니다</b><span>바꿨다고 말해도 누가 들었는지 모릅니다. 자기 방식대로 굳습니다.</span></div>
+    <div class="tile"><b>오픈·마감을 했는지 모릅니다</b><span>체크리스트는 종이에, 확인은 말로.</span></div>
+    <div class="tile"><b>레시피가 밖으로 새는 게 제일 무섭습니다</b><span>카톡으로 보내면 끝. 그래서 공유 자체를 못 했습니다.</span></div>
+  </div>
+</section>
+
+<section class="slide" id="s4">
+  <span class="num">3 / 10</span>
+  <small class="step">③ AI로 이렇게 만들어 써 봤어요</small>
+  <h2>AI에게 "기획안"부터 쓰게 했습니다</h2>
+  <ul>
+    <li>처음부터 끝까지 <b>말로</b> 만들었습니다. 코드는 한 줄도 직접 쓰지 않았습니다.</li>
+    <li>순서: 레시피북(v1) → 로그인·권한 → 바뀐 레시피 확인 → 매뉴얼 8영역·응대북 → 오늘 체크·교육·시험 → 유출 방지 → 재미·경쟁 장치</li>
+    <li>한 기능이 될 때마다 AI가 검사를 만들고(60개), 직원 눈·사장 눈으로 직접 눌러 보게 했습니다.</li>
+  </ul>
+  <p class="quote">"외부 유출이 완전 싫거든" — 이 한마디가 로그인·워터마크·열람 기록·자동 로그아웃이 됐습니다.</p>
+</section>
+
+<section class="slide" id="s5">
+  <span class="num">4 / 10</span>
+  <small class="step">③ 시연 — 빈숲 OS 한 바퀴</small>
+  <h2>주소 하나, 영역 버튼 15개</h2>
+  <p class="url">https://beansoop-recipe-os.vercel.app</p>
+  <div class="grid">
+    <div class="tile"><b>레시피 · 물어보기</b><span>정량·순서·자주 틀리는 포인트. "카페라떼 핫 액체 얼마야?" → 답 + 열기. 없는 건 없다고.</span></div>
+    <div class="tile"><b>응대북 · 매뉴얼 8영역</b><span>이렇게 말해요 / 이렇게는 안 해요 / 혼자 해도 되는 범위 / 책임자를 불러요</span></div>
+    <div class="tile"><b>오늘 체크</b><span>누가 몇 시에. 온도·수량은 숫자를 적어야 체크. 매주·매월 항목, 기한 지나면 지연.</span></div>
+    <div class="tile"><b>바뀐 레시피 확인</b><span>게시 → 바뀐 메뉴만 알림 → 확인했어요 → 누가 안 봤는지</span></div>
+  </div>
+  <p class="muted">시연판은 가짜 예시 데이터 · 로그인 없음 · 데이터 창고 연결 없음. "직원 눈으로 / 사장 눈으로"로 바꿔 봅니다.</p>
+</section>
+
+<section class="slide" id="s6">
+  <span class="num">5 / 10</span>
+  <small class="step">③ 시연 — 직원이 스스로 하게 만드는 장치</small>
+  <h2>재미있게, 은근히 경쟁하게</h2>
+  <div class="grid">
+    <div class="tile"><b>이번 주 퀘스트</b><span>매주 사람마다 다른 문제 5개. 베낄 수 없고 내 것만 보입니다. "적용할 것 한 줄" 미션은 사장이 확인.</span></div>
+    <div class="tile"><b>레벨 · 점수판</b><span>🌱 새싹 → 🫘 원두 → ☕ 바리스타 → 🔥 로스터 → 🌳 숲지기. 한 일이 그대로 점수.</span></div>
+    <div class="tile"><b>칭찬 릴레이</b><span>하루 한 장, 이름으로. 받은 사람이 다음 사람에게 이어 줍니다.</span></div>
+    <div class="tile"><b>인수인계</b><span>교대 때 남기는 메모. 읽었어요를 누르면 누가 안 읽었는지 보입니다.</span></div>
+  </div>
+  <p class="quote">점수는 재미와 격려용. 급여·승급은 시험·인증에서 사장이 따로 정합니다.</p>
+</section>
+
+<section class="slide" id="s7">
+  <span class="num">6 / 10</span>
+  <small class="step">③ 시연 — 유출 방지</small>
+  <h2>레시피는 가게 영업 비밀입니다</h2>
+  <ul>
+    <li>로그인 없이는 메뉴 이름도 안 보입니다. 퇴사하면 그 순간 차단.</li>
+    <li>사진에는 보는 사람 이름과 날짜가 <b>파일 자체에</b> 새겨집니다.</li>
+    <li>누가 언제 무엇을 봤는지, 어느 기기·어디서 들어왔는지 남습니다. 30분 안 쓰면 자동 로그아웃.</li>
+    <li>실제 레시피는 공개 저장소·시연판에 단 한 줄도 없습니다. 비공개 버전에만.</li>
+  </ul>
+</section>
+
+<section class="slide" id="s8">
+  <span class="num">7 / 10</span>
+  <small class="step">④ 매장 적용 &amp; 변화</small>
+  <h2>저는 <u>직원이 매번 묻고 레시피가 사람마다 달라지는 문제</u>를<br><u>묻지 않아도 찾고·똑같이 만들고·기록이 남는 빈숲 OS</u>로 풀었습니다.</h2>
+  <div class="grid">
+    <div class="tile"><b>지금까지 (예시 시험)</b><span>AI와 함께 미리보기·로그인 모드로 전 기능을 돌려 봤습니다. 직원 권한 규칙 29가지, 자동 로그아웃까지 확인.</span></div>
+    <div class="tile"><b>다음 (실제 사용)</b><span>실제 레시피는 엑셀 표를 붙여 넣어 한 번에. 10/14까지 직원 1명에게 비공개 주소로 써 보게 할 계획.</span></div>
+  </div>
+  <p class="muted"><span class="tag warn">직접 잰 값 아직 없음</span> 레시피 질문 횟수·오픈마감 확인 시간은 실제 데이터를 넣은 뒤 잽니다. (사장님 한 줄 — 전에는 하루 몇 번 물어봤는지, 느낌이라도)</p>
+</section>
+
+<section class="slide" id="s9">
+  <span class="num">8 / 10</span>
+  <small class="step">④ 시행착오</small>
+  <h2>막혔다가 푼 것</h2>
+  <ul>
+    <li>문서 1장만 고쳐도 알림이 26건 — 창고가 항목 순서를 바꿔서 "다르다"고 본 것. 순서 무관 비교로 고침.</li>
+    <li>컴퓨터 이름이 한글이라 배포가 죽음 — 이름을 가짜로 바꾸는 한 줄 패치.</li>
+    <li>공개판에 실제 데이터를 넣을 수 없음 — 원본은 비공개 폴더, 시연판은 가짜 데이터만 복사해 올리는 구조로.</li>
+    <li>다른 사장님 저장소에서 배움 — 본노엘(퀴즈 시도 횟수), 떡기리(숫자 입력 필수), 해모닉(적용 미션·주기 항목).</li>
+  </ul>
+</section>
+
+<section class="slide" id="s10">
+  <span class="num">9 / 10</span>
+  <small class="step">⑤ 마음의 변화 &amp; 한마디</small>
+  <h2>AI에 대한 생각이 이렇게 바뀌었습니다</h2>
+  <ul>
+    <li class="muted">(사장님 한 줄 — 참여 전후 자신감·태도)</li>
+    <li class="muted">(사장님 한 줄 — 가게·직원의 변화, 느낌이라도)</li>
+    <li>앞으로: 실제 레시피 넣기 → 직원과 써 보기 → 챗봇에 AI 붙이기 → 매장 공용 패드 모드</li>
+  </ul>
+</section>
+
+<section class="slide cover" id="s11">
+  <span class="num">10 / 10</span>
+  <p class="big">묻지 않아도 알고,<br>실행하고, 기록하는 매장.</p>
+  <p class="muted">빈숲카페 · 양진서 · 감사합니다</p>
+</section>
+
+</div>
+<div class="nav" aria-label="넘기기"><button type="button" onclick="go(-1)">← 이전</button><button type="button" onclick="go(1)">다음 →</button></div>
+<script>
+  const slides = [...document.querySelectorAll(".slide")];
+  let index = 0;
+  function go(delta) { index = Math.max(0, Math.min(slides.length - 1, index + delta)); slides[index].scrollIntoView({ behavior: "smooth", block: "start" }); }
+  document.addEventListener("keydown", (event) => { if (event.key === "ArrowRight" || event.key === " " || event.key === "PageDown") { event.preventDefault(); go(1); } if (event.key === "ArrowLeft" || event.key === "PageUp") { event.preventDefault(); go(-1); } });
+</script>
+</body>
+</html>
