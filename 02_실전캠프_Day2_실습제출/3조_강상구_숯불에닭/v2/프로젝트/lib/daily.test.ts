@@ -101,3 +101,21 @@ describe("monthHoursByStaff", () => {
     expect(r[0]).toMatchObject({ days: 1, hours: 8, labor: 96_000 });
   });
 });
+
+describe("근무시간은 분 단위를 그대로 살린다", () => {
+  // 0.1시간으로 올리면 6시간 45분이 6.8시간이 돼 하루 600원씩 급여가 더 나온다 (2026-09 실제)
+  it("45분은 0.75시간", () => {
+    expect(hoursBetween("16:00", "22:45")).toBe(6.75);
+  });
+  it("15분 단위가 정확하다", () => {
+    expect(hoursBetween("17:00", "23:15")).toBe(6.25);
+    expect(hoursBetween("18:00", "23:30")).toBe(5.5);
+    expect(hoursBetween("16:00", "22:05")).toBe(6.08);
+  });
+  it("자정을 넘겨도 분이 살아 있다", () => {
+    expect(hoursBetween("17:45", "00:30")).toBe(6.75);
+  });
+  it("정시는 그대로", () => {
+    expect(hoursBetween("17:00", "00:00")).toBe(7);
+  });
+});

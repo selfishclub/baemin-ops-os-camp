@@ -136,8 +136,8 @@ export function monthHoursByStaff(month: Month, shifts: Shift[], staff: Staff[])
   return staff
     .map((p) => {
       const rows = mine.filter((s) => s.staffId === p.id);
-      const hours = round1(rows.reduce((a, s) => a + s.hours, 0));
-      return { staffId: p.id, alias: p.alias, wage: p.wage, days: new Set(rows.map((s) => s.date)).size, hours, labor: Math.round(hours * p.wage), active: p.active };
+      const exact = rows.reduce((a, s) => a + s.hours, 0); // 급여는 반올림 전 시간으로 (보여 줄 때만 0.1 단위)
+      return { staffId: p.id, alias: p.alias, wage: p.wage, days: new Set(rows.map((s) => s.date)).size, hours: round1(exact), labor: Math.round(exact * p.wage), active: p.active };
     })
     .filter((r) => r.hours > 0 || r.active) // 그만둔 사람은 이 달 근무가 있을 때만
     .sort((a, b) => b.labor - a.labor);
@@ -155,7 +155,9 @@ export function monthChannelTotals(month: Month, sales: DailySale[], channels: C
   return out;
 }
 
-// 출근·퇴근 시각("HH:MM")으로 근무시간을 구한다. 퇴근이 출근보다 이르면 자정을 넘긴 것으로 본다. 0.5시간 단위 반올림 없이 소수 1자리.
+// 출근·퇴근 시각("HH:MM")으로 근무시간을 구한다. 퇴근이 출근보다 이르면 자정을 넘긴 것으로 본다.
+//  분 단위를 그대로 살린다 (6시간 45분 = 6.75시간). 소수 1자리로 올리면 15분 근무가 18분으로 잡혀
+//  하루 몇백 원씩 급여가 더 나온다 — 2026년 9월에 여덟 명 합쳐 13,400원 차이가 났다.
 export function hoursBetween(start: string, end: string): number {
   const m = (t: string) => {
     const [h, mi] = t.split(":").map(Number);
@@ -166,7 +168,7 @@ export function hoursBetween(start: string, end: string): number {
   if (Number.isNaN(a) || Number.isNaN(b)) return 0;
   let diff = b - a;
   if (diff < 0) diff += 24 * 60;
-  return Math.round((diff / 60) * 10) / 10;
+  return Math.round((diff / 60) * 100) / 100;
 }
 
 // 사람이 친 시각을 "HH:MM"으로 정리한다. "6"→"06:00", "610"→"06:10", "1830"→"18:30", "18:3"→"18:03", "24:00"→"00:00". 못 알아들으면 "".
