@@ -74,3 +74,47 @@ export function looksLikeSplitPayout(deposit: number, depositDate: string, settl
 }
 
 export const totalMissing = (list: MissingSale[]) => list.reduce((a, m) => a + m.deposit, 0);
+
+// ── 짝 안 맞는 입금이 "지난달 주문분"인지 가려내기 ────────────────────
+//  월초에는 지난달 말 주문분 정산이 들어온다. 그 달에 아직 그 채널 주문이 없으면
+//  정산 탭이 "매출 미입력"이라고 띄워서, 사장님이 안 넣은 것처럼 보였다 (2026-10 롯데·요기요).
+
+export interface StrayDeposit {
+  date: string; // 입금일
+  amount: number;
+  saleDates: string[]; // 며칠 주문분일 수 있나 (주말이 끼면 여럿)
+}
+
+export interface StrayGroup {
+  deposits: StrayDeposit[];
+  total: number;
+  /** 전부 지난달(이전) 주문분이면 true — 이 달에서 또 셀 필요가 없다 */
+  allPrevMonth: boolean;
+}
+
+/** 한 채널의 짝 안 맞는 입금이 며칠 주문분인지 풀어 본다 */
+export function explainStrays(
+  unmatched: { date: string; amount: number }[],
+  rule: SettlementRule | undefined,
+  month: string,
+  holidays: string[] = [],
+): StrayGroup {
+  const deposits: StrayDeposit[] = unmatched.map((d) => ({
+    date: d.date,
+    amount: d.amount,
+    saleDates: rule ? saleDatesOf(d.date, rule, holidays) : [],
+  }));
+  const total = deposits.reduce((a, d) => a + d.amount, 0);
+  // 주문일을 하나라도 풀었고, 그 날짜가 전부 이 달보다 앞이면 지난달 몫이다
+  const resolved = deposits.filter((d) => d.saleDates.length > 0);
+  const allPrevMonth =
+    resolved.length === deposits.length && deposits.length > 0 && deposits.every((d) => d.saleDates.every((c) => c.slice(0, 7) < month));
+  return { deposits, total, allPrevMonth };
+}
+
+/** "9/30 주문분" 처럼 읽기 좋게. 여러 날이면 범위로 */
+export function strayDatesText(d: StrayDeposit): string {
+  if (d.saleDates.length === 0) return "";
+  const f = (s: string) => `${Number(s.slice(5, 7))}/${s.slice(8, 10)}`;
+  return d.saleDates.length === 1 ? f(d.saleDates[0]) : `${f(d.saleDates[0])}~${f(d.saleDates[d.saleDates.length - 1])}`;
+}

@@ -7,6 +7,7 @@ import type { useLedger } from "@/components/useLedger";
 import type { SettlementState } from "@/components/useSettlement";
 import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
+import { explainStrays, strayDatesText } from "@/lib/salesGap";
 import { DEFAULT_RULES, RULE_NOTES, type SettlementRule } from "@/lib/settlement";
 import { explainOverdue } from "@/lib/overdue";
 
@@ -67,7 +68,13 @@ export default function SettlementSection({
   const unmatched = results.flatMap((r) => r.unmatchedDeposits.map((d) => ({ ...d, channel: r.channel })));
   // 통장엔 입금이 있는데 오늘 탭에 그 채널 매출이 하나도 없는 채널 — 짝을 맞출 수가 없어 0으로 보인다
   const strayOf = (r: (typeof results)[number]) => r.unmatchedDeposits.reduce((a, d) => a + d.amount, 0);
-  const noSales = results.filter((r) => r.sales === 0 && strayOf(r) > 0);
+  // 짝이 안 맞는 입금이 며칠 주문분인지 정산 규칙을 거꾸로 풀어 둔다.
+  //  월초에는 지난달 말 주문분이 들어오는데, 그걸 "매출 미입력"이라고 띄우면 안 넣은 줄 알고 또 넣게 된다.
+  const strayInfo = (r: (typeof results)[number]) =>
+    explainStrays(r.unmatchedDeposits, rules.find((x) => x.channel === r.channel), month, settlement.holidays);
+  const withStray = results.filter((r) => r.sales === 0 && strayOf(r) > 0);
+  const prevMonthOnly = withStray.filter((r) => strayInfo(r).allPrevMonth);
+  const noSales = withStray.filter((r) => !strayInfo(r).allPrevMonth);
   const unmatchedShown = unmatched.filter((d) => !noSales.some((r) => r.channel === d.channel));
   // 카드사별로 나눴을 때 카드 합계 줄
   const cardRows = results.filter((r) => daily.channels.find((c) => c.id === r.channel)?.kind === "card");
@@ -277,7 +284,11 @@ export default function SettlementSection({
                         </td>
                         {r.sales === 0 && strayOf(r) > 0 ? (
                           <>
-                            <td className="text-right text-xs font-semibold text-orange-600">매출 미입력</td>
+                            {strayInfo(r).allPrevMonth ? (
+                              <td className="text-right text-xs font-semibold text-stone-500">지난달 주문분</td>
+                            ) : (
+                              <td className="text-right text-xs font-semibold text-orange-600">매출 미입력</td>
+                            )}
                             <td className="text-right text-stone-500" title="오늘 탭에 매출이 없어 짝을 못 맞춘 입금">
                               {num(strayOf(r))}
                             </td>
@@ -397,6 +408,14 @@ export default function SettlementSection({
                     </tbody>
                   </table>
                 </div>
+              )}
+              {prevMonthOnly.length > 0 && (
+                <Notice tone="info">
+                  {prevMonthOnly
+                    .map((r) => `${name(r.channel)} ${strayInfo(r).deposits.map((d) => `${strayDatesText(d)} 주문분 ${num(d.amount)}원`).join(", ")}`)
+                    .join(" · ")}
+                  이 이 달에 들어왔어요 — <b>지난달에서 이미 셌으니 다시 넣지 마세요</b>. 월초에는 지난달 말 주문분 정산이 들어와서 이렇게 보여요.
+                </Notice>
               )}
               {noSales.length > 0 && (
                 <Notice tone="warn">

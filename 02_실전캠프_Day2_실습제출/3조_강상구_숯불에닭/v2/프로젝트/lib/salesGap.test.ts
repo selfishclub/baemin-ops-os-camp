@@ -110,3 +110,37 @@ describe("카드사가 하루치를 두 번에 나눠 보낸 경우", () => {
     expect(missingSales([sum], [rule("yogiyo", 5)], [], C, "2026-09")).toHaveLength(1);
   });
 });
+
+import { explainStrays, strayDatesText } from "./salesGap";
+
+describe("짝 안 맞는 입금이 지난달 주문분인지", () => {
+  // 2026-10 실제: 롯데 10/2 입금 66,330은 9/30 주문분, 요기요 10/2 입금 24,948은 9/26 주문분
+  it("지난달 주문분이면 그렇다고 알려 준다", () => {
+    const g = explainStrays([{ date: "2026-10-02", amount: 66330 }], rule("card_lotte", 2), "2026-10");
+    expect(g.allPrevMonth).toBe(true);
+    expect(g.total).toBe(66330);
+    expect(g.deposits[0].saleDates).toContain("2026-09-30");
+  });
+
+  it("이번 달 주문분이 섞여 있으면 지난달 몫이 아니다", () => {
+    const g = explainStrays(
+      [{ date: "2026-10-02", amount: 66330 }, { date: "2026-10-20", amount: 50000 }],
+      rule("card_lotte", 2), "2026-10",
+    );
+    expect(g.allPrevMonth).toBe(false);
+  });
+
+  it("정산 규칙이 없으면 주문일을 몰라 지난달이라고 단정하지 않는다", () => {
+    expect(explainStrays([{ date: "2026-10-02", amount: 24948 }], undefined, "2026-10").allPrevMonth).toBe(false);
+  });
+
+  it("입금이 없으면 지난달 몫도 아니다", () => {
+    expect(explainStrays([], rule("card_lotte", 2), "2026-10").allPrevMonth).toBe(false);
+  });
+
+  it("날짜를 읽기 좋게 — 하루면 그날, 여럿이면 범위", () => {
+    expect(strayDatesText({ date: "2026-10-02", amount: 1, saleDates: ["2026-09-30"] })).toBe("9/30");
+    expect(strayDatesText({ date: "2026-10-02", amount: 1, saleDates: ["2026-09-25", "2026-09-26", "2026-09-27"] })).toBe("9/25~9/27");
+    expect(strayDatesText({ date: "2026-10-02", amount: 1, saleDates: [] })).toBe("");
+  });
+});
