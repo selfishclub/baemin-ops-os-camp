@@ -245,3 +245,4 @@ p.save-status { margin: 8px 0 0; font-size: 14px; }
 .demo-banner strong { color: #0b2e6b; }
 .waste-add { display: flex; gap: 8px; margin: 8px 0; }
 .waste-add .text-input { flex: 1; margin: 0; }
+.hire-row select { font-size: 14px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; max-width: 42%; }

@@ -224,7 +224,7 @@
     var products = ['인절미', '꿀떡', '흑임자 인절미', '약식', '송편'];
     var settings = {
       stores: stores, staff: staff, products: products,
-      staff_meta: { '알바 A': { hire_on: shiftDate(today(), -12) }, '알바 B': { hire_on: shiftDate(today(), -3) } },
+      staff_meta: { '알바 A': { hire_on: shiftDate(today(), -12), store: '데모 1호점' }, '알바 B': { hire_on: shiftDate(today(), -3), store: '데모 2호점' } },
       store_items: { '데모 1호점': { open: ['테라스 의자 펴기'], close: ['테라스 의자 접고 묶기', '제빙기 내부 세척 (매주 월)', '소화기 점검 (매월 1일)'] }, '데모 2호점': { open: ['외부 배너 세우기'], close: ['외부 배너 들여놓기'] } }
     };
     store.set('settings', JSON.stringify(settings));
@@ -344,8 +344,11 @@
       var h = '<div class="crumb"><a href="#/">첫 화면</a> › ' + (multi ? '매장·' : '') + '이름</div><h1>누구세요?</h1><p class="muted">한 번 고르면 이 폰이 기억해요. 체크 기록에 ' + (multi ? '매장과 ' : '') + '이름이 남습니다.</p>';
       if (multi) h += '<p class="section-title">매장</p><div class="choice" id="pick-store">' + s.stores.map(function (x) { return '<button type="button" class="choice-btn' + (cur.store === x ? ' on' : '') + '" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>';
       h += '<p class="section-title">이름</p>';
+      // 직원에게 소속 매장이 있으면 고른 매장의 직원만 보여 준다 (소속 없는 이름은 늘 보임)
+      function staffFor(storeName) { return s.staff.filter(function (x) { var st = (s.staff_meta || {})[x] && s.staff_meta[x].store; return !st || !storeName || st === storeName; }); }
+      function staffButtons(storeName, chosen) { return staffFor(storeName).map(function (x) { return '<button type="button" class="choice-btn' + (chosen === x ? ' on' : '') + '" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') || '<span class="muted small">이 매장에 등록된 이름이 없어요. 사장님께 말씀해 주세요.</span>'; }
       if (s.staff.length) {
-        h += '<div class="choice" id="pick-staff">' + s.staff.map(function (x) { return '<button type="button" class="choice-btn' + (cur.staff === x ? ' on' : '') + '" data-v="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>';
+        h += '<div class="choice" id="pick-staff">' + (multi && !cur.store ? '<span class="muted small">먼저 매장을 골라 주세요.</span>' : staffButtons(multi ? cur.store : single, cur.staff)) + '</div>';
         h += '<p class="muted small">내 이름이 없으면 사장님께 말씀해 주세요 (사장 점검표 → 목록에서 추가합니다).</p>';
       } else {
         h += '<input type="text" id="staff-text" class="text-input" placeholder="이름 또는 별칭 (예: 알바 A)" value="' + esc(cur.staff || '') + '" maxlength="20">';
@@ -354,11 +357,18 @@
       h += '<button type="button" class="btn primary wide" id="who-ok">이대로 시작</button>';
       app.innerHTML = h;
       var pick = { store: multi ? cur.store : single, staff: cur.staff };
-      ['store', 'staff'].forEach(function (k) {
-        app.querySelectorAll('#pick-' + k + ' .choice-btn').forEach(function (b) {
-          b.addEventListener('click', function () { pick[k] = b.dataset.v; app.querySelectorAll('#pick-' + k + ' .choice-btn').forEach(function (x) { x.classList.toggle('on', x === b); }); });
+      function bindStaff() {
+        app.querySelectorAll('#pick-staff .choice-btn').forEach(function (b) {
+          b.addEventListener('click', function () { pick.staff = b.dataset.v; app.querySelectorAll('#pick-staff .choice-btn').forEach(function (x) { x.classList.toggle('on', x === b); }); });
+        });
+      }
+      app.querySelectorAll('#pick-store .choice-btn').forEach(function (b) {
+        b.addEventListener('click', function () {
+          pick.store = b.dataset.v; app.querySelectorAll('#pick-store .choice-btn').forEach(function (x) { x.classList.toggle('on', x === b); });
+          if (s.staff.length) { var ps = document.getElementById('pick-staff'); if (staffFor(pick.store).indexOf(pick.staff) < 0) pick.staff = null; ps.innerHTML = staffButtons(pick.store, pick.staff); bindStaff(); }
         });
       });
+      bindStaff();
       document.getElementById('who-ok').addEventListener('click', function () {
         var t = document.getElementById('staff-text'); if (t) pick.staff = t.value.trim();
         if (multi && !pick.store) { alert('매장을 골라 주세요.'); return; }
@@ -378,7 +388,8 @@
     // 이름 목록이 등록돼 있으면 목록에 있는 이름만, 매장이 여러 개면 등록된 매장만 허용. 아니면 다시 고르게 한다.
     loadSettings().then(function (s) {
       var single = singleStore(s);
-      var staffOk = s.staff.length ? s.staff.indexOf(m.staff) >= 0 : !!m.staff;
+      var homeStore = (s.staff_meta || {})[m.staff] && s.staff_meta[m.staff].store;
+      var staffOk = (s.staff.length ? s.staff.indexOf(m.staff) >= 0 : !!m.staff) && (!homeStore || single !== null || homeStore === m.store);
       var storeOk = single === null ? s.stores.indexOf(m.store) >= 0 : true;
       if (!staffOk || !storeOk) { store.del('me'); location.hash = next; return; }
       if (single !== null && m.store !== single) { m.store = single; store.set('me', JSON.stringify(m)); }
@@ -599,7 +610,7 @@
         var isLate = days !== null && days > 7 && confirmed < STEPS.length;
         if (isLate) late.push(name);
         var done = STEPS.length && confirmed === STEPS.length;
-        html += '<div class="card tr-card' + (isLate ? ' late' : '') + '"><div class="title">' + esc(name) + (days ? ' <span class="muted small">입사 ' + days + '일째</span>' : ' <span class="muted small">입사일 미등록</span>') + (done ? ' <span class="pill done">교육 완료</span>' : isLate ? ' <span class="pill none">7일 지남 · 미완료</span>' : '') + '</div>';
+        html += '<div class="card tr-card' + (isLate ? ' late' : '') + '"><div class="title">' + esc(name) + (meta.store ? ' <span class="muted small">' + esc(meta.store) + '</span>' : '') + (days ? ' <span class="muted small">· 입사 ' + days + '일째</span>' : ' <span class="muted small">· 입사일 미등록</span>') + (done ? ' <span class="pill done">교육 완료</span>' : isLate ? ' <span class="pill none">7일 지남 · 미완료</span>' : '') + '</div>';
         html += '<div class="progress-bar"><div style="width:' + pct + '%"></div></div><div class="muted small">읽음 ' + read + '/' + STEPS.length + ' · 사수 확인 ' + confirmed + '/' + STEPS.length + '</div>' + stepsHtml + '</div>';
       });
       el.className = '';
@@ -640,9 +651,13 @@
       h += '<label class="field">매장 (지점) <span class="muted small">— 하나뿐이면 하나만. 두 개 이상일 때만 직원 화면에 매장 선택이 나와요</span><textarea id="stores" rows="3" placeholder="예: 본점">' + esc(s.stores.join('\n')) + '</textarea></label><p class="preview muted small" id="stores-preview"></p>';
       h += '<label class="field">직원 이름 <span class="muted small">— 비워 두면 직원이 직접 이름을 적습니다</span><textarea id="staff" rows="6" placeholder="예:\n김하나\n이두리\n알바 A">' + esc(s.staff.join('\n')) + '</textarea></label><p class="preview muted small" id="staff-preview"></p>';
       if (s.staff.length) {
-        h += '<div class="card"><div class="title">입사일 <span class="muted small">— 적으면 "입사 N일째"와 7일 넘은 신입 배지가 보여요 (대략이어도 됨)</span></div>';
-        s.staff.forEach(function (name, i) { var meta = (s.staff_meta || {})[name] || {}; h += '<div class="hire-row"><span>' + esc(name) + '</span><input type="date" id="hire-' + i + '" data-name="' + esc(name) + '" value="' + esc(meta.hire_on || '') + '"></div>'; });
-        h += '<p class="muted small">이름을 새로 추가했으면 먼저 저장한 뒤 입사일을 적어 주세요.</p></div>';
+        h += '<div class="card"><div class="title">직원별 소속 매장 · 입사일 <span class="muted small">— 소속을 정하면 직원 화면에서 그 매장을 고를 때 그 직원 이름만 보여요. 입사일을 적으면 "입사 N일째"와 7일 배지</span></div>';
+        s.staff.forEach(function (name, i) {
+          var meta = (s.staff_meta || {})[name] || {};
+          var opts = '<option value="">(소속 없음 · 모든 매장)</option>' + s.stores.map(function (st) { return '<option value="' + esc(st) + '"' + (meta.store === st ? ' selected' : '') + '>' + esc(st) + '</option>'; }).join('');
+          h += '<div class="hire-row"><span>' + esc(name) + '</span>' + (s.stores.length > 1 ? '<select id="sstore-' + i + '" data-name="' + esc(name) + '">' + opts + '</select>' : '') + '<input type="date" id="hire-' + i + '" data-name="' + esc(name) + '" value="' + esc(meta.hire_on || '') + '"></div>';
+        });
+        h += '<p class="muted small">이름을 새로 추가했으면 먼저 저장한 뒤 소속·입사일을 적어 주세요.</p></div>';
       }
       h += '<label class="field">떡 종류 (폐기 입력용) <span class="muted small">— 마감 때 직원이 폐기 있는 떡을 골라 개수를 적습니다. 비워 두면 폐기 칸이 안 나와요</span><textarea id="products" rows="6" placeholder="예:\n인절미\n흑임자 인절미\n꿀떡">' + esc((s.products || []).join('\n')) + '</textarea></label><p class="preview muted small" id="products-preview"></p>';
       var extraStores = s.stores.length ? s.stores : [''];
@@ -695,8 +710,14 @@
           if (arr.length) storeItems[key][kind] = arr;
         });
         var staffMeta = {};
-        app.querySelectorAll('input[id^="hire-"]').forEach(function (inp) { if (inp.value && sf.indexOf(inp.dataset.name) >= 0) staffMeta[inp.dataset.name] = { hire_on: inp.value }; });
-        Object.keys(s.staff_meta || {}).forEach(function (nm) { if (sf.indexOf(nm) >= 0 && !staffMeta[nm] && !app.querySelector('input[id^="hire-"][data-name="' + nm.replace(/"/g, '\\"') + '"]')) staffMeta[nm] = s.staff_meta[nm]; });
+        sf.forEach(function (nm) {
+          var prev = (s.staff_meta || {})[nm] || {}, meta = {};
+          var hireEl = app.querySelector('input[id^="hire-"][data-name="' + nm.replace(/"/g, '\\"') + '"]'), storeEl = app.querySelector('select[id^="sstore-"][data-name="' + nm.replace(/"/g, '\\"') + '"]');
+          var hire = hireEl ? hireEl.value : prev.hire_on, st2 = storeEl ? storeEl.value : prev.store;
+          if (hire) meta.hire_on = hire;
+          if (st2 && st.indexOf(st2) >= 0) meta.store = st2;
+          if (Object.keys(meta).length) staffMeta[nm] = meta;
+        });
         btn.disabled = true; btn.textContent = '저장 중…'; n.className = 'save-status'; n.textContent = '서버에 저장하는 중…';
         store.del('me');
         Promise.all([saveSetting('stores', st), saveSetting('staff', sf), saveSetting('products', pr), saveSetting('store_items', storeItems), saveSetting('staff_meta', staffMeta)]).then(function () {
