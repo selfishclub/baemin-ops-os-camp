@@ -76,6 +76,11 @@ export default function SettlementSection({
   const prevMonthOnly = withStray.filter((r) => strayInfo(r).allPrevMonth);
   const noSales = withStray.filter((r) => !strayInfo(r).allPrevMonth);
   const unmatchedShown = unmatched.filter((d) => !noSales.some((r) => r.channel === d.channel));
+  // 펼친 카드 채널에서 "입금이 포스 매출보다 많은" 묶음.
+  //  포스가 간편결제로 찍은 건(토스페이카드 등)은 돈이 그 카드사에서 들어오고, 배달대행 기사 단말기로 받은
+  //  만나서 카드결제도 포스 카드승인현황에 안 찍힌다. 이상이라고 띄우기 전에 그쪽부터 보게 안내한다.
+  const openIsCard = !!open && daily.channels.find((c) => c.id === open)?.kind === "card";
+  const overpaid = openIsCard ? (results.find((r) => r.channel === open)?.settlements ?? []).filter((s) => s.status === "차이" && s.deposit > s.sales && !s.extra) : [];
   // 카드사별로 나눴을 때 카드 합계 줄
   const cardRows = results.filter((r) => daily.channels.find((c) => c.id === r.channel)?.kind === "card");
   const cardSum = cardRows.reduce(
@@ -408,6 +413,11 @@ export default function SettlementSection({
                     </tbody>
                   </table>
                 </div>
+              )}
+              {overpaid.length > 0 && (
+                <Notice tone="info">
+                  {name(open!)} {overpaid.map((s) => `${s.payout.slice(5)} 입금이 매출보다 ${num(s.deposit - s.sales)}원 많아요`).join(" · ")} — <b>이상이라고 보기 전에 먼저 여기부터 확인해 보세요.</b> 포스가 <b>간편결제</b>로 찍은 건(토스페이카드 등)은 돈이 그 카드사에서 들어와서 포스 카드승인현황엔 안 나와요. 배달대행 기사 단말기로 받은 <b>배민 만나서 카드결제</b>도 마찬가지예요. 카드사 앱에서 그날 승인 내역을 보면 포스에 없는 건이 바로 보여요.
+                </Notice>
               )}
               {prevMonthOnly.length > 0 && (
                 <Notice tone="info">
