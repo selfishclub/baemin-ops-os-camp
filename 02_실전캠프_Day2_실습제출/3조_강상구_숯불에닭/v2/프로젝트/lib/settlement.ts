@@ -25,6 +25,9 @@ export interface SettlementAdjustment {
   amount: number; // 입금 중 정산금이 아닌 부분
   note: string; // "상생 요금제 월 환급" 등
 }
+// 매출 정산이 아니라 환급만 들어온 입금(쿠팡이츠 상생 요금제 월 환급 등)은 "짝이 안 맞는 입금"으로 띄우지 않는다
+const fullyRefund = (a: SettlementAdjustment | undefined, amount: number) => !!a && a.amount >= amount;
+
 export const HOLIDAYS_KEY = "holidays"; // "2026-10-03" 같은 날짜 목록
 
 const dow = (date: string) => (new Date(date + "T00:00:00Z").getUTCDay() + 6) % 7; // 월=0
@@ -198,7 +201,7 @@ export function settleChannel(
   // 이 달 입금 중 어느 묶음에도 안 붙은 것 (지난달 주문분 정산은 제외: 지난달 묶음의 payout일에 해당)
   const monthStart = month + "-01";
   const unmatchedDeposits = [...deposits.entries()]
-    .filter(([date]) => date >= monthStart && date <= lastBankDate && !used.has(date))
+    .filter(([date, amount]) => date >= monthStart && date <= lastBankDate && !used.has(date) && !fullyRefund(adj.get(date), amount))
     .map(([date, amount]) => ({ date, amount }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -266,7 +269,7 @@ function settleManual(
     if (raw <= 0) continue;
     const eligible = bundles.filter((b) => !b.claimed && b.payout <= date);
     if (eligible.length === 0) {
-      if (date >= monthStart && date <= lastBankDate) unmatchedDeposits.push({ date, amount: raw });
+      if (date >= monthStart && date <= lastBankDate && !fullyRefund(adj.get(date), raw)) unmatchedDeposits.push({ date, amount: raw });
       continue;
     }
     for (const b of eligible) b.claimed = true;

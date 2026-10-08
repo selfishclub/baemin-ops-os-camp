@@ -106,6 +106,18 @@ describe("환급 포함 표시 · 늦은 입금 합치기", () => {
     expect(after.fee).toBe(6_983 - 31_693); // 환급만큼 수수료가 준다
     expect(after.deposited).toBe(55_710);
   });
+  it("환급만 단독으로 들어온 입금은 짝이 안 맞는 입금으로 띄우지 않는다", () => {
+    // 2026-10-08 쿠팡이츠: 9월분 상생 요금제 환급 25,950원만 따로 들어왔다 (붙일 매출 묶음이 없다)
+    const rule: SettlementRule = { channel: "coupang", mode: "days", days: 4, weekday: 0, manual: true };
+    const daily: DailySale[] = [{ date: "2026-10-06", channel: "coupang", amount: 50_000 }]; // 화 → 10/12
+    const txs = [tx("2026-10-08", "coupang", 25_950)];
+    const before = settleChannel("coupang", "2026-10", rule, daily, txs, "2026-10-09");
+    expect(before.unmatchedDeposits).toEqual([{ date: "2026-10-08", amount: 25_950 }]);
+    const adj = [{ channel: "coupang" as const, date: "2026-10-08", amount: 25_950, note: "상생 요금제 월 환급 (9월분)" }];
+    const after = settleChannel("coupang", "2026-10", rule, daily, txs, "2026-10-09", [], adj);
+    expect(after.unmatchedDeposits).toEqual([]);
+    expect(after.fee).toBe(-25_950); // 환급만큼 그 달 수수료가 준다
+  });
   it("카드 입금이 하루 늦게 앞날 것과 같이 들어오면 두 묶음을 합친다", () => {
     const rule: SettlementRule = { channel: "card_hyundai", mode: "days", days: 2, weekday: 0 };
     const daily: DailySale[] = [
