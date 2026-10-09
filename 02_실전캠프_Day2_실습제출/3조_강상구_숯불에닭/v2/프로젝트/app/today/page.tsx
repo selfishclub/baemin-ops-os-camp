@@ -763,8 +763,15 @@ function SettingsDialog({ daily, onClose }: { daily: ReturnType<typeof useDaily>
     await daily.reload();
   }
   async function saveChannels(next: Channel[]) {
+    // 화면을 먼저 바꾸되, 저장에 실패하면 되돌린다 (저장된 것처럼 보이면 안 되니까)
+    const prev = channels;
     setChannels(next);
-    await getStore().saveSetting(CHANNELS_KEY, next);
+    try {
+      await getStore().saveSetting(CHANNELS_KEY, next);
+    } catch (e) {
+      setChannels(prev);
+      throw e;
+    }
     await daily.reload();
   }
 

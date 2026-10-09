@@ -21,9 +21,17 @@ export function RatioCard({ pnl }: { pnl: Pnl }) {
 
   async function save() {
     const next = normalizeLimits(draft);
+    const prev = limits;
     setLimits(next);
     setEditing(false);
-    await getStore().saveSetting(RATIO_LIMITS_KEY, next);
+    try {
+      await getStore().saveSetting(RATIO_LIMITS_KEY, next);
+    } catch (e) {
+      // 저장 실패 — 화면도 원래 기준으로 되돌린다 (알림은 AppShell 이 띄운다)
+      setLimits(prev);
+      setEditing(true);
+      throw e;
+    }
   }
 
   if (pnl.revenue <= 0) return null;

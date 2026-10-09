@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { monthLabel, nextMonth, prevMonth } from "@/lib/month";
 import { storageMode } from "@/lib/storage";
 import type { Month } from "@/lib/types";
+import { DamagedRecovery, StorageFailureToast, useLocalHealth, useStorageFailure } from "@/components/StorageGuard";
 
 const MONTH_KEY = "sootdak-ledger-month";
 
@@ -42,6 +43,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [month, setMonthState] = useState<Month | null>(null);
   const mode = storageMode();
+  // 내 PC 모드에서만: 저장된 장부를 읽을 수 있는지 확인하고, 저장 실패 알림을 받는다
+  const { health, recheck } = useLocalHealth(mode === "local");
+  const { failure, dismiss } = useStorageFailure(recheck);
+  const damaged = health !== null && !health.ok;
 
   useEffect(() => {
     setMonthState(readMonth() ?? defaultMonth());
@@ -56,15 +61,18 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col">
+      <StorageFailureToast failure={failure} onDismiss={dismiss} />
       <div
         role="status"
         className={`px-4 py-1.5 text-center text-xs font-semibold ${
-          mode === "local" ? "bg-emerald-600 text-white" : "bg-amber-400 text-amber-950"
+          damaged ? "bg-red-600 text-white" : mode === "local" ? "bg-emerald-600 text-white" : "bg-amber-400 text-amber-950"
         }`}
       >
-        {mode === "local"
-          ? "내 PC 모드 — 데이터가 이 컴퓨터에만 저장돼요"
-          : "시연 모드 — 가짜 데이터만 넣으세요. 누구나 볼 수 있어요"}
+        {damaged
+          ? "저장된 장부를 읽을 수 없어요 — 입력이 잠겼어요. 아래 안내대로 복구해 주세요"
+          : mode === "local"
+            ? "내 PC 모드 — 데이터가 이 컴퓨터에만 저장돼요"
+            : "시연 모드 — 가짜 데이터만 넣으세요. 누구나 볼 수 있어요"}
       </div>
 
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-stone-100/95 px-4 py-3 backdrop-blur">
@@ -83,7 +91,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <main className="flex-1 space-y-4 px-4 pb-28">
-        {month ? <MonthContext.Provider value={{ month, setMonth }}>{children}</MonthContext.Provider> : null}
+        {/* 장부를 읽을 수 없으면 화면을 띄우지 않는다 — 어떤 화면도 빈 장부를 보고 저장하지 못하게 */}
+        {health && !health.ok ? (
+          <DamagedRecovery read={health} onRecovered={recheck} />
+        ) : month ? (
+          <MonthContext.Provider value={{ month, setMonth }}>{children}</MonthContext.Provider>
+        ) : null}
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-stone-200 bg-white">

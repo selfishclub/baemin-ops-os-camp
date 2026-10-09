@@ -9,6 +9,8 @@ import { DEFAULT_CHANNELS, type Major } from "@/lib/categories";
 import { monthLabel } from "@/lib/month";
 import { getStore, storageMode } from "@/lib/storage";
 import { exportBackup, importBackup } from "@/lib/storage/backup";
+import { markBackupStarted } from "@/lib/storage/local";
+import StorageUsageCard from "@/components/StorageUsageCard";
 import type { Rule } from "@/lib/types";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, parsePayDays } from "@/lib/paydays";
 import { amountFor, emptyFixedCost, fixedCostGaps, FIXED_COSTS_KEY, setAmountFor, type FixedCost } from "@/lib/fixedCosts";
@@ -44,8 +46,14 @@ export default function RulesPage() {
       .catch(() => {});
   }, []);
   async function saveFixedCosts(next: FixedCost[]) {
+    const prev = fixedCosts;
     setFixedCosts(next);
-    await getStore().saveSetting(FIXED_COSTS_KEY, next);
+    try {
+      await getStore().saveSetting(FIXED_COSTS_KEY, next);
+    } catch (e) {
+      setFixedCosts(prev); // 저장 실패 — 화면도 되돌린다
+      throw e;
+    }
   }
   async function savePayDays() {
     const days = parsePayDays(payDaysText);
@@ -69,14 +77,25 @@ export default function RulesPage() {
     await ledger.reload();
   }
 
+  const [usageTick, setUsageTick] = useState(0);
   function downloadBackup() {
-    const blob = new Blob([exportBackup()], { type: "application/json" });
+    let text: string;
+    try {
+      text = exportBackup();
+    } catch (e) {
+      setNote({ tone: "error", text: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    const blob = new Blob([text], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `sootdak-ledger-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
-    setNote({ tone: "ok", text: "백업 파일을 저장했어요. 실제 숫자가 들어 있으니 GitHub나 단톡방에 올리지 마세요." });
+    // 브라우저는 파일이 실제로 저장됐는지 알려 주지 않는다. "시작했다"고만 기록하고 확인은 사장님께 맡긴다.
+    markBackupStarted();
+    setUsageTick((t) => t + 1);
+    setNote({ tone: "ok", text: "백업 파일 내려받기를 시작했어요. 다운로드 폴더에 파일이 있는지 확인해 주세요. 실제 숫자가 들어 있으니 GitHub나 단톡방에 올리지 마세요." });
   }
 
   async function restore(file: File) {
@@ -272,8 +291,9 @@ export default function RulesPage() {
         {local ? (
           <>
             <p className="text-sm text-stone-600">
-              내 PC 모드의 데이터는 <b>이 컴퓨터의 이 브라우저</b>에만 있어요. 브라우저 기록을 지우면 사라지니, 정산을 마칠 때마다 백업 파일을 저장해 두세요.
+              내 PC 모드의 데이터는 <b>이 컴퓨터의 이 브라우저</b>에만 있어요. 브라우저 기록을 지우면 사라지니, 정산을 마칠 때마다 백업 파일을 저장해 두세요. (영수증 사진은 백업 파일에 들어가지 않아요)
             </p>
+            <StorageUsageCard refreshKey={usageTick} />
             <div className="flex flex-wrap gap-2">
               <button className="btn-primary" onClick={downloadBackup}>
                 백업 파일 저장
