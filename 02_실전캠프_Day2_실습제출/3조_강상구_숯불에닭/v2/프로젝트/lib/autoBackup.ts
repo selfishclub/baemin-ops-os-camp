@@ -177,26 +177,32 @@ async function post(deps: BackupDeps, path: string, token: string, body: BodyIni
   return j;
 }
 
-// 한 번의 백업: 업로드(장부[, 사진]) → 마무리. 서버가 검증한 manifest 를 돌려준다. 어느 단계든 실패하면 던진다.
-export async function runBackupUpload(mode: BackupMode, deps: BackupDeps): Promise<ServerManifest> {
+export interface BackupRunResult {
+  manifest: ServerManifest;
+  snapshotAt: string; // 장부·사진을 "읽기 시작한" 시각. 성공 기록은 이 시각으로 적는다 — 보내는 동안 바뀐 것은 다음 백업으로
+}
+
+// 한 번의 백업: 장부·사진을 먼저 전부 읽고(스냅샷) → 업로드 → 마무리. 서버가 검증한 manifest 를 돌려준다. 어느 단계든 실패하면 던진다.
+//  - 읽기를 업로드보다 앞에 모아 두는 이유: 장부를 읽고 사진 ZIP 을 만드는 사이가 짧을수록 "같은 시점 묶음"에 가깝다.
+//  - 그래도 그 사이에 바뀔 수 있다. 그래서 성공 시각을 snapshotAt(읽기 전)으로 적어, 그 뒤 변경은 모두 "아직 백업 안 됨"으로 남긴다.
+export async function runBackupUpload(mode: BackupMode, deps: BackupDeps): Promise<BackupRunResult> {
   const token = await deps.session();
   const id = deps.newId();
-  const createdAt = deps.now().toISOString();
-  const ledgerText = deps.getLedgerText();
-  const ledgerBytes = new TextEncoder().encode(ledgerText);
+  const snapshotAt = deps.now().toISOString();
+  const ledgerBytes = new TextEncoder().encode(deps.getLedgerText());
+  const photosZip = mode === "full" ? await deps.getPhotosZip() : null;
   const ledgerSha = await sha256Hex(ledgerBytes);
   await post(deps, "/api/backup/upload", token, ledgerBytes as BodyInit, { "x-backup-id": id, "x-backup-kind": "ledger", "x-backup-sha256": ledgerSha, "content-type": "application/octet-stream" });
   let photos: { sha256: string; size: number; count: number } | null = null;
-  if (mode === "full") {
-    const { zip, count } = await deps.getPhotosZip();
-    const zipSha = await sha256Hex(zip);
-    await post(deps, "/api/backup/upload", token, zip as BodyInit, { "x-backup-id": id, "x-backup-kind": "photos", "x-backup-sha256": zipSha, "content-type": "application/octet-stream" });
-    photos = { sha256: zipSha, size: zip.length, count };
+  if (photosZip) {
+    const zipSha = await sha256Hex(photosZip.zip);
+    await post(deps, "/api/backup/upload", token, photosZip.zip as BodyInit, { "x-backup-id": id, "x-backup-kind": "photos", "x-backup-sha256": zipSha, "content-type": "application/octet-stream" });
+    photos = { sha256: zipSha, size: photosZip.zip.length, count: photosZip.count };
   }
-  const j = await post(deps, "/api/backup/finalize", token, JSON.stringify({ id, createdAt, mode, ledger: { sha256: ledgerSha, size: ledgerBytes.length }, photos }), { "content-type": "application/json" });
+  const j = await post(deps, "/api/backup/finalize", token, JSON.stringify({ id, createdAt: snapshotAt, mode, ledger: { sha256: ledgerSha, size: ledgerBytes.length }, photos }), { "content-type": "application/json" });
   const m = j.manifest as ServerManifest | undefined;
   if (!m || m.verified !== true || m.id !== id) throw new BackupClientError("서버가 검증을 끝내지 못했어요.", 500);
-  return m;
+  return { manifest: m, snapshotAt };
 }
 
 export async function fetchSession(fetchFn: typeof fetch): Promise<{ token: string } | { disabled: string }> {
@@ -214,9 +220,9 @@ export async function fetchStatus(fetchFn: typeof fetch, token: string): Promise
   return j as unknown as ServerStatus;
 }
 
-// 성공·실패를 상태에 적는다 (순수)
-export function applySuccess(s: AutoBackupState, mode: BackupMode, storedAt: string): AutoBackupState {
-  return { ...s, lastAttemptAt: storedAt, lastError: null, failures: 0, lastLedgerOkAt: storedAt, lastPhotosOkAt: mode === "full" ? storedAt : s.lastPhotosOkAt, lastFullOkAt: mode === "full" ? storedAt : s.lastFullOkAt };
+// 성공·실패를 상태에 적는다 (순수). 성공 시각은 "읽은 시각(snapshotAt)" — 보내는 동안 바뀐 것은 여전히 '안 됨'으로 남는다.
+export function applySuccess(s: AutoBackupState, mode: BackupMode, snapshotAt: string): AutoBackupState {
+  return { ...s, lastAttemptAt: snapshotAt, lastError: null, failures: 0, lastLedgerOkAt: snapshotAt, lastPhotosOkAt: mode === "full" ? snapshotAt : s.lastPhotosOkAt, lastFullOkAt: mode === "full" ? snapshotAt : s.lastFullOkAt };
 }
 export function applyFailure(s: AutoBackupState, message: string, at: string): AutoBackupState {
   return { ...s, lastAttemptAt: at, lastError: message, failures: s.failures + 1 };

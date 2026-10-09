@@ -146,7 +146,8 @@ export function inspectBackup(text: string): BackupInspection {
     txSeen(t.id, "식별자");
     if (!MONTH.test(String(t.month))) err(`${at}: 달(month) 형식이 틀려요 (${String(t.month)}).`);
     if (!DATE.test(String(t.date))) err(`${at}: 날짜 형식이 틀려요 (${String(t.date)}).`);
-    if (!isNum(t.out) || !isNum(t.in) || t.out < 0 || t.in < 0) err(`${at}: 출금·입금이 숫자가 아니거나 음수예요.`);
+    // 음수는 허용한다 — 은행 내역의 취소·환불 줄은 출금이 음수로 들어온다 (F단계에서 가짜 9월 파일로 발견)
+    if (!isNum(t.out) || !isNum(t.in)) err(`${at}: 출금·입금이 숫자가 아니에요.`);
     if (t.source !== "bank" && t.source !== "manual") err(`${at}: 출처(source)가 bank/manual 이 아니에요.`);
   });
   const saleSeen = seen("일별 매출");
@@ -154,7 +155,7 @@ export function inspectBackup(text: string): BackupInspection {
     const at = `일별 매출 ${i + 1}번째 줄`;
     if (!DATE.test(String(s?.date))) return err(`${at}: 날짜 형식이 틀려요 (${String(s?.date)}).`);
     if (!isStr(s.channel)) return err(`${at}: 채널이 비어 있어요.`);
-    if (!isNum(s.amount) || s.amount < 0) err(`${at}: 금액이 숫자가 아니거나 음수예요.`);
+    if (!isNum(s.amount)) err(`${at}: 금액이 숫자가 아니에요.`);
     saleSeen(`${s.date}/${s.channel}`, "날짜·채널");
   });
   const staffSeen = seen("직원");

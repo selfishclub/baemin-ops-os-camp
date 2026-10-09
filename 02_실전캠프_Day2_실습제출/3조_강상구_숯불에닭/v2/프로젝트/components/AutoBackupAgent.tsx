@@ -25,7 +25,7 @@ import { buildPhotoBackup, type PhotoBytes } from "@/lib/photoBackup";
 import { getPhotoBlob, listAllPhotos } from "@/lib/photos";
 import { exportBackup, photoOwnerIds } from "@/lib/storage/backup";
 import { onLedgerChanged, onPhotosChanged } from "@/lib/storage/events";
-import { readLocal } from "@/lib/storage/local";
+import { inspectLocal, readLocal } from "@/lib/storage/local";
 
 // 화면 어딘가에 하나만 떠 있는 "자동 백업 일꾼". 보이는 건 없다.
 //  - 앱이 열리면 서버에 세션을 받고 상태를 묻는다. 서버가 꺼져 있으면(503) 아무것도 안 한다.
@@ -96,6 +96,11 @@ export default function AutoBackupAgent() {
       if (running.current) return; // 중복 요청 무시
       if (server.current && !server.current.enabled) return;
       if (!manual && state.current.failures >= GIVE_UP_FAILURES) return;
+      // 빈 장부(아무것도 저장된 적 없음)는 자동으로 백업하지 않는다 — 저장소가 지워진 직후 "빈 백업"이 최신으로 남는 일을 막는다 (F단계 발견). 수동은 허용
+      if (!manual) {
+        const r = inspectLocal();
+        if (!r.ok || r.empty) return;
+      }
       if (retryHandle.current) {
         clearTimeout(retryHandle.current);
         retryHandle.current = null;
@@ -105,8 +110,9 @@ export default function AutoBackupAgent() {
       push();
       const at = new Date().toISOString();
       try {
-        const m = await runBackupUpload(mode, { fetchFn, session, getLedgerText: exportBackup, getPhotosZip, newId: () => crypto.randomUUID(), now: () => new Date() });
-        save(applySuccess(state.current, mode, m.storedAt));
+        const r = await runBackupUpload(mode, { fetchFn, session, getLedgerText: exportBackup, getPhotosZip, newId: () => crypto.randomUUID(), now: () => new Date() });
+        // 읽은 시각으로 적는다. 보내는 동안 들어온 변경(ledgerChangedAt > snapshotAt)은 그대로 '아직 안 됨'
+        save(applySuccess(state.current, mode, r.snapshotAt));
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if ((e as { status?: number })?.status === 401) token.current = null; // 세션 만료 → 다음엔 새로 받는다

@@ -178,9 +178,11 @@ export async function finalizeBackup(ctx: StoreCtx, claim: FinalizeClaim): Promi
     throw new BackupError(message, status);
   };
 
+  // 아무것도 받은 게 없으면 불완전 기록도 남기지 않는다 (세션만 있으면 누구나 폴더에 파일을 쌓을 수 있게 되므로)
+  if (!(await f.exists(ledgerTemp))) throw new BackupError("장부 파일이 아직 안 올라왔어요.", 422);
+
   try {
     // 장부: 임시 파일 존재 → 다시 읽어 해시·크기 → 구조 검사
-    if (!(await f.exists(ledgerTemp))) return fail("장부 파일이 아직 안 올라왔어요.");
     const ledgerBuf = await f.readFile(ledgerTemp);
     if (ledgerBuf.length !== claim.ledger.size) return fail(`장부 파일 크기가 달라요 (받은 ${ledgerBuf.length}B, 말한 ${claim.ledger.size}B).`);
     const ledgerSha = sha256(ledgerBuf);

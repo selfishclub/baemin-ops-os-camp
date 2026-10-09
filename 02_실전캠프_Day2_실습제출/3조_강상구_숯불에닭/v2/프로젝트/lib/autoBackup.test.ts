@@ -128,10 +128,55 @@ const deps = (fetchFn: typeof fetch): BackupDeps => ({
   now: () => T0,
 });
 
+describe("F. 백업 중 변경 — 성공 시각은 읽은 시각", () => {
+  it("보내는 동안 장부가 바뀌면 성공 뒤에도 '아직 안 됨'이다", () => {
+    const snapshotAt = iso(0);
+    const changedDuring = iso(5_000); // 읽은 뒤, 서버가 저장하기 전
+    const s = st({ ledgerChangedAt: changedDuring, photosChangedAt: changedDuring });
+    const after = applySuccess(s, "full", snapshotAt);
+    expect(after.lastLedgerOkAt).toBe(snapshotAt);
+    expect(isFullyBackedUp(after)).toBe(false);
+    expect(planAutoBackup(after, new Date(T0.getTime() + 10_000))).toBe("full"); // 사진도 바뀌었으니 전체로 다시
+  });
+  it("보내기 전에 바뀐 것은 성공으로 덮인다", () => {
+    const s = st({ ledgerChangedAt: iso(-1000) });
+    const after = applySuccess(s, "ledger", iso(0));
+    expect(isFullyBackedUp({ ...after, lastFullOkAt: iso(0), lastPhotosOkAt: iso(0) })).toBe(true);
+  });
+  it("runBackupUpload 는 장부·사진을 업로드보다 먼저 읽고, 읽기 시작 시각을 돌려준다", async () => {
+    const order: string[] = [];
+    const { fetchFn } = fakeServer();
+    const d = deps(async (i, init) => {
+      order.push("net:" + String(i).split("/").pop());
+      return fetchFn(i, init);
+    });
+    d.getLedgerText = () => {
+      order.push("read:ledger");
+      return '{"app":"sootdak-ledger","version":1,"data":{"transactions":[]}}';
+    };
+    d.getPhotosZip = async () => {
+      order.push("read:photos");
+      return { zip: new Uint8Array([1]), count: 0 };
+    };
+    const r = await runBackupUpload("full", d);
+    expect(order).toEqual(["read:ledger", "read:photos", "net:upload", "net:upload", "net:finalize"]);
+    expect(r.snapshotAt).toBe(T0.toISOString());
+    expect(r.manifest.verified).toBe(true);
+  });
+  it("성공 응답 직전에 연결이 끊기면 실패로 기록된다 (서버엔 파일이 남을 수 있음)", async () => {
+    const { fetchFn } = fakeServer();
+    const d = deps(async (i, init) => {
+      if (String(i).endsWith("/finalize")) throw new TypeError("Failed to fetch");
+      return fetchFn(i, init);
+    });
+    await expect(runBackupUpload("ledger", d)).rejects.toThrow("Failed to fetch");
+  });
+});
+
 describe("1·2·3. 장부·사진·통합 백업 주고받기", () => {
   it("장부만: 업로드 1번 + 마무리, 같은 식별자, 해시 헤더 포함", async () => {
     const { fetchFn, calls } = fakeServer();
-    const m = await runBackupUpload("ledger", deps(fetchFn));
+    const { manifest: m } = await runBackupUpload("ledger", deps(fetchFn));
     expect(m.verified).toBe(true);
     expect(m.mode).toBe("ledger");
     expect(calls.map((c) => c.url)).toEqual(["/api/backup/upload", "/api/backup/finalize"]);
@@ -146,7 +191,7 @@ describe("1·2·3. 장부·사진·통합 백업 주고받기", () => {
   });
   it("전체: 장부·사진 둘 다 같은 식별자로 올리고 마무리에 사진 정보가 든다", async () => {
     const { fetchFn, calls } = fakeServer();
-    const m = await runBackupUpload("full", deps(fetchFn));
+    const { manifest: m } = await runBackupUpload("full", deps(fetchFn));
     expect(m.photos?.count).toBe(1);
     expect(calls.map((c) => c.headers["x-backup-kind"] ?? "-")).toEqual(["ledger", "photos", "-"]);
     expect(new Set(calls.slice(0, 2).map((c) => c.headers["x-backup-id"])).size).toBe(1);

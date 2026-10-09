@@ -129,6 +129,10 @@ describe("4. 필수 데이터 누락", () => {
     const bad2 = fakeData();
     bad2.dailySales.push({ date: "2026-09-07", channel: "hall_card", amount: Number.NaN });
     expect(inspectBackup(wrap(bad2)).ok).toBe(false);
+    // 음수 출금(취소·환불 줄)은 정상 데이터다 — 거절하면 실제 장부를 백업·복원하지 못한다 (F단계 발견)
+    const refund = fakeData();
+    refund.transactions.push({ ...tx("t_refund"), out: -16000 });
+    expect(inspectBackup(wrap(refund)).ok).toBe(true);
     const bad3 = fakeData();
     (bad3.transactions[0] as { id?: string }).id = undefined;
     expect(inspectBackup(wrap(bad3)).ok).toBe(false);
