@@ -775,6 +775,7 @@ const App = (() => {
 
   const serverSends = () => !!(Store.supa && Store.supa.signedIn);
   async function sendTelegram(text, kind, direct) {
+    if (DEMO) { banner('데모판이라 텔레그램은 보내지 않습니다', '실제 매장에서는 이 내용이 사장님 텔레그램 방으로 바로 갑니다.'); return { ok: true, demo: true }; }
     const tk = (S.settings.tgToken || '').trim(), ch = (S.settings.tgChat || '').trim();
     if (!tk || !ch) return { ok: false, err: '봇 토큰과 대화방 ID를 설정에서 먼저 입력하세요.' };
     if (serverSends() && !direct) {
@@ -1619,7 +1620,8 @@ const App = (() => {
   /* 접수된 오류·건의 — 쓴 글이 바로 이 자리에 남고, 지난 것도 전부 이력으로 볼 수 있다 (사장님 요청 2026-10-08). 두 매장 공용, 최근 것이 위 */
   let fbUi = { f: 'all', all: false };   // 이 기기 화면 전용 — 저장하지 않는다
   function fbSnip(x) {
-    const lines = String(x.body || '').split('\n').map((l) => l.trim()).filter(Boolean);
+    const tplLines = new Set(FB_TEMPLATE.split('\n').map((l) => l.trim()));   // 손대지 않은 양식 줄은 요약에서 뺀다
+    const lines = String(x.body || '').split('\n').map((l) => l.trim()).filter((l) => l && !tplLines.has(l));
     const val = (l) => l.replace(/^[^:：]*[:：]\s*/, '').replace(/\(예:[^)]*\)/g, '').trim();
     const pick = lines.find((l) => l.startsWith('❗') && val(l)) || lines.find((l) => l.startsWith('✅') && val(l)) || lines.find((l) => val(l));
     const t = pick ? val(pick) : '';
@@ -5510,7 +5512,7 @@ const App = (() => {
     if (t.ev === 'money') b += `<div class="mlabel">오늘 매출 — 포스 마감 화면을 보고 적으세요 (회계 › 매출 입력에 그대로 쌓입니다)</div>` + salesFields(salesOf(key));
     if (t.ev === 'kakao') b += `<label class="chk"><input type="checkbox" id="evKakao"> 카톡방에 사진을 보냈습니다</label>
       <p class="hint">사진은 앱이 아니라 카톡방에 남습니다. 이상이 있던 날은 아래에 한 줄 적어두면 나중에 앱에서 바로 찾을 수 있습니다.</p>`;
-    if (memoMode !== 'off') b += `<label>어떻게 했나요 <span class="opt">${memoMode === 'req' ? '필수' : '선택'}</span><textarea id="evNote" rows="3" placeholder="${esc(t.notePh || '예: 수조 3번 온도 1도 내림 · 이끼 닦음 · 특이사항 없음')}"></textarea></label>
+    if (memoMode !== 'off') b += `<label>어떻게 했나요 <span class="opt">${memoMode === 'req' ? '필수' : '선택'}</span><textarea id="evNote" rows="3" placeholder="${esc(t.notePh || (t.ev === 'deaths' || t.ev === 'kakao' || /수조|갑각류|염도/.test(t.title) ? '예: 수조 3번 온도 1도 내림 · 이끼 닦음 · 특이사항 없음' : '예: 룸 3번 벽 얼룩 세제로 닦음 · 부족한 것 채움 · 특이사항 없음'))}"></textarea></label>
       <p class="hint" style="margin-top:4px">한 줄이면 됩니다. 무엇을 어떻게 했는지, 평소와 다른 점이 있었는지. 체크만 하면 나중에 아무도 모릅니다.</p>`;
     else if (t.note || t.ev === 'kakao') b += `<label>메모 <span class="opt">선택</span><textarea id="evNote" rows="2" placeholder="이상 있을 때만 적으세요"></textarea></label>`;
 
