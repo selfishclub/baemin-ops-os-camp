@@ -132,3 +132,46 @@ export async function photosTotalSize(): Promise<{ count: number; bytes: number 
   const rows = await run<PhotoRecord[]>("readonly", (s) => s.getAll() as IDBRequest<PhotoRecord[]>);
   return { count: rows.length, bytes: rows.reduce((a, r) => a + (r.size ?? 0), 0) };
 }
+
+// ── 백업·복원용 ──────────────────────────────────────────────────
+export type { PhotoRecord };
+
+/** 모든 사진의 정보(블롭 제외). 백업 ZIP 을 만들 때 쓴다 */
+export async function listAllPhotos(): Promise<PhotoMeta[]> {
+  if (!photosAvailable()) return [];
+  const rows = await run<PhotoRecord[]>("readonly", (s) => s.getAll() as IDBRequest<PhotoRecord[]>);
+  return rows.map(({ blob, ...meta }) => meta); // eslint-disable-line @typescript-eslint/no-unused-vars
+}
+
+/**
+ * 여러 장을 한 트랜잭션으로 더한다. 전부 저장되거나 하나도 저장되지 않는다.
+ *  - put 이 아니라 add 를 쓴다: 같은 id 가 이미 있으면 그 요청이 실패하고 트랜잭션 전체가 취소된다 (덮어쓰기 금지).
+ *  - 저장 공간 부족 등으로 중간에 실패해도 IndexedDB 가 트랜잭션을 되돌린다.
+ */
+export async function addPhotosAtomic(records: PhotoRecord[]): Promise<void> {
+  if (records.length === 0) return;
+  if (!photosAvailable()) throw new Error("이 브라우저에서는 사진 저장소를 쓸 수 없어요.");
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    let firstError: unknown = null;
+    for (const r of records) {
+      const req = store.add(r);
+      req.onerror = () => {
+        if (!firstError) firstError = req.error; // 기본 동작(트랜잭션 취소)을 막지 않는다
+      };
+    }
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    const fail = () => {
+      db.close();
+      const e = firstError ?? tx.error;
+      reject(e instanceof Error ? e : new Error(e ? String(e) : "사진 저장이 취소됐어요"));
+    };
+    tx.onerror = fail;
+    tx.onabort = fail;
+  });
+}

@@ -12,6 +12,7 @@ import { exportBackup } from "@/lib/storage/backup";
 import { inspectLocal, markBackupConfirmed, markBackupStarted } from "@/lib/storage/local";
 import StorageUsageCard from "@/components/StorageUsageCard";
 import RestoreDialog from "@/components/RestoreDialog";
+import PhotoBackupCard from "@/components/PhotoBackupCard";
 import type { Rule } from "@/lib/types";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, parsePayDays } from "@/lib/paydays";
 import { amountFor, emptyFixedCost, fixedCostGaps, FIXED_COSTS_KEY, setAmountFor, type FixedCost } from "@/lib/fixedCosts";
@@ -295,6 +296,7 @@ export default function RulesPage() {
               내 PC 모드의 데이터는 <b>이 컴퓨터의 이 브라우저</b>에만 있어요. 브라우저 기록을 지우면 사라지니, 정산을 마칠 때마다 백업 파일을 저장해 두세요. (영수증 사진은 백업 파일에 들어가지 않아요)
             </p>
             <StorageUsageCard refreshKey={usageTick} />
+            <PhotoBackupCard onLedgerBackup={() => setUsageTick((t) => t + 1)} />
             <div className="flex flex-wrap gap-2">
               <button className="btn-primary" onClick={downloadBackup}>
                 백업 파일 저장
