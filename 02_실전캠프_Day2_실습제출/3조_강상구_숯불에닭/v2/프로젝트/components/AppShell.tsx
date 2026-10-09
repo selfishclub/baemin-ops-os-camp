@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { monthLabel, nextMonth, prevMonth } from "@/lib/month";
 import { storageMode } from "@/lib/storage";
+import { appTitle, loadStoreProfile, STORE_PROFILE_EVENT } from "@/lib/storeProfile";
 import type { Month } from "@/lib/types";
 
 const MONTH_KEY = "sootdak-ledger-month";
@@ -41,11 +42,25 @@ const TABS = [
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [month, setMonthState] = useState<Month | null>(null);
+  const [title, setTitle] = useState(appTitle(null));
   const mode = storageMode();
 
   useEffect(() => {
     setMonthState(readMonth() ?? defaultMonth());
   }, []);
+
+  // 가게 이름은 설정에 있다. 서버에서 그려지는 <title>은 못 바꾸니 여기서 다시 적어 준다
+  useEffect(() => {
+    const apply = () =>
+      void loadStoreProfile().then((p) => {
+        const t = appTitle(p);
+        setTitle(t);
+        document.title = t;
+      });
+    apply();
+    window.addEventListener(STORE_PROFILE_EVENT, apply);
+    return () => window.removeEventListener(STORE_PROFILE_EVENT, apply);
+  }, [pathname]);
 
   const setMonth = (m: Month) => {
     try {
@@ -68,7 +83,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-stone-100/95 px-4 py-3 backdrop-blur">
-        <h1 className="min-w-0 truncate text-sm font-bold sm:text-base">🔥 한눈 손익 장부</h1>
+        <h1 className="min-w-0 truncate text-sm font-bold sm:text-base">🔥 {title}</h1>
         {month && (
           <div className="flex shrink-0 items-center gap-1">
             <button aria-label="이전 달" className="btn-ghost px-2.5 py-1.5" onClick={() => setMonth(prevMonth(month))}>

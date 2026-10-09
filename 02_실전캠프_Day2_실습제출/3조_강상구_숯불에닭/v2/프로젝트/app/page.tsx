@@ -19,7 +19,8 @@ import { monthFindings, monthSources, type FindingsInput } from "@/lib/findings"
 import { missingFixedCosts } from "@/lib/missingFixed";
 import { dayTotals } from "@/lib/weekday";
 import { PURCHASES_KEY_PREFIX, type Purchase } from "@/lib/costing/purchases";
-import { buildTaxSheets, taxFileName } from "@/lib/taxExport";
+import { loadStoreProfile, taxFileName } from "@/lib/storeProfile";
+import { buildTaxSheets } from "@/lib/taxExport";
 import type { Transaction } from "@/lib/types";
 
 export default function PnlPage() {
@@ -329,7 +330,7 @@ function TaxExportCard({ month, txs, needsReview, closed }: { month: string; txs
     setMsg(null);
     try {
       const store = getStore();
-      const [sales, purchases] = await Promise.all([store.listDailySales(month), store.getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + month)]);
+      const [sales, purchases, profile] = await Promise.all([store.listDailySales(month), store.getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + month), loadStoreProfile()]);
       const sheets = buildTaxSheets(month, txs, sales, purchases ?? []);
       const XLSX = await import("xlsx");
       const wb = XLSX.utils.book_new();
@@ -338,8 +339,9 @@ function TaxExportCard({ month, txs, needsReview, closed }: { month: string; txs
         ws["!cols"] = sh.rows[0].map((h, i) => ({ wch: Math.max(8, String(h).length * 2, ...sh.rows.slice(1, 200).map((r) => String(r[i] ?? "").length + 2)) }));
         XLSX.utils.book_append_sheet(wb, ws, sh.name);
       }
-      XLSX.writeFile(wb, taxFileName(month));
-      setMsg(`${taxFileName(month)} 파일을 저장했어요 (다운로드 폴더). 세무사님께는 사장님이 직접 보내 주세요.`);
+      const file = taxFileName(profile, month);
+      XLSX.writeFile(wb, file);
+      setMsg(`${file} 파일을 저장했어요 (다운로드 폴더). 세무사님께는 사장님이 직접 보내 주세요.`);
     } catch (e) {
       setMsg(`파일을 만들지 못했어요 (${e instanceof Error ? e.message : e})`);
     } finally {

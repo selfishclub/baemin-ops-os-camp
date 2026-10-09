@@ -105,4 +105,4 @@ function channelOrder(id: string): number {
   return 5;
 }
 
-export const taxFileName = (month: string) => `숯불에닭_세무사용_${month}.xlsx`;
+// 파일 이름은 가게마다 달라서 lib/storeProfile.ts 의 taxFileName 을 쓴다

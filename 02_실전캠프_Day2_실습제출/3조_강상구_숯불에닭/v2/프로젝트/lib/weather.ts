@@ -1,10 +1,11 @@
 import type { Channel } from "./categories";
 import { daysInMonth, shiftDate, todayStr } from "./daily";
+import type { StoreLocation } from "./storeProfile";
 import type { DailySale, Shift, Staff } from "./types";
 
 // 날씨 × 매출 — 일별 매출 옆에 그날 날씨를 붙여 "비 오는 날 배달이 얼마나 느나"를 본다.
-// 날씨는 Open-Meteo(무료, 키 없음)에서 가져온다. 청주 율량동 좌표.
-export const STORE_LOCATION = { latitude: 36.66, longitude: 127.48, name: "청주 율량동" };
+// 날씨는 Open-Meteo(무료, 키 없음)에서 가져온다.
+//  좌표는 가게마다 다르니 설정(store_profile)에서 받아 넘긴다 — 코드에 박으면 남의 동네 날씨가 나온다.
 
 export type WeatherKind = "맑음" | "흐림" | "비" | "눈";
 
@@ -49,8 +50,8 @@ function toRecords(d: OpenMeteoDaily): DailyWeather[] {
 const DAILY = "weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum";
 
 // 과거 날씨 (어제까지). 오늘·미래는 forecast 로.
-export async function fetchPastWeather(from: string, to: string): Promise<DailyWeather[]> {
-  const { latitude, longitude } = STORE_LOCATION;
+export async function fetchPastWeather(loc: StoreLocation, from: string, to: string): Promise<DailyWeather[]> {
+  const { latitude, longitude } = loc;
   const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=${from}&end_date=${to}&daily=${DAILY}&timezone=Asia%2FSeoul`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`날씨를 가져오지 못했어요 (${res.status})`);
@@ -59,8 +60,8 @@ export async function fetchPastWeather(from: string, to: string): Promise<DailyW
 }
 
 // 오늘부터 7일 예보 (오늘 포함)
-export async function fetchForecast(days = 7): Promise<DailyWeather[]> {
-  const { latitude, longitude } = STORE_LOCATION;
+export async function fetchForecast(loc: StoreLocation, days = 7): Promise<DailyWeather[]> {
+  const { latitude, longitude } = loc;
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=${DAILY}&forecast_days=${days}&timezone=Asia%2FSeoul`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`예보를 가져오지 못했어요 (${res.status})`);

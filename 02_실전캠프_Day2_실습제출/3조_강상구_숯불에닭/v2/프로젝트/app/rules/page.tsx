@@ -15,6 +15,7 @@ import { amountFor, emptyFixedCost, fixedCostGaps, FIXED_COSTS_KEY, setAmountFor
 import PhotoStrip from "@/components/PhotoStrip";
 import { deletePhotosOf } from "@/lib/photos";
 import { num, parseNum, won } from "@/lib/format";
+import { EMPTY_PROFILE, loadStoreProfile, saveStoreProfile, searchLocations, type StoreLocation, type StoreProfile } from "@/lib/storeProfile";
 
 export default function RulesPage() {
   const { month } = useMonth();
@@ -36,6 +37,46 @@ export default function RulesPage() {
       })
       .catch(() => setPayDaysSaved(DEFAULT_PAY_DAYS));
   }, []);
+  // 내 가게 — 가게 이름과 날씨 지역. 가게마다 다른 것만 여기에 둔다
+  const [profile, setProfile] = useState<StoreProfile | null>(null);
+  const [storeName, setStoreName] = useState("");
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [placeHits, setPlaceHits] = useState<StoreLocation[] | null>(null);
+  const [placeBusy, setPlaceBusy] = useState(false);
+  useEffect(() => {
+    void loadStoreProfile().then((p) => {
+      setProfile(p);
+      setStoreName(p.name);
+    });
+  }, []);
+  async function saveName() {
+    const next = { ...(profile ?? EMPTY_PROFILE), name: storeName.trim() };
+    await saveStoreProfile(next);
+    setProfile(next);
+    setNote({ tone: "ok", text: next.name ? "가게 이름을 “" + next.name + "”으로 저장했어요." : "가게 이름을 비웠어요." });
+  }
+  async function findPlace() {
+    setPlaceBusy(true);
+    setPlaceHits(null);
+    try {
+      const hits = await searchLocations(placeQuery);
+      setPlaceHits(hits);
+      if (hits.length === 0) setNote({ tone: "error", text: "그 이름으로는 못 찾았어요. 동네 이름 말고 시·군 이름으로 해 보세요 (예: 율량동 → 청주). 그래도 안 나오면 가까운 시·군을 고르면 돼요." });
+    } catch (e) {
+      setNote({ tone: "error", text: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setPlaceBusy(false);
+    }
+  }
+  async function pickPlace(loc: StoreLocation) {
+    const next = { ...(profile ?? EMPTY_PROFILE), location: loc };
+    await saveStoreProfile(next);
+    setProfile(next);
+    setPlaceHits(null);
+    setPlaceQuery("");
+    setNote({ tone: "ok", text: "날씨 지역을 “" + loc.name + "”으로 저장했어요." });
+  }
+
   const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
   useEffect(() => {
     getStore()
@@ -104,6 +145,55 @@ export default function RulesPage() {
         <span>📖 처음이세요? 사용법 — 어디에 무엇을 넣나</span>
         <span>→</span>
       </Link>
+
+      <section className="card space-y-3">
+        <h2 className="text-base font-bold">
+          내 가게 <span className="text-xs font-normal text-stone-500">처음 한 번 — 가게 이름과 날씨 지역</span>
+        </h2>
+        <div className="space-y-1.5">
+          <p className="text-xs text-stone-600">
+            <b>가게 이름</b> — 화면 맨 위와 세무사용 엑셀 파일 이름에 들어가요. 비워 둬도 장부는 다 돌아가요.
+          </p>
+          <div className="flex items-center gap-2">
+            <input aria-label="가게 이름" className="field flex-1" placeholder="예: 가나분식 역전점" value={storeName} onChange={(e) => setStoreName(e.target.value)} />
+            <button className="btn-primary shrink-0 px-3 py-1.5 text-xs" disabled={profile === null || storeName.trim() === profile.name} onClick={saveName}>
+              저장
+            </button>
+          </div>
+        </div>
+        <div className="space-y-1.5 border-t border-stone-200 pt-3">
+          <p className="text-xs text-stone-600">
+            <b>날씨 지역</b> — 날씨 × 매출을 보려면 우리 동네를 골라 주세요. 지역 이름을 치면 찾아 줘요.
+          </p>
+          <p className="text-sm">
+            지금: <b>{profile?.location ? profile.location.name : "아직 안 정했어요"}</b>
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              aria-label="지역 찾기"
+              className="field flex-1"
+              placeholder="예: 청주, 수원, 제주"
+              value={placeQuery}
+              onChange={(e) => setPlaceQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && placeQuery.trim() && void findPlace()}
+            />
+            <button className="btn-ghost shrink-0 px-3 py-1.5 text-xs" disabled={placeBusy || !placeQuery.trim()} onClick={findPlace}>
+              {placeBusy ? "찾는 중…" : "찾기"}
+            </button>
+          </div>
+          {placeHits && placeHits.length > 0 && (
+            <ul className="space-y-1">
+              {placeHits.map((h) => (
+                <li key={h.latitude + "," + h.longitude}>
+                  <button className="btn-ghost w-full px-3 py-2 text-left text-sm" onClick={() => pickPlace(h)}>
+                    {h.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
 
       <section className="card space-y-2">
         <h2 className="text-base font-bold">
