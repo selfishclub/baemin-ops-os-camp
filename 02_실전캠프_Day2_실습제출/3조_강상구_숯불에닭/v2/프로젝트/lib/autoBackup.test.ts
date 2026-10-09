@@ -26,7 +26,12 @@ describe("4. 변경 후 백업 예약 (판단)", () => {
     const after = applySuccess(s, "full", iso(0));
     expect(isFullyBackedUp(after)).toBe(true);
   });
-  it("하루가 지나면 전체 백업이 다시 돈다 (하루 1회)", () => {
+  it("사진이 안 바뀌면 전체 백업은 7일에 한 번만 (보험), 그 전엔 장부만", () => {
+    const sixDays = st({ lastFullOkAt: iso(-6 * 86_400_000), lastLedgerOkAt: iso(-60_000), lastPhotosOkAt: iso(-6 * 86_400_000), ledgerChangedAt: iso(-30_000) });
+    expect(planAutoBackup(sixDays, T0)).toBe("ledger");
+    expect(FULL_INTERVAL_MS).toBe(7 * 86_400_000);
+  });
+  it("간격이 지나면 전체 백업이 다시 돈다", () => {
     const fresh = st({ lastFullOkAt: iso(-FULL_INTERVAL_MS + 60_000), lastLedgerOkAt: iso(-60_000), lastPhotosOkAt: iso(-FULL_INTERVAL_MS + 60_000) });
     expect(planAutoBackup(fresh, T0)).toBeNull();
     const stale = st({ lastFullOkAt: iso(-FULL_INTERVAL_MS), lastLedgerOkAt: iso(-60_000), lastPhotosOkAt: iso(-FULL_INTERVAL_MS) });

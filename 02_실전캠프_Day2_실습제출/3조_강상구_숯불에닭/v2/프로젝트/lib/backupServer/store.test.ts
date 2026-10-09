@@ -191,6 +191,52 @@ describe("11·12. 중복 요청 · 파일명 충돌", () => {
   });
 });
 
+describe("사진 내용이 같으면 새 파일을 만들지 않는다 (용량 절약)", () => {
+  it("두 번째 전체 백업의 manifest 가 첫 번째 ZIP 을 가리키고, 폴더에 ZIP 은 하나뿐이다", async () => {
+    const l = await uploadLedger();
+    const p = await uploadPhotos();
+    const m1 = await finalizeBackup(ctx(), claimFor(l, p));
+    const later = () => new Date(2026, 9, 10, 9, 0, 0);
+    const l2 = await uploadLedger(ID2, ledgerJson(), ctx({ now: later }));
+    const p2 = await uploadPhotos(ID2, ctx({ now: later })); // 같은 사진, ZIP 바이트는 만든 시각 때문에 다를 수 있음
+    const m2 = await finalizeBackup(ctx({ now: later }), claimFor(l2, p2, ID2));
+    expect(m2.photos!.reusedFrom).toBe(ID);
+    expect(m2.photos!.file).toBe(m1.photos!.file);
+    expect(m2.photos!.contentHash).toBe(m1.photos!.contentHash);
+    const names = await fsp.readdir(dir);
+    expect(names.filter((n) => n.startsWith("photos-")).length).toBe(1);
+    expect(names.filter((n) => n.endsWith(".part"))).toEqual([]);
+    const s = await readBackupStatus(ctx());
+    expect(s.verifiedCount).toBe(2);
+    expect(s.lastPhotosOkAt).toBe(later().toISOString()); // 사진 백업 성공 시각은 갱신된다
+    expect(s.totalBytes).toBe(m1.ledger.size + m1.photos!.size + m2.ledger.size); // 사진은 한 번만 센다
+  });
+  it("사진이 한 장이라도 바뀌면 새 ZIP 을 만든다", async () => {
+    const l = await uploadLedger();
+    const p = await uploadPhotos();
+    await finalizeBackup(ctx(), claimFor(l, p));
+    const later = () => new Date(2026, 9, 10, 9, 0, 0);
+    const l2 = await uploadLedger(ID2, ledgerJson(), ctx({ now: later }));
+    const { zip } = await buildPhotoBackup([fakePhoto("ph_a", 1), fakePhoto("ph_b", 2), fakePhoto("ph_c", 3)]);
+    await receiveUpload(ctx({ now: later }), "photos", ID2, stream(zip), sha(zip));
+    const m2 = await finalizeBackup(ctx({ now: later }), { ...claimFor(l2, null, ID2), mode: "full", photos: { sha256: sha(zip), size: zip.length, count: 3 } });
+    expect(m2.photos!.reusedFrom).toBeUndefined();
+    expect((await fsp.readdir(dir)).filter((n) => n.startsWith("photos-")).length).toBe(2);
+  });
+  it("직전 ZIP 을 사장님이 지웠으면 다시 저장한다", async () => {
+    const l = await uploadLedger();
+    const p = await uploadPhotos();
+    const m1 = await finalizeBackup(ctx(), claimFor(l, p));
+    await fsp.unlink(path.join(dir, m1.photos!.file));
+    const later = () => new Date(2026, 9, 10, 9, 0, 0);
+    const l2 = await uploadLedger(ID2, ledgerJson(), ctx({ now: later }));
+    const p2 = await uploadPhotos(ID2, ctx({ now: later }));
+    const m2 = await finalizeBackup(ctx({ now: later }), claimFor(l2, p2, ID2));
+    expect(m2.photos!.reusedFrom).toBeUndefined();
+    expect(await fsp.readFile(path.join(dir, m2.photos!.file))).toBeTruthy();
+  });
+});
+
 describe("6. 브라우저 종료 (임시 파일만 남은 경우)", () => {
   it("상태에서 임시 파일 수로 보이고, 성공으로 세지 않는다", async () => {
     await uploadLedger();

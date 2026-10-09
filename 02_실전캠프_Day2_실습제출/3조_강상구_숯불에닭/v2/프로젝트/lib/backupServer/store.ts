@@ -139,9 +139,43 @@ export interface BackupManifest {
   createdAt: string; // 브라우저 시각
   storedAt: string; // 서버 시각
   ledger: { file: string; sha256: string; size: number; transactions: number; dailySales: number };
-  photos: { file: string; sha256: string; size: number; count: number } | null;
+  // contentHash: ZIP 안 사진들의 (id + 바이트 해시) 를 정렬해 합친 해시. ZIP 파일 해시는 만든 시각 때문에 매번 달라지지만 이건 사진이 같으면 같다.
+  // reusedFrom: 사진 내용이 직전 검증본과 같아 새 파일을 만들지 않고 그 백업의 파일을 가리킨 경우, 그 백업의 id.
+  photos: { file: string; sha256: string; size: number; count: number; contentHash: string; reusedFrom?: string } | null;
   verified: true;
   verifiedAt: string;
+}
+
+// 사진 "내용" 해시 — 같은 사진 묶음이면 ZIP 을 언제 만들었든 같다
+export function photoContentHash(entries: { id: string; sha256: string }[]): string {
+  const h = createHash("sha256");
+  for (const e of [...entries].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) h.update(`${e.id}:${e.sha256}\n`);
+  return h.digest("hex");
+}
+
+// 같은 사진 내용을 가진 가장 최근 검증 백업을 찾는다 (그 파일이 아직 폴더에 있어야 한다)
+async function findReusablePhotos(f: StoreFs, dir: string, contentHash: string): Promise<{ id: string; file: string; sha256: string; size: number; count: number } | null> {
+  let names: string[];
+  try {
+    names = await f.readdir(dir);
+  } catch {
+    return null;
+  }
+  let best: { storedAt: string; id: string; file: string; sha256: string; size: number; count: number } | null = null;
+  for (const n of names) {
+    if (!n.startsWith("backup-manifest-") || !n.endsWith(".json") || n.endsWith(".incomplete.json")) continue;
+    let m: Partial<BackupManifest>;
+    try {
+      m = JSON.parse((await f.readFile(inside(dir, n))).toString("utf8"));
+    } catch {
+      continue;
+    }
+    if (m.verified !== true || !m.photos || m.photos.contentHash !== contentHash || !isValidId(m.id) || typeof m.storedAt !== "string") continue;
+    if (best && m.storedAt <= best.storedAt) continue;
+    if (!(await f.exists(inside(dir, m.photos.file)))) continue; // 사장님이 정리해서 지웠으면 새로 저장한다
+    best = { storedAt: m.storedAt, id: m.id, file: m.photos.file, sha256: m.photos.sha256, size: m.photos.size, count: m.photos.count };
+  }
+  return best;
 }
 
 export interface IncompleteManifest {
@@ -202,8 +236,15 @@ export async function finalizeBackup(ctx: StoreCtx, claim: FinalizeClaim): Promi
       const pins = await inspectPhotoBackup(new Uint8Array(zipBuf));
       if (!pins.ok) return fail(`사진 파일이 복원 가능한 백업이 아니에요: ${pins.errors[0]}`);
       if (pins.entries.length !== claim.photos.count) return fail(`사진 수가 달라요 (ZIP 안 ${pins.entries.length}장, 말한 ${claim.photos.count}장).`);
-      photosOut = `photos-${s}-${claim.id}.zip`;
-      photosInfo = { file: photosOut, sha256: zipSha, size: zipBuf.length, count: pins.entries.length };
+      const contentHash = photoContentHash(pins.entries.map((e) => ({ id: e.entry.id, sha256: e.entry.sha256 })));
+      // 사진 내용이 직전 검증본과 같으면 새 ZIP 을 만들지 않고 그 파일을 가리킨다 (폴더가 매일 수십 MB 씩 커지지 않게)
+      const prev = await findReusablePhotos(f, ctx.dir, contentHash);
+      if (prev) {
+        photosInfo = { file: prev.file, sha256: prev.sha256, size: prev.size, count: prev.count, contentHash, reusedFrom: prev.id };
+      } else {
+        photosOut = `photos-${s}-${claim.id}.zip`;
+        photosInfo = { file: photosOut, sha256: zipSha, size: zipBuf.length, count: pins.entries.length, contentHash };
+      }
     } else if (await f.exists(photosTemp)) {
       await f.unlink(photosTemp).catch(() => {}); // 장부만 백업인데 사진 임시 파일이 남아 있으면 치운다
     }
@@ -282,7 +323,7 @@ export async function readBackupStatus(ctx: StoreCtx): Promise<BackupStatus> {
   for (const n of names) {
     if (!n.startsWith("backup-manifest-") || !n.endsWith(".json")) continue;
     // 검증된 것과 불완전한 것이 섞여 있으므로 느슨한 모양으로 읽는다
-    let m: { app?: unknown; id?: unknown; storedAt?: unknown; verified?: unknown; mode?: "ledger" | "full"; ledger?: { size?: number }; photos?: { size?: number } | null };
+    let m: { app?: unknown; id?: unknown; storedAt?: unknown; verified?: unknown; mode?: "ledger" | "full"; ledger?: { size?: number }; photos?: { size?: number; reusedFrom?: string } | null };
     try {
       m = JSON.parse((await f.readFile(inside(ctx.dir, n))).toString("utf8"));
     } catch {
@@ -291,7 +332,8 @@ export async function readBackupStatus(ctx: StoreCtx): Promise<BackupStatus> {
     if (m.app !== "sootdak-ledger-backup" || !isValidId(m.id) || typeof m.storedAt !== "string") continue;
     if (m.verified === true && m.ledger) {
       out.verifiedCount += 1;
-      const size = (m.ledger.size ?? 0) + (m.photos?.size ?? 0);
+      // 직전 파일을 다시 가리킨 사진은 디스크를 더 쓰지 않았으므로 용량에 세지 않는다
+      const size = (m.ledger.size ?? 0) + (m.photos && !m.photos.reusedFrom ? (m.photos.size ?? 0) : 0);
       out.totalBytes += size;
       if (!out.lastLedgerOkAt || m.storedAt > out.lastLedgerOkAt) out.lastLedgerOkAt = m.storedAt;
       if (m.photos && (!out.lastPhotosOkAt || m.storedAt > out.lastPhotosOkAt)) out.lastPhotosOkAt = m.storedAt;

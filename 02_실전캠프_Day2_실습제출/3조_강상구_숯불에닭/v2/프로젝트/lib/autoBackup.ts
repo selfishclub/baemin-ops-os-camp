@@ -6,14 +6,15 @@ import { sha256Hex } from "./photoBackup";
 //
 // 정책
 //  - 장부가 바뀌면 30초 뒤 장부 백업 (연속으로 바뀌면 마지막 변경 기준으로 한 번만 = debounce)
-//  - 전체(장부+사진) 백업은 하루 1회. 사진이 바뀌었는데 아직 사진 백업이 없으면 전체로
+//  - 전체(장부+사진) 백업은 사진이 바뀐 날에만. 바뀐 게 없어도 보험으로 주 1회는 전체를 다시 보낸다
+//    (서버는 사진 내용이 직전과 같으면 새 파일을 만들지 않고 직전 파일을 가리킨다)
 //  - 실패하면 2분 → 4분 → 8분 … 최대 30분 간격으로 다시. 3번 연속 실패하면 경고
 //  - "서버가 검증까지 끝냈다"는 응답을 받았을 때만 성공으로 적는다
 //  - 오래된 백업은 지우지 않는다 (서버도 브라우저도)
 
 export const AUTO_BACKUP_KEY = "sootdak-ledger-auto-backup";
 export const DEBOUNCE_MS = 30_000;
-export const FULL_INTERVAL_MS = 24 * 60 * 60 * 1000;
+export const FULL_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 사진이 안 바뀌어도 이 간격마다 한 번은 전체 백업 (보험)
 export const RETRY_BASE_MS = 2 * 60 * 1000;
 export const RETRY_MAX_MS = 30 * 60 * 1000;
 export const WARN_FAILURES = 3;
