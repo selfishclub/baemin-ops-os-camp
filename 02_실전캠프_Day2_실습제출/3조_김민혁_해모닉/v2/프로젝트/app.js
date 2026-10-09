@@ -2,7 +2,7 @@
 
 const App = (() => {
   let S = null;                 // 전체 상태
-  let view = 'today';
+  let view = 'dash';   // 사이트를 열면 대시보드부터 — 사장님 요청 2026-10-06
   let tickTimer = null;
 
   /* ── 유틸 ────────────────────────────────────────────────── */
@@ -139,16 +139,91 @@ const App = (() => {
   /* 잠금: 순서 편집은 PIN 으로 풀고, 10분 지나거나 새로고침하면 다시 잠긴다 (이 기기에서만) */
   const ORDER_UNLOCK_MS = 10 * 60 * 1000;
   let orderUnlockedAt = 0;
-  const orderUnlocked = () => Date.now() - orderUnlockedAt < ORDER_UNLOCK_MS;
+  /* ── 사장님 모드 (2026-10-08) ──
+     아이디 없이 비밀번호 하나. 해시(SHA-256)만 두 매장 공용 문서(shared:issues → SH.owner)에 저장해 두 매장이 같은 비밀번호를 쓴다.
+     풀린 상태는 이 탭(sessionStorage)에만 남고, 5분 동안 누르거나 입력이 없으면 자동으로 잠긴다. */
+  const OWNER_IDLE_MS = 5 * 60 * 1000;
+  let ownerUntil = 0; try { ownerUntil = Number(sessionStorage.getItem('hm.ownerUntil') || 0); } catch (_) { /* 무시 */ }
+  const ownerOn = () => Date.now() < ownerUntil;
+  const ownerPwSet = () => !!(typeof SH !== 'undefined' && SH && SH.owner && SH.owner.hash);
+  function ownerExtend() { ownerUntil = Date.now() + OWNER_IDLE_MS; try { sessionStorage.setItem('hm.ownerUntil', String(ownerUntil)); } catch (_) { /* 무시 */ } }
+  function ownerLock(auto) {
+    ownerUntil = 0; try { sessionStorage.removeItem('hm.ownerUntil'); } catch (_) { /* 무시 */ }
+    if (!$('#modal').hidden) closeModal();
+    render();
+    banner(auto ? '사장님 모드가 잠겼습니다' : '사장님 모드를 잠갔습니다', auto ? '5분 동안 사용이 없어 자동으로 잠갔습니다.' : '다시 열려면 비밀번호를 넣으세요.');
+  }
+  async function hashPw(pw) {
+    const data = new TextEncoder().encode('haemonic-owner:' + pw);
+    if (window.crypto && crypto.subtle) { const b = await crypto.subtle.digest('SHA-256', data); return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join(''); }
+    let h = 2166136261; data.forEach((c) => { h ^= c; h = Math.imul(h, 16777619) >>> 0; }); return 'f' + h.toString(16);   // 보안 문맥이 아닐 때(file://) 임시 해시
+  }
+  function ownerLoginModal() {
+    if (LIMITED) { banner('등록된 기기에서만 됩니다', '사장님 모드는 기기 등록 뒤에 쓸 수 있습니다.'); return; }
+    if (!ownerPwSet()) { ownerPwModal(); return; }
+    modal('사장님 모드 열기', `<label>사장님 비밀번호<input id="owP" type="password" autocomplete="current-password"></label>
+      <p class="hint">맞으면 인사관리 · 운영 · 서비스 교육 · 회계 · 설정이 열리고, 할 일 순서도 바꿀 수 있습니다. <b>5분 동안 사용이 없으면 자동으로 잠깁니다.</b></p>`, () => {
+      const v = $('#owP').value; if (!v) return false;
+      hashPw(v).then((h) => {
+        if (h !== SH.owner.hash) { alert('비밀번호가 다릅니다.'); const i = $('#owP'); if (i) { i.value = ''; i.focus(); } return; }
+        ownerExtend(); closeModal(); render(); window.scrollTo(0, 0);
+        banner('사장님 모드', '5분 동안 사용이 없으면 자동으로 잠깁니다. 왼쪽 아래에서 바로 잠글 수도 있습니다.');
+      });
+      return false;
+    }, '열기');
+  }
+  function ownerPwModal() {
+    if (LIMITED) { banner('등록된 기기에서만 됩니다', '기기 등록 화면에서 비밀번호를 넣으면 등록과 함께 처리됩니다.'); return; }
+    const has = ownerPwSet(), needCur = has && !ownerOn();
+    modal(has ? '사장님 비밀번호 바꾸기' : '사장님 비밀번호 만들기', `
+      <p class="hint" style="margin-top:0">${has ? '새 비밀번호를 넣습니다. 안산점·안양점에 같이 적용됩니다.' : '아직 비밀번호가 없습니다. 지금 만드는 비밀번호로 사장님 전용 메뉴(인사관리·운영·서비스 교육·회계·설정)가 잠기고, 안산점·안양점에 같이 적용됩니다. 직원에게는 알려주지 마세요.'}</p>
+      ${needCur ? `<label>현재 비밀번호<input id="owCur" type="password" autocomplete="current-password"></label>` : ''}
+      <label>새 비밀번호 (4자 이상, 숫자만도 됨)<input id="owNew" type="password" autocomplete="new-password"></label>
+      <label>새 비밀번호 한 번 더<input id="owNew2" type="password" autocomplete="new-password"></label>`, () => {
+      const n = $('#owNew').value, n2 = $('#owNew2').value;
+      if (n.length < 4) { alert('4자 이상으로 넣어 주세요.'); return false; }
+      if (n !== n2) { alert('두 번 넣은 비밀번호가 서로 다릅니다.'); return false; }
+      (async () => {
+        if (needCur) { const c = $('#owCur').value; if (await hashPw(c) !== SH.owner.hash) { alert('현재 비밀번호가 다릅니다.'); return; } }
+        SH.owner = { hash: await hashPw(n), at: Date.now() }; saveShared();
+        ownerExtend(); closeModal(); render();
+        banner(has ? '비밀번호를 바꿨습니다' : '사장님 비밀번호를 만들었습니다', '지금은 사장님 모드입니다. 5분 동안 사용이 없으면 잠깁니다.');
+      })();
+      return false;
+    }, '저장');
+  }
+  /* ── 직원 잠금 (테스트 기간, 사장님 요청 2026-10-08) ──
+     사장님 모드가 아니면 "내용을 바꾸는" 동작은 전부 막는다. 직원에게 남는 것: 할 일 체크·건너뜀·되돌리기·메모, 완료 창의 숫자 입력,
+     수조·폐사 기록, 매출·식자재 매입 입력, 게시판 글. 설정 › 직원 잠금에서 끌 수 있다(기본 켜짐). */
+  const STAFF_BLOCK = new Set([
+    'addExtra', 'delExtra', 'tplNew', 'editTpl', 'cardTime', 'critToggle', 'orderUnlock', 'orderLock', 'orderReset', 'orderPinSet',
+    'noticeAdd', 'noticeEdit', 'noticeDel', 'noticeSend',
+    'seAdd', 'seClearDay', 'seCopyPrev', 'seFlag', 'seMonth', 'seNote', 'sePattern', 'seRemove', 'seRules', 'seShift', 'patFill', 'patFillNext', 'cmApply', 'cmAuto', 'cmClear', 'cmPreview', 'hdAdd', 'hdDel', 'crew',
+    'healthAdd', 'healthDel', 'trainAdd', 'trainDel', 'trainEdit', 'trainSeed', 'trainReward', 'rankReward', 'msAdd', 'msEdit', 'msDel', 'msGoal',
+    'recipeAdd', 'recipeEdit', 'recipeDel', 'staffAdd', 'staffDel', 'staffOff', 'staffRole', 'staffSeg', 'staffType',
+    'tankCount', 'tankCareDel', 'tankLogDel', 'deadDel', 'purchaseDel', 'purchaseCsv', 'salesDel', 'salesCsv',
+    'reset', 'import', 'sampleLoad', 'sampleClear', 'fixedAdd', 'fixedEdit', 'fixedDel', 'weeklyPay', 'sper', 'toggleAskWho', 'toggleReport', 'toggleSound', 'toggleTgInstant', 'tgFind', 'tgTest', 'supaClear', 'laborConfirm', 'laborUnconfirm', 'sealUpload', 'sealDel', 'guideEdit', 'doneMemo', 'staffLockToggle',
+    'cAdd', 'cDel', 'cVoid', 'cEdit', 'cSign', 'cStamp', 'cDeliver', 'cAttach', 'cFileDel', 'cSaveBack', 'sendReportNow', 'testAlarm',
+  ]);
+  const staffLocked = () => S.settings && S.settings.staffLock !== false && !ownerOn();
+  const blockedBanner = () => banner('테스트 기간에는 사장님만 바꿀 수 있습니다', '직원은 할 일 체크·메모·숫자 입력·게시판만 씁니다. 바꾸고 싶은 게 있으면 게시판에 건의로 올려 주세요.');
+  /* 사용 중이면 5분 연장, 안 쓰면 자동 잠김 */
+  ['pointerdown', 'keydown'].forEach((ev) => document.addEventListener(ev, () => { if (ownerOn()) ownerExtend(); }, { passive: true }));
+  setInterval(() => { if (ownerUntil && !ownerOn()) ownerLock(true); }, 15 * 1000);
+  const orderUnlocked = () => ownerOn() || Date.now() - orderUnlockedAt < ORDER_UNLOCK_MS;
   const pinOk = (v) => /^\d{4,6}$/.test(v || '');
 
-  function orderUnlockModal() {
+  /* 업무 카테고리 밖(인사관리·운영·서비스 교육·회계·설정)은 사장님 계정으로 로그인해야 열린다 (사장님 요청 2026-10-07).
+     직원 기기(자동 연결)에서는 항상 잠겨 있다. */
+  const viewLocked = (v) => { const g = groupOf(v); return !!(g && g.lock && !ownerOn()); };
+  function orderUnlockModal(why) {
+    if (ownerPwSet()) { ownerLoginModal(); return; }
     if (!pinOk(S.settings.orderPin)) { orderPinModal(true); return; }
-    modal('순서 잠금 풀기', `<p class="hint" style="margin-top:0">할 일 순서를 바꾸려면 사장님 PIN 을 넣으세요. 10분 뒤 자동으로 다시 잠깁니다.</p>
+    modal('사장님 PIN', `<p class="hint" style="margin-top:0">${why || '할 일 순서를 바꾸려면 사장님 PIN 을 넣으세요.'} 10분 뒤 자동으로 다시 잠깁니다.</p>
       <label>PIN<input id="opIn" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="숫자 4~6자리"></label>`, () => {
       const v = $('#opIn').value.trim();
       if (v !== String(S.settings.orderPin)) { alert('PIN 이 다릅니다.'); return false; }
-      orderUnlockedAt = Date.now(); render();
+      orderUnlockedAt = Date.now(); render(); window.scrollTo(0, 0);
     }, '풀기');
     setTimeout(() => { const i = $('#opIn'); if (i) i.focus(); }, 50);
   }
@@ -156,8 +231,8 @@ const App = (() => {
   /* PIN 만들기·바꾸기. 처음이면 새 PIN 두 번, 이미 있으면 현재 PIN 확인 뒤 새 PIN 두 번 */
   function orderPinModal(thenUnlock) {
     const has = pinOk(S.settings.orderPin);
-    modal(has ? '순서 잠금 PIN 바꾸기' : '순서 잠금 PIN 만들기', `
-      <p class="hint" style="margin-top:0">${has ? '현재 PIN 을 확인한 뒤 새 PIN 을 넣습니다.' : '할 일 순서는 이 PIN 을 아는 사람만 바꿀 수 있습니다. 직원에게는 알려주지 마세요.'}</p>
+    modal(has ? '사장님 PIN 바꾸기' : '사장님 PIN 만들기', `
+      <p class="hint" style="margin-top:0">${has ? '현재 PIN 을 확인한 뒤 새 PIN 을 넣습니다.' : '직원 기기에서 할 일 순서·이름을 바꿀 때 쓰는 PIN 입니다. 사장님 로그인 중에는 PIN 없이 됩니다. 직원에게는 알려주지 마세요.'}</p>
       ${has ? `<label>현재 PIN<input id="opCur" type="password" inputmode="numeric" maxlength="6" autocomplete="off"></label>` : ''}
       <label>새 PIN (숫자 4~6자리)<input id="opNew" type="password" inputmode="numeric" maxlength="6" autocomplete="off"></label>
       <label>새 PIN 한 번 더<input id="opNew2" type="password" inputmode="numeric" maxlength="6" autocomplete="off"></label>`, () => {
@@ -167,7 +242,7 @@ const App = (() => {
       if (n !== $('#opNew2').value.trim()) { alert('두 번 넣은 PIN 이 서로 다릅니다.'); return false; }
       S.settings.orderPin = n; save();
       if (thenUnlock) orderUnlockedAt = Date.now();
-      banner(has ? 'PIN 을 바꿨습니다' : 'PIN 을 만들었습니다', thenUnlock ? '이제 손잡이(⠿)를 끌어 순서를 바꾸세요. 10분 뒤 자동으로 잠깁니다.' : '할 일 화면의 "순서 바꾸기"에서 씁니다.');
+      banner(has ? 'PIN 을 바꿨습니다' : 'PIN 을 만들었습니다', thenUnlock ? '10분 뒤 자동으로 다시 잠깁니다.' : '업무 밖 카테고리를 열 때와 할 일 "순서 바꾸기"에서 씁니다.');
       render();
     }, '저장');
   }
@@ -341,7 +416,11 @@ const App = (() => {
     if (!t) return undefined;
     /* 2인 시간대: 홀 담당이 따로 없다. 홀 업무는 관리자가 겸하고(설정의 "관리자가 홀 겸직"), 주방이 맡기로 정한 것(role2)만 주방으로.
        그래서 2인일 때 담당은 갑각류 관리자 · 주방 · 공통 셋뿐이다 — 사장님 요청 2026-09-23 (낮 2명인데 셋으로 쪼개져 보이던 문제) */
-    if (crewOf(key, t.slot) === 2) { if (t.role2) return t.role2; if (t.role === '홀') return ROLE_MGR; }
+    if (crewOf(key, t.slot) === 2) {
+      // 안양점 2인: 반반 담당표(ANYANG_TWO)가 우선 — 사장님 요청 2026-10-08
+      if (Store.meta && Store.meta.current === 'anyang' && typeof ANYANG_TWO !== 'undefined' && ANYANG_TWO[tid]) return ANYANG_TWO[tid];
+      if (t.role2) return t.role2; if (t.role === '홀') return ROLE_MGR;
+    }
     return t.role;
   }
 
@@ -468,11 +547,11 @@ const App = (() => {
   async function checkReport() {
     if (S.settings.reportOff) return;
     const key = dateKey(), day = ensureDay(key);
-    const at = minutesOf(S.settings.reportAt || '21:30');
+    const at = minutesOf(S.settings.reportAt || '21:50');
     if (at == null || nowMin() < at) return;
     if (day.notified['reportSent']) return;                       // 이미 성공
     const hasTg = (S.settings.tgToken || '').trim() && (S.settings.tgChat || '').trim();
-    if (hasTg && serverSends()) return;                            // 서버가 21:30 에 보낸다 — 여기서 또 보내면 두 통
+    if (hasTg && serverSends()) return;                            // 서버가 21:50 에 보낸다 — 여기서 또 보내면 두 통
 
     if (hasTg) {
       // 전송 성공할 때까지 30초 틱마다 재시도한다. PC가 22:00에 꺼지므로 조용히 미루지 않는다.
@@ -504,7 +583,16 @@ const App = (() => {
   }
 
   /* ── 저장 ────────────────────────────────────────────────── */
-  function save() { Store.save(S); }
+  /* 등록 안 된 기기 = 교육 자료 전용 모드. 매장 기록은 서버가 내주지 않고, 교육 진도만 RPC로 오간다 */
+  let LIMITED = false, limitedTimer = null;
+  function save() {
+    if (!LIMITED) { Store.save(S); return; }
+    clearTimeout(limitedTimer);
+    limitedTimer = setTimeout(() => {
+      const patch = { trainDone: S.trainDone || {}, trainQuiz: S.trainQuiz || {}, missions: S.missions || [], trainSeen: S.trainSeen || [] };
+      Store.trainingSave(Store.meta.current, patch).catch((e) => banner('교육 진도 저장 실패', e.message || String(e)));
+    }, 400);
+  }
 
   /* 접기·펼치기 상태를 화면 다시 그리기 전후로 유지한다.
      체크 한 번에 화면 전체를 다시 그리는 구조라, 이걸 기억하지 않으면
@@ -519,7 +607,7 @@ const App = (() => {
     const day = S.days[key]; if (!day) return null;
     const ids = Object.keys(day.inst).filter((t) => tpl(t) && !tpl(t).rest && !day.inst[t].auto);   // 자동 완료(비해당 요일)는 리포트에서 뺀다
 
-    /* 리포트를 21:30에 보내므로, 그 시점에 아직 할 시간이 안 된 업무(마감 정산·문잠금 등)를
+    /* 리포트를 21:50에 보내므로, 그 시점에 아직 할 시간이 안 된 업무(마감 정산·문잠금 등)를
        미완료로 세면 매일 억울한 리포트가 나간다. '이후 예정'으로 분리하고 분모에서도 뺀다. */
     const isPending = (t) => {
       if (key !== dateKey()) return false;
@@ -592,7 +680,97 @@ const App = (() => {
         return `${st ? st.name : '?'}(${(e.roles || []).join('·')})`;
       }).join(' '));
     }
+    const coach = buildCoach(key, { isPending });
+    if (coach) L.push('', coach);
     return { text: L.join('\n'), pct, critLeft: critLeft.length, done, base };
+  }
+
+  /* 오늘 평가·코칭 — 서버 daily_coach(supabase_coach.sql)와 같은 규칙 (사장님 요청 2026-10-08).
+     🟢 잘한 날: 90%↑·중요 미완료 0·늦게 한 업무 2건↓ / 🟡 보통: 70%↑·중요 미완료 1건↓ / 🔴 점검 필요 */
+  function dayStats(k) {
+    const day = S.days[k]; if (!day) return null;
+    let done = 0, base = 0, deaths = 0;
+    Object.keys(day.inst).forEach((id) => {
+      const t = tpl(id), r = day.inst[id];
+      if (!t || t.rest || r.auto || r.s === 'skip') return;
+      base++;
+      if (r.s !== 'done') return;
+      done++;
+      if (t.ev === 'deaths' && r.ev != null) deaths += typeof r.ev === 'object' ? Object.values(r.ev).reduce((a, b) => a + (Number(b) || 0), 0) : (Number(r.ev) || 0);
+    });
+    return { done, base, deaths };
+  }
+  function buildCoach(key, o) {
+    const day = S.days[key]; if (!day) return '';
+    const isPending = (o && o.isPending) || (() => false);
+    const memoMode = doneMemoMode();
+    let total = 0, done = 0, skip = 0, pending = 0, crit = 0, critDone = 0, critLeft = 0, late = 0, lateMax = 0, lateTitle = '', memo = 0, noname = 0, deaths = 0;
+    const lateList = [], by = {};
+    Object.keys(day.inst).forEach((id) => {
+      const t = tpl(id), r = day.inst[id];
+      if (!t || t.rest || r.auto) return;
+      total++;
+      if (isPending(id)) { pending++; return; }
+      if (r.s === 'skip') { skip++; return; }
+      if (t.crit) { crit++; if (r.s === 'done') critDone++; else if (r.s === 'todo') critLeft++; }
+      if (r.s !== 'done') return;
+      done++;
+      if ((r.note || '').trim()) memo++;
+      if (r.by) by[r.by] = (by[r.by] || 0) + 1; else noname++;
+      const due = minutesOf(t.due || t.sort), at = minutesOf(r.at);
+      if (due != null && at != null && at > due + (t.grace || 30)) {
+        late++; if (at - due > lateMax) { lateMax = at - due; lateTitle = t.title; }
+        if (lateList.length < 3) lateList.push(`${t.title}(+${at - due}분)`);
+      }
+      if (t.ev === 'deaths' && r.ev != null) deaths += typeof r.ev === 'object' ? Object.values(r.ev).reduce((a, b) => a + (Number(b) || 0), 0) : (Number(r.ev) || 0);
+    });
+    const base = total - skip - pending, pct = base ? Math.round(done * 100 / base) : 0;
+    let hd = 0, hb = 0, hdt = 0, hdd = 0;
+    for (let i = 1; i <= 7; i++) { const st = dayStats(shift(key, -i)); if (st && st.base > 0) { hd += st.done; hb += st.base; hdt += st.deaths; hdd++; } }
+    const avg = hb ? Math.round(hd * 100 / hb) : null, davg = hdd ? Math.round(hdt / hdd * 10) / 10 : null;
+    const fb = issuesAll().filter((x) => FB_CATS.includes(x.cat) && dateKey(new Date(x.createdAt || 0)) === key).length;
+
+    const grade = (pct >= 90 && critLeft === 0 && late <= 2) ? '🟢 잘한 날' : (pct >= 70 && critLeft <= 1) ? '🟡 보통' : '🔴 점검 필요';
+    let sum;
+    if (!base) sum = '평가할 업무가 없었습니다.';
+    else if (critLeft) sum = `중요 업무 ${critLeft}건이 끝까지 안 됐습니다. 다른 게 아무리 잘 돼도 이건 오늘의 구멍입니다.`;
+    else if (pct >= 95 && !late) sum = '시간 안에 거의 다 해냈습니다. 이 정도면 체크리스트가 아니라 습관입니다.';
+    else if (pct >= 90) sum = '큰 틀은 잘 돌아갔습니다. 남은 건 "제시간에"입니다.';
+    else if (pct >= 70) sum = '절반 이상은 했지만 빠진 게 눈에 띕니다. 바쁜 날일수록 체크리스트를 먼저 열어야 합니다.';
+    else sum = '오늘은 체크리스트가 거의 안 돌았습니다. 앱을 안 연 건지, 일을 안 한 건지부터 확인이 필요합니다.';
+
+    const good = [], bad = [];
+    if (crit && !critLeft) good.push(`중요 업무 ${crit}건 전부 완료`);
+    if (avg != null && pct >= avg + 10) good.push(`7일 평균(${avg}%)보다 ${pct - avg}%p 높음`);
+    if (done && memoMode !== 'off' && memo >= done * 0.8) good.push(`메모 ${memo}/${done}건 — 어떻게 했는지 잘 남겼음`);
+    if (done >= 5 && !late) good.push('늦게 한 업무 없음');
+    if (davg != null && !deaths && davg >= 1) good.push(`폐사 0 (평소 하루 ${davg}마리)`);
+    if (late) bad.push(`늦게 한 업무 ${late}건 — ${lateList.join(', ')}`);
+    if (done && memoMode === 'req' && memo < done * 0.5) bad.push(`메모가 ${done}건 중 ${memo}건뿐 — 체크만 하고 넘어감`);
+    if (noname) bad.push(`이름 없이 완료 ${noname}건 — 누가 했는지 모름`);
+    if (skip >= 3) bad.push(`건너뜀 ${skip}건 — 사유 확인 필요`);
+    if (avg != null && pct <= avg - 10) bad.push(`7일 평균(${avg}%)보다 ${avg - pct}%p 낮음`);
+    if (davg != null && deaths >= 3 && deaths > davg * 1.5) bad.push(`폐사 ${deaths}마리 — 평소(${davg})보다 많음, 수조 온도·염도 확인`);
+
+    let tip;
+    if (critLeft) tip = '시간대 시작할 때 "중요" 표시부터 끝내기. 중요 업무는 미루면 다음 날 손님이 느낍니다.';
+    else if (late >= 3) tip = `알림이 울리면 그 자리에서 처리하기. 가장 많이 늦은 건 ${lateTitle}(+${lateMax}분)입니다.`;
+    else if (done && memoMode === 'req' && memo < done * 0.5) tip = '완료할 때 "어떻게 했나요"에 한 줄이라도. 테스트 기간엔 이 메모가 제일 중요한 자료입니다.';
+    else if (noname) tip = '완료할 때 이름을 고르기. 누가 했는지 남아야 잘한 사람을 챙길 수 있습니다.';
+    else if (pct < 90) tip = '오픈 때 오늘 할 일을 한 번 훑고 시작하기. 빠지는 건 대부분 "몰라서"가 아니라 "잊어서"입니다.';
+    else if (davg != null && deaths > davg * 1.5 && deaths >= 3) tip = '내일 아침 수조 온도·염도·산소 먼저 확인하고 폐사 기록 남기기.';
+    else tip = '오늘처럼. 내일은 메모를 한 줄 더 구체적으로 적어 보세요.';
+
+    const who = Object.entries(by).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([n, c]) => `${n} ${c}`);
+    if (noname) who.push(`이름 없음 ${noname}`);
+
+    const L = ['━━━━━━━━━━━━', `📊 오늘 평가 · ${grade} ${avg != null ? `(7일 평균 ${avg}% → 오늘 ${pct}%)` : `(오늘 ${pct}%)`}`, sum];
+    if (good.length) L.push('', '👍 잘한 것', ...good.slice(0, 3).map((g) => '· ' + g));
+    if (bad.length) L.push('', '👀 아쉬운 것', ...bad.slice(0, 3).map((b) => '· ' + b));
+    L.push('', '🎯 내일 한 가지', '· ' + tip);
+    if (who.length) L.push('', '👥 오늘 손: ' + who.join(' · '));
+    if (fb) L.push(`🧪 오늘 접수된 앱 오류·건의 ${fb}건 — 테스트 안내 페이지에서 확인`);
+    return L.join('\n');
   }
 
   const serverSends = () => !!(Store.supa && Store.supa.signedIn);
@@ -674,13 +852,15 @@ const App = (() => {
   /* ── 렌더 ────────────────────────────────────────────────── */
   /* 왼쪽 메뉴: 대카테고리(g) 아래 하위 메뉴(items). 대카테고리를 누르면 접었다 펼친다.
      g 가 null 이면 헤더 없이 바로 버튼(설정). */
-  const MENU = [
-    { id: 'work', g: '업무', ic: '🗂️', items: [['rules', '공지사항 필독', '📌'], ['tanks', '수조 관리표', '🐟'], ['today', '할 일', '✅'], ['report', '기록', '📊']] },
-    { id: 'people', g: '직원', ic: '👥', items: [['month', '월간 근무표', '📅'], ['staff', '직원 명단', '🧑‍🍳'], ['contracts', '근로계약서', '📄'], ['payslip', '급여명세서', '💳'], ['health', '보건증 관리', '🩺'], ['hygiene', '위생교육 일정관리', '🧼']] },
-    { id: 'ops', g: '운영', ic: '🏪', items: [['costs', '원가 관리', '💰'], ['buyInsight', '갑각류 매입 인사이트', '🦀'], ['notices', '월간 공지', '📢'], ['issues', '트러블시트', '📝']] },
-    { id: 'kitchen', g: '서비스 교육', ic: '🎓', items: [['training', '교육 자료', '🎓'], ['recipes', '레시피 관리', '📖']] },
-    { id: 'acct', g: '회계', ic: '💵', items: [['salesIn', '매출 입력', '🧾'], ['salesStat', '매출 분석', '📈'], ['pnl', '월 손익', '📘'], ['labor', '인건비', '👷']] },
-    { id: 'sys', g: '설정', ic: '⚙️', items: [['settings', '설정', '⚙️'], ['routines', '루틴', '🔁']] },
+  const MENU_LIMITED = [{ id: 'home', items: [['register', '기기 등록', '🔐'], ['training', '교육 자료', '🎓']], gs: '홈', ic: '🔐', main: 'register' }];
+  let MENU = [
+    { id: 'home', items: [['guide', '테스트 안내', '📋'], ['dash', '대시보드', '🧭']], gs: '홈', ic: '🧭', main: 'dash', hot: 'guide' },   // 테스트 안내가 맨 위, 첫 화면은 대시보드   // 카테고리 없이 맨 위 단독 항목
+    { id: 'work', g: '업무', gs: '업무', ic: '🗂️', items: [['rules', '공지사항 필독', '📌'], ['notices', '월간 공지', '📢'], ['today', '할 일', '✅'], ['tanks', '수조 관리표', '🐟'], ['month', '월간 근무표', '📅'], ['training', '교육 자료', '🎓'], ['report', '기록', '📊'], ['salesIn', '매출 입력', '🧾'], ['issues', '공유 게시판', '📝'], ['costs', '원가 관리 (식자재)', '💰'], ['health', '보건증 관리', '🩺']] },
+    { id: 'people', g: '인사관리', gs: '인사', ic: '👥', lock: true, items: [['staff', '직원 명단', '🧑‍🍳'], ['contracts', '근로계약서', '📄'], ['payslip', '급여명세서', '💳'], ['hygiene', '위생교육 일정관리', '🧼']] },
+    { id: 'ops', g: '운영', gs: '운영', ic: '🏪', lock: true, items: [['costAll', '총원가 (갑각류 + 식자재)', '💰'], ['buyInsight', '갑각류 매입 인사이트', '🦀']] },
+    { id: 'kitchen', g: '서비스 교육', gs: '교육', ic: '🎓', lock: true, items: [['recipes', '레시피 관리', '📖']] },
+    { id: 'acct', g: '회계', gs: '회계', ic: '💵', lock: true, items: [['salesStat', '매출 분석', '📈'], ['pnl', '월 손익', '📘'], ['labor', '인건비', '👷']] },
+    { id: 'sys', g: '설정', gs: '설정', ic: '⚙️', lock: true, items: [['settings', '설정', '⚙️'], ['routines', '루틴', '🔁']] },
   ];
   const groupOf = (k) => MENU.find((m) => m.items.some(([x]) => x === k));
 
@@ -697,25 +877,169 @@ const App = (() => {
     saveNavOpen();
   }
 
+  /* ── 테스트 기간 안내 (대시보드 아래 단독 페이지, 사장님 요청 2026-10-07) ──
+     일정은 매장 문서 settings.testRounds[3] = { from, to } 에 저장 — 매장마다 다르다. 사장님 모드에서만 고친다. */
+  const GUIDE_ROUNDS = [
+    { n: '1차', focus: '할 일 체크가 하루 흐름에 맞는지, 시간·담당이 실제와 같은지' },
+    { n: '2차', focus: '1차에서 고친 것이 잘 됐는지, 수조·매출 입력과 교육 영상' },
+    { n: '3차', focus: '마감 리포트·근무표까지 전체, 이대로 계속 쓸 수 있는지' },
+  ];
+  const guideRounds = () => { const r = (S.settings.testRounds || []); return GUIDE_ROUNDS.map((g, i) => ({ ...g, from: (r[i] || {}).from || '', to: (r[i] || {}).to || '' })); };
+  const mdShort = (k) => (k ? `${Number(k.slice(5, 7))}/${Number(k.slice(8, 10))}` : '');
+  function vGuide() {
+    const rounds = guideRounds();
+    const dateCell = (r) => (r.from || r.to) ? `<b>${mdShort(r.from)} ~ ${mdShort(r.to)}</b>` : '<span class="mut">미정</span>';
+    const now = dateKey();
+    const cur = rounds.find((r) => r.from && r.to && r.from <= now && now <= r.to);
+    return `<div class="hd">
+      <div><div class="mustTag">📌 공지사항 필수</div><h2>📋 테스트 기간 안내 — ${esc(storeName())}</h2><div class="sub">3일씩 세 번, 같이 써 보고 고칩니다. 평소처럼 일하면서 앱이 거슬리는 순간만 알려 주세요.</div></div>
+      ${ownerOn() ? `<button class="btn sm" data-act="guideEdit" style="margin-left:auto">일정 고치기</button>` : ''}
+    </div>
+    ${cur ? `<div class="notice pin"><b>지금은 ${cur.n} 테스트 기간입니다 (${mdShort(cur.from)}~${mdShort(cur.to)}).</b> 이번 회차에서 보는 것: ${esc(cur.focus)}</div>` : ''}
+    ${fbNotice()}
+    <div class="guide">
+      <p class="lead"><b>목적은 하나.</b> 쓰기 불편한 것과 잘못 움직이는 것을 찾아서 고치는 것. 잘하고 못하고를 보는 자리가 아닙니다.</p>
+
+      <h3>언제</h3>
+      <div class="tkLogWrap"><table class="tkLog gTbl"><thead><tr><th>회차</th><th>${esc(storeName())}</th><th>이번에 보는 것</th></tr></thead>
+      <tbody>${rounds.map((r) => `<tr><td><b>${r.n}</b></td><td>${dateCell(r)}</td><td>${esc(r.focus)}</td></tr>`).join('')}</tbody></table></div>
+
+      <h3>매일 세 가지</h3>
+      <ol class="gSteps">
+        <li><div><b>업무는 끝내자마자 체크 — 내 이름 고르고 "어떻게 했나요" 한 줄</b><div class="mut">몰아서 체크 ✕ · 못 한 건 "건너뜀" + 이유 · 내 이름이 없으면 사장님께</div></div></li>
+        <li><div><b>숫자는 실제 값 그대로</b><div class="mut">수온·염도 · 폐사 마릿수 · 매출 kg·주문 건(매장/배달) · 폐사는 3일 안에 쓰고 "사용 완료"</div></div></li>
+        <li><div><b>거슬리면 그때 바로 게시판에</b><div class="mut">오류는 바로 · 건의는 팀원과 상의한 뒤 (맨 위 버튼)</div></div></li>
+      </ol>
+      <p class="hint" style="margin-top:6px">교육 영상 시청은 테스트 기간에는 하지 않습니다. 안내가 있을 때 시작합니다.</p>
+
+      <h3>이런 게 보이면 맨 위 버튼으로 알려 주세요</h3>
+      <div class="gTwo">
+        <div class="card"><b>🐛 오류</b><ul>
+          <li>눌렀는데 반응 없음 · 체크가 풀림 · 두 번 체크됨</li>
+          <li>다른 기기에서 다르게 보임</li>
+          <li>화면·글자 깨짐 (특히 폰)</li>
+          <li>알림이 안 오거나 두 번 옴</li></ul></div>
+        <div class="card"><b>🙋 건의</b> <span class="chip crit">중요</span><div class="gImp">혼자 판단해서 올리지 말고 <b>반드시 팀원들과 상의한 뒤</b> 올립니다.</div><ul>
+          <li>할 일 시간·담당이 실제와 다름</li>
+          <li>빠진 업무 · 필요 없는 업무 · 이름이 현장 말과 다름</li>
+          <li>누르는 횟수가 많다 · 글씨가 작다</li>
+          <li>이게 있으면 좋겠다</li></ul></div>
+      </div>
+      <p class="hint">캡처는 매장 단톡방에. 아예 안 열리면 게시판 말고 사장님께 바로 전화·톡.</p>
+
+      <div class="gTwo">
+        <div class="card gOk"><b>걱정 안 해도 되는 것</b><ul>
+          <li>잘못 눌러도 됨 — 다시 누르면 풀리고, 복구 가능</li>
+          <li>점수·배지는 테스트 기간엔 참고만</li>
+          <li>앱이 안 열리면 평소대로 일하고 나중에 알려 주기</li></ul></div>
+        <div class="card gNo"><b>이것만 지켜 주세요</b><ul>
+          <li>남의 이름으로 체크 ✕ · "테스트니까" 가짜 체크 ✕</li>
+          <li>사장님 로그인 창 손대지 않기</li>
+          <li>앱 주소 외부 공유 ✕</li></ul></div>
+      </div>
+
+      <p class="mut" style="margin-top:18px">3일이 끝나는 날 10분 미팅: <b>제일 불편했던 것 하나, 편했던 것 하나.</b> 모인 의견은 고쳐서 게시판에 결과를 올립니다. 고맙습니다.</p>
+    </div>`;
+  }
+  function guideEditModal() {
+    const rounds = guideRounds();
+    modal(`테스트 일정 — ${storeName()}`, `<p class="hint" style="margin-top:0">회차마다 시작일·마지막일을 넣으세요. 이 매장에만 저장됩니다 (안양점은 안양점에서 따로).</p>
+      ${rounds.map((r, i) => `<div class="setrow"><span>${r.n}</span><span class="v"><input type="date" id="gr${i}a" value="${r.from}"> ~ <input type="date" id="gr${i}b" value="${r.to}"></span></div>`).join('')}`, () => {
+      S.settings.testRounds = rounds.map((r, i) => ({ from: $('#gr' + i + 'a').value || '', to: $('#gr' + i + 'b').value || '' }));
+      save(); render();
+    }, '저장');
+  }
+  /* ── 기기 등록 (등록 안 된 기기가 보는 첫 화면) ── */
+  function vRegister() {
+    const sp = Store.supa || {};
+    const revoked = sp.device && sp.deviceOk === false;
+    const st = Store.meta ? (Store.meta.stores.find((x) => x.id === Store.meta.current) || {}) : {};
+    return `<div class="hd"><div><h2>🔐 기기 등록</h2><div class="sub">해모닉 업무 체크리스트는 사장님이 등록한 기기에서만 매장 기록을 보여 줍니다.</div></div></div>
+      <div class="lockBox regBox">
+        <div class="lockIc">${revoked ? '⛔' : '🔐'}</div>
+        <p>${revoked ? '<b>이 기기의 등록이 해제되었습니다.</b><br><span class="mut">다시 쓰려면 사장님이 아래에서 다시 등록해 주세요.</span>' : '<b>이 기기는 아직 등록되지 않았습니다.</b><br><span class="mut">매장 아이패드·사장님 폰처럼 매장에서 쓰는 기기만 사장님이 직접 등록합니다. 직원 개인 폰은 등록하지 않습니다.</span>'}</p>
+        <div class="regForm">
+          <label>기기 이름<input id="rgName" placeholder="예: ${esc(st.name || '안산점')} 아이패드 · 사장님 폰" autocomplete="off"></label>
+          <label>매장<select id="rgStore">${(Store.meta ? Store.meta.stores : []).map((x) => `<option value="${x.id}"${x.id === (Store.meta || {}).current ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="">공용 (사장님 기기)</option></select></label>
+          <label>사장님 비밀번호<input id="rgPw" type="password" autocomplete="current-password"></label>
+          <button class="btn primary" data-act="deviceRegister">이 기기 등록</button>
+          <p class="hint">첫 등록이면 지금 넣는 비밀번호가 사장님 비밀번호가 됩니다 (안산점·안양점 공통). 등록은 사장님만 합니다.</p>
+          <p class="hint">어제 등록했는데 또 뜨나요? 이 브라우저가 껐다 켤 때 저장소를 지우고 있는 것입니다. 등록 뒤에 나오는 <b>이 기기 전용 주소</b>를 홈 화면에 추가해 두면 그 주소로 열 때마다 자동으로 복구됩니다.</p>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px"><b>🎓 교육 자료는 등록 없이 볼 수 있습니다.</b>
+        <p class="hint" style="margin:6px 0 10px">직원은 개인 폰에서 교육 영상을 보고 "내일 적용할 것 한 줄"과 미션 체크까지 할 수 있습니다. 할 일·수조·매출 등 매장 기록은 등록된 기기에서만 보입니다.</p>
+        <button class="btn" data-act="view" data-v="training">교육 자료 열기</button></div>`;
+  }
+  async function deviceRegisterGo() {
+    const name = $('#rgName').value.trim(), pw = $('#rgPw').value, store = $('#rgStore').value;
+    if (!name) { alert('기기 이름을 적어 주세요. (예: 안산점 아이패드)'); return; }
+    if (pw.length < 4) { alert('사장님 비밀번호를 넣어 주세요 (4자 이상).'); return; }
+    const btn = document.querySelector('[data-act="deviceRegister"]'); if (btn) { btn.disabled = true; btn.textContent = '등록 중…'; }
+    try {
+      const h = await hashPw(pw);
+      await Store.deviceRegister(h, name, store || null);
+      deviceLinkModal(true);
+    } catch (e) { alert('등록 실패: ' + (e.message || e)); if (btn) { btn.disabled = false; btn.textContent = '이 기기 등록'; } }
+  }
+  /* 이 기기 전용 주소 — 홈 화면·즐겨찾기에 두면 브라우저가 저장소를 지워도 그 주소로 열 때 자동 복구된다 */
+  function deviceLinkModal(justRegistered) {
+    const link = Store.deviceLink();
+    modal(justRegistered ? '기기를 등록했습니다' : '이 기기 전용 주소', `
+      ${justRegistered ? '<p>이 기기는 이제 매장 기록을 볼 수 있습니다.</p>' : ''}
+      <div class="notice"><b>📌 이 주소를 홈 화면(또는 즐겨찾기·시작 페이지)에 추가해 두세요.</b>
+        <p class="hint" style="margin:6px 0 8px">포스·태블릿 브라우저가 껐다 켤 때 저장소를 지우면 등록이 풀려 매일 다시 등록해야 합니다. 이 주소로 열면 그때마다 자동으로 등록된 상태로 돌아옵니다. <b>이 기기에서만</b> 쓰고 다른 사람에게 보내지 마세요.</p>
+        <input class="mono" readonly value="${esc(link)}" onfocus="this.select()" style="width:100%;font-size:12px">
+        <div class="rowbtns" style="margin-top:8px"><button class="btn" data-act="deviceLinkCopy">주소 복사</button></div></div>
+      <p class="hint">브라우저 설정에서 "종료 시 쿠키·사이트 데이터 삭제"가 켜져 있으면 끄는 게 가장 확실합니다. 시크릿(프라이빗) 창에서는 등록이 남지 않습니다.</p>`,
+      justRegistered ? () => { location.reload(); } : null, justRegistered ? '앱 열기' : undefined);
+    if (justRegistered) { const x = $('#modal [data-act="mClose"]'); if (x) x.hidden = true; }   // 등록 직후엔 '앱 열기'로만 닫는다 (새로 불러와야 기록이 보인다)
+  }
+  /* 설정 › 등록된 기기 — 사장님 모드에서 목록·해제 */
+  let devList = null, devMine = '';
+  function deviceSettings() {
+    const sp = Store.supa || {};
+    if (!sp.signedIn) return '';
+    if (devList === null) { devList = []; Promise.all([Store.deviceList().catch(() => []), Store.deviceHash()]).then(([l, h]) => { devList = l; devMine = h; if (view === 'settings') render(); }); }
+    const fmt = (t) => t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+    const stName = (id) => id ? ((Store.meta.stores.find((x) => x.id === id) || {}).name || id) : '공용';
+    const act = devList.filter((d) => d.active);
+    return `<div class="hd sub2"><h3>등록된 기기</h3></div>
+      <p class="hint" style="margin:0 0 8px">매장 기록은 여기 있는 기기에서만 보입니다. 새 기기는 그 기기에서 앱을 열어 "기기 등록"으로 추가합니다. 잃어버린 기기는 <b>끊기</b>로 바로 막을 수 있습니다.${act.length ? '' : ' <b>아직 등록된 기기가 없어 지금은 어디서나 열립니다.</b> 이 기기부터 등록하세요.'}</p>
+      ${act.length ? `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>기기</th><th>매장</th><th>등록</th><th>마지막 사용</th><th></th></tr></thead><tbody>
+        ${act.map((d) => `<tr><td><b>${esc(d.name)}</b>${d.key_hash === devMine ? ' <span class="chip today">이 기기</span>' : ''}</td><td>${esc(stName(d.store))}</td><td class="mut">${fmt(d.created_at)}</td><td class="mut">${fmt(d.last_seen)}</td>
+          <td>${d.key_hash === devMine ? '' : `<button class="btn sm danger" data-act="deviceRevoke" data-id="${d.id}" data-name="${esc(d.name)}">끊기</button>`}</td></tr>`).join('')}</tbody></table></div>` : ''}
+      ${!sp.device && act.length === 0 ? `<div class="rowbtns" style="margin-top:8px"><button class="btn primary" data-act="view" data-v="register">이 기기 등록하기</button></div>` : ''}
+      ${sp.device ? `<div class="rowbtns" style="margin-top:8px"><button class="btn sm" data-act="deviceLink">📌 이 기기 전용 주소 보기</button><span class="hint" style="margin:0">매일 등록이 풀리는 기기는 이 주소를 홈 화면에 두면 자동 복구됩니다.</span></div>` : ''}`;
+  }
+  function vLocked() {
+    const g = groupOf(view) || {};
+    const has = ownerPwSet();
+    return `<div class="hd"><div><h2>${g.ic || '🔒'} ${esc(g.g || '')}</h2><div class="sub">사장님 비밀번호로 잠겨 있습니다.</div></div></div>
+      <div class="lockBox"><div class="lockIc">🔒</div>
+        <p>이 카테고리는 사장님만 봅니다.<br><span class="mut">${has ? '비밀번호를 넣으면 열리고, 5분 동안 사용이 없으면 자동으로 다시 잠깁니다.' : '아직 사장님 비밀번호가 없습니다. 사장님이 먼저 만들어 주세요 (두 매장 공통).'}</span></p>
+        <button class="btn primary" data-act="ownerLogin">${has ? '비밀번호 넣고 열기' : '사장님 비밀번호 만들기'}</button>
+        <button class="btn ghost" data-act="view" data-v="today">할 일로 돌아가기</button></div>`;
+  }
   function sideMenu() {
-    const item = ([k, n, ic]) => `<button class="sitem${view === k ? ' on' : ''}" data-act="view" data-v="${k}"><span class="sic">${ic}</span>${n}</button>`;
     const cur = groupOf(view);
-    return MENU.map((m) => {
-      if (!m.g) return `<div class="sgap"></div>${m.items.map(item).join('')}`;
+    const item = (m) => ([k, n, ic]) => `<button class="sitem${view === k ? ' on' : ''}${m.hot === k ? ' hot' : ''}" data-act="view" data-v="${k}"><span class="sic">${ic}</span>${n}${m.hot === k ? '<span class="hotTag">필독</span>' : ''}</button>`;
+    return MENU.map((m, i) => {
+      if (!m.g) return `${i ? '<div class="sgap"></div>' : ''}<div class="shome">${m.items.map(item(m)).join('')}</div>`;
       const open = navOpen.has(m.id), here = cur && cur.id === m.id;
       return `<button class="sgrp${open ? ' open' : ''}${here ? ' here' : ''}" data-act="navGroup" data-g="${m.id}" aria-expanded="${open}">
-          <span class="sic">${m.ic}</span><span class="sgname">${m.g}</span><span class="sgcnt">${m.items.length}</span><span class="scaret">›</span>
+          <span class="sic">${m.ic}</span><span class="sgname">${m.g}</span><span class="sgcnt">${m.lock ? (ownerOn() ? '🔓' : '🔒') : m.items.length}</span><span class="scaret">›</span>
         </button>
-        <div class="ssub"${open ? '' : ' hidden'}>${m.items.map(item).join('')}</div>`;
+        <div class="ssub"${open ? '' : ' hidden'}>${m.items.map(item(m)).join('')}</div>`;
     }).join('');
   }
 
   /* 모바일 상단: 1줄은 대카테고리, 2줄은 선택한 대카테고리의 하위 메뉴 */
   function topNav() {
     const cur = groupOf(view);
-    const gs = MENU.map((m) => `<button class="tab g${cur === m ? ' on' : ''}" data-act="navGroupM" data-g="${m.id}">${m.ic || '⚙️'} ${m.g || '설정'}</button>`).join('');
-    const subs = cur && cur.g ? `<div class="navs">${cur.items.map(([k, n, ic]) =>
-      `<button class="tab s${view === k ? ' on' : ''}" data-act="view" data-v="${k}">${ic} ${n}</button>`).join('')}</div>` : '';
+    const gs = MENU.map((m) => `<button class="tab g${cur === m ? ' on' : ''}" data-act="${m.g ? 'navGroupM' : 'view'}" data-g="${m.id}" data-v="${m.g ? '' : (m.main || m.items[0][0])}">${m.ic || '⚙️'} ${m.gs || m.g || '설정'}</button>`).join('');
+    const subs = cur && (cur.g || cur.items.length > 1) ? `<div class="navs">${cur.items.map(([k, n, ic]) =>
+      `<button class="tab s${view === k ? ' on' : ''}${cur.hot === k ? ' hot' : ''}" data-act="view" data-v="${k}">${ic} ${n}</button>`).join('')}</div>` : '';
     return `<div class="navg">${gs}</div>${subs}`;
   }
 
@@ -726,7 +1050,7 @@ const App = (() => {
 
   function render() {
     const who = S.ui.whoDate === dateKey() ? S.ui.who : null;
-    const whoBtn = `<button class="whoBtn" data-act="pickWho">${who ? esc(who) : '지금 누구세요?'}</button>`;
+    const whoBtn = S.settings.askWho ? '<div class="hint" style="margin:0">완료할 때마다 이름을 고릅니다</div>' : `<button class="whoBtn" data-act="pickWho">${who ? esc(who) : '지금 누구세요?'}</button>`;
 
     const mt = Store.meta;
     const storeBtns = mt ? mt.stores.map((st) =>
@@ -738,23 +1062,241 @@ const App = (() => {
     else if (view !== lastNavView && g && !navOpen.has(g.id)) { navOpen.add(g.id); saveNavOpen(); }
     lastNavView = view;
 
-    $('#side').innerHTML = `<div class="slogo">🦀 해모닉<small>업무 체크리스트</small></div>
+    $('#side').innerHTML = `<div class="slogo">🦀 해모닉<small>업무 체크리스트</small><button class="sideX" data-act="sideClose" aria-label="메뉴 닫기">✕</button></div>
       <div class="sstore">${storeBtns}</div>
       <nav class="smenu">${sideMenu()}</nav>
-      <div class="sfoot"><div class="sfl">지금 사용 중</div>${whoBtn}</div>`;
+      <div class="sfoot"><div class="sfl">지금 사용 중</div>${whoBtn}${ownerOn() ? '<button class="btn sm ghost ownerBtn" data-act="ownerLock">👑 사장님 모드 · 잠그기</button>' : ''}</div>`;
 
     $('#nav').innerHTML = topNav();
     $('#who').innerHTML = whoBtn;
     const sb = $('#storebar'); if (sb) sb.innerHTML = `<div class="sstore top">${storeBtns}</div>`;
 
     const y = window.scrollY;
-    $('#main').innerHTML = ({ rules: vRules, tanks: vTanks, today: vToday, staff: vStaff, contracts: vContracts, month: vMonth, costs: vCosts, notices: vNotices, issues: vIssues, recipes: vRecipes, routines: vRoutines, report: vReport, salesIn: vSalesIn, salesStat: vSalesStat, pnl: vPnl, labor: vLabor, payslip: vPayslip, health: vHealth, hygiene: vHygiene, buyInsight: vBuyInsight, training: vTraining, settings: vSettings })[view]();
+    $('#main').innerHTML = demoBar() + (viewLocked(view) ? vLocked() : ({ dash: vDash, guide: vGuide, register: vRegister, costAll: vCostAll, rules: vRules, tanks: vTanks, today: vToday, staff: vStaff, contracts: vContracts, month: vMonth, costs: vCosts, notices: vNotices, issues: vIssues, recipes: vRecipes, routines: vRoutines, report: vReport, salesIn: vSalesIn, salesStat: vSalesStat, pnl: vPnl, labor: vLabor, payslip: vPayslip, health: vHealth, hygiene: vHygiene, buyInsight: vBuyInsight, training: vTraining, settings: vSettings })[view]());
     /* 지금 어느 매장 데이터를 보고 있는지 화면마다 박아둔다.
        직원·기록이 매장별로 따로인데 표시가 없으면 공유되는 것처럼 오해한다. */
     const h2 = $('#main .hd h2');
     if (h2 && !h2.querySelector('.chip.store')) h2.insertAdjacentHTML('beforeend', `<span class="chip store">${esc(storeName())}</span>`);
     window.scrollTo(0, y);   // 체크할 때마다 화면이 위로 튀지 않게
     if (view === 'contracts') bindEditor();
+    if (staffLocked()) {
+      document.querySelectorAll('#main [data-act]').forEach((el) => { if (STAFF_BLOCK.has(el.dataset.act)) el.hidden = true; });
+      const sf = $('#side .sfoot'); if (sf && !sf.querySelector('.staffLockTag')) sf.insertAdjacentHTML('afterbegin', '<div class="staffLockTag">🔒 테스트 기간 — 체크·메모만</div>');
+    }
+  }
+
+  /* ── 게임 요소 — 활동 점수 · 레벨 · 배지 ─────────────────────────
+     점수는 이달 활동(체크·미션)과 누적 학습(영상·코스)으로 계산한다. 저장하지 않고 매번 문서에서 계산 — 사장님 요청 2026-10-06 */
+  const LEVELS = [[0, '🦐', '새우'], [100, '🦀', '꽃게'], [300, '🦞', '랍스터'], [600, '👑', '킹크랩'], [1000, '🏆', '대게왕']];
+  const POINTS = { video: 10, course: 50, check: 1, crit: 3, msAdd: 5, msDone: 30, msGoal: 50, quiz: 5 };
+  const BADGES = [
+    { id: 'first', icon: '🎬', name: '첫 걸음', desc: '첫 교육 영상 시청', test: (s) => s.videos >= 1 },
+    { id: 'v10', icon: '📚', name: '배움꾼', desc: '영상 10편', test: (s) => s.videos >= 10 },
+    { id: 'v30', icon: '🎓', name: '지식왕', desc: '영상 30편', test: (s) => s.videos >= 30 },
+    { id: 'ms1', icon: '🎯', name: '실천가', desc: '첫 미션 달성', test: (s) => s.msDoneAll >= 1 },
+    { id: 'ms3', icon: '🏅', name: '이달의 미션', desc: '한 달 목표 달성', test: (s) => s.msGoalHit },
+    { id: 'ms10', icon: '💎', name: '미션 마스터', desc: '미션 10개 달성', test: (s) => s.msDoneAll >= 10 },
+    { id: 'c50', icon: '✅', name: '꾸준함', desc: '이달 체크 50건', test: (s) => s.checks >= 50 },
+    { id: 'c200', icon: '🔥', name: '불꽃', desc: '이달 체크 200건', test: (s) => s.checks >= 200 },
+    { id: 'crit30', icon: '🛡️', name: '수호자', desc: '이달 중요 업무 30건', test: (s) => s.critChecks >= 30 },
+    { id: 'all', icon: '🌟', name: '올 클리어', desc: '코스 5개 모두 완주', test: (s) => s.courses >= TRAIN_TRACKS.length },
+  ];
+  const levelOf = (pts) => { let L = LEVELS[0], next = null; LEVELS.forEach((l, i) => { if (pts >= l[0]) { L = l; next = LEVELS[i + 1] || null; } }); return { icon: L[1], name: L[2], min: L[0], next: next ? { icon: next[1], name: next[2], at: next[0], left: next[0] - pts } : null }; };
+  /* 한 매장 문서의 사람별 게임 통계 */
+  function gamify(doc, sid) {
+    const m = dateKey().slice(0, 7), td = doc.trainDone || {};
+    const names = [...new Set([...(doc.staff || []).filter((s) => s.active).map((s) => s.name), ...Object.keys(td), ...(doc.missions || []).map((x) => x.who)])].filter(Boolean);
+    const ph = (doc.staff || []).filter((s) => !s.active).map((s) => s.name);
+    const checks = {}, crit = {};
+    Object.entries(doc.days || {}).forEach(([k, dd]) => { if (k.slice(0, 7) !== m || !dd || !dd.inst) return; Object.entries(dd.inst).forEach(([id, r]) => { if (r.s !== 'done' || !r.by) return; checks[r.by] = (checks[r.by] || 0) + 1; const t = (doc.templates || []).find((x) => x.id === id); if (t && t.crit) crit[r.by] = (crit[r.by] || 0) + 1; }); (dd.extras || []).forEach((e) => { if (e.s === 'done' && e.by) checks[e.by] = (checks[e.by] || 0) + 1; }); });
+    const goal = Number((doc.settings || {}).missionGoal) || 3;
+    return names.filter((n) => !ph.includes(n)).map((n) => {
+      const seen = td[n] || {}, videos = Object.keys(seen).length;
+      const courseList = TRAIN_TRACKS.filter((tr) => { const st = trackSteps(tr); return st.length && st.every((u) => seen[u]); });
+      const ms = (doc.missions || []).filter((x) => x.who === n);
+      const msM = ms.filter((x) => x.month === m);
+      const msDone = msM.filter((x) => x.status === 'done').length, msDoneAll = ms.filter((x) => x.status === 'done').length;
+      const qz = Object.values(((doc.trainQuiz || {})[n]) || {});
+      const st = { name: n, sid, store: scopeName(sid), videos, courses: courseList.length, courseIcons: courseList.map((t) => t.icon).join(''), checks: checks[n] || 0, critChecks: crit[n] || 0,
+        quizzes: qz.length, quizTries: qz.length ? Math.round(qz.reduce((acc, r) => acc + (r.tries || 1), 0) / qz.length * 10) / 10 : 0,
+        msDone, msDoneAll, msOpen: msM.filter((x) => x.status === 'open').length, msWait: msM.filter((x) => x.status === 'claimed').length, msAdded: msM.length, msGoalHit: msDone >= goal, goal };
+      st.points = videos * POINTS.video + courseList.length * POINTS.course + st.quizzes * POINTS.quiz + st.checks * POINTS.check + st.critChecks * POINTS.crit + msM.length * POINTS.msAdd + msDone * POINTS.msDone + (st.msGoalHit ? POINTS.msGoal : 0);
+      st.level = levelOf(st.points);
+      st.badges = BADGES.filter((b) => b.test(st));
+      return st;
+    });
+  }
+  const medal = (i) => (['🥇', '🥈', '🥉'][i] || `${i + 1}위`);
+  /* 두 매장 전 직원 통합 순위 — 점수 같으면 같은 등수(1,1,3), 0점은 0위 */
+  function rankAll(list) {
+    const sorted = list.slice().sort((x, y) => y.points - x.points || y.badges.length - x.badges.length || x.name.localeCompare(y.name, 'ko'));
+    let rank = 0, prev = null;
+    return sorted.map((s, i) => { if (s.points <= 0) { s.rank = 0; return s; } if (s.points !== prev) { rank = i + 1; prev = s.points; } s.rank = rank; return s; });
+  }
+  const rankLabel = (r) => (r === 0 ? '0위' : r <= 3 ? ['🥇', '🥈', '🥉'][r - 1] : `${r}위`);
+  function rankTableAll(list) {
+    if (!list.length) return '<div class="mut" style="font-size:12.5px;padding:8px 0">아직 직원이 없습니다.</div>';
+    const ranked = rankAll(list), allZero = ranked.every((s) => s.points <= 0);
+    return `${allZero ? '<div class="hint" style="margin:0 0 6px">아직 아무도 점수가 없어 모두 0위입니다. 영상을 보거나 할 일을 체크하면 바로 순위가 생깁니다.</div>' : ''}<div class="rankList">${ranked.map((s) => `<div class="rank${s.rank === 1 ? ' top' : ''}${s.rank === 0 ? ' zero' : ''}">
+      <span class="rkNo">${rankLabel(s.rank)}</span>
+      <div class="rkMain"><div class="rkName"><b>${esc(s.name)}</b> <span class="chip cat">${esc(s.store)}</span> <span class="chip lvl">${s.level.icon} ${s.level.name}</span>${s.badges.length ? ` <span class="rkBadges">${s.badges.map((b) => `<span class="bdg" title="${esc(b.name)} — ${esc(b.desc)}">${b.icon}</span>`).join('')}${s.courseIcons ? `<span class="bdg mut" title="완주 코스">${s.courseIcons}</span>` : ''}</span>` : ''}</div>
+        <div class="rkSub">코스 <b>${s.courses}</b>개 수료 · 영상 <b>${s.videos}</b>편${s.quizzes ? ` · 퀴즈 ${s.quizzes}개 통과(평균 ${s.quizTries}회)` : ''} · 미션 달성 <b>${s.msDone}</b>${s.msOpen || s.msWait ? ` · 진행 중 ${s.msOpen}${s.msWait ? ` · 확인 대기 ${s.msWait}` : ''}` : ''} · 체크 ${s.checks}건${s.critChecks ? ` (중요 ${s.critChecks})` : ''}</div></div>
+      <div class="rkPts"><b>${s.points.toLocaleString('ko-KR')}</b><small>점</small><div class="rkBc">배지 ${s.badges.length}</div></div></div>`).join('')}</div>`;
+  }
+  function rankTable(list, mode) {
+    if (!list.length) return '<div class="mut" style="font-size:12.5px;padding:8px 0">아직 활동 기록이 없습니다. 영상을 보거나 할 일을 체크하면 점수가 쌓입니다.</div>';
+    return `<div class="rankList">${list.map((s, i) => `<div class="rank${i === 0 ? ' top' : ''}">
+      <span class="rkNo">${medal(i)}</span>
+      <div class="rkMain"><div class="rkName"><b>${esc(s.name)}</b> <span class="chip cat">${esc(s.store)}</span> <span class="chip lvl">${s.level.icon} ${s.level.name}</span></div>
+        <div class="rkSub">${mode === 'badge'
+          ? `${s.badges.length ? s.badges.map((b) => `<span class="bdg" title="${esc(b.name)} — ${esc(b.desc)}">${b.icon}</span>`).join('') : '<span class="mut">배지 없음</span>'}${s.courseIcons ? ` <span class="mut">코스 ${s.courseIcons}</span>` : ''}`
+          : `코스 <b>${s.courses}</b>개 수료 · 영상 <b>${s.videos}</b>편${s.quizzes ? ` · 퀴즈 ${s.quizzes}개 통과(평균 ${s.quizTries}회)` : ''} · 미션 달성 <b>${s.msDone}</b>${s.msOpen || s.msWait ? ` · 진행 중 ${s.msOpen}${s.msWait ? ` · 확인 대기 ${s.msWait}` : ''}` : ''} · 체크 ${s.checks}건${s.critChecks ? ` (중요 ${s.critChecks})` : ''}`}</div></div>
+      <div class="rkPts"><b>${mode === 'badge' ? s.badges.length : s.points.toLocaleString('ko-KR')}</b><small>${mode === 'badge' ? '개' : '점'}</small></div></div>`).join('')}</div>`;
+  }
+
+  /* ── 대시보드 — 운영·할 일 중심으로 안산점 · 안양점 나란히 ─────────
+     매장 문서(doc) 하나를 요약하는 storeSnap 을 두 매장에 똑같이 적용한다. 지금 보는 매장은 S, 다른 매장은 서버에서 받은 문서(dashDocs). */
+  let dashDocs = {}, dashAt = 0;
+  function storeSnap(doc, sid) {
+    const tk = dateKey(), n = nowMin();
+    const T = (id) => (doc.templates || []).find((t) => t.id === id);
+    const day = (doc.days || {})[tk] || { inst: {} };
+    const ids = Object.keys(day.inst).filter((t) => T(t) && !T(t).rest && !day.inst[t].auto);
+    const done = ids.filter((t) => day.inst[t].s !== 'todo').length;
+    const over = (t) => { const r = day.inst[t]; const tt = T(t); const m = minutesOf(tt.due || tt.sort); return r.s === 'todo' && m != null && n > m + (tt.grace || 30); };
+    const late = ids.filter(over).sort((x, y) => (T(x).sort || '').localeCompare(T(y).sort || ''));
+    const slots = SLOTS.map((sl) => { const l = ids.filter((t) => T(t).slot === sl.key); return { name: sl.name, key: sl.key, n: l.length, d: l.filter((t) => day.inst[t].s !== 'todo').length }; });
+    const next = ids.filter((t) => day.inst[t].s === 'todo' && !over(t)).sort((x, y) => (T(x).sort || '').localeCompare(T(y).sort || '')).slice(0, 3).map((t) => ({ time: T(t).time, title: T(t).title, crit: !!T(t).crit }));
+    /* 근무 — 오전·오후 조 */
+    const pmS = minutesOf((doc.settings || {}).pmStart || '17:00');
+    let am = [], pm = [];
+    const sd = doc.sched && doc.sched.days && doc.sched.days[tk];
+    if (sd && sd.segs && doc.sched.segments) {
+      const A = new Set(), P = new Set();
+      doc.sched.segments.forEach((sg) => { const x = sd.segs[sg.key]; if (!x) return; const m = minutesOf(String(sg.time || '').split(/[–\-~]/)[0].trim()); (x.workers || []).filter((w) => !(x.leave || []).includes(w.name)).forEach((w) => ((m != null && m >= pmS) ? P : A).add(w.name)); });
+      am = [...A]; pm = [...P];
+    }
+    /* 수조 */
+    const tanks = [];
+    if (doc.tanks && doc.tanks.items) { const c = doc.tanks.cycle || TANK_DEFAULT().cycle; doc.tanks.items.forEach((it) => { if (it.water && it.water.date && diffDays(it.water.date, tk) > c.water.late) tanks.push(`수조 ${it.n} 해수 교체`); if (it.clean && it.clean.date && diffDays(it.clean.date, tk) > c.clean.late) tanks.push(`수조 ${it.n} 청소`); }); }
+    /* 폐사 7일 */
+    const deathIds = (doc.templates || []).filter((t) => t.ev === 'deaths').map((t) => t.id);
+    const deaths7 = [...Array(7)].map((_, i) => { const k = shift(tk, -(6 - i)); const dd = (doc.days || {})[k]; let v = 0; if (dd) deathIds.forEach((id) => { const r = dd.inst[id]; if (!r || r.s !== 'done' || r.ev == null) return; v += typeof r.ev === 'object' ? SPECIES.reduce((acc, sp) => acc + (Number(r.ev[sp]) || 0), 0) : (Number(r.ev) || 0); }); return { k, v }; });
+    /* 교육 · 미션 */
+    const m = tk.slice(0, 7);
+    const staffN = (doc.staff || []).filter((s) => s.active).map((s) => s.name);
+    const td = doc.trainDone || {};
+    const badges = staffN.reduce((acc, nm) => acc + TRAIN_TRACKS.filter((tr) => { const steps = trackSteps(tr); return steps.length && steps.every((u) => (td[nm] || {})[u]); }).length, 0);
+    const watched = staffN.reduce((acc, nm) => acc + Object.keys(td[nm] || {}).length, 0);
+    const ms = (doc.missions || []).filter((x) => x.month === m);
+    const goal = Number((doc.settings || {}).missionGoal) || 3;
+    const msByWho = {}; ms.forEach((x) => { msByWho[x.who] = msByWho[x.who] || { d: 0, w: 0, o: 0 }; msByWho[x.who][x.status === 'done' ? 'd' : x.status === 'claimed' ? 'w' : 'o']++; });
+    /* 7일 완료율 추이 */
+    const trend = [...Array(7)].map((_, i) => { const k = shift(tk, -(6 - i)); const dd = (doc.days || {})[k]; if (!dd) return { k, v: null }; const l = Object.keys(dd.inst).filter((t) => T(t) && !T(t).rest && !dd.inst[t].auto && dd.inst[t].s !== 'skip'); return { k, v: l.length ? Math.round(l.filter((t) => dd.inst[t].s === 'done').length / l.length * 100) : null }; });
+    return { sid, name: scopeName(sid), total: ids.length, done, pct: ids.length ? Math.round(done / ids.length * 100) : 0, late: late.map((t) => ({ title: T(t).title, time: T(t).time, crit: !!T(t).crit })), slots, next, am, pm, tanks, deaths7, deathSum: deaths7.reduce((acc, x) => acc + x.v, 0), staffN: staffN.length, badges, watched, msDone: ms.filter((x) => x.status === 'done').length, msWait: ms.filter((x) => x.status === 'claimed').length, msOpen: ms.filter((x) => x.status === 'open').length, msByWho, goal, trend, hasDay: !!(doc.days || {})[tk] };
+  }
+  function vDash() {
+    const tk = dateKey(), now = nowMin(), cur = Store.meta.current;
+    const stores = (Store.meta.stores || []).slice();
+    dashAsyncLoad();
+    const snaps = stores.map((st) => (st.id === cur ? storeSnap(S, st.id) : (dashDocs[st.id] ? storeSnap(dashDocs[st.id], st.id) : null)));
+    const curSlot = (SLOTS.slice().reverse().find((s2) => now >= minutesOf(s2.from)) || SLOTS[0]).key;
+    const openIssues = issuesAll().filter((x) => x.status !== 'done').sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
+    const d = new Date(tk + 'T00:00:00');
+    let h = `<div class="hd"><div><h2>대시보드</h2><div class="sub">${d.getMonth() + 1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일 · 지금 ${pad(Math.floor(now / 60))}:${pad(now % 60)} 기준 · 안산점과 안양점을 나란히 봅니다. 다른 매장은 서버에 저장된 최신 기록입니다.</div></div>
+      <button class="btn sm" data-act="dashRefresh">새로고침</button></div>`;
+
+    /* 0. 매장 점수판 — 원형 게이지 + 급한 업무는 숫자로만 (사장님 요청 2026-10-06: 위쪽 목록 없애고 매장별 숫자) */
+    const noLogin0 = !(Store.supa && Store.supa.signedIn);
+    const ringCls = (pct) => (pct >= 90 ? 'good' : pct >= 70 ? 'mid' : 'low');
+    h += `<div class="dscore">${stores.map((st, i) => { const sn = snaps[i];
+      if (!sn) return `<div class="dsc${st.id === cur ? ' me' : ''}"><div class="dscHead"><b>${esc(st.name)}</b></div>${noLogin0 ? `<div class="dnologin"><b>서버에 연결되지 않았습니다</b><div class="mut">연결되면 이 매장 기록이 실시간으로 보입니다. 인터넷을 확인해 주세요.</div><button class="btn sm primary" data-act="supaRetry">다시 연결</button></div>` : '<div class="mut" style="padding:14px 0">서버에서 불러오는 중…</div>'}</div>`;
+      const lc = sn.late.filter((x) => x.crit).length;
+      const nums = [
+        { n: lc, l: '중요 지연', ic: '⏰', v: 'today' }, { n: sn.late.length - lc, l: '일반 지연', ic: '⌛', v: 'today', soft: true },
+        { n: sn.tanks.length, l: '수조 처리', ic: '🐟', v: 'tanks' }, { n: sn.msWait, l: '미션 확인', ic: '🎯', v: 'training' },
+      ];
+      return `<div class="dsc${st.id === cur ? ' me' : ''}">
+        <div class="dscHead"><b>${esc(st.name)}</b>${st.id === cur ? '<span class="chip today">지금 보는 매장</span>' : `<button class="btn sm ghost" data-act="dashGo" data-s="${st.id}" data-v="today">이 매장 보기</button>`}</div>
+        <div class="dscBody">
+          <button class="ring ${ringCls(sn.pct)}" style="--p:${sn.pct}" data-act="dashGo" data-s="${st.id}" data-v="today" title="오늘 진행률"><span><b>${sn.pct}</b><small>%</small><em>${sn.done}/${sn.total}</em></span></button>
+          <div class="dscNums">${nums.map((x) => `<button class="dnum${x.n ? (x.soft ? ' warn' : ' bad') : ' ok'}" data-act="dashGo" data-s="${st.id}" data-v="${x.v}"><span class="dnIc">${x.ic}</span><b>${x.n}</b><small>${x.l}</small></button>`).join('')}</div>
+        </div>
+        <div class="dscFoot"><span>👥 오전 <b>${sn.am.length}</b> · 오후 <b>${sn.pm.length}</b></span><span>🦀 폐사 7일 <b>${sn.deathSum}</b></span><span>🎓 배지 <b>${sn.badges}</b></span>${!sn.hasDay && now >= minutesOf(SLOTS[0].from) ? '<span class="warnTxt">오늘 앱 미접속</span>' : ''}</div>
+      </div>`; }).join('')}</div>`;
+
+    const noLogin = !(Store.supa && Store.supa.signedIn);
+    const col = (sn, st, body) => `<div class="dcol${st.id === cur ? ' me' : ''}"><div class="dcolh"><b>${esc(st.name)}</b>${st.id === cur ? '<span class="chip today">지금 보는 매장</span>' : `<button class="btn sm ghost" data-act="dashGo" data-s="${st.id}" data-v="today">이 매장 보기</button>`}</div>${sn ? body(sn) : (noLogin
+      ? `<div class="dnologin"><b>서버에 연결되지 않았습니다</b><div class="mut">다른 매장 기록은 서버에 있습니다. 인터넷이 연결되면 자동으로 이어집니다.</div><button class="btn sm primary" data-act="supaRetry">다시 연결</button></div>`
+      : '<div class="mut" style="padding:10px 0">서버에서 불러오는 중…</div>')}</div>`;
+    dashLive();
+    const kpi = (l, v, s, cls) => `<div class="dkpi${cls ? ' ' + cls : ''}"><div class="dkl">${l}</div><div class="dkv">${v}</div>${s ? `<div class="dks">${s}</div>` : ''}</div>`;
+    const sec = (icon, title, v, inner) => `<section class="dsec"><div class="dhead"><h3>${icon} ${esc(title)}</h3>${v ? `<button class="btn sm ghost" data-act="view" data-v="${v}">자세히 ›</button>` : ''}</div><div class="dcmp">${inner}</div></section>`;
+    const two = (body) => stores.map((st, i) => col(snaps[i], st, body)).join('');
+
+    /* 1. 오늘 할 일 */
+    h += sec('✅', '오늘 할 일 — 시간대별', 'today', two((sn) => `
+      <div class="dslots big">${sn.slots.map((r) => `<div class="dslot${r.key === curSlot ? ' cur' : ''}${r.n && r.d === r.n ? ' full' : ''}"><span>${r.name}</span><span class="stBar"><i style="width:${r.n ? Math.round(r.d / r.n * 100) : 0}%"></i></span><b>${r.d}/${r.n}</b></div>`).join('')}</div>
+      ${sn.late.length ? `<div class="dlist"><div class="dll">지연 중</div>${sn.late.slice(0, 4).map((x) => `<div class="dli ${x.crit ? 'crit' : ''}"><span class="tgTime sm late">${esc(x.time)}</span>${esc(x.title)}${x.crit ? '<span class="chip crit">중요</span>' : ''}</div>`).join('')}${sn.late.length > 4 ? `<div class="mut">외 ${sn.late.length - 4}건</div>` : ''}</div>` : ''}
+      ${sn.next.length ? `<div class="dlist"><div class="dll">다음 할 일</div>${sn.next.map((x) => `<div class="dli"><span class="tgTime sm">${esc(x.time)}</span>${esc(x.title)}${x.crit ? '<span class="chip crit">중요</span>' : ''}</div>`).join('')}</div>` : ''}`));
+
+    /* 2. 최근 7일 완료율 */
+    h += sec('📈', '최근 7일 완료율', 'report', two((sn) => `
+      <div class="dtrend">${sn.trend.map((x) => `<div class="dtb" title="${x.k} · ${x.v == null ? '기록 없음' : x.v + '%'}"><i style="height:${x.v == null ? 2 : Math.max(3, x.v)}%" class="${x.v == null ? 'none' : x.v >= 90 ? 'good' : x.v >= 70 ? 'mid' : 'low'}"></i><span>${x.k.slice(8)}</span></div>`).join('')}</div>
+      <div class="mut" style="font-size:12px">초록 90% 이상 · 노랑 70~89% · 빨강 70% 미만 · 회색 기록 없음</div>`));
+
+    /* 3. 수조·갑각류 */
+    h += sec('🦀', '수조 · 폐사', 'tanks', two((sn) => `
+      <div class="dkpis two"><div>${kpi('수조 처리', `${sn.tanks.length}<small>건</small>`, sn.tanks.length ? sn.tanks.slice(0, 2).join(' · ') : '주기 안', sn.tanks.length ? 'bad' : 'ok')}</div><div>${kpi('폐사 7일', `${sn.deathSum}<small>마리</small>`, sn.deathSum ? '최근 7일 합계' : '0 또는 기록 없음', sn.deathSum >= 10 ? 'bad' : '')}</div></div>
+      <div class="spark sm">${(() => { const mx = Math.max(...sn.deaths7.map((x) => x.v), 1); return sn.deaths7.map((x) => `<span class="sb" title="${x.k} · ${x.v}마리"><i style="height:${Math.max(3, x.v / mx * 100)}%"></i></span>`).join(''); })()}</div>`));
+
+    /* 4. 오늘 근무 */
+    h += sec('👥', '오늘 근무 (오전 · 오후 조)', 'month', two((sn) => `
+      <div class="dshift"><div><span class="dll">오전 조 ${sn.am.length}명</span><div>${sn.am.length ? sn.am.map(esc).join(', ') : '<span class="mut">편성 없음</span>'}</div></div>
+      <div><span class="dll">오후 조 ${sn.pm.length}명</span><div>${sn.pm.length ? sn.pm.map(esc).join(', ') : '<span class="mut">편성 없음</span>'}</div></div></div>`));
+
+    /* 5. 교육·미션 */
+    h += sec('🎓', '교육 · 개인 미션', 'training', two((sn) => `
+      <div class="dkpis">${kpi('확인 대기', `${sn.msWait}<small>건</small>`, sn.msWait ? '사장님 확인 필요' : '없음', sn.msWait ? 'bad' : 'ok')}${kpi('이달 달성', `${sn.msDone}<small>건</small>`, `진행 중 ${sn.msOpen} · 목표 1인 ${sn.goal}`)}${kpi('교육', `${sn.badges}<small>배지</small>`, `본 영상 ${sn.watched}편 · 직원 ${sn.staffN}명`)}</div>
+      ${Object.keys(sn.msByWho).length ? `<div class="dlist">${Object.entries(sn.msByWho).sort((x, y) => y[1].d - x[1].d).slice(0, 4).map(([nm, c]) => `<div class="dli">${esc(nm)} <b>${c.d}</b>/${sn.goal}${c.d >= sn.goal ? ' 🏆' : ''}${c.w ? ` <span class="chip crit">확인 대기 ${c.w}</span>` : ''}</div>`).join('')}</div>` : '<div class="mut" style="font-size:12.5px">이달 미션이 아직 없습니다</div>'}`));
+
+    /* 5-2. 랭킹 — 두 매장 합쳐서 서로 독려 */
+    const all = stores.flatMap((st, i) => (st.id === cur ? gamify(S, st.id) : (dashDocs[st.id] ? gamify(dashDocs[st.id], st.id) : [])));
+    const reward = S.settings.rankReward || '이달 활동 1위와 배지 최다 보유자에게 사장님 보상';
+    const missingStore = stores.filter((st, i) => st.id !== cur && !dashDocs[st.id]).map((st) => st.name);
+    h += `<section class="dsec"><div class="dhead"><h3>🏆 이달 랭킹 — 안산점 · 안양점 전 직원</h3><button class="btn sm ghost" data-act="trainBoardGo">자세히 ›</button></div>
+      <div class="dreward">🎁 ${esc(reward)} <button class="btn sm ghost" data-act="rankReward">문구 고치기</button> <span class="mut">· 영상 ${POINTS.video}점 · 퀴즈 ${POINTS.quiz}점 · 코스 완주 ${POINTS.course}점 · 체크 ${POINTS.check}점(중요 ${POINTS.crit}) · 미션 등록 ${POINTS.msAdd} · 달성 ${POINTS.msDone} · 월 목표 +${POINTS.msGoal} · 같은 점수는 같은 등수</span></div>
+      ${missingStore.length ? `<div class="hint" style="margin:0 0 8px">${esc(missingStore.join(', '))} 직원은 서버에 연결되면 함께 순위에 들어갑니다.</div>` : ''}
+      ${rankTableAll(all)}</section>`;
+
+    /* 6. 트러블 — 공용 문서, 매장별로 나눠 센다 */
+    h += sec('📝', '트러블 (미해결)', 'issues', stores.map((st) => { const mine = openIssues.filter((x) => x.store === st.name); return `<div class="dcol${st.id === cur ? ' me' : ''}"><div class="dcolh"><b>${esc(st.name)}</b><span class="chip ${mine.length ? 'crit' : 'ok'}">${mine.length}건</span></div>
+      ${mine.length ? `<div class="dlist">${mine.slice(0, 3).map((x) => `<button class="dli linkish" data-act="issueOpen" data-id="${x.id}"><span class="chip cat">${esc(x.cat || '')}</span>${esc(x.title)} <span class="mut">${new Date(x.createdAt).toLocaleDateString('ko-KR')}</span></button>`).join('')}</div>` : '<div class="mut" style="padding:8px 0;font-size:12.5px">미해결 트러블 없음</div>'}</div>`; }).join(''));
+    return h;
+  }
+  /* 실시간 — 다른 매장 문서가 서버에서 바뀌면 바로 받아 다시 그린다. 대시보드를 벗어나면 구독을 끊는다. 1분마다 보조 폴링 */
+  let dashUnsubs = [], dashPoll = null, dashLiveOn = false;
+  function dashLive() {
+    if (view !== 'dash') { dashLiveOff(); return; }
+    if (dashLiveOn) return;
+    if (!(Store.supa && Store.supa.signedIn)) return;
+    dashLiveOn = true;
+    const cur = Store.meta.current;
+    (Store.meta.stores || []).forEach((st) => { if (st.id === cur) return; dashUnsubs.push(Store.watchDoc('state:' + st.id, (doc) => { if (doc && doc.templates) { dashDocs[st.id] = doc; if (view === 'dash' && $('#modal').hidden) render(); } })); });
+    dashPoll = setInterval(() => { if (view !== 'dash') { dashLiveOff(); return; } dashAt = 0; dashAsyncLoad(true); }, 60000);
+  }
+  function dashLiveOff() { dashUnsubs.forEach((u) => { try { u(); } catch (_) { /* 무시 */ } }); dashUnsubs = []; if (dashPoll) clearInterval(dashPoll); dashPoll = null; dashLiveOn = false; }
+  document.addEventListener('cloud-status', () => { if (view === 'dash') { dashLiveOff(); dashAt = 0; dashAsyncLoad(true); render(); } });
+  /* 다른 매장 문서는 서버에서 받아 30초 캐시. 받으면 대시보드를 한 번 다시 그린다 */
+  async function dashAsyncLoad(force) {
+    if (!force && Date.now() - dashAt < 30000) return;
+    dashAt = Date.now();
+    const cur = Store.meta.current; let changed = false;
+    for (const st of (Store.meta.stores || [])) {
+      if (st.id === cur) continue;
+      try { const doc = await Store.loadStore(st.id); if (doc && doc.templates) { dashDocs[st.id] = doc; changed = true; } } catch (_) { /* 무시 */ }
+    }
+    if (changed && view === 'dash') render();
   }
 
   /* ── 수조 관리표 ─────────────────────────────────────────── */
@@ -809,14 +1351,98 @@ const App = (() => {
     return out;
   }
 
-  function tankAlerts() {
-    const T = S.tanks; if (!T || !T.items) return [];
-    const c = T.cycle || TANK_DEFAULT().cycle, tk = dateKey(), out = [];
-    T.items.forEach((it) => {
-      if (it.water && it.water.date && diffDays(it.water.date, tk) > c.water.late) out.push(`수조 ${it.n} 해수 교체`);
-      if (it.clean && it.clean.date && diffDays(it.clean.date, tk) > c.clean.late) out.push(`수조 ${it.n} 청소`);
+  /* ── 폐사 기록 · 3일 안에 사용 (사장님 요청 2026-10-08) ──
+     폐사는 두 곳에서 들어온다: ① 할 일(갑각류 상태 확인 등)에서 입력한 폐사 마릿수 ② 수조 관리표에서 직접 적은 기록(S.deaths[]).
+     폐사한 날 + 3일이 사용 기한. 사용 처리는 S.deadUse[key] = { at, by, how } 로 남긴다. */
+  const DEAD_DAYS = 3;
+  function deadEntries(days) {
+    const tk = dateKey(), from = shift(tk, -(days || 30)), out = [];
+    Object.entries(S.days || {}).forEach(([k, d]) => {
+      if (k < from || k > tk) return;
+      Object.entries(d.inst || {}).forEach(([tid, r]) => {
+        if (!r || r.s !== 'done' || r.ev == null) return;
+        const t = tpl(tid); if (!t || t.ev !== 'deaths') return;
+        if (typeof r.ev === 'object') SPECIES.forEach((sp) => { const n = Number(r.ev[sp]) || 0; if (n > 0) out.push({ key: `${k}|${tid}|${sp}`, date: k, sp, n, by: r.by || '', src: t.title }); });
+        else if (Number(r.ev) > 0) out.push({ key: `${k}|${tid}|기타`, date: k, sp: '기타', n: Number(r.ev), by: r.by || '', src: t.title });
+      });
     });
-    return out;
+    (S.deaths || []).forEach((x) => { if (x.date >= from) out.push({ key: `m|${x.id}`, id: x.id, date: x.date, sp: x.sp, n: Number(x.n) || 0, by: x.by || '', tank: x.tank, note: x.note, src: '직접 기록' }); });
+    out.forEach((e) => { e.use = (S.deadUse || {})[e.key] || null; e.due = addDays(e.date, DEAD_DAYS); e.left = diffDays(tk, e.due); });
+    // 미사용이 위(기한 급한 순), 사용 완료는 아래(최근 순)
+    return out.sort((a, b) => (!!a.use - !!b.use) || (a.use ? b.date.localeCompare(a.date) : a.left - b.left || a.date.localeCompare(b.date)));
+  }
+  const deadLeftLabel = (e) => e.left > 1 ? `${md(e.due)}까지 · ${e.left}일 남음` : e.left === 1 ? `내일(${md(e.due)})까지` : e.left === 0 ? '오늘까지 사용' : `기한 ${-e.left}일 지남`;
+  const deadLeftCls = (e) => e.left >= 2 ? 'ok' : e.left === 1 ? 'warn' : 'bad';
+  function deadSection() {
+    const all = deadEntries(30), open = all.filter((e) => !e.use), used = all.filter((e) => e.use);
+    const sum = (arr) => arr.reduce((a, e) => a + e.n, 0);
+    const today = open.filter((e) => e.left === 0), over = open.filter((e) => e.left < 0);
+    const rowOf = (e) => `<tr class="${e.use ? 'used' : deadLeftCls(e)}">
+      <td>${md(e.date)} (${WD[new Date(e.date + 'T00:00:00').getDay()]})</td>
+      <td><b>${esc(e.sp)}</b></td><td class="r"><b>${e.n}</b>마리</td>
+      <td>${e.tank ? `수조 ${esc(String(e.tank))}` : '<span class="dim">—</span>'}</td>
+      <td>${e.use ? `<span class="tkAgo used">사용 완료</span> <small class="mut">${esc(e.use.by || '')} ${esc(e.use.at || '')}${e.use.how ? ' · ' + esc(e.use.how) : ''}</small>` : `<span class="tkAgo ${deadLeftCls(e)}">${deadLeftLabel(e)}</span>`}</td>
+      <td class="mut">${esc(e.by || '')}<br><small>${esc(e.src)}</small>${e.note ? `<br><small>${esc(e.note)}</small>` : ''}</td>
+      <td>${e.use ? `<button class="btn sm ghost" data-act="deadUnuse" data-key="${esc(e.key)}">되돌리기</button>` : `<button class="btn sm primary" data-act="deadUse" data-key="${esc(e.key)}">사용 완료</button>`}${e.id ? ` <button class="more" data-act="deadDel" data-id="${e.id}" aria-label="삭제">✕</button>` : ''}</td></tr>`;
+    return `<div class="hd sub2"><h3>🦀 폐사 기록 — 3일 안에 사용</h3>
+      <button class="btn sm primary" data-act="deadAdd" style="margin-left:auto">+ 폐사 기록</button></div>
+    <p class="hint" style="margin:0 0 8px">폐사한 갑각류는 <b>폐사한 날부터 3일 안에</b> 사용해야 합니다. 할 일에서 입력한 폐사 마릿수는 여기에 자동으로 들어오고, 사용했으면 <b>사용 완료</b>를 눌러 누가 어떻게 썼는지 남깁니다.</p>
+    ${open.length ? `<div class="notice ${over.length || today.length ? 'warn' : ''}"><b>사용 대기 ${sum(open)}마리</b>${today.length ? ` · <b class="crit">오늘까지 ${sum(today)}마리</b>` : ''}${over.length ? ` · <b class="crit">기한 지남 ${sum(over)}마리</b>` : ''}${!today.length && !over.length ? ' · 아직 여유 있음' : ''}</div>` : ''}
+    ${all.length ? `<div class="tkLogWrap"><table class="tkLog deadTbl">
+      <thead><tr><th>폐사일</th><th>품종</th><th class="r">마릿수</th><th>수조</th><th>사용 기한 · 상태</th><th>기록</th><th></th></tr></thead>
+      <tbody>${all.map(rowOf).join('')}</tbody>
+      <tfoot><tr><td colspan="2">최근 30일</td><td class="r">${sum(all)}마리</td><td colspan="4">사용 대기 ${sum(open)} · 사용 완료 ${sum(used)}</td></tr></tfoot></table></div>`
+      : '<div class="tkEmptyLog">최근 30일 폐사 기록이 없습니다. 할 일에서 폐사를 입력하거나 위 "+ 폐사 기록"으로 남기세요.</div>'}`;
+  }
+  function deadAddModal() {
+    const T = tanksOf();
+    modal('폐사 기록', `<label>폐사일<input type="date" id="ddDate" value="${dateKey()}" max="${dateKey()}"></label>
+      <div class="mlabel">품종</div><div class="roles" id="ddSp">${SPECIES.map((sp, i) => `<button type="button" class="rl${i === 0 ? ' on' : ''}" data-sp="${esc(sp)}">${esc(sp)}</button>`).join('')}</div>
+      <div class="frow"><label>마릿수<input type="number" id="ddN" min="1" step="1" value="1" inputmode="numeric"></label>
+      <label>수조 번호 <span class="opt">선택</span><select id="ddTank"><option value="">—</option>${T.items.map((it) => `<option value="${it.n}">수조 ${it.n}</option>`).join('')}</select></label></div>
+      <label>메모 <span class="opt">선택</span><input id="ddNote" placeholder="예: 집게 떨어짐 · 활력 저하 후 폐사"></label>
+      ${whoInput(whoNow())}
+      <p class="hint">저장하면 폐사일 + 3일이 사용 기한으로 잡힙니다.</p>`, () => {
+      const n = Number($('#ddN').value); if (!(n > 0)) { alert('마릿수를 넣어 주세요.'); return false; }
+      const by = whoValue(); if (!by) { alert('누가 기록하는지 적어 주세요.'); return false; }
+      const sp = (document.querySelector('#ddSp .rl.on') || {}).dataset?.sp || SPECIES[0];
+      S.deaths = S.deaths || [];
+      S.deaths.push({ id: 'd' + Date.now(), date: $('#ddDate').value || dateKey(), sp, n, tank: $('#ddTank').value || undefined, note: $('#ddNote').value.trim() || undefined, by, at: stamp() });
+      save(); render();
+    }, '저장');
+    $('#ddSp').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return; $('#ddSp').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); });
+    bindWhoChips();
+  }
+  function deadUseModal(key) {
+    const e = deadEntries(60).find((x) => x.key === key); if (!e) return;
+    modal(`사용 완료 — ${e.sp} ${e.n}마리 (${md(e.date)} 폐사)`, `
+      <div class="mlabel">어떻게 사용했나요</div>
+      <div class="roles wrap" id="duHow">${['찜 서비스', '직원 식사', '육수·요리용', '폐기'].map((h) => `<button type="button" class="rl" data-how="${h}">${h}</button>`).join('')}</div>
+      <input id="duHowIn" placeholder="직접 입력 (예: 단골 서비스로 제공)" style="margin-top:6px">
+      ${whoInput(whoNow())}`, () => {
+      const by = whoValue(); if (!by) { alert('누가 처리했는지 적어 주세요.'); return false; }
+      const sel = document.querySelector('#duHow .rl.on');
+      const how = $('#duHowIn').value.trim() || (sel ? sel.dataset.how : '');
+      S.deadUse = S.deadUse || {}; S.deadUse[key] = { at: stamp(), by, how: how || undefined };
+      save(); render();
+    }, '저장');
+    $('#duHow').addEventListener('click', (ev) => { const b = ev.target.closest('.rl'); if (!b) return; $('#duHow').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); $('#duHowIn').value = ''; });
+    bindWhoChips();
+  }
+  /* 사용 기한이 오늘이거나 지난 폐사 — 수조 관리표 상단·대시보드 "수조 처리"에 같이 뜬다 */
+  function deadAlerts() {
+    return deadEntries(30).filter((e) => !e.use && e.left <= 0).map((e) => `폐사 ${e.sp} ${e.n}마리 ${e.left === 0 ? '오늘까지 사용' : '사용 기한 지남'}`);
+  }
+  function tankAlerts() {
+    const T = S.tanks, tk = dateKey(), out = [];
+    if (T && T.items) {
+      const c = T.cycle || TANK_DEFAULT().cycle;
+      T.items.forEach((it) => {
+        if (it.water && it.water.date && diffDays(it.water.date, tk) > c.water.late) out.push(`수조 ${it.n} 해수 교체`);
+        if (it.clean && it.clean.date && diffDays(it.clean.date, tk) > c.clean.late) out.push(`수조 ${it.n} 청소`);
+      });
+    }
+    return out.concat(deadAlerts());
   }
 
   function vTanks() {
@@ -863,6 +1489,8 @@ const App = (() => {
       <span class="tkFirst inl">먼저 사용 ①</span><span class="hint" style="margin:0">= 같은 품종 중 가장 먼저 들어온 칸. 주문 나가면 여기서 먼저 뺍니다</span></div>
 
     <p class="hint">수조 개수와 교체·청소 주기는 <b>설정 → 수조 관리</b>에서 바꿉니다.</p>
+
+    ${deadSection()}
 
     <div class="hd sub2"><h3>해수 교체 · 청소 기록</h3><span class="hint" style="margin:0">위 칸에서 기록할 때마다 한 줄씩 · 최근 것이 위</span></div>
     ${T.care.length ? `<div class="tkLogWrap"><table class="tkLog">
@@ -967,6 +1595,61 @@ const App = (() => {
   }
 
   /* ── 공지사항 필독 ───────────────────────────────────────── */
+  /* 테스트 기간 피드백 기본 양식 — 게시판 글 쓰기에 자동으로 채워지고, 공지사항 필독 맨 위에도 보인다 (사장님 요청 2026-10-07) */
+  const FB_CATS = ['앱 오류', '앱 건의'];
+  const FB_TEMPLATE = [
+    '📍 어느 화면 : (예: 업무 › 할 일 › 미들)',
+    '👆 무엇을 눌렀나 : (예: "갑각류 중간체크" 완료)',
+    '❗ 어떻게 됐나 : (예: 체크됐다가 2초 뒤 풀림)',
+    '✅ 이렇게 되면 좋겠다 : ',
+    '📱 기기 : 매장 아이패드 / 내 폰(기종)',
+    '🔁 다시 해도 같은가 : 예 / 아니오 / 가끔',
+  ].join('\n');
+  function fbNotice() {
+    return `<div class="fbBox">
+      <div class="fbHead"><b>🧪 오류·수정 요청은 이 양식으로</b><span class="chip wk">공유 게시판에 올라갑니다</span></div>
+      <p class="hint" style="margin:0 0 8px">업무 › 공유 게시판 › 글 쓰기에서 종류를 <b>앱 오류</b> 또는 <b>앱 건의</b>로 고르면 아래 칸이 자동으로 채워집니다. 괄호 안 예시를 지우고 한 줄씩만 적으면 됩니다. 이름은 익명으로 해도 됩니다.</p>
+      <pre class="fbTpl">${esc(FB_TEMPLATE)}</pre>
+      <div class="fbImp"><span class="chip crit">중요</span><b>건의는 혼자 판단해서 올리지 않습니다.</b> 반드시 같이 일하는 팀원들과 먼저 상의하고, 상의한 내용으로 올려 주세요. 오류 신고는 혼자 바로 올려도 됩니다.</div>
+      <div class="rowbtns"><button class="btn primary sm" data-act="fbNew" data-c="앱 오류">🐛 오류 신고 쓰기</button><button class="btn sm" data-act="fbNew" data-c="앱 건의">🙋 건의 쓰기</button><button class="btn sm ghost" data-act="fbCopy">양식 복사</button></div>
+      <p class="hint">제목은 한눈에 알 수 있게: "할 일 체크가 풀림", "근무표에 내 이름 없음"처럼 <b>어디 + 무엇</b>으로.</p>
+      ${fbRecent()}
+    </div>`;
+  }
+  /* 접수된 오류·건의 — 쓴 글이 바로 이 자리에 남고, 지난 것도 전부 이력으로 볼 수 있다 (사장님 요청 2026-10-08). 두 매장 공용, 최근 것이 위 */
+  let fbUi = { f: 'all', all: false };   // 이 기기 화면 전용 — 저장하지 않는다
+  function fbSnip(x) {
+    const lines = String(x.body || '').split('\n').map((l) => l.trim()).filter(Boolean);
+    const val = (l) => l.replace(/^[^:：]*[:：]\s*/, '').replace(/\(예:[^)]*\)/g, '').trim();
+    const pick = lines.find((l) => l.startsWith('❗') && val(l)) || lines.find((l) => l.startsWith('✅') && val(l)) || lines.find((l) => val(l));
+    const t = pick ? val(pick) : '';
+    return t.length > 70 ? t.slice(0, 70) + '…' : t;
+  }
+  function fbRecent() {
+    const all = issuesAll().filter((x) => FB_CATS.includes(x.cat)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const open = all.filter((x) => x.status !== 'done').length, done = all.length - open;
+    if (!all.length) return `<div class="fbList"><div class="fbListHead"><b>접수된 오류·건의</b><span class="mut">아직 없음 — 올리면 여기에 바로 남습니다</span></div></div>`;
+    const F = { all: () => true, open: (x) => x.status !== 'done', done: (x) => x.status === 'done', bug: (x) => x.cat === '앱 오류', idea: (x) => x.cat === '앱 건의' };
+    const list = all.filter(F[fbUi.f] || F.all);
+    const LIM = 8, shown = fbUi.all ? list : list.slice(0, LIM);
+    const chip = (k, label) => `<button class="chip pick${fbUi.f === k ? ' on' : ''}" data-act="fbFilter" data-f="${k}">${label}</button>`;
+    const row = (x) => { const snip = fbSnip(x), last = (x.replies || []).slice(-1)[0];
+      return `<button class="fbRow${x.status === 'done' ? ' done' : ''}" data-act="issueOpen" data-id="${x.id}">
+        <span class="fbCat">${x.cat === '앱 오류' ? '🐛' : '🙋'}</span>
+        <span class="fbTitle">${esc(x.title)}</span>
+        <span class="fbMeta">${esc(x.store || '')} · ${x.anon ? '익명' : esc(x.by || '')} · ${new Date(x.createdAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}${(x.replies || []).length ? ` · 💬${x.replies.length}` : ''}</span>
+        ${snip ? `<span class="fbSnip">${esc(snip)}</span>` : ''}
+        ${last && last.fix ? `<span class="fbSnip fix">✅ ${esc(last.text.length > 70 ? last.text.slice(0, 70) + '…' : last.text)}</span>` : ''}
+        <span class="ipill${x.status === 'done' ? ' done' : ''}">${x.status === 'done' ? '처리 완료' : '접수'}</span></button>`; };
+    return `<div class="fbList">
+      <div class="fbListHead"><b>접수된 오류·건의 ${all.length}건</b><span class="mut">처리 전 ${open} · 처리 완료 ${done} · 누르면 내용과 답글</span></div>
+      <div class="fbChips">${chip('all', `전체 ${all.length}`)}${chip('open', `접수 ${open}`)}${chip('done', `처리 완료 ${done}`)}${chip('bug', '🐛 오류')}${chip('idea', '🙋 건의')}</div>
+      ${shown.length ? shown.map(row).join('') : '<div class="mut" style="padding:6px 2px">해당하는 글이 없습니다.</div>'}
+      <div class="rowbtns" style="margin-top:6px">
+        ${list.length > LIM ? `<button class="btn sm ghost" data-act="fbAll">${fbUi.all ? '최근 8건만' : `전체 이력 펼치기 (${list.length}건)`}</button>` : ''}
+        <button class="btn sm ghost" data-act="view" data-v="issues">공유 게시판에서 보기</button>
+      </div></div>`;
+  }
   function vRules() {
     const sid = Store.meta ? Store.meta.current : 'ansan';
     const stores = Store.meta ? Store.meta.stores : [{ id: 'ansan', name: '안산점' }, { id: 'anyang', name: '안양점' }];
@@ -1038,7 +1721,7 @@ const App = (() => {
         폴더 안의 <b>실행하기</b> 파일로 다시 열어주세요. 그래도 같으면 크롬이나 엣지로 열어보세요.</div></div>`;
     }
 
-    { const sp = Store.supa; if (sp.configured && !sp.signedIn && sp.libLoaded) h += `<div class="notice warn"><b>서버 로그인이 풀렸습니다.</b> 지금은 이 기기에만 저장됩니다. <button class="btn sm" data-act="supaLogin">로그인</button></div>`; }
+    { const sp = Store.supa; if (sp.configured && !sp.signedIn && sp.libLoaded) h += `<div class="notice warn"><b>서버에 연결되지 않았습니다.</b> 지금은 이 기기에만 저장됩니다. 인터넷을 확인하고 <button class="btn sm" data-act="supaRetry">다시 연결</button></div>`; }
     const ta = tankAlerts();
     if (isToday && ta.length) {
       h += `<button class="notice pin" data-act="view" data-v="tanks">🐟 <b>수조 ${ta.length}건 오늘 처리</b> — ${ta.map(esc).join(' · ')}</button>`;
@@ -1200,9 +1883,10 @@ const App = (() => {
       ${canDrag ? `<span class="dragH" data-drag="${tid}" title="끌어서 순서 바꾸기">⠿</span>` : ''}
       <button class="ck" data-act="toggle" data-id="${tid}" aria-label="${esc(t.title)} 완료"${opt.isFuture ? ' disabled' : ''}>${rec.s === 'done' ? '✓' : rec.s === 'skip' ? '–' : ''}</button>
       <button class="tcMain" data-act="cardOpen" data-id="${tid}">
-        <div class="tcTitle"><span class="chip ${rc}">${role}</span>${esc(t.title)}${t.crit ? '<span class="chip crit">중요</span>' : ''}${rep.t === 'weekly' ? `<span class="chip wk">주 ${rep.days.length}회 · ${repDays(t)}</span>` : ''}${late ? '<span class="chip late">지연</span>' : ''}${missed ? '<span class="chip missed">미완료</span>' : ''}</div>
-        ${rec.s === 'done' ? `<div class="tcBy ok">${rec.by ? esc(rec.by) + ' · ' : ''}${rec.at || ''}${rec.ev != null ? ` · ${t.ev === 'deaths' || typeof rec.ev === 'object' ? esc(deathsLabel(rec.ev)) : esc(t.evLabel || '입력') + ' ' + esc(rec.ev)}` : ''}${rec.note ? ` · ${esc(rec.note)}` : ''}</div>` : ''}
+        <div class="tcTitle"><span class="chip ${rc}">${role}</span>${esc(t.title)}${t.crit ? '<span class="chip crit">중요</span>' : ''}${typeof HEAVY_TASKS !== 'undefined' && HEAVY_TASKS.has(tid) ? '<span class="chip heavy" title="몸을 많이 쓰는 일">💪</span>' : ''}${rep.t === 'weekly' ? `<span class="chip wk">주 ${rep.days.length}회 · ${repDays(t)}</span>` : ''}${late ? '<span class="chip late">지연</span>' : ''}${missed ? '<span class="chip missed">미완료</span>' : ''}</div>
+        ${rec.s === 'done' ? `<div class="tcBy ok">${rec.by ? esc(rec.by) + ' · ' : ''}${rec.at || ''}${rec.ev != null ? ` · ${t.ev === 'deaths' || typeof rec.ev === 'object' ? esc(deathsLabel(rec.ev)) : esc(t.evLabel || '입력') + ' ' + esc(rec.ev)}` : ''}</div>` : ''}
         ${rec.s === 'skip' ? (rec.auto ? `<div class="tcBy auto">자동 완료 — ${esc(rec.reason || '')}</div>` : `<div class="tcBy warn">건너뜀 — ${esc(rec.reason || '')}</div>`) : ''}
+        ${rec.note ? `<div class="tcNote">📝 ${esc(rec.note)}</div>` : (rec.s === 'done' && !rec.auto && !opt.isFuture ? `<div class="tcNote empty">📝 메모 없음</div>` : '')}
         <div class="tcBody">
           ${t.memo ? `<div class="tcMemo">${esc(t.memo)}</div>` : ''}
           <div class="tcMeta">담당 ${role}${tplScope(t) !== 'all' ? ` · ${esc(scopeName(tplScope(t)))}만` : ''}${t.support ? ` · 보조 ${t.support}` : ''}${t.deadline ? ` · 마감 ${t.deadline}` : ''}${evLabel ? ` · ${evLabel}` : ''}</div>
@@ -1211,6 +1895,7 @@ const App = (() => {
       <span class="tcRight">
         ${canDrag ? `<button class="tTime" data-act="cardTime" data-id="${tid}" title="시각 바꾸기">${esc(t.time || '')} ✎</button>` : ''}
         <span class="repBadge">${repLabel}</span>
+        ${opt.isFuture || rec.auto ? '' : `<button class="more" data-act="taskNote" data-id="${tid}" title="메모 남기기" aria-label="메모">📝</button>`}
         ${opt.isFuture ? '' : `<button class="more" data-act="menu" data-id="${tid}" aria-label="더보기">⋯</button>`}
       </span>
     </div>`;
@@ -1361,17 +2046,21 @@ const App = (() => {
   function patternModal() {
     const pat = patternOf(), m = monthKey();
     const rows = [1, 2, 3, 4, 5, 6, 0].map((d) => `<tr><th>${WD[d]}</th>
-      <td><input data-pat="${d}:am" value="${esc((pat[d] || {}).am ? pat[d].am.join(', ') : '')}" placeholder="이름, 이름" autocomplete="off"></td>
-      <td><input data-pat="${d}:pm" value="${esc((pat[d] || {}).pm ? pat[d].pm.join(', ') : '')}" placeholder="이름, 이름" autocomplete="off"></td></tr>`).join('');
+      <td><input data-pat="${d}:am" value="${esc((pat[d] || {}).am ? pat[d].am.join(', ') : '')}" placeholder="칸 누르고 아래 이름 선택" autocomplete="off"></td>
+      <td><input data-pat="${d}:pm" value="${esc((pat[d] || {}).pm ? pat[d].pm.join(', ') : '')}" placeholder="칸 누르고 아래 이름 선택" autocomplete="off"></td></tr>`).join('');
     modal('요일별 오전·오후 조 패턴', `
-      <p class="hint" style="margin-top:0">매주 같은 사람이 나오는 기본 패턴입니다. 이름은 쉼표로 나눠 적으세요. 오후 조는 <b>${esc(S.settings.pmStart || '17:00')}</b>부터입니다 (설정 › 인원 기준에서 변경).</p>
+      <p class="hint" style="margin-top:0">매주 같은 사람이 나오는 기본 패턴입니다. <b>표의 칸을 누른 뒤 아래 이름을 누르면</b> 들어가고, 다시 누르면 빠집니다. 오후 조는 <b>${esc(S.settings.pmStart || '17:00')}</b>부터입니다 (설정 › 인원 기준에서 변경).</p>
       <div class="tkLogWrap"><table class="tkLog patTbl"><thead><tr><th>요일</th><th>오전 조</th><th>오후 조 (${esc(S.settings.pmStart || '17:00')}~)</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="mlabel" id="patTargetLbl">넣을 칸: 표에서 요일·조 칸을 누르세요</div>
+      ${crewChips(null, null)}
       <label class="chk" style="margin-top:10px"><input type="checkbox" id="patOver"> 이미 배치된 날도 패턴으로 덮어쓰기 (병원·대체 같은 예외가 지워집니다)</label>
       <div class="rowbtns" style="margin-top:8px"><button type="button" class="btn primary" data-act="patFill">${monthLabel(m)} 채우기</button>
         <button type="button" class="btn" data-act="patFillNext">${monthLabel(monthShiftKey(m, 1))}도 채우기</button></div>
       <p class="hint">채운 뒤 병원·대체 근무 같은 예외는 달력에서 날짜를 누르고 <b>오전·오후 조 편집</b>으로 고치면 됩니다.</p>`, () => {
       readPattern(); save(); render();
     }, '패턴만 저장');
+    bindCrewPicker($('#modal .mbody'), '[data-pat]');
+    $('#modal .mbody').addEventListener('focusin', (e) => { const inp = e.target.closest('[data-pat]'); if (!inp) return; const [d, k] = inp.dataset.pat.split(':'); $('#patTargetLbl').textContent = `넣을 칸: ${WD[d]}요일 ${k === 'am' ? '오전' : '오후'} 조`; });
   }
   function readPattern() {
     const pat = patternOf();
@@ -1380,18 +2069,58 @@ const App = (() => {
       pat[d] = pat[d] || { am: [], pm: [] }; pat[d][k] = splitNames(inp.value);
     });
   }
+  /* 직원 칩 선택기 — 이름을 타이핑하지 않고 명단에서 눌러 넣는다 (사장님 요청 2026-10-07).
+     data-for 가 있으면 그 입력칸에, 없으면 마지막으로 누른(포커스한) 입력칸에 이름을 넣고 뺀다. */
+  const roleShort = (r) => ({ '갑각류 관리자': '관리', '관리자': '관리', '홀': '홀', '주방': '주방' })[r] || (r || '').slice(0, 2);
+  function crewChips(forId, date) {
+    const list = S.staff.filter((st) => st.active && st.name);
+    if (!list.length) return `<p class="hint">직원 명단이 비어 있습니다. 인사관리 › 직원 명단에 등록하면 여기서 눌러 넣을 수 있습니다.</p>`;
+    return `<div class="roles wrap sm cpRow"${forId ? ` data-for="${forId}"` : ''}>${list.map((st) => {
+      const off = date ? isOffDay(st, date) : false;
+      return `<button type="button" class="rl cp${off ? ' off' : ''}" data-name="${esc(st.name)}" title="${off ? '고정 휴무일' : ''}">${esc(st.name)}${(st.roles || []).length ? `<small>${esc(roleShort(st.roles[0]))}</small>` : ''}${off ? '<small>휴</small>' : ''}</button>`;
+    }).join('')}</div>`;
+  }
+  function bindCrewPicker(root, inputSel) {
+    root = root || $('#modal .mbody');   // .mbody 는 모달을 열 때마다 새로 만들어져 리스너가 쌓이지 않는다
+    let target = null;
+    const inputs = () => [...root.querySelectorAll(inputSel)];
+    const syncRow = (row) => {
+      const inp = row.dataset.for ? root.querySelector('#' + row.dataset.for) : target;
+      const names = inp ? splitNames(inp.value) : [];
+      row.querySelectorAll('.cp').forEach((c) => c.classList.toggle('on', names.includes(c.dataset.name)));
+      row.classList.toggle('noTarget', !inp);
+    };
+    const syncAll = () => root.querySelectorAll('.cpRow').forEach(syncRow);
+    root.addEventListener('focusin', (e) => { const inp = e.target.closest(inputSel); if (!inp) return; target = inp; inputs().forEach((i) => i.classList.toggle('cpTarget', i === inp)); syncAll(); });
+    root.addEventListener('input', (e) => { if (e.target.closest(inputSel)) syncAll(); });
+    root.addEventListener('click', (e) => {
+      const c = e.target.closest('.cp'); if (!c) return;
+      const row = c.closest('.cpRow');
+      const inp = row.dataset.for ? root.querySelector('#' + row.dataset.for) : target;
+      if (!inp) { banner('먼저 넣을 칸을 누르세요', '표에서 요일·조 칸을 한 번 누른 뒤 이름을 누르면 들어갑니다.'); return; }
+      let names = splitNames(inp.value);
+      names = names.includes(c.dataset.name) ? names.filter((n) => n !== c.dataset.name) : [...names, c.dataset.name];
+      inp.value = names.join(', ');
+      syncAll();
+    });
+    syncAll();
+  }
+
   function shiftDayModal(date) {
     const sp = dayCrewSplit(date) || { am: [], pm: [] };
     const d = new Date(date + 'T00:00:00');
     modal(`${mdLabel(date)} ${WD[d.getDay()]}요일 — 오전·오후 조`, `
-      <label>오전 조<input id="sdAm" value="${esc(sp.am.join(', '))}" placeholder="이름, 이름" autocomplete="off"></label>
-      <label>오후 조 (${esc(S.settings.pmStart || '17:00')}~)<input id="sdPm" value="${esc(sp.pm.join(', '))}" placeholder="이름, 이름" autocomplete="off"></label>
-      <p class="hint">저장하면 이 날의 구간별 배치를 통째로 다시 만듭니다. 오픈 업무는 오전 조 인원, 미들·마감 업무는 오후 조 인원 기준으로 담당이 정해집니다.</p>`, () => {
+      <label>오전 조<input id="sdAm" value="${esc(sp.am.join(', '))}" placeholder="아래 이름을 누르거나 직접 입력" autocomplete="off"></label>
+      ${crewChips('sdAm', date)}
+      <label>오후 조 (${esc(S.settings.pmStart || '17:00')}~)<input id="sdPm" value="${esc(sp.pm.join(', '))}" placeholder="아래 이름을 누르거나 직접 입력" autocomplete="off"></label>
+      ${crewChips('sdPm', date)}
+      <p class="hint">이름을 누르면 들어가고 다시 누르면 빠집니다. 명단에 없는 사람은 칸에 직접 적어도 됩니다. 저장하면 이 날의 구간별 배치를 통째로 다시 만듭니다. 오픈 업무는 오전 조 인원, 미들·마감 업무는 오후 조 인원 기준으로 담당이 정해집니다.</p>`, () => {
       const am = splitNames($('#sdAm').value), pm = splitNames($('#sdPm').value);
       applyShiftDay(date, am, pm);
       logSched(`${mdLabel(date)} 오전 ${am.length}명 · 오후 ${pm.length}명 편성`);
       save(); render();
     }, '저장');
+    bindCrewPicker($('#modal .mbody'), '#sdAm, #sdPm');
   }
 
   let rtScope = 'all';
@@ -1654,81 +2383,108 @@ const App = (() => {
   /* ── 원가 관리 (매입) ─────────────────────────────────────── */
   const fmtWon = (n) => (Number(n) || 0).toLocaleString('ko-KR') + '원';
 
-  function vCosts() {
-    const m = S.ui.cmonth || dateKey().slice(0, 7);
+  /* 원가 관리는 두 판 (사장님 요청 2026-10-08, 두 매장 공통):
+     · 업무 › 원가 관리 (식자재) — 직원이 입력. 갑각류(대게·킹크랩·랍스터)는 아예 빠진다.
+     · 운영 › 총원가 — 사장님만. 갑각류 + 식자재 전체와 원가율. 갑각류 매입 입력도 여기서. */
+  const CRAB_CATS = ['대게', '킹크랩', '랍스터'];
+  const isCrabBuy = (x) => CRAB_CATS.includes(x.cat);
+  const monthBuys = (m) => (S.purchases || []).filter((x) => (x.date || '').slice(0, 7) === m).sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
+  const sumAmt = (arr) => arr.reduce((a, x) => a + (Number(x.amount) || 0), 0);
+  function monthNavCosts(m, extraBtns) {
     const [y, mo] = m.split('-').map(Number);
-    const list = (S.purchases || []).filter((x) => (x.date || '').slice(0, 7) === m)
-      .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || 0) - (a.createdAt || 0));
-
-    const total = list.reduce((a, x) => a + (Number(x.amount) || 0), 0);
-    // 같은 달 매출(회계 › 매출 입력 + 마감 정산 입력분) → 원가율
-    const sales = monthSales(m);
-    const byCat = {};
-    list.forEach((x) => { byCat[x.cat] = (byCat[x.cat] || 0) + (Number(x.amount) || 0); });
-
-    let h = `<div class="hd">
-      <div><h2>원가 관리</h2><div class="sub">매입한 것을 그때그때 적어두면 월말에 원가율이 저절로 나옵니다. 직원 누구나 입력할 수 있습니다.</div></div>
-      <div class="mnav">
+    return `<div class="mnav">
         <button class="dnav" data-act="cmonthNav" data-d="-1" aria-label="이전 달">‹</button>
         <span class="mtitle">${y}년 ${mo}월</span>
         <button class="dnav" data-act="cmonthNav" data-d="1" aria-label="다음 달">›</button>
-        <button class="btn" data-act="purchaseCsv">CSV 가져오기</button>
-        <button class="btn primary" data-act="purchaseAdd">+ 매입 입력</button>
-      </div>
-    </div>`;
-
-    h += `<div class="cards m4">
-      <div class="card"><div class="cl">이번 달 매입</div><div class="cv sm2">${fmtWon(total)}</div><div class="cs">${list.length}건</div></div>
-      <div class="card"><div class="cl">이번 달 매출</div><div class="cv sm2">${sales ? fmtWon(sales) : '–'}</div><div class="cs">회계 › 매출 입력 기준</div></div>
-      <div class="card${sales && total / sales > 0.45 ? ' warn' : ''}"><div class="cl">원가율</div>
-        <div class="cv">${sales ? Math.round(total / sales * 100) : '–'}<small>${sales ? '%' : ''}</small></div>
-        <div class="cs">매입 ÷ 매출</div></div>
-      <div class="card"><div class="cl">최다 분류</div>
-        <div class="cv sm2">${Object.keys(byCat).length ? Object.entries(byCat).sort((a, b) => b[1] - a[1])[0][0] : '–'}</div></div>
-    </div>`;
-
-    if (Object.keys(byCat).length) {
-      const mx = Math.max(...Object.values(byCat), 1);
-      h += `<div class="hd sub2"><h3>분류별 매입</h3></div><div class="loads">
-        ${Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => `<div class="lrow"><span class="ln">${esc(c)}</span>
-          <span class="lbar"><i style="width:${v / mx * 100}%"></i></span><span class="lv">${fmtWon(v)}</span></div>`).join('')}</div>`;
-    }
-
-    h += `<div class="hd sub2"><h3>매입 내역</h3><span class="hint" style="margin:0">분류 · 품목 · <b>수량</b> · <b>거래처</b> · 금액 · 기록자 — 줄을 누르면 수정</span></div>`;
-    if (!list.length) {
-      h += `<div class="notice"><b>이번 달 매입 기록이 없습니다.</b>
-        <div class="hint">입고될 때마다 <b>+ 매입 입력</b>으로 바로 적어두세요. 영수증이 쌓이고 나서 몰아 적으면 반드시 빠집니다.</div></div>`;
-    } else {
-      let lastDate = '';
-      h += `<div class="plist">`;
-      list.forEach((x) => {
-        if (x.date !== lastDate) {
-          lastDate = x.date;
-          const d = new Date(x.date + 'T00:00:00');
-          h += `<div class="pdate">${d.getMonth() + 1}월 ${d.getDate()}일 ${WD[d.getDay()]}</div>`;
-        }
-        h += `<button class="prow" data-act="purchaseEdit" data-id="${x.id}">
-          <span class="chip cat">${esc(x.cat)}</span>
+        ${extraBtns || ''}
+      </div>`;
+  }
+  function purchaseList(list, emptyMsg) {
+    if (!list.length) return `<div class="notice"><b>${emptyMsg || '이번 달 매입 기록이 없습니다.'}</b><div class="hint">입고될 때마다 <b>+ 매입 입력</b>으로 바로 적어두세요. 영수증이 쌓이고 나서 몰아 적으면 반드시 빠집니다.</div></div>`;
+    let lastDate = '', h = `<div class="plist">`;
+    list.forEach((x) => {
+      if (x.date !== lastDate) { lastDate = x.date; const d = new Date(x.date + 'T00:00:00'); h += `<div class="pdate">${d.getMonth() + 1}월 ${d.getDate()}일 ${WD[d.getDay()]}</div>`; }
+      h += `<button class="prow" data-act="purchaseEdit" data-id="${x.id}">
+          <span class="chip ${isCrabBuy(x) ? 'mgr' : 'cat'}">${esc(x.cat)}</span>
           <span class="pnm">${esc(x.name)}</span>
           <span class="pqty">${x.qty ? `${esc(x.qty)}<small>${esc(x.unit || '')}</small>` : '<small class="dim">수량 없음</small>'}</span>
           <span class="pvendor">${x.vendor ? `🏷 ${esc(x.vendor)}` : '<small class="dim">거래처 없음</small>'}</span>
           <span class="pamt">${fmtWon(x.amount)}</span>
           <span class="pby">${esc(x.by || '')}</span>
         </button>`;
-      });
-      h += `</div>`;
-    }
+    });
+    return h + `</div>`;
+  }
+  function catBars(byCat) {
+    const mx = Math.max(...Object.values(byCat), 1);
+    return `<div class="loads">${Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => `<div class="lrow"><span class="ln">${esc(c)}</span>
+          <span class="lbar"><i style="width:${v / mx * 100}%"></i></span><span class="lv">${fmtWon(v)}</span></div>`).join('')}</div>`;
+  }
+  /* 직원용 — 식자재·소모품만 */
+  function vCosts() {
+    const m = S.ui.cmonth || dateKey().slice(0, 7);
+    const list = monthBuys(m).filter((x) => !isCrabBuy(x));
+    const total = sumAmt(list), sales = monthSales(m);
+    const byCat = {};
+    list.forEach((x) => { byCat[x.cat] = (byCat[x.cat] || 0) + (Number(x.amount) || 0); });
+    let h = `<div class="hd">
+      <div><h2>원가 관리 — 식자재·소모품</h2><div class="sub">매장에서 실제로 사 오는 것(수산물 · 식자재 · 주류·음료 · 소모품)을 그때그때 적습니다. 갑각류 매입은 여기서 다루지 않습니다.</div></div>
+      ${monthNavCosts(m, `<button class="btn" data-act="purchaseCsv">CSV 가져오기</button><button class="btn primary" data-act="purchaseAdd" data-mode="staff">+ 매입 입력</button>`)}
+    </div>`;
+    h += `<div class="cards m4">
+      <div class="card"><div class="cl">이번 달 식자재 매입</div><div class="cv sm2">${fmtWon(total)}</div><div class="cs">${list.length}건</div></div>
+      <div class="card"><div class="cl">이번 달 매출</div><div class="cv sm2">${sales ? fmtWon(sales) : '–'}</div><div class="cs">매출 입력 기준</div></div>
+      <div class="card${sales && total / sales > 0.2 ? ' warn' : ''}"><div class="cl">식자재 원가율</div>
+        <div class="cv">${sales ? Math.round(total / sales * 100) : '–'}<small>${sales ? '%' : ''}</small></div>
+        <div class="cs">식자재 매입 ÷ 매출 (갑각류 제외)</div></div>
+      <div class="card"><div class="cl">최다 분류</div>
+        <div class="cv sm2">${Object.keys(byCat).length ? Object.entries(byCat).sort((a, b) => b[1] - a[1])[0][0] : '–'}</div></div>
+    </div>`;
+    if (Object.keys(byCat).length) h += `<div class="hd sub2"><h3>분류별 매입</h3></div>` + catBars(byCat);
+    h += `<div class="hd sub2"><h3>매입 내역</h3><span class="hint" style="margin:0">분류 · 품목 · <b>수량</b> · <b>거래처</b> · 금액 · 기록자 — 줄을 누르면 수정</span></div>`;
+    h += purchaseList(list);
     return h;
   }
-
-  function purchaseForm(x) {
-    const isNew = !x; x = x || { date: dateKey(), cat: PURCHASE_CATS[0], unit: 'kg' };
-    modal(isNew ? '매입 입력' : '매입 수정', `
+  /* 사장님용 — 갑각류 + 식자재 전체 */
+  function vCostAll() {
+    const m = S.ui.cmonth || dateKey().slice(0, 7);
+    const all = monthBuys(m), crab = all.filter(isCrabBuy), food = all.filter((x) => !isCrabBuy(x));
+    const tAll = sumAmt(all), tCrab = sumAmt(crab), tFood = sumAmt(food), sales = monthSales(m);
+    const pct = (v) => (sales ? Math.round(v / sales * 100) + '%' : '–');
+    const bySp = {}; crab.forEach((x) => { const o = bySp[x.cat] = bySp[x.cat] || { amt: 0, kg: 0, n: 0 }; o.amt += Number(x.amount) || 0; if ((x.unit || 'kg') === 'kg') o.kg += Number(x.qty) || 0; o.n++; });
+    const byCat = {}; food.forEach((x) => { byCat[x.cat] = (byCat[x.cat] || 0) + (Number(x.amount) || 0); });
+    let h = `<div class="hd">
+      <div><h2>총원가 — 갑각류 + 식자재</h2><div class="sub">사장님만 보는 화면입니다. 직원이 업무 › 원가 관리에 적은 식자재와 갑각류 매입을 합쳐 전체 원가율을 봅니다.</div></div>
+      ${monthNavCosts(m, `<button class="btn" data-act="purchaseCsv">CSV 가져오기</button><button class="btn" data-act="purchaseAdd" data-mode="crab">+ 갑각류 매입</button><button class="btn primary" data-act="purchaseAdd" data-mode="all">+ 매입 입력</button>`)}
+    </div>`;
+    h += `<div class="cards m4">
+      <div class="card"><div class="cl">총매입</div><div class="cv sm2">${fmtWon(tAll)}</div><div class="cs">${all.length}건</div></div>
+      <div class="card"><div class="cl">🦀 갑각류</div><div class="cv sm2">${fmtWon(tCrab)}</div><div class="cs">${crab.length}건 · 매출의 ${pct(tCrab)}</div></div>
+      <div class="card"><div class="cl">🧺 식자재·소모품</div><div class="cv sm2">${fmtWon(tFood)}</div><div class="cs">${food.length}건 · 매출의 ${pct(tFood)}</div></div>
+      <div class="card${sales && tAll / sales > 0.45 ? ' warn' : ''}"><div class="cl">총원가율</div><div class="cv">${sales ? Math.round(tAll / sales * 100) : '–'}<small>${sales ? '%' : ''}</small></div><div class="cs">총매입 ÷ 매출 ${fmtWon(sales)}</div></div>
+    </div>`;
+    h += `<div class="hd sub2"><h3>🦀 갑각류 매입 — 품종별</h3><span class="hint" style="margin:0">kg당 단가 흐름은 갑각류 매입 인사이트에서</span></div>`;
+    h += Object.keys(bySp).length ? `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>품종</th><th class="r">매입액</th><th class="r">kg</th><th class="r">kg당</th><th class="r">건</th><th class="r">매출 대비</th></tr></thead><tbody>
+      ${CRAB_CATS.filter((c) => bySp[c]).map((c) => { const o = bySp[c]; return `<tr><td><b>${c}</b></td><td class="r">${fmtWon(o.amt)}</td><td class="r">${o.kg ? fmtKg(o.kg) : '–'}</td><td class="r">${o.kg ? fmtWon(Math.round(o.amt / o.kg)) : '–'}</td><td class="r">${o.n}</td><td class="r">${pct(o.amt)}</td></tr>`; }).join('')}</tbody>
+      <tfoot><tr><td>합계</td><td class="r">${fmtWon(tCrab)}</td><td class="r">${fmtKg(Object.values(bySp).reduce((a, o) => a + o.kg, 0)) || '–'}</td><td></td><td class="r">${crab.length}</td><td class="r">${pct(tCrab)}</td></tr></tfoot></table></div>`
+      : `<div class="notice"><b>이번 달 갑각류 매입 기록이 없습니다.</b><div class="hint">위 <b>+ 갑각류 매입</b>으로 적거나 CSV로 가져오세요.</div></div>`;
+    h += `<div class="hd sub2"><h3>🧺 식자재·소모품 — 분류별</h3><span class="hint" style="margin:0">직원이 업무 › 원가 관리에서 입력</span></div>`;
+    h += Object.keys(byCat).length ? catBars(byCat) : `<div class="notice"><b>이번 달 식자재 매입 기록이 없습니다.</b></div>`;
+    h += `<div class="hd sub2"><h3>전체 매입 내역</h3><span class="hint" style="margin:0">갑각류는 진한 표시 — 줄을 누르면 수정</span></div>`;
+    h += purchaseList(all);
+    return h;
+  }
+  function purchaseForm(x, mode) {
+    const isNew = !x;
+    if (!mode) mode = x ? (isCrabBuy(x) ? 'crab' : 'staff') : 'staff';
+    const cats = mode === 'crab' ? CRAB_CATS : mode === 'all' ? PURCHASE_CATS : PURCHASE_CATS.filter((c) => !CRAB_CATS.includes(c));
+    x = x || { date: dateKey(), cat: cats[0], unit: mode === 'crab' ? 'kg' : '개' };
+    modal(isNew ? (mode === 'crab' ? '갑각류 매입 입력' : '매입 입력') : '매입 수정', `
       <div class="frow">
         <label>날짜<input type="date" id="puD" value="${esc(x.date)}"></label>
-        <label>분류<select id="puC">${PURCHASE_CATS.map((c) => `<option${c === x.cat ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
+        <label>분류<select id="puC">${cats.map((c) => `<option${c === x.cat ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
       </div>
-      <label>품목<input id="puN" value="${esc(x.name || '')}" placeholder="예: 러시아 대게 활"></label>
+      <label>품목<input id="puN" value="${esc(x.name || '')}" placeholder="${mode === 'crab' ? '예: 러시아 대게 활' : '예: 깻잎 10단 · 소주 2박스 · 위생장갑'}"></label>
       <div class="frow">
         <label>수량 <span class="opt">선택</span><input type="number" id="puQ" min="0" step="0.1" value="${x.qty ?? ''}" inputmode="decimal"></label>
         <label>단위<select id="puU">${PURCHASE_UNITS.map((u) => `<option${u === x.unit ? ' selected' : ''}>${u}</option>`).join('')}</select></label>
@@ -1835,8 +2591,8 @@ const App = (() => {
     if (issueCat !== 'all') list = list.filter((x) => x.cat === issueCat);
 
     let h = `<div class="hd">
-      <div><h2>트러블시트</h2><div class="sub">두 매장이 같이 보는 기록입니다. 크고 작은 일을 그날 바로 적고, 어떻게 해결했는지까지 남기세요. 같은 실수가 줄어듭니다.</div></div>
-      <button class="btn primary" data-act="issueAdd" style="margin-left:auto">+ 트러블 등록</button>
+      <div><h2>공유 게시판</h2><div class="sub">안산점·안양점이 같이 보는 게시판입니다. 트러블·건의·아이디어를 그날 바로 적고, 어떻게 했는지까지 남기세요. 이름 없이 <b>익명</b>으로도 올릴 수 있습니다.</div></div>
+      <button class="btn primary" data-act="issueAdd" style="margin-left:auto">+ 글 쓰기</button>
     </div>`;
 
     h += `<div class="rcbar">
@@ -1854,14 +2610,14 @@ const App = (() => {
     </div>`;
 
     if (!list.length) {
-      h += `<div class="notice"><b>${issueFilter === 'open' ? '진행 중인 트러블이 없습니다.' : '기록이 없습니다.'}</b>
+      h += `<div class="notice"><b>${issueFilter === 'open' ? '진행 중인 글이 없습니다.' : '글이 없습니다.'}</b>
         <div class="hint">예: "룸2 에어컨 소음 — 손님 컴플레인", "찜 시간 안내가 사람마다 다름". 잘잘못을 따지는 곳이 아니라 <b>다음에 어떻게 할지</b>를 남기는 곳입니다.</div></div>`;
     } else {
       h += list.map((x) => `<button class="icard" data-act="issueOpen" data-id="${x.id}">
         <div class="rcTop">
           <span class="ipill${x.status === 'done' ? ' done' : ''}">${x.status === 'done' ? '해결 완료' : '진행 중'}</span>
           <span class="chip store">${esc(x.store || '')}</span><span class="chip cat">${esc(x.cat)}</span>
-          <span class="rcMeta" style="margin-left:auto">${esc(x.by || '')} · ${new Date(x.createdAt).toLocaleDateString('ko-KR')}</span>
+          <span class="rcMeta" style="margin-left:auto">${x.anon ? '🙈 익명' : esc(x.by || '')} · ${new Date(x.createdAt).toLocaleDateString('ko-KR')}</span>
         </div>
         <div class="rcName">${esc(x.title)}</div>
         ${x.body ? `<div class="nbody">${esc(x.body.split('\n')[0])}</div>` : ''}
@@ -1872,16 +2628,18 @@ const App = (() => {
   }
 
   function issueForm(x) {
-    const isNew = !x; x = x || { cat: ISSUE_CATS[0] };
+    const isNew = !(x && x.id); x = x || { cat: ISSUE_CATS[0] };
     const curBy = x.by || (S.ui.whoDate === dateKey() ? S.ui.who : '') || '';
-    modal(isNew ? '트러블 등록' : '트러블 수정', `
+    modal(isNew ? '글 쓰기' : '글 수정', `
       <div class="mlabel">종류</div>
-      <div class="roles wrap" id="isCats">${ISSUE_CATS.map((c) => `<button type="button" class="rl${c === x.cat ? ' on' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}</div>
-      <input id="isCOther" placeholder="다른 종류 직접 입력" value="${x.cat && !ISSUE_CATS.includes(x.cat) ? esc(x.cat) : ''}" style="margin-top:6px">
-      <label>제목<input id="isT" value="${esc(x.title || '')}" placeholder="예: 룸2 에어컨 소음 — 손님 컴플레인"></label>
-      <label>무슨 일이 있었나요<textarea id="isB" rows="4" placeholder="상황을 그대로 적으세요. 잘잘못보다 다음에 어떻게 할지가 중요합니다.">${esc(x.body || '')}</textarea></label>
-      <label>작성자<input id="isBy" value="${esc(curBy)}" placeholder="이름을 적어 주세요" autocomplete="off"></label>
-      <div class="roles wrap sm" id="isByChips">${S.staff.filter((st) => st.active).map((st) => `<button type="button" class="rl" data-who="${esc(st.name)}">${esc(st.name)}</button>`).join('')}</div>
+      <div class="roles wrap" id="isCats">${[...FB_CATS, ...ISSUE_CATS].map((c) => `<button type="button" class="rl${c === x.cat ? ' on' : ''}${FB_CATS.includes(c) ? ' fb' : ''}" data-cat="${esc(c)}">${FB_CATS.includes(c) ? (c === '앱 오류' ? '🐛 ' : '🙋 ') : ''}${esc(c)}</button>`).join('')}</div>
+      <input id="isCOther" placeholder="다른 종류 직접 입력" value="${x.cat && !ISSUE_CATS.includes(x.cat) && !FB_CATS.includes(x.cat) ? esc(x.cat) : ''}" style="margin-top:6px">
+      <label>제목<input id="isT" value="${esc(x.title || '')}" placeholder="${FB_CATS.includes(x.cat) ? '예: 할 일 체크가 풀림 (어디 + 무엇)' : '예: 룸2 에어컨 소음 — 손님 컴플레인'}"></label>
+      <label>무슨 일이 있었나요<textarea id="isB" rows="${FB_CATS.includes(x.cat) ? 8 : 4}" placeholder="상황을 그대로 적으세요. 잘잘못보다 다음에 어떻게 할지가 중요합니다.">${esc(x.body || (FB_CATS.includes(x.cat) ? FB_TEMPLATE : ''))}</textarea></label>
+      <label class="chk impChk" id="isTeamWrap"${x.cat === '앱 건의' ? '' : ' hidden'}><input type="checkbox" id="isTeam"${x.team ? ' checked' : ''}> <span class="chip crit">중요</span> 이 건의는 <b>팀원들과 상의한 내용</b>입니다 (혼자 판단한 건의는 올리지 않습니다)</label>
+      <label class="chk"><input type="checkbox" id="isAnon"${x.anon ? ' checked' : ''}> 🙈 익명으로 올리기 (이름을 남기지 않습니다)</label>
+      <div id="isByWrap"${x.anon ? ' hidden' : ''}><label>작성자<input id="isBy" value="${esc(curBy)}" placeholder="이름을 적어 주세요" autocomplete="off"></label>
+      <div class="roles wrap sm" id="isByChips">${S.staff.filter((st) => st.active).map((st) => `<button type="button" class="rl" data-who="${esc(st.name)}">${esc(st.name)}</button>`).join('')}</div></div>
       ${isNew ? `<label class="chk"><input type="checkbox" id="isTg" checked> 텔레그램 방에 공유 (다른 매장도 봅니다)</label>` : ''}
     `, () => {
       const title = $('#isT').value.trim();
@@ -1889,38 +2647,49 @@ const App = (() => {
       const catSel = document.querySelector('#isCats .rl.on');
       const cat = $('#isCOther').value.trim() || (catSel ? catSel.dataset.cat : '');
       if (!cat) { alert('종류를 골라 주세요.'); return false; }
-      const by = $('#isBy').value.trim();
-      if (!by) { alert('작성자를 적어 주세요.'); return false; }
+      const anon = $('#isAnon').checked;
+      const team = !!($('#isTeam') && $('#isTeam').checked);
+      if (cat === '앱 건의' && !team) { alert('건의는 팀원들과 먼저 상의한 뒤 올립니다. 상의했다면 체크해 주세요.'); return false; }
+      const by = anon ? '' : $('#isBy').value.trim();
+      if (!anon && !by) { alert('작성자를 적거나 익명을 켜 주세요.'); return false; }
       const rec = {
         id: x.id || 'i' + Date.now(), cat, title, body: $('#isB').value.trim(),
         status: x.status || 'open', replies: x.replies || [],
-        by, createdAt: x.createdAt || Date.now(), store: x.store || storeName(), updatedAt: Date.now(),
+        by, anon, team: team || undefined, createdAt: x.createdAt || Date.now(), store: x.store || storeName(), updatedAt: Date.now(),
       };
       if (x.id) SH.issues = issuesAll().map((i2) => (i2.id === x.id ? rec : i2));
       else issuesAll().push(rec);
       saveShared(); render();
+      if (!x.id && FB_CATS.includes(rec.cat)) banner('접수됐습니다', '테스트 안내 페이지의 "접수된 오류·건의" 목록과 공유 게시판에 남았습니다.');
       const tg = $('#isTg');
       if (tg && tg.checked) {
-        sendTelegram(`\u{1F4DD} [${rec.store} 트러블] ${rec.cat} — ${rec.title}${rec.body ? '\n' + rec.body : ''}${rec.by ? '\n- ' + rec.by : ''}`)
+        sendTelegram(`\u{1F4DD} [${rec.store} 게시판] ${rec.cat} — ${rec.title}${rec.body ? '\n' + rec.body : ''}\n- ${rec.anon ? '익명' : rec.by}`)
           .then((r) => banner(r.ok ? '텔레그램으로 공유했습니다' : '텔레그램 전송 실패', r.ok ? rec.title : r.err));
       }
     }, '저장');
     $('#isCats').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return;
-      $('#isCats').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); $('#isCOther').value = ''; });
-    $('#isCOther').addEventListener('input', () => { if ($('#isCOther').value.trim()) $('#isCats').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); });
+      $('#isCats').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); $('#isCOther').value = '';
+      // 앱 오류·건의를 고르면 본문이 비어 있거나 양식 그대로일 때 양식을 채운다 (다른 종류로 바꾸면 양식 그대로인 경우만 비운다)
+      const tw = $('#isTeamWrap'); if (tw) tw.hidden = b.dataset.cat !== '앱 건의';
+      const ta = $('#isB'), isFb = FB_CATS.includes(b.dataset.cat), raw = ta.value.trim();
+      if (isFb && (!raw || raw === FB_TEMPLATE)) { ta.value = FB_TEMPLATE; ta.rows = 8; $('#isT').placeholder = '예: 할 일 체크가 풀림 (어디 + 무엇)'; }
+      else if (!isFb && raw === FB_TEMPLATE) { ta.value = ''; ta.rows = 4; } });
+    $('#isCOther').addEventListener('input', () => { if ($('#isCOther').value.trim()) { $('#isCats').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); const tw = $('#isTeamWrap'); if (tw) tw.hidden = true; } });
     $('#isByChips').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return; $('#isBy').value = b.dataset.who; });
+    $('#isAnon').addEventListener('change', () => { $('#isByWrap').hidden = $('#isAnon').checked; });
   }
 
   function issueShow(id) {
     const x = issuesAll().find((i2) => i2.id === id); if (!x) return;
     modal(x.title, `
       <div class="rcTop"><span class="ipill${x.status === 'done' ? ' done' : ''}">${x.status === 'done' ? '해결 완료' : '진행 중'}</span>
-        <span class="chip store">${esc(x.store || '')}</span><span class="chip cat">${esc(x.cat)}</span>
-        <span class="opt">${esc(x.by || '')} · ${new Date(x.createdAt).toLocaleDateString('ko-KR')}</span></div>
+        <span class="chip store">${esc(x.store || '')}</span><span class="chip cat">${esc(x.cat)}</span>${x.team ? '<span class="chip today">팀 상의 완료</span>' : ''}
+        <span class="opt">${x.anon ? '🙈 익명' : esc(x.by || '')} · ${new Date(x.createdAt).toLocaleDateString('ko-KR')}</span></div>
       ${x.body ? `<div class="rcBody">${esc(x.body)}</div>` : ''}
       ${(x.replies || []).map((r) => `<div class="irep${r.fix ? ' fix' : ''}">${r.fix ? '✅ ' : ''}${esc(r.text)}
-        <div class="rcMeta">${esc(r.by || '')} · ${new Date(r.at).toLocaleDateString('ko-KR')}</div></div>`).join('')}
-      <label>덧글 · 해결 내용<textarea id="isR" rows="2" placeholder="해본 것, 알게 된 것을 남기세요"></textarea></label>
+        <div class="rcMeta">${r.anon ? '🙈 익명' : esc(r.by || '')}${r.store ? ' · ' + esc(r.store) : ''} · ${new Date(r.at).toLocaleDateString('ko-KR')}</div></div>`).join('')}
+      <label>덧글 · 해결 내용<textarea id="isR" rows="2" placeholder="해본 것, 알게 된 것, 의견을 남기세요"></textarea></label>
+      <label class="chk"><input type="checkbox" id="isRAnon"> 🙈 익명으로 덧글</label>
       <div class="rowbtns">
         <button class="btn" data-act="issueReply" data-id="${x.id}">덧글 남기기</button>
         ${x.status === 'done'
@@ -2915,7 +3684,7 @@ const App = (() => {
     const tabName = mt ? (mt.stores.find((x) => x.id === tab) || {}).name : '';
 
     h += `<div class="hd sub2"><h3>직원</h3></div>
-      <div class="notice"><b>직원 명단과 근로계약서는 왼쪽 메뉴 <b>직원</b>으로 옮겼습니다.</b>
+      <div class="notice"><b>직원 명단과 근로계약서는 왼쪽 메뉴 <b>인사관리</b>로 옮겼습니다.</b>
         <div class="rowbtns"><button class="btn sm" data-act="view" data-v="staff">직원 명단 열기</button>
         <button class="btn sm" data-act="view" data-v="contracts">근로계약서 열기</button></div></div>`;
 
@@ -2983,16 +3752,30 @@ const App = (() => {
       <div class="setrow"><span>사장님 폰 즉시 알림 <span class="hint" style="margin:0">중요 업무 완료·지연 때 한 줄</span></span>
         <button class="btn sm${S.settings.tgInstant === false ? '' : ' on'}" data-act="toggleTgInstant">${S.settings.tgInstant === false ? '꺼짐' : '켜짐'}</button></div>
       <p class="hint">${serverSends()
-        ? '서버에 로그인되어 있어 <b>알림은 서버가 보냅니다</b> — 마감 리포트는 매일 <b>21:30</b>(서버 고정), 매장 PC가 꺼져 있어도 갑니다. 실패하면 1분마다 3회 다시 보냅니다. 서버 설치는 <code>서버/supabase_alerts.sql</code>.'
+        ? `서버에 로그인되어 있어 <b>알림은 서버가 보냅니다</b> — 마감 리포트는 매일 <b>${esc(S.settings.reportAt || '21:50')}</b>(위 '띄우는 시각'을 바꾸면 서버도 따라갑니다), 매장 PC가 꺼져 있어도 갑니다. 실패하면 1분마다 3회 다시 보냅니다. 서버 설치는 <code>서버/supabase_alerts.sql</code>.`
         : (S.settings.tgToken && S.settings.tgChat)
-          ? `매일 <b>${esc(S.settings.reportAt || '21:30')}</b> 에 텔레그램으로 <b>자동 전송</b>됩니다. 실패하면 30초마다 재시도하고, 화면에도 알려드립니다. 전송 시각에 앱(브라우저 탭)이 열려 있고 인터넷이 연결되어 있어야 합니다.`
+          ? `매일 <b>${esc(S.settings.reportAt || '21:50')}</b> 에 텔레그램으로 <b>자동 전송</b>됩니다. 실패하면 30초마다 재시도하고, 화면에도 알려드립니다. 전송 시각에 앱(브라우저 탭)이 열려 있고 인터넷이 연결되어 있어야 합니다.`
           : '텔레그램을 설정하면 그 시각에 자동으로 전송됩니다. 설정 전에는 문구만 만들어져 직접 복사해 보내시면 됩니다.'}
         리포트 시점 이후에 할 업무(마감 정산·문잠금)는 '이후 예정'으로 따로 표시되고 완료율에서 빠집니다.</p>
 
-      <div class="hd sub2"><h3>할 일 순서 잠금</h3></div>
-      <div class="setrow"><span>순서 바꾸기 PIN <span class="hint" style="margin:0">사장님만 아는 숫자 4~6자리</span></span>
-        <span class="v">${pinOk(S.settings.orderPin) ? '설정됨' : '미설정'} <button class="btn sm" data-act="orderPinSet">${pinOk(S.settings.orderPin) ? 'PIN 바꾸기' : 'PIN 만들기'}</button></span></div>
-      <p class="hint">할 일 화면의 순서는 기본으로 잠겨 있어 직원이 실수로 바꿀 수 없습니다. 할 일 화면 › <b>순서 바꾸기</b>에서 PIN 을 넣으면 10분 동안 손잡이(⠿)를 끌어 순서를 바꿀 수 있고, 새로고침하거나 10분이 지나면 다시 잠깁니다. 바꾼 순서는 매일 · 모든 기기에 같이 적용됩니다.</p>
+      <div class="hd sub2"><h3>사장님 비밀번호</h3></div>
+      <div class="setrow"><span>비밀번호 <span class="hint" style="margin:0">아이디 없음 · 두 매장 공통</span></span>
+        <span class="v">${ownerPwSet() ? '설정됨' : '미설정 — 지금 만드세요'} <button class="btn sm${ownerPwSet() ? '' : ' primary'}" data-act="ownerPw">${ownerPwSet() ? '비밀번호 바꾸기' : '비밀번호 만들기'}</button>${ownerOn() ? ' <button class="btn sm ghost" data-act="ownerLock">지금 잠그기</button>' : ''}</span></div>
+      <p class="hint">인사관리 · 운영 · 서비스 교육 · 회계 · 설정은 이 비밀번호를 넣어야 열립니다. 열고 나서 <b>5분 동안 사용이 없으면 자동으로 잠깁니다.</b> 할 일 순서·이름 바꾸기, 미션 승인, 게시판 글 삭제도 같은 비밀번호입니다.</p>
+      ${ownerPwSet() ? '' : `<div class="hd sub2"><h3>할 일 순서 잠금 (예전 PIN)</h3></div>`}
+      ${ownerPwSet() ? '' : `<div class="setrow"><span>순서 바꾸기 PIN <span class="hint" style="margin:0">사장님만 아는 숫자 4~6자리</span></span>
+        <span class="v">${pinOk(S.settings.orderPin) ? '설정됨 — 직원 기기에서 할 일 순서·이름을 바꿀 때 씁니다 (사장님 로그인 중에는 필요 없음)' : '미설정 — 직원 기기에서 순서를 바꾸려면 만드세요 (사장님 로그인 중에는 필요 없음)'} <button class="btn sm" data-act="orderPinSet">${pinOk(S.settings.orderPin) ? 'PIN 바꾸기' : 'PIN 만들기'}</button></span></div>
+      <p class="hint">할 일 화면의 순서는 기본으로 잠겨 있어 직원이 실수로 바꿀 수 없습니다. 할 일 화면 › <b>순서 바꾸기</b>에서 PIN 을 넣으면 10분 동안 손잡이(⠿)를 끌어 순서를 바꿀 수 있고, 새로고침하거나 10분이 지나면 다시 잠깁니다. 바꾼 순서는 매일 · 모든 기기에 같이 적용됩니다.</p>`}
+
+      <div class="hd sub2"><h3>직원 잠금 (테스트 기간)</h3></div>
+      <div class="setrow"><span>직원은 체크·메모·숫자 입력·게시판만</span>
+        <button class="btn sm${S.settings.staffLock !== false ? ' on' : ''}" data-act="staffLockToggle">${S.settings.staffLock !== false ? '켜짐' : '꺼짐'}</button></div>
+      <p class="hint">켜져 있으면 사장님 모드가 아닌 기기에서는 업무 추가·이름·시각·담당·순서 변경, 공지·근무표·직원·루틴·수조 설정 변경, 기록 삭제, CSV 가져오기가 모두 숨겨지고 막힙니다. 남는 것: 할 일 체크·건너뜀·메모, 완료 창의 숫자, 수조·폐사 기록, 매출·식자재 매입 입력, 게시판. 테스트가 끝나면 끄세요.</p>
+
+      <div class="hd sub2"><h3>완료 메모</h3></div>
+      <div class="setrow"><span>완료할 때 "어떻게 했나요" 메모</span>
+        <span class="v">${[['req', '필수'], ['opt', '선택'], ['off', '끔']].map(([v, n]) => `<button class="btn sm${doneMemoMode() === v ? ' on' : ''}" data-act="doneMemo" data-v="${v}">${n}</button>`).join(' ')}</span></div>
+      <p class="hint">${doneMemoMode() === 'req' ? '체크할 때마다 어떻게 했는지 한 줄을 꼭 적어야 완료됩니다. 테스트 기간과 신입 교육 때 권장.' : doneMemoMode() === 'opt' ? '메모 칸은 뜨지만 비워도 완료됩니다.' : '체크만 하면 바로 완료됩니다. 메모는 카드의 📝 로 따로 남길 수 있습니다.'} 완료된 카드의 📝 를 누르면 나중에도 메모를 남기거나 고칠 수 있고, 마감 리포트와 기록 탭에 함께 남습니다.</p>
 
       <div class="hd sub2"><h3>완료자 기록</h3></div>
       <div class="setrow"><span>완료할 때마다 누가 했는지 묻기</span>
@@ -3015,6 +3798,7 @@ const App = (() => {
       <input type="number" class="tkIn" data-act="tankCycle" data-k="clean" data-f="late" value="${_c.clean.late}" min="1"></div>`;
 
     h += acctSettings();
+    h += deviceSettings();
     h += serverSettings();
     h += `<div class="hd sub2"><h3>앱 주소</h3></div>
       <div class="setrow"><span>이 앱의 주소 <span class="hint" style="margin:0">아이패드 · 폰 홈 화면에 이 주소로 바로가기</span></span>
@@ -3039,9 +3823,15 @@ const App = (() => {
      S.payroll{ 'YYYY-MM': {at, by, sig, rows[], total} } — 사장님이 확정한 순간의 숫자 (그 뒤 근무표가 바뀌어도 그대로)
      staff.pay{type:'hour'|'month', amount} · staff.email */
   const SALES_F = [
-    ['orders', '총주문', '건', 1], ['store', '매장 매출', '원', 100], ['deliv', '배달 매출', '원', 100], ['take', '포장 매출', '원', 100],
-    ['total', '총매출', '원', 100], ['crab', '대게', 'kg', 0.1], ['king', '킹크랩', 'kg', 0.1], ['lob', '랍스터', 'kg', 0.1], ['liquor', '주류 매출', '원', 100],
+    ['orders', '총주문', '건', 1], ['store', '매장 매출', '원', 100],
+    ['ordersS', '매장 주문', '건', 1], ['ordersD', '배달 주문', '건', 1], ['deliv', '배달 매출', '원', 100], ['take', '포장 매출', '원', 100],   // 2026-10-07 매장·배달 주문 건 분리 — 총주문은 자동 합
+    ['total', '총매출', '원', 100], ['crab', '대게', 'kg', 0.1], ['king', '킹크랩', 'kg', 0.1], ['lob', '랍스터', 'kg', 0.1], ['liquor', '그중 주류 매출', '원', 100],
+    ['crabS', '대게 매장', 'kg', 0.1], ['crabD', '대게 배달', 'kg', 0.1], ['kingS', '킹크랩 매장', 'kg', 0.1], ['kingD', '킹크랩 배달', 'kg', 0.1], ['lobS', '랍스터 매장', 'kg', 0.1], ['lobD', '랍스터 배달', 'kg', 0.1],
   ];
+  /* kg 는 품종별 합계(crab·king·lob)가 기준이고, 매장(S)·배달(D)로 나눠 넣으면 합계는 자동으로 채워진다 — 사장님 요청 2026-10-02 */
+  const KG_SP = [['crab', '대게'], ['king', '킹크랩'], ['lob', '랍스터']];
+  const kgCh = (r, ch) => KG_SP.reduce((acc, [k]) => acc + (Number((r || {})[k + ch]) || 0), 0);   // ch: 'S' 매장 · 'D' 배달
+  const hasKgSplit = (r) => !!r && KG_SP.some(([k]) => r[k + 'S'] != null || r[k + 'D'] != null);
   const salesTotal = (r) => { if (!r) return 0; if (r.total != null && !isNaN(r.total)) return Number(r.total) || 0; return (Number(r.store) || 0) + (Number(r.deliv) || 0) + (Number(r.take) || 0); };
   const salesKg = (r) => (Number(r.crab) || 0) + (Number(r.king) || 0) + (Number(r.lob) || 0);
   const salesOf = (k) => (S.sales || {})[k] || null;
@@ -3065,12 +3855,49 @@ const App = (() => {
   function salesFields(r) {
     r = r || {};
     const inp = ([k, n, u, st]) => `<label>${n} <small class="opt">${u}</small><input type="number" class="sfIn" data-k="${k}" min="0" step="${st}" value="${r[k] ?? ''}" inputmode="decimal"></label>`;
-    return `<div class="frow">${inp(SALES_F[0])}${inp(SALES_F[4])}</div>
-      <div class="frow3">${inp(SALES_F[1])}${inp(SALES_F[2])}${inp(SALES_F[3])}</div>
-      <div class="frow3">${inp(SALES_F[5])}${inp(SALES_F[6])}${inp(SALES_F[7])}</div>
-      ${inp(SALES_F[8])}
-      <p class="hint">빈칸은 0이 아니라 "미입력"으로 남습니다. 총매출을 비우면 매장·배달·포장의 합으로 채웁니다.</p>`;
+    const kgIn = (k, ph) => `<input type="number" class="sfIn" data-k="${k}" min="0" step="0.1" value="${r[k] ?? ''}" inputmode="decimal" placeholder="${ph || ''}">`;
+    const auto = ([k, n, u]) => `<label class="autoF">${n} <small class="opt">${u} · 자동 합계</small><input type="number" class="sfIn" data-k="${k}" min="0" step="1" value="${r[k] ?? ''}" inputmode="decimal" placeholder="자동"></label>`;
+    return `<div class="mlabel">주문 건 — 매장 · 배달 따로 넣으면 총주문은 자동</div>
+      <div class="frow3">${inp(SALES_F[2])}${inp(SALES_F[3])}${auto(SALES_F[0])}</div>
+      <div class="mlabel">매출 — 매장 · 배달 · 포장을 넣으면 총매출은 자동</div>
+      <div class="frow3">${inp(SALES_F[1])}${inp(SALES_F[4])}${inp(SALES_F[5])}</div>
+      <div class="frow">${auto(SALES_F[6])}${inp(SALES_F[10])}</div>
+      <div class="mlabel">판매 kg — 매장 · 배달 따로 넣으면 합계는 자동</div>
+      <table class="kgTbl"><thead><tr><th></th><th>매장 kg</th><th>배달 kg</th><th>합계 kg</th></tr></thead><tbody>
+        ${KG_SP.map(([k, n]) => `<tr><th>${n}</th><td>${kgIn(k + 'S')}</td><td>${kgIn(k + 'D')}</td><td>${kgIn(k, '자동')}</td></tr>`).join('')}
+        <tr class="sum"><th>합계</th><td id="kgSumS">–</td><td id="kgSumD">–</td><td id="kgSumT">–</td></tr>
+      </tbody></table>
+      <p class="hint">빈칸은 0이 아니라 "미입력"으로 남습니다. 총주문·총매출은 나눠 넣은 값의 합으로 자동 계산되고, 나눠 넣지 않았을 때만 직접 적습니다. 주류 매출은 매장 매출 안에 포함된 금액을 따로 적는 칸입니다(총매출에 더해지지 않음). 합계 kg 만 알면 합계 칸에만 넣어도 됩니다.</p>`;
   }
+  function syncKgTotals() {
+    const g = (k) => { const el = document.querySelector(`.sfIn[data-k="${k}"]`); if (!el) return null; const v = el.value.trim(); return v === '' ? null : Number(v); };
+    let sS = 0, sD = 0, sT = 0, anyS = false, anyD = false, anyT = false;
+    KG_SP.forEach(([k]) => {
+      const s = g(k + 'S'), d = g(k + 'D'), tEl = document.querySelector(`.sfIn[data-k="${k}"]`);
+      if (s != null || d != null) { const t = Math.round(((s || 0) + (d || 0)) * 100) / 100; if (tEl) tEl.value = t; }
+      if (s != null) { sS += s; anyS = true; } if (d != null) { sD += d; anyD = true; }
+      const t = g(k); if (t != null) { sT += t; anyT = true; }
+    });
+    const put = (id, v, any) => { const el = document.getElementById(id); if (el) el.textContent = any ? fmtKg(Math.round(v * 100) / 100) : '–'; };
+    put('kgSumS', sS, anyS); put('kgSumD', sD, anyD); put('kgSumT', sT, anyT);
+  }
+  /* 총주문 = 매장 주문 + 배달 주문, 총매출 = 매장 + 배달 + 포장. 나눠 넣은 값이 하나라도 있으면 자동, 없으면 직접 입력 가능 */
+  function syncSalesTotals() {
+    const g = (k) => { const el = document.querySelector(`.sfIn[data-k="${k}"]`); if (!el) return null; const v = el.value.trim(); return v === '' ? null : Number(v); };
+    const setAuto = (k, parts) => {
+      const el = document.querySelector(`.sfIn[data-k="${k}"]`); if (!el) return;
+      const vals = parts.map(g), any = vals.some((v) => v != null);
+      el.readOnly = any; el.classList.toggle('autoOn', any);
+      if (any) el.value = vals.reduce((a, v) => a + (v || 0), 0);
+    };
+    setAuto('orders', ['ordersS', 'ordersD']);
+    setAuto('total', ['store', 'deliv', 'take']);
+  }
+  document.addEventListener('input', (e) => {
+    if (!e.target.closest) return;
+    if (e.target.closest('.kgTbl')) syncKgTotals();
+    else if (e.target.classList.contains('sfIn')) syncSalesTotals();
+  });
   /* 입력값 읽기 — 음수·글자는 붉게 표시하고 null 반환(저장 안 함) */
   function readSalesFields() {
     const out = {}; let bad = false;
@@ -3082,7 +3909,9 @@ const App = (() => {
       out[el.dataset.k] = n;
     });
     if (bad) { alert('음수나 글자는 넣을 수 없습니다. 붉게 표시된 칸을 확인하세요.'); return null; }
-    if (out.total == null && (out.store != null || out.deliv != null || out.take != null)) out.total = (out.store || 0) + (out.deliv || 0) + (out.take || 0);
+    if (out.store != null || out.deliv != null || out.take != null) out.total = (out.store || 0) + (out.deliv || 0) + (out.take || 0);
+    if (out.ordersS != null || out.ordersD != null) out.orders = (out.ordersS || 0) + (out.ordersD || 0);
+    KG_SP.forEach(([k]) => { if (out[k + 'S'] != null || out[k + 'D'] != null) out[k] = Math.round(((out[k + 'S'] || 0) + (out[k + 'D'] || 0)) * 100) / 100; });
     if (SALES_F.every(([k]) => out[k] == null)) { alert('숫자를 하나도 넣지 않았습니다.'); return null; }
     return out;
   }
@@ -3111,6 +3940,7 @@ const App = (() => {
       S.ui.smonth = d.slice(0, 7);
       save(); render();
     }, '저장');
+    syncKgTotals(); syncSalesTotals();
   }
 
   function vSalesIn() {
@@ -3124,13 +3954,18 @@ const App = (() => {
       <div class="card"><div class="cl">이달 매출</div><div class="cv sm2">${fmtWon(monthSales(m))}</div></div>
       <div class="card"><div class="cl">입력한 날</div><div class="cv">${filled.length}<small>일</small></div></div>
       <div class="card${dates.length - filled.length ? ' warn' : ''}"><div class="cl">미입력</div><div class="cv">${dates.length - filled.length}<small>일</small></div><div class="cs">오늘까지 기준</div></div>
-      <div class="card"><div class="cl">총 kg</div><div class="cv sm2">${fmtKg(filled.reduce((a, k) => a + salesKg(S.sales[k]), 0)) || '–'}</div></div></div>`;
+      <div class="card"><div class="cl">총 kg</div><div class="cv sm2">${fmtKg(filled.reduce((a, k) => a + salesKg(S.sales[k]), 0)) || '–'}</div>
+        ${filled.some((k) => hasKgSplit(S.sales[k])) ? `<div class="cs">매장 ${fmtKg(filled.reduce((a, k) => a + kgCh(S.sales[k], 'S'), 0)) || '0kg'} · 배달 ${fmtKg(filled.reduce((a, k) => a + kgCh(S.sales[k], 'D'), 0)) || '0kg'}</div>` : ''}</div></div>`;
     if (!dates.length) return h + `<div class="notice"><b>아직 오지 않은 달입니다.</b></div>`;
+    const kv = S.ui.skg || 'all';   // kg 열 보기: all 합계 · S 매장 · D 배달
+    h += `<div class="filters" style="margin:4px 0 10px"><span class="hint" style="margin:0 6px 0 0">kg 보기</span>${[['all', '합계'], ['S', '매장'], ['D', '배달']].map(([k, n]) => `<button class="fl${kv === k ? ' on' : ''}" data-act="skgView" data-k="${k}">${n}</button>`).join('')}</div>`;
     const cell = (v, u) => (v == null ? '<span class="dim">–</span>' : (u === 'kg' ? fmtKg(v) : Number(v).toLocaleString('ko-KR')));
-    h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>날짜</th><th class="r">총주문</th><th class="r">매장</th><th class="r">배달</th><th class="r">포장</th><th class="r">총매출</th><th class="r">대게</th><th class="r">킹크랩</th><th class="r">랍스터</th><th class="r">주류</th><th>입력자</th></tr></thead><tbody>`;
+    const kgCell = (r, k) => { const t = r[k]; if (kv !== 'all') return cell(r[k + kv], 'kg'); const s = r[k + 'S'], d = r[k + 'D']; return `${cell(t, 'kg')}${(s != null || d != null) ? `<br><small class="dim">매장 ${fmtKg(s || 0) || '0kg'} · 배달 ${fmtKg(d || 0) || '0kg'}</small>` : ''}`; };
+    const kgHead = kv === 'S' ? ' (매장)' : kv === 'D' ? ' (배달)' : '';
+    h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>날짜</th><th class="r">총주문</th><th class="r">매장</th><th class="r">배달</th><th class="r">포장</th><th class="r">총매출</th><th class="r">대게${kgHead}</th><th class="r">킹크랩${kgHead}</th><th class="r">랍스터${kgHead}</th><th class="r">주류</th><th>입력자</th></tr></thead><tbody>`;
     dates.slice().reverse().forEach((k) => {
       const r = salesOf(k), d = new Date(k + 'T00:00:00'), lb = `${k.slice(5)} ${WD[d.getDay()]}`;
-      h += r ? `<tr class="rowbtn" data-act="salesEdit" data-k="${k}"><td>${lb}</td><td class="r">${cell(r.orders)}</td><td class="r">${cell(r.store)}</td><td class="r">${cell(r.deliv)}</td><td class="r">${cell(r.take)}</td><td class="r"><b>${fmtWon(salesTotal(r))}</b></td><td class="r">${cell(r.crab, 'kg')}</td><td class="r">${cell(r.king, 'kg')}</td><td class="r">${cell(r.lob, 'kg')}</td><td class="r">${cell(r.liquor)}</td><td>${esc(r.by || '')}${r.src === 'csv' ? ' <span class="chip missed">CSV</span>' : ''}</td></tr>`
+      h += r ? `<tr class="rowbtn" data-act="salesEdit" data-k="${k}"><td>${lb}</td><td class="r">${cell(r.orders)}${(r.ordersS != null || r.ordersD != null) ? `<br><small class="dim">매장 ${r.ordersS ?? 0} · 배달 ${r.ordersD ?? 0}</small>` : ''}</td><td class="r">${cell(r.store)}</td><td class="r">${cell(r.deliv)}</td><td class="r">${cell(r.take)}</td><td class="r"><b>${fmtWon(salesTotal(r))}</b></td><td class="r">${kgCell(r, 'crab')}</td><td class="r">${kgCell(r, 'king')}</td><td class="r">${kgCell(r, 'lob')}</td><td class="r">${cell(r.liquor)}</td><td>${esc(r.by || '')}${r.src === 'csv' ? ' <span class="chip missed">CSV</span>' : ''}</td></tr>`
         : `<tr class="rowbtn empty" data-act="salesEdit" data-k="${k}"><td>${lb}</td><td colspan="10" style="text-align:left"><span class="chip missed">미입력</span> <small>눌러서 입력</small></td></tr>`;
     });
     h += `</tbody></table></div>`;
@@ -3145,7 +3980,8 @@ const App = (() => {
     if (!lines.length) return { head: [], rows: [] };
     return { head: split(lines[0]), rows: lines.slice(1).map(split) };
   }
-  const CSV_MAP = { '날짜': 'date', '매장': 'storeName', '총주문': 'orders', '매장매출': 'store', '배달매출': 'deliv', '포장매출': 'take', '총매출': 'total', '대게kg': 'crab', '킹크랩kg': 'king', '랍스타kg': 'lob', '랍스터kg': 'lob', '주류매출': 'liquor' };
+  const CSV_MAP = { '날짜': 'date', '매장': 'storeName', '총주문': 'orders', '매장주문': 'ordersS', '배달주문': 'ordersD', '매장매출': 'store', '배달매출': 'deliv', '포장매출': 'take', '총매출': 'total', '대게kg': 'crab', '킹크랩kg': 'king', '랍스타kg': 'lob', '랍스터kg': 'lob', '주류매출': 'liquor',
+    '대게매장kg': 'crabS', '대게배달kg': 'crabD', '킹크랩매장kg': 'kingS', '킹크랩배달kg': 'kingD', '랍스터매장kg': 'lobS', '랍스타매장kg': 'lobS', '랍스터배달kg': 'lobD', '랍스타배달kg': 'lobD' };
   function salesCsvImport() {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = '.csv,text/csv';
@@ -3163,10 +3999,11 @@ const App = (() => {
           const d = (r[idx.date] || '').slice(0, 10);
           if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d > dateKey()) { skipped++; return; }
           const v = {};
-          ['orders', 'store', 'deliv', 'take', 'total', 'crab', 'king', 'lob', 'liquor'].forEach((k) => {
+          ['orders', 'ordersS', 'ordersD', 'store', 'deliv', 'take', 'total', 'crab', 'king', 'lob', 'liquor', 'crabS', 'crabD', 'kingS', 'kingD', 'lobS', 'lobD'].forEach((k) => {
             if (idx[k] == null) return;
             const x = r[idx[k]]; v[k] = (x === '' || x == null) ? null : Number(x); if (isNaN(v[k]) || v[k] < 0) v[k] = null;
           });
+          KG_SP.forEach(([k]) => { if (v[k] == null && (v[k + 'S'] != null || v[k + 'D'] != null)) v[k] = (v[k + 'S'] || 0) + (v[k + 'D'] || 0); });
           if (!v.total && v.orders == null && v.store == null) { skipped++; return; }   // 아무 숫자도 없는 날(휴무·빈 줄)
           if (idx.storeName != null && r[idx.storeName] && r[idx.storeName] !== storeName()) otherStore.add(r[idx.storeName]);
           recs.push({ d, v });
@@ -3213,7 +4050,7 @@ const App = (() => {
       <div class="card"><div class="cl">총매출</div><div class="cv sm2">${fmtWon(tot)}</div></div>
       <div class="card"><div class="cl">일평균</div><div class="cv sm2">${fmtWon(Math.round(tot / recs.length))}</div><div class="cs">입력한 날 기준</div></div>
       <div class="card"><div class="cl">객단가</div><div class="cv sm2">${orders ? fmtWon(Math.round(ordSales / orders)) : '–'}</div><div class="cs">${orders ? `주문 ${orders.toLocaleString('ko-KR')}건` : '총주문 미입력'}</div></div>
-      <div class="card"><div class="cl">총 kg</div><div class="cv sm2">${fmtKg(kg) || '–'}</div></div></div>`;
+      <div class="card"><div class="cl">총 kg</div><div class="cv sm2">${fmtKg(kg) || '–'}</div>${recs.some((x) => hasKgSplit(x.r)) ? `<div class="cs">매장 ${fmtKg(recs.reduce((a, x) => a + kgCh(x.r, 'S'), 0)) || '0kg'} · 배달 ${fmtKg(recs.reduce((a, x) => a + kgCh(x.r, 'D'), 0)) || '0kg'}</div>` : ''}</div></div>`;
     const mx = Math.max(...recs.map((x) => salesTotal(x.r)), 1);
     h += `<div class="hd sub2"><h3>일별 매출</h3></div><div class="spark sales">${all.map((k) => {
       const r = salesOf(k), v = r ? salesTotal(r) : 0, d = new Date(k + 'T00:00:00');
@@ -3231,7 +4068,20 @@ const App = (() => {
     const sp = { '대게': 0, '킹크랩': 0, '랍스터': 0 };
     recs.forEach((x) => { sp['대게'] += Number(x.r.crab) || 0; sp['킹크랩'] += Number(x.r.king) || 0; sp['랍스터'] += Number(x.r.lob) || 0; });
     const spmx = Math.max(...Object.values(sp), 1);
-    if (kg) h += `<div class="hd sub2"><h3>품종별 kg</h3></div><div class="loads">${Object.entries(sp).map(([n, v]) => `<div class="lrow"><span class="ln">${n}</span><span class="lbar"><i style="width:${v / spmx * 100}%"></i></span><span class="lv">${fmtKg(v)}</span></div>`).join('')}</div>`;
+    if (kg) {
+      const split = recs.some((x) => hasKgSplit(x.r));
+      const chS = {}, chD = {};
+      KG_SP.forEach(([k, n]) => { chS[n] = recs.reduce((a, x) => a + (Number(x.r[k + 'S']) || 0), 0); chD[n] = recs.reduce((a, x) => a + (Number(x.r[k + 'D']) || 0), 0); });
+      h += `<div class="hd sub2"><h3>품종별 kg${split ? ' — 매장 · 배달' : ''}</h3>${split ? '<span class="hint" style="margin:0"><i class="legS"></i> 매장 <i class="legD"></i> 배달 <i class="legN"></i> 구분 없음</span>' : ''}</div><div class="loads">${Object.entries(sp).map(([n, v]) => {
+        const s = chS[n], d = chD[n], rest = Math.max(0, v - s - d);
+        return `<div class="lrow"><span class="ln">${n}</span><span class="lbar stack">${split ? `<i class="s" style="width:${s / spmx * 100}%"></i><i class="d" style="width:${d / spmx * 100}%"></i><i class="n" style="width:${rest / spmx * 100}%"></i>` : `<i style="width:${v / spmx * 100}%"></i>`}</span><span class="lv">${fmtKg(v)}${split ? `<small class="dim"> (매장 ${fmtKg(s) || '0kg'} · 배달 ${fmtKg(d) || '0kg'})</small>` : ''}</span></div>`; }).join('')}</div>`;
+      if (split) {
+        const tS = kgCh({ crabS: chS['대게'], kingS: chS['킹크랩'], lobS: chS['랍스터'] }, 'S'), tD = kgCh({ crabD: chD['대게'], kingD: chD['킹크랩'], lobD: chD['랍스터'] }, 'D'), tt = tS + tD;
+        h += `<div class="hd sub2"><h3>채널별 kg</h3></div><div class="tkLogWrap"><table class="tkLog cList"><thead><tr><th></th><th class="r">매장</th><th class="r">배달</th><th class="r">합계</th><th class="r">배달 비중</th></tr></thead><tbody>
+          ${KG_SP.map(([k, n]) => { const s = chS[n], d = chD[n]; return `<tr><td><b>${n}</b></td><td class="r">${fmtKg(s) || '–'}</td><td class="r">${fmtKg(d) || '–'}</td><td class="r"><b>${fmtKg(s + d) || '–'}</b></td><td class="r">${s + d ? Math.round(d / (s + d) * 100) + '%' : '–'}</td></tr>`; }).join('')}
+          <tr><td><b>전체</b></td><td class="r">${fmtKg(tS) || '–'}</td><td class="r">${fmtKg(tD) || '–'}</td><td class="r"><b>${fmtKg(tt) || '–'}</b></td><td class="r">${tt ? Math.round(tD / tt * 100) + '%' : '–'}</td></tr></tbody></table></div>`;
+      }
+    }
     const lq = recs.reduce((a, x) => a + (Number(x.r.liquor) || 0), 0);
     if (lq) h += `<p class="hint">주류 매출 ${fmtWon(lq)} — 총매출의 ${tot ? Math.round(lq / tot * 100) : 0}%</p>`;
     return h;
@@ -3395,23 +4245,23 @@ const App = (() => {
   /* 설정 › 서버 연결 (Supabase 실시간 동기화) */
   function serverSettings() {
     const sp = Store.supa;
-    const state = !sp.libLoaded ? '<span class="chip missed">연결 도구를 못 불러옴 — 인터넷 확인</span>' : sp.signedIn ? `<span class="chip today">연결됨</span> <small class="mut">${esc(sp.email || '')}</small>` : sp.configured ? '<span class="chip crit">로그인 필요</span>' : '<span class="chip missed">미연결 — 이 기기에만 저장 중</span>';
+    const state = !sp.libLoaded ? '<span class="chip missed">연결 도구를 못 불러옴 — 인터넷 확인</span>' : sp.signedIn ? `<span class="chip today">연결됨</span> <small class="mut">${sp.anon ? '자동 연결 (이 기기 전용 세션)' : '서버 계정 — ' + esc(sp.email || '')}</small>` : '<span class="chip crit">연결 안 됨 — 이 기기에만 저장 중</span>';
     return `<div class="hd sub2"><h3>서버 연결 — 실시간 동기화</h3></div>
-      <p class="hint">Supabase 서버에 연결하면 매장 아이패드 · 사장님 폰 · PC가 같은 기록을 실시간으로 봅니다. 설정 순서는 <code>서버/README.md</code>. 열쇠는 이 기기에만 저장됩니다.</p>
+      <p class="hint">앱을 열면 서버에 자동으로 연결됩니다 — 로그인이나 비밀번호가 필요 없습니다. 매장 아이패드 · 사장님 폰 · PC가 같은 기록을 실시간으로 봅니다. 아래 주소·키는 바꿀 일이 거의 없습니다.</p>
       <div class="setrow"><span>상태</span><span class="v">${state}</span></div>
       <div class="setrow"><span>Project URL</span><input class="num wide2" data-act="supaUrl" value="${esc(sp.url || '')}" placeholder="https://xxxx.supabase.co" autocomplete="off"${sp.signedIn ? ' disabled' : ''}></div>
       <div class="setrow"><span>anon 키 <div class="hint">공개용 키. service_role 키는 넣지 마세요.</div></span><input type="password" class="num wide2" data-act="supaKey" value="${esc((JSON.parse(localStorage.getItem('hm.supa') || 'null') || {}).key || '')}" placeholder="eyJ…" autocomplete="off"${sp.signedIn ? ' disabled' : ''}></div>
-      <div class="rowbtns">${sp.signedIn ? `<button class="btn" data-act="supaLogout">로그아웃</button><button class="btn ghost danger" data-act="supaClear">연결 해제</button>` : `<button class="btn primary" data-act="supaLogin"${sp.configured ? '' : ' disabled'}>로그인</button>${sp.configured ? '<button class="btn ghost danger" data-act="supaClear">설정 지우기</button>' : ''}</div>`}
-      <p class="hint">${sp.signedIn ? '이 기기의 변경은 곧바로 서버에 올라가고, 다른 기기의 변경은 1~2초 안에 이 화면에 나타납니다.' : '주소와 키를 넣으면 로그인 버튼이 켜집니다. 처음 연결하는 기기의 기록이 서버에 올라가니, 기록이 있는 기기부터 연결하세요.'}</p>`;
+      <div class="rowbtns">${sp.signedIn ? (sp.anon ? '' : `<button class="btn" data-act="supaLogout">서버 계정 로그아웃 (자동 연결로)</button>`) : `<button class="btn primary" data-act="supaRetry">다시 연결</button>`}</div>
+      <p class="hint">${sp.signedIn ? '이 기기의 변경은 곧바로 서버에 올라가고, 다른 기기의 변경은 1~2초 안에 이 화면에 나타납니다.' : '인터넷이 끊겼거나 서버가 잠시 응답하지 않을 때입니다. 연결되면 이 기기의 기록은 서버와 합쳐집니다.'}</p>`;
   }
   function supaLoginModal() {
-    modal('서버 로그인 — 매장 공용 계정', `<label>이메일<input id="suE" type="email" autocomplete="username" placeholder="store@example.com"></label>
+    modal('사장님 로그인', `<label>이메일<input id="suE" type="email" autocomplete="username" placeholder="사장님 계정 이메일"></label>
       <label>비밀번호<input id="suP" type="password" autocomplete="current-password"></label>
-      <p class="hint">Supabase › Authentication › Users 에서 만든 계정입니다. 기기마다 한 번만 로그인하면 계속 유지됩니다.</p>`, () => {
+      <p class="hint">사장님 계정으로 로그인하면 인사관리·운영·서비스 교육·회계·설정이 열리고, PIN 없이 할 일 순서도 바꿀 수 있습니다. 직원 기기에서는 로그인하지 말고, 썼다면 왼쪽 아래 <b>로그아웃</b>을 누르세요. 직원은 로그인 없이 업무 카테고리를 그대로 씁니다.</p>`, () => {
       const e = $('#suE').value.trim(), pw = $('#suP').value;
       if (!e || !pw) { alert('이메일과 비밀번호를 넣어 주세요.'); return false; }
       const btn = $('#modal [data-act="mOk"]'); if (btn) { btn.disabled = true; btn.textContent = '연결 중…'; }
-      Store.flush().then(() => Store.supaSignIn(e, pw)).then(() => { closeModal(); banner('서버에 연결했습니다', '앱을 다시 불러옵니다.'); setTimeout(() => location.reload(), 600); })
+      Store.flush().then(() => Store.supaSignIn(e, pw)).then(() => { closeModal(); banner('사장님 모드로 들어갑니다', '앱을 다시 불러옵니다.'); setTimeout(() => location.reload(), 600); })
         .catch((err) => { if (btn) { btn.disabled = false; btn.textContent = '로그인'; } alert('로그인 실패: ' + (err && err.message ? err.message : err)); });
       return false;
     }, '로그인');
@@ -4199,6 +5049,41 @@ const App = (() => {
         { name: '2단계 · 수산물 위생과 안전', effect: '갑각류 위생 기준과 주방 사고 유형을 알고 예방한다', steps: ['https://www.youtube.com/watch?v=3c9Slq1dGbk', 'https://www.youtube.com/watch?v=ss2Z3CpN92g', 'https://www.youtube.com/watch?v=Co8OmnrI-gw'] },
       ] },
   ];
+  /* 영상 뒤 O/X 퀴즈 — 첫 출근 3일 필수 코스 9편. 다 맞혀야 "적용할 것 한 줄"을 적을 수 있다. 틀리면 이유를 보여 주고 다시 (시도 횟수 기록) — 사장님 요청 2026-10-06 */
+  const TRAIN_QUIZ = {
+    'https://www.youtube.com/watch?v=wd6XR9Q1IM8': [
+      { q: '손은 흐르는 물에 비누로 30초 이상 씻는다.', a: true, why: '30초 이상, 손가락 사이·손톱 밑까지 6단계로 씻어야 세균이 제대로 떨어집니다.' },
+      { q: '장갑을 끼면 손을 씻지 않아도 된다.', a: false, why: '장갑 안쪽에서 세균이 더 빨리 늘어납니다. 장갑을 끼기 전에도 손을 씻어야 합니다.' },
+      { q: '화장실을 다녀온 뒤에는 반드시 손을 씻는다.', a: true, why: '화장실 이후, 생물(갑각류·날고기)을 만진 뒤, 휴대폰을 만진 뒤가 손 씻기 필수 시점입니다.' }],
+    'https://www.youtube.com/watch?v=JjUrJLU73-o': [
+      { q: '조리 중에는 반지·시계 같은 장신구를 빼야 한다.', a: true, why: '장신구 틈에 세균이 남고, 음식에 떨어지는 이물 사고의 원인이 됩니다.' },
+      { q: '손에 상처가 있어도 밴드만 붙이면 맨손으로 조리해도 된다.', a: false, why: '상처에는 황색포도상구균이 많습니다. 방수 밴드 위에 장갑을 끼거나 조리에서 빠져야 합니다.' },
+      { q: '위생모는 머리카락이 밖으로 나오지 않게 쓴다.', a: true, why: '머리카락 이물은 가장 흔한 컴플레인입니다. 앞머리까지 모자 안에 넣습니다.' }],
+    'https://www.youtube.com/watch?v=Xq7kBre2YpQ': [
+      { q: '식중독균은 냉장 온도에서 모두 죽는다.', a: false, why: '냉장은 번식을 늦출 뿐입니다. 리스테리아처럼 냉장에서도 자라는 균이 있어 보관 기간을 지켜야 합니다.' },
+      { q: '설사·구토 증상이 있는 직원은 조리 업무에서 빠져야 한다.', a: true, why: '노로바이러스 등은 증상이 있는 사람 손을 통해 퍼집니다. 증상이 있으면 바로 사장님께 알립니다.' },
+      { q: '익힌 음식과 날음식은 같은 칼·도마를 써도 된다.', a: false, why: '날음식의 균이 익힌 음식으로 옮는 교차오염이 식중독의 큰 원인입니다. 칼·도마를 구분합니다.' }],
+    'https://www.youtube.com/watch?v=Se7GQXciFgs': [
+      { q: '인사는 손님이 들어오고 3초 안에 눈을 맞추며 한다.', a: true, why: '처음 3초가 그 손님의 매장 평가를 정합니다. 하던 일을 멈추고 눈을 맞춥니다.' },
+      { q: '바쁠 때는 인사를 생략해도 된다.', a: false, why: '바쁠수록 인사가 "기다려 달라"는 신호가 됩니다. 짧게라도 "어서 오세요, 잠시만요"를 합니다.' }],
+    'https://www.youtube.com/watch?v=SYIaY9kL_Do': [
+      { q: '손님 앞에서 동료와 잡담하거나 휴대폰을 보는 것은 금기행동이다.', a: true, why: '손님은 "나보다 다른 게 중요하다"고 느낍니다. 우리 공지사항의 휴대폰 규칙과 같은 이유입니다.' },
+      { q: '손님 요청에 "안 돼요"라고 바로 끊어 말하는 것은 괜찮다.', a: false, why: '거절은 대안과 함께 해야 합니다. "그건 어렵고, 대신 이렇게 해 드릴 수 있어요."' }],
+    'https://www.youtube.com/watch?v=BjyWhBtd5wg': [
+      { q: '"안 돼요" 대신 "이렇게 도와드릴 수 있어요"처럼 대안을 먼저 말한다.', a: true, why: '같은 내용도 대안을 먼저 말하면 손님이 거절로 받아들이지 않습니다.' },
+      { q: '내용이 같으면 말투는 손님 만족에 영향이 없다.', a: false, why: '손님은 내용보다 말투를 먼저 기억합니다. 쿠션어와 청유형이 그래서 중요합니다.' }],
+    'https://www.youtube.com/watch?v=kFPPSHMN2L0': [
+      { q: '바닥에 물·기름이 떨어지면 바로 닦는다.', a: true, why: '주방 사고 1위가 미끄러짐입니다. "나중에"가 사고로 이어집니다.' },
+      { q: '급할 때는 젖은 바닥에서 뛰어도 된다.', a: false, why: '뛰다 넘어지면 뜨거운 물·칼을 든 채 다칩니다. 급할수록 걷습니다.' }],
+    'https://www.youtube.com/watch?v=nfAtpav6L1k': [
+      { q: '마감 때 가스 중간밸브를 잠그고 확인한다.', a: true, why: '우리 마감 루틴 "가스·전기 최종 확인"이 중요 업무인 이유입니다.' },
+      { q: '가스 냄새가 나면 환풍기 스위치를 켜서 빼면 된다.', a: false, why: '스위치 불꽃이 폭발을 일으킬 수 있습니다. 창문을 열고 밸브를 잠근 뒤 밖에서 신고합니다.' }],
+    'https://www.youtube.com/watch?v=YFnojqczG6E': [
+      { q: '업무상 적정 범위를 넘어 신체적·정신적 고통을 주는 행위는 직장 내 괴롭힘이다.', a: true, why: '근로기준법이 정한 정의입니다. 지위나 관계의 우위를 이용한 행위가 해당합니다.' },
+      { q: '한 번뿐이면 괴롭힘이 아니다.', a: false, why: '반복되지 않아도 정도가 심하면 괴롭힘에 해당합니다. 우리 룰 "상호 존중과 바른 언어"의 근거입니다.' }],
+  };
+  const quizOf = (url) => TRAIN_QUIZ[url] || null;
+  const quizRec = (who, url) => (((S.trainQuiz || {})[who] || {})[url] || null);
   const TRAIN_REWARD_DEFAULT = '코스를 완주하면 사장님께 말씀해 주세요 — 완주 배지와 함께 작은 보상을 드립니다. 배운 것을 매장에서 실제로 적용해 성과가 나면 더 큰 보상이 있습니다.';
   function seedTraining(onlyNew) {
     const list = (S.training = S.training || []), seen = (S.trainSeen = S.trainSeen || []);
@@ -4246,12 +5131,37 @@ const App = (() => {
     if (trainTab === 'board') return h + vTrainBoard(names);
     return h + vTrainAll();
   }
+  /* 교육 여정 맵 — 5개 코스를 역처럼 한 줄로. 끝낸 코스(초록) · 지금 코스(강조, 단계 점) · 앞으로 할 코스(회색) */
+  function journeyMap(name) {
+    const done = (S.trainDone || {})[name] || {};
+    const prs = TRAIN_TRACKS.map((tr) => ({ tr, pr: trackProgress(tr, name) }));
+    const curIdx = prs.findIndex((x) => !x.pr.complete);
+    const totalDone = prs.reduce((acc, x) => acc + x.pr.n, 0), total = prs.reduce((acc, x) => acc + x.pr.total, 0);
+    const cur = curIdx >= 0 ? prs[curIdx] : null;
+    const curStage = cur ? cur.tr.stages.find((st) => st.steps.some((u) => !done[u])) : null;
+    let h = `<div class="jmapWrap"><div class="jmapHead"><b>🗺️ ${esc(name)}님의 교육 여정</b>
+      <span class="mut">${totalDone}/${total}편 · 코스 ${prs.filter((x) => x.pr.complete).length}/${prs.length} 완주</span></div>
+      <div class="jmap">`;
+    prs.forEach((x, i) => {
+      const state = x.pr.complete ? 'done' : i === curIdx ? 'cur' : 'todo';
+      const dots = x.tr.stages.map((st) => { const n = st.steps.filter((u) => done[u]).length; return `<i class="${n === st.steps.length ? 'on' : n ? 'half' : ''}" title="${esc(st.name)} ${n}/${st.steps.length}"></i>`; }).join('');
+      h += `<button class="jnode ${state}" data-act="jmapGo" data-k="${x.tr.key}" title="${esc(x.tr.name)} ${x.pr.n}/${x.pr.total}">
+        <span class="jring" style="--p:${x.pr.pct}"><span class="jicon">${x.pr.complete ? '✓' : x.tr.icon}</span></span>
+        <span class="jname">${esc(x.tr.name.replace(' 코스', '').replace(' 필수', ''))}</span>
+        <span class="jpct">${x.pr.complete ? '완주 🏅' : state === 'cur' ? `${x.pr.n}/${x.pr.total} 진행 중` : `${x.pr.total}편`}</span>
+        <span class="jdots">${dots}</span></button>`;
+    });
+    h += `</div>
+      <div class="jnow">${cur ? `📍 지금 위치 — <b>${esc(cur.tr.name)}</b>${curStage ? ` › ${esc(curStage.name)}` : ''} <span class="mut">(${cur.pr.n}/${cur.pr.total}편)</span>` : '🎉 모든 코스를 완주했습니다!'}</div></div>`;
+    return h;
+  }
   function vTrainProgram(names) {
     let h = '';
     const reward = S.settings.trainReward || TRAIN_REWARD_DEFAULT;
     h += `<div class="notice ok"><b>🎁 보상</b> ${esc(reward)} <button class="btn sm ghost" data-act="trainReward">문구 고치기</button></div>`;
     if (!names.length) return h + `<div class="notice"><b>직원 명단이 비어 있습니다.</b><div class="hint">직원 › 직원 명단에 이름을 넣으면 사람별로 진행을 기록할 수 있습니다.</div></div>`;
     h += `<div class="mlabel">누구의 진행인가요?</div><div class="roles wrap" style="margin-bottom:12px">${names.map((n) => `<button class="rl${n === trainWho ? ' on' : ''}" data-act="trainWho" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>`;
+    h += journeyMap(trainWho);
     const ps = personSummary(trainWho);
     const nextTr = TRAIN_TRACKS.find((tr) => trackProgress(tr, trainWho).next);
     const nextUrl = nextTr ? trackProgress(nextTr, trainWho).next : null, nextItem = nextUrl ? trainByUrl(nextUrl) : null;
@@ -4275,7 +5185,7 @@ const App = (() => {
             <div class="trEffect">✨ 이 단계를 마치면 — ${esc(st.effect)}</div>
             ${st.steps.map((u) => { idx++; const it = trainByUrl(u); if (!it) return ''; const d = done[u]; const isNext = u === pr.next;
               return `<div class="trStep${d ? ' done' : ''}${isNext ? ' next' : ''}"><span class="trNo">${d ? '✓' : idx}</span>
-                <div class="trStepMain"><div class="trStepTitle">${esc(it.title)}</div><div class="mut">${esc(it.cat)}${it.sub ? ' · ' + esc(it.sub) : ''}${it.min ? ' · ' + it.min + '분' : ''}${d ? ' · ' + d + ' 시청' : ''}${isNext ? ' · <b>다음 차례</b>' : ''}</div></div>
+                <div class="trStepMain"><div class="trStepTitle">${esc(it.title)}</div><div class="mut">${esc(it.cat)}${it.sub ? ' · ' + esc(it.sub) : ''}${it.min ? ' · ' + it.min + '분' : ''}${quizOf(u) ? ' · 📝 퀴즈' : ''}${d ? ' · ' + d + ' 시청' : ''}${(() => { const r = quizRec(trainWho, u); return r ? ` · 퀴즈 ${r.tries}회 만에 통과` : ''; })()}${isNext ? ' · <b>다음 차례</b>' : ''}</div></div>
                 <span class="rowbtns" style="margin:0"><button class="btn sm${isNext ? ' primary' : ''}" data-act="trainOpen" data-u="${esc(u)}">${d ? '다시 보기' : '보기'}</button>${d ? `<button class="btn sm ghost" data-act="trainUndo" data-u="${esc(u)}">취소</button>` : ''}</span></div>`; }).join('')}
           </div>`; }).join('')}
       </details>`;
@@ -4284,9 +5194,17 @@ const App = (() => {
   }
   function vTrainBoard(names) {
     if (!names.length) return `<div class="notice"><b>직원 명단이 비어 있습니다.</b></div>`;
+    dashAsyncLoad();
+    const g = (Store.meta.stores || []).flatMap((st) => (st.id === Store.meta.current ? gamify(S, st.id) : (dashDocs[st.id] ? gamify(dashDocs[st.id], st.id) : [])));
+    let h = `<div class="hd sub2"><h3>🏆 이달 활동 랭킹 — 안산점 · 안양점 전 직원</h3><span class="hint" style="margin:0">같은 점수는 같은 등수 · 0점은 0위</span></div>`;
+    h += `<div class="notice ok">🎁 ${esc(S.settings.rankReward || '이달 활동 1위와 배지 최다 보유자에게 사장님 보상')} <button class="btn sm ghost" data-act="rankReward">문구 고치기</button>
+      <div class="hint" style="margin-top:4px">점수 — 영상 ${POINTS.video}점 · 퀴즈 통과 ${POINTS.quiz}점 · 코스 완주 ${POINTS.course}점 · 할 일 체크 ${POINTS.check}점(중요 ${POINTS.crit}점) · 미션 등록 ${POINTS.msAdd}점 · 미션 달성 ${POINTS.msDone}점 · 월 목표 달성 +${POINTS.msGoal}점. 레벨 — ${LEVELS.map(([p, i, n]) => `${i} ${n} ${p}+`).join(' → ')}</div></div>`;
+    h += rankTableAll(g);
+    h += `<div class="hd sub2" style="margin-top:18px"><h3>🎖️ 배지 — 모을 수 있는 것</h3></div><div class="badgeGrid">${BADGES.map((b) => { const who = g.filter((s) => s.badges.some((x) => x.id === b.id)).map((s) => s.name); return `<div class="badgeCard${who.length ? ' got' : ''}"><div class="bIcon">${b.icon}</div><div><b>${esc(b.name)}</b><div class="mut">${esc(b.desc)}</div><div class="bWho">${who.length ? who.map(esc).join(', ') : '<span class="mut">아직 없음</span>'}</div></div></div>`; }).join('')}
+      ${TRAIN_TRACKS.map((tr) => { const who = g.filter((s) => s.courseIcons.includes(tr.icon)).map((s) => s.name); return `<div class="badgeCard${who.length ? ' got' : ''}"><div class="bIcon">${tr.icon}</div><div><b>${esc(tr.name)} 완주</b><div class="mut">${trackSteps(tr).length}편</div><div class="bWho">${who.length ? who.map(esc).join(', ') : '<span class="mut">아직 없음</span>'}</div></div></div>`; }).join('')}</div>`;
     const rows = names.map((n) => ({ name: n, ...personSummary(n) })).sort((p, q) => q.pct - p.pct || q.mins - p.mins);
     const medal = ['🥇', '🥈', '🥉'];
-    let h = `<div class="hd sub2"><h3>직원별 진행</h3><span class="hint" style="margin:0">함께 보면 서로 끌어 줍니다 · 코스 완주 = 배지</span></div>`;
+    h += `<div class="hd sub2" style="margin-top:18px"><h3>직원별 교육 진행</h3><span class="hint" style="margin:0">코스 완주 = 배지</span></div>`;
     h += `<div class="tkLogWrap"><table class="tkLog cList"><thead><tr><th></th><th>이름</th><th>진행</th><th>본 영상</th><th>누적</th><th>완주 배지</th></tr></thead><tbody>${rows.map((r, i) => `<tr>
       <td>${i < 3 && r.n > 0 ? medal[i] : ''}</td><td><b>${esc(r.name)}</b></td>
       <td style="min-width:140px"><span class="stBar" style="display:block"><i style="width:${r.pct}%"></i></span><span class="mut">${r.pct}%</span></td>
@@ -4366,13 +5284,32 @@ const App = (() => {
     }
     const need = w.player ? (w.dur ? w.dur * 0.9 : Infinity) : (w.fallbackSec || 0) * 0.9;
     const ready = w.ended || (need !== Infinity && w.watched >= need);
-    if (ready && !w.ready) { w.ready = true; }
+    if (ready && !w.ready) { w.ready = true; quizShow(); }
     const bar = $('#wProg'), txt = $('#wTxt'), ta = $('#msText'), ok = m.querySelector('[data-act="mOk"]');
     const pct = need && need !== Infinity ? Math.min(100, Math.round(w.watched / need * 100)) : 0;
     if (bar) bar.style.width = pct + '%';
-    if (txt) txt.textContent = w.ready ? '✅ 다 봤습니다 — 아래에 적용할 것 한 가지를 적어 주세요' : (w.player && w.dur ? `시청 ${fmtSec(w.watched)} / ${fmtSec(w.dur)} · 90% 이상 보면 열립니다` : w.fallbackSec ? `시청 ${fmtSec(w.watched)} / 약 ${fmtSec(w.fallbackSec)}` : '재생을 시작하세요');
-    if (ta) ta.disabled = !w.ready;
-    if (ok) ok.disabled = !w.ready;
+    const unlocked = w.ready && (!w.quiz || w.quizPassed);
+    if (txt) txt.textContent = !w.ready ? (w.player && w.dur ? `시청 ${fmtSec(w.watched)} / ${fmtSec(w.dur)} · 90% 이상 보면 열립니다` : w.fallbackSec ? `시청 ${fmtSec(w.watched)} / 약 ${fmtSec(w.fallbackSec)}` : '재생을 시작하세요') : (w.quiz && !w.quizPassed ? '✅ 다 봤습니다 — 아래 확인 퀴즈를 풀어 주세요' : '✅ 다 봤습니다 — 아래에 적용할 것 한 가지를 적어 주세요');
+    if (ta) ta.disabled = !unlocked;
+    if (ok) ok.disabled = !unlocked;
+  }
+  function quizShow() { const q = $('#qz'); if (q) { q.hidden = false; const msg = $('#qzMsg'); if (msg && watch && !watch.quizPassed) msg.textContent = 'O 또는 X를 고르세요. 다 맞히면 다음으로 넘어갑니다.'; } }
+  function quizAnswer(i, val) {
+    if (!watch || !watch.quiz || !watch.ready || watch.quizPassed) return;
+    watch.answers[i] = val;
+    const item = document.querySelector(`.qzItem[data-i="${i}"]`); if (item) item.querySelectorAll('.qzA').forEach((b) => b.classList.toggle('on', (b.dataset.a === '1') === val));
+    if (Object.keys(watch.answers).length < watch.quiz.length) return;
+    watch.quizTries++;
+    const wrong = watch.quiz.map((q, k) => k).filter((k) => watch.answers[k] !== watch.quiz[k].a);
+    document.querySelectorAll('.qzItem').forEach((el) => { const k = Number(el.dataset.i); const why = el.querySelector('.qzWhy'); const bad = wrong.includes(k); el.classList.toggle('bad', bad); el.classList.toggle('good', !bad); why.hidden = false; why.textContent = (bad ? '✗ 아니에요 — ' : '✓ 맞아요 — ') + watch.quiz[k].why; });
+    const msg = $('#qzMsg');
+    if (wrong.length) { msg.textContent = `${wrong.length}문제가 틀렸어요. 이유를 읽고 다시 골라 주세요 (${watch.quizTries}번째 시도)`; watch.answers = {}; setTimeout(() => document.querySelectorAll('.qzItem.bad .qzA').forEach((b) => b.classList.remove('on')), 300); return; }
+    watch.quizPassed = true;
+    if (!S.trainQuiz) S.trainQuiz = {}; if (!S.trainQuiz[watch.who]) S.trainQuiz[watch.who] = {};
+    S.trainQuiz[watch.who][watch.url] = { tries: watch.quizTries, at: dateKey() }; save();
+    msg.textContent = `🎉 통과! (${watch.quizTries}번 만에) 이제 적용할 것 한 가지를 적어 주세요.`;
+    watchTick();
+    const ta = $('#msText'); if (ta) ta.focus();
   }
   function trainOpen(url) {
     const it = trainByUrl(url); if (!it) return;
@@ -4383,11 +5320,17 @@ const App = (() => {
     modal(it.title, `${id ? `<div class="ytBox"><div id="ytp"></div></div>` : `<p><a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener">${it.noEmbed ? '유튜브에서 열기 (외부 재생만 허용된 영상)' : '새 창에서 열기'}</a></p>`}
       <div class="wBar"><i id="wProg"></i></div><div class="hint" id="wTxt">${id ? '재생 준비 중…' : '보고 나서 아래에 적어 주세요'}</div>
       ${it.memo ? `<p class="mmemo">${esc(it.memo)}</p>` : ''}
+      ${quizOf(url) ? `<div id="qz" class="qz" hidden><div class="mlabel">📝 확인 퀴즈 — 다 맞혀야 다음으로 (${quizOf(url).length}문제)</div>
+        ${quizOf(url).map((q, i) => `<div class="qzItem" data-i="${i}"><div class="qzQ">${i + 1}. ${esc(q.q)}</div>
+          <div class="qzBtns"><button type="button" class="btn qzA" data-act="qzAns" data-i="${i}" data-a="1">O 맞다</button><button type="button" class="btn qzA" data-act="qzAns" data-i="${i}" data-a="0">X 아니다</button></div>
+          <div class="qzWhy" hidden></div></div>`).join('')}
+        <div class="hint" id="qzMsg">${quizRec(who, url) ? `전에 ${quizRec(who, url).tries}번 만에 통과했습니다. 다시 풀어도 됩니다.` : '영상을 다 보면 풀 수 있습니다.'}</div></div>` : ''}
       <div class="mlabel">🎯 <b>${esc(who)}</b>님, 내일 매장에서 적용할 것 한 가지</div>
-      <textarea id="msText" rows="2" placeholder="예: 손님 들어올 때 하던 일 멈추고 눈 맞추며 인사하기" ${id ? 'disabled' : ''}></textarea>
+      <textarea id="msText" rows="2" placeholder="예: 손님 들어올 때 하던 일 멈추고 눈 맞추며 인사하기" ${id || quizOf(url) ? 'disabled' : ''}></textarea>
       <div class="roles wrap sm" id="msCats">${MISSION_CATS.map((c) => `<button type="button" class="rl${c === cat0 ? ' on' : ''}" data-cat="${c}">${c}</button>`).join('')}</div>
       <p class="hint">이 한 줄이 이달의 <b>개인 미션</b>이 됩니다 (월 목표 ${missionGoal()}개). 해내면 "해냈어요"를 누르고 사장님 확인을 받으세요.</p>`, () => {
       if (watch && !watch.ready) { alert('영상을 90% 이상 본 뒤에 적을 수 있어요.'); return false; }
+      if (watch && watch.quiz && !watch.quizPassed) { alert('확인 퀴즈를 먼저 다 맞혀 주세요.'); return false; }
       const text = $('#msText').value.trim();
       if (text.length < 5) { alert('적용할 것을 한 줄로 조금 더 구체적으로 적어 주세요 (5자 이상).'); return false; }
       const catSel = document.querySelector('#msCats .rl.on'); const cat = catSel ? catSel.dataset.cat : cat0;
@@ -4396,10 +5339,10 @@ const App = (() => {
       watchStop();
       trainMarkDone(url, who, text);
     }, '시청 완료 · 미션 등록');
-    const ok = $('#modal').querySelector('[data-act="mOk"]'); if (ok && id) ok.disabled = true;
+    const ok = $('#modal').querySelector('[data-act="mOk"]'); if (ok && (id || quizOf(url))) ok.disabled = true;
     $('#msCats').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return; $('#msCats').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); });
-    watch = { player: null, dur: 0, watched: 0, last: null, playing: false, ended: false, ready: !id, timer: null, startedAt: Date.now(), fallbackSec: (it.min || 0) * 60, item: it };
-    if (!id) return;
+    watch = { player: null, dur: 0, watched: 0, last: null, playing: false, ended: false, ready: !id, timer: null, startedAt: Date.now(), fallbackSec: (it.min || 0) * 60, item: it, url, who, quiz: quizOf(url), quizPassed: false, quizTries: 0, answers: {} };
+    if (!id) { quizShow(); return; }
     loadYtApi().then((okApi) => {
       if (!watch || watch.item !== it) return;
       if (okApi && $('#ytp')) {
@@ -4484,8 +5427,12 @@ const App = (() => {
     modal('미션 달성 확인', `<p class="mmemo"><b>${esc(x.who)}</b> — ${esc(x.text)}</p>
       <label>확인하며 한마디 <span class="opt">선택</span><input id="msNote" value="${esc(x.note || '')}" placeholder="예: 어제 룸 손님 배웅 잘 봤어요" autocomplete="off"></label>
       <p class="hint">확인하면 완료로 바뀌고, 텔레그램이 연결돼 있으면 방에 공유됩니다.</p>`, () => {
+      const before = (gamify(S, Store.meta.current).find((s) => s.name === x.who) || { points: 0, badges: [] });
       x.status = 'done'; x.doneAt = Date.now(); x.note = $('#msNote').value.trim() || undefined;
       save(); render();
+      const after = (gamify(S, Store.meta.current).find((s) => s.name === x.who) || { points: 0, badges: [] });
+      const newB = after.badges.filter((b) => !before.badges.some((q) => q.id === b.id));
+      if (newB.length) setTimeout(() => banner(`🎖️ ${x.who} 새 배지 — ${newB.map((b) => b.icon + ' ' + b.name).join(', ')}`, `활동 점수 ${after.points}점 · ${after.level.icon} ${after.level.name}`), 1200);
       const doneN = missionsOf(x.who, x.month).filter((q) => q.status === 'done').length, goal = missionGoal();
       const hasTg = (S.settings.tgToken || '').trim() && (S.settings.tgChat || '').trim();
       if (doneN === goal) {
@@ -4544,13 +5491,14 @@ const App = (() => {
     const who = S.ui.whoDate === dateKey() ? S.ui.who : null;
     const ask = !!S.settings.askWho;
     if (!who && !ask) { pickWho(); return; }
+    const memoMode = doneMemoMode();   // 'req' 필수 · 'opt' 선택 · 'off' 끔
 
-    // 매번 묻기 + 증빙 없음 → 이름 한 번만 누르면 끝. 확인 버튼을 거치지 않는다.
-    if (ask && !t.ev && !t.note) {
+    // 매번 묻기 + 증빙 없음 + 메모 끔 → 이름 한 번만 누르면 끝. 확인 버튼을 거치지 않는다.
+    if (ask && !t.ev && !t.note && memoMode === 'off') {
       modal(t.title, (t.memo ? `<p class="mmemo">${esc(t.memo)}</p>` : '') + whoRow(tid, true), null);
       return;
     }
-    if (!ask && !t.ev && !t.note) { doComplete(tid, {}); return; }
+    if (!ask && !t.ev && !t.note && memoMode === 'off') { doComplete(tid, {}); return; }
 
     let b = '';
     if (t.memo) b += `<p class="mmemo">${esc(t.memo)}</p>`;
@@ -4562,8 +5510,11 @@ const App = (() => {
     if (t.ev === 'money') b += `<div class="mlabel">오늘 매출 — 포스 마감 화면을 보고 적으세요 (회계 › 매출 입력에 그대로 쌓입니다)</div>` + salesFields(salesOf(key));
     if (t.ev === 'kakao') b += `<label class="chk"><input type="checkbox" id="evKakao"> 카톡방에 사진을 보냈습니다</label>
       <p class="hint">사진은 앱이 아니라 카톡방에 남습니다. 이상이 있던 날은 아래에 한 줄 적어두면 나중에 앱에서 바로 찾을 수 있습니다.</p>`;
-    if (t.note || t.ev === 'kakao') b += `<label>메모 <span class="opt">선택</span><textarea id="evNote" rows="2" placeholder="이상 있을 때만 적으세요"></textarea></label>`;
+    if (memoMode !== 'off') b += `<label>어떻게 했나요 <span class="opt">${memoMode === 'req' ? '필수' : '선택'}</span><textarea id="evNote" rows="3" placeholder="${esc(t.notePh || '예: 수조 3번 온도 1도 내림 · 이끼 닦음 · 특이사항 없음')}"></textarea></label>
+      <p class="hint" style="margin-top:4px">한 줄이면 됩니다. 무엇을 어떻게 했는지, 평소와 다른 점이 있었는지. 체크만 하면 나중에 아무도 모릅니다.</p>`;
+    else if (t.note || t.ev === 'kakao') b += `<label>메모 <span class="opt">선택</span><textarea id="evNote" rows="2" placeholder="이상 있을 때만 적으세요"></textarea></label>`;
 
+    setTimeout(() => { if (t.ev === 'money') { syncKgTotals(); syncSalesTotals(); } }, 0);
     modal(t.title, b, () => {
       const out = {};
       if (ask) {
@@ -4585,9 +5536,23 @@ const App = (() => {
       }
       const kk = $('#evKakao');
       if (kk && !kk.checked) { alert('카톡방에 사진을 보냈는지 확인해 주세요.'); return false; }
-      const nt = $('#evNote'); if (nt && nt.value.trim()) out.note = nt.value.trim();
+      const nt = $('#evNote');
+      if (nt && memoMode === 'req' && nt.value.trim().length < 2) { alert('어떻게 했는지 한 줄 적어 주세요. (설정에서 "완료 메모"를 선택으로 바꿀 수 있습니다)'); nt.focus(); return false; }
+      if (nt && nt.value.trim()) out.note = nt.value.trim();
       doComplete(tid, out);
     }, '완료');
+    setTimeout(() => { const nt = $('#evNote'); if (nt && !document.querySelector('.whosel') && t.ev !== 'money') nt.focus(); }, 60);
+  }
+  const doneMemoMode = () => (['req', 'opt', 'off'].includes(S.settings.doneMemo) ? S.settings.doneMemo : 'req');
+  /* 완료 뒤에도 메모를 남기거나 고친다 (담당자 누구나) */
+  function taskNoteModal(tid) {
+    const key = viewKey(), rec = S.days[key].inst[tid], t = tpl(tid); if (!rec) return;
+    modal(`메모 — ${t.title}`, `<label>어떻게 했나요<textarea id="tnNote" rows="4" placeholder="예: 수조 3번 온도 1도 내림 · 이끼 닦음 · 특이사항 없음">${esc(rec.note || '')}</textarea></label>
+      <p class="hint">${rec.s === 'done' ? `${esc(rec.by || '')} ${rec.at || ''} 완료` : '아직 완료 전입니다. 메모만 먼저 남겨 둘 수 있습니다.'}</p>`, () => {
+      const v = $('#tnNote').value.trim(); if (v) rec.note = v; else delete rec.note;
+      rec.noteBy = (S.ui.whoDate === dateKey() ? S.ui.who : '') || rec.noteBy || '';
+      save(); render();
+    }, '저장');
   }
 
   function doComplete(tid, extra) {
@@ -4620,10 +5585,11 @@ const App = (() => {
           `<button class="rl${rec.by === x.name ? ' on' : ''}" data-menu="by:${esc(x.name)}">${esc(x.name)}</button>`).join('')}</div>` : ''}
       ${rec.s !== 'todo' ? `<button class="btn big" data-menu="undo">되돌리기 (미완료로)</button>` : ''}
       ${rec.s === 'todo' ? `<button class="btn big" data-menu="skip">오늘만 건너뛰기</button>` : ''}
-      <div class="mlabel">오늘만 담당 바꾸기</div>
+      ${staffLocked() ? '' : `<div class="mlabel">오늘만 담당 바꾸기</div>
       <div class="roles big">${ROLE_OPTS.map((x) => `<button class="rl${roleOf(key, tid) === x ? ' on' : ''}" data-menu="role:${x}">${x}</button>`).join('')}</div>
-      <button class="btn big" data-menu="title">✏️ 이름 고치기 (매일 · 두 매장 적용)</button>
-      <button class="btn big" data-menu="memo">✏️ 메모 고치기 (매일 적용)</button>
+      <button class="btn big" data-menu="title">✏️ 이름 고치기 (매일 · 두 매장 적용)</button>`}
+      <button class="btn big" data-menu="note">📝 오늘 메모 남기기 · 고치기</button>
+      ${staffLocked() ? '<p class="hint">테스트 기간에는 담당·이름·설명 변경은 사장님만 합니다.</p>' : `<button class="btn big" data-menu="memo">✏️ 설명 고치기 (매일 적용)</button>`}
     </div>`, null);
     $('#modal').dataset.tid = tid;
   }
@@ -4682,7 +5648,16 @@ const App = (() => {
   }
 
   /* ── 이벤트 ──────────────────────────────────────────────── */
+  /* 왼쪽 메뉴 서랍 (PC·포스 1024×768) — 평소엔 숨기고 ☰ 로 연다. 고르면 닫히고, 15초 가만히 두면 저절로 닫힌다 (사장님 요청 2026-10-09) */
+  let sideTimer = null;
+  const SIDE_IDLE_MS = 15 * 1000;
+  function sideArm() { clearTimeout(sideTimer); sideTimer = setTimeout(sideClose, SIDE_IDLE_MS); }
+  function sideOpen() { document.body.classList.add('sideOpen'); sideArm(); }
+  function sideClose() { clearTimeout(sideTimer); sideTimer = null; document.body.classList.remove('sideOpen'); }
+
   function bind() {
+    $('#side').addEventListener('pointerdown', () => { if (document.body.classList.contains('sideOpen')) sideArm(); }, { passive: true });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('sideOpen')) sideClose(); });
     document.addEventListener('change', (e) => {
       const el = e.target.closest('[data-act="tankCycle"]'); if (!el) return;
       const v = Math.max(1, Number(el.value) || 1), T = tanksOf();
@@ -4714,12 +5689,14 @@ const App = (() => {
       const mm = e.target.closest('[data-menu]');
       if (mm) {
         const tid = m.dataset.tid, key = viewKey(), rec = S.days[key].inst[tid], v = mm.dataset.menu;
+        if (staffLocked() && (v === 'title' || v === 'memo' || v.startsWith('role:'))) { blockedBanner(); return; }
         if (v === 'undo') { S.days[key].inst[tid] = { s: 'todo', role: rec.role }; }
         else if (v === 'skip') {
           const why = prompt('건너뛰는 이유를 적어주세요.\n(예: 재료 미입고)');
           if (why === null) return;
           Object.assign(rec, { s: 'skip', reason: why.trim() || '사유 없음', by: S.ui.who });
         } else if (v === 'memo') { closeModal(); editMemo(tid); return; }
+        else if (v === 'note') { closeModal(); taskNoteModal(tid); return; }
         else if (v === 'title') { closeModal(); editTitle(tid); return; }
         else if (v.startsWith('role:')) { rec.role = v.slice(5); }
         else if (v.startsWith('by:')) { rec.by = v.slice(3); }
@@ -4730,9 +5707,16 @@ const App = (() => {
       if (!b) { if (e.target === m) closeModal(); return; }
       const a = b.dataset.act, id = b.dataset.id;
       const key = view === 'month' ? mdateKey() : viewKey();   // 편성 동작은 근무표에서 선택한 날짜 기준
+      if (STAFF_BLOCK.has(a) && staffLocked()) { blockedBanner(); return; }
+      if (b.closest('#side') && (a === 'view' || a === 'storeSwitch')) sideClose();   // 메뉴를 고르면 서랍은 바로 닫힌다 (대카테고리 접기·펼치기는 열어 둔다)
 
       switch (a) {
-        case 'view': view = b.dataset.v; if (view !== 'contracts') { cOpen = null; cMode = null; } render(); window.scrollTo(0, 0); break;
+        case 'demoReset': demoReset(); break;
+        case 'sideToggle': if (document.body.classList.contains('sideOpen')) sideClose(); else sideOpen(); break;
+        case 'sideClose': sideClose(); break;
+        case 'view': view = b.dataset.v; if (view !== 'contracts') { cOpen = null; cMode = null; } if (view !== 'dash') dashLiveOff(); render(); window.scrollTo(0, 0); break;
+        case 'viewUnlock': orderUnlockModal('이 카테고리를 열려면 사장님 PIN 을 넣으세요.'); break;
+        case 'guideEdit': guideEditModal(); break;
         case 'navGroup': {   // PC 사이드바: 접기/펼치기만 (화면 이동 없음)
           toggleGroup(b.dataset.g);
           const sub = b.nextElementSibling;
@@ -4742,7 +5726,7 @@ const App = (() => {
         }
         case 'navGroupM': {  // 모바일 상단: 대카테고리를 누르면 첫 하위 화면으로 이동 → 2줄에 하위 메뉴가 뜬다
           const m = MENU.find((x) => x.id === b.dataset.g);
-          if (m) { view = m.items[0][0]; render(); window.scrollTo(0, 0); }
+          if (m) { view = m.main || m.items[0][0]; render(); window.scrollTo(0, 0); }
           break;
         }
         case 'dateGo': {
@@ -4757,7 +5741,7 @@ const App = (() => {
         case 'storeSwitch': switchStore(b.dataset.id); break;
         case 'cmonthNav': S.ui.cmonth = monthShiftKey(S.ui.cmonth || dateKey().slice(0, 7), Number(b.dataset.d)); save(); render(); break;
         case 'nmonthNav': S.ui.nmonth = monthShiftKey(S.ui.nmonth || dateKey().slice(0, 7), Number(b.dataset.d)); save(); render(); break;
-        case 'purchaseAdd': purchaseForm(null); break;
+        case 'purchaseAdd': purchaseForm(null, b.dataset.mode || 'staff'); break;
         case 'purchaseCsv': purchaseCsvImport(); break;
         case 'biSp': S.ui.biSp = b.dataset.sp; save(); render(); break;
         case 'buyEvAdd': buyEvForm(); break;
@@ -4826,12 +5810,19 @@ const App = (() => {
           break;
         }
         case 'issueAdd': issueForm(null); break;
+        case 'fbNew': issueForm({ cat: b.dataset.c }); break;
+        case 'fbFilter': fbUi.f = b.dataset.f; fbUi.all = false; render(); break;
+        case 'fbAll': fbUi.all = !fbUi.all; render(); break;
+        case 'fbCopy': { const done = () => banner('양식을 복사했습니다', '게시판 글 쓰기나 단톡방에 붙여 넣으세요.');
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(FB_TEMPLATE).then(done).catch(() => prompt('아래 양식을 복사하세요', FB_TEMPLATE));
+          else prompt('아래 양식을 복사하세요', FB_TEMPLATE); break; }
         case 'issueOpen': issueShow(id); break;
         case 'issueEdit': closeModal(); issueForm(issuesAll().find((x) => x.id === id)); break;
         case 'issueFilter': issueFilter = b.dataset.f; render(); break;
         case 'issueStoreF': issueStore = b.dataset.s; render(); break;
         case 'issueCatF': issueCat = b.dataset.c; render(); break;
         case 'issueDel': {
+          if (pinOk(S.settings.orderPin) && !orderUnlocked()) { closeModal(); orderUnlockModal('글을 지우려면 사장님 PIN 을 넣으세요.'); return; }
           if (!confirm('이 기록을 삭제할까요? 덧글도 함께 사라집니다. 두 매장 모두에서 사라집니다.')) return;
           SH.issues = issuesAll().filter((x) => x.id !== id); saveShared(); closeModal(); render(); break;
         }
@@ -4840,7 +5831,8 @@ const App = (() => {
           if (!t) { alert('내용을 입력하세요.'); return; }
           const x = issuesAll().find((i2) => i2.id === id); if (!x) return;
           x.replies = x.replies || [];
-          x.replies.push({ text: t, by: (S.ui.whoDate === dateKey() ? S.ui.who : '') || '', store: storeName(), at: Date.now() });
+          const ranon = !!($('#isRAnon') && $('#isRAnon').checked);
+          x.replies.push({ text: t, by: ranon ? '' : ((S.ui.whoDate === dateKey() ? S.ui.who : '') || ''), anon: ranon, store: storeName(), at: Date.now() });
           x.updatedAt = Date.now(); saveShared(); closeModal(); render(); issueShow(id); break;
         }
         case 'issueDone': {
@@ -4871,6 +5863,8 @@ const App = (() => {
         case 'trainEdit': closeModal(); trainForm(trainList().find((t) => t.id === id)); break;
         case 'trainCat': trainCat = b.dataset.c; render(); break;
         case 'trainTab': trainTab = b.dataset.t; render(); break;
+        case 'qzAns': quizAnswer(Number(b.dataset.i), b.dataset.a === '1'); break;
+        case 'jmapGo': { TRAIN_TRACKS.forEach((tr) => { openState['tr:' + tr.key] = tr.key === b.dataset.k; }); render(); const el = document.querySelector(`[data-k="tr:${b.dataset.k}"]`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); break; }
         case 'trainWho': trainWho = b.dataset.n; render(); break;
         case 'trainOpen': trainOpen(b.dataset.u); break;
         case 'trainDone': { const who = trainWho || whoNow(); if (!who) { pickWho(); return; } trainMarkDone(b.dataset.u, who); break; }
@@ -4907,6 +5901,10 @@ const App = (() => {
         case 'pickWhoAll': pickWho(true); break;
         case 'tankDate': tankDateModal(Number(b.dataset.n), b.dataset.kind); break;
         case 'tankStock': tankStockModal(Number(b.dataset.n), b.dataset.pos); break;
+        case 'deadAdd': deadAddModal(); break;
+        case 'deadUse': deadUseModal(b.dataset.key); break;
+        case 'deadUnuse': { if (S.deadUse) delete S.deadUse[b.dataset.key]; save(); render(); break; }
+        case 'deadDel': { if (!confirm('이 폐사 기록을 지울까요?')) return; S.deaths = (S.deaths || []).filter((x) => x.id !== b.dataset.id); if (S.deadUse) delete S.deadUse['m|' + b.dataset.id]; save(); render(); break; }
         case 'tankCareDel': {
           if (!confirm('이 기록 한 줄을 지웁니다. 위 표의 칸은 그대로 둡니다.')) break;
           const T = tanksOf(); T.care = T.care.filter((x) => x.id !== id); save(); render(); break;
@@ -4927,6 +5925,9 @@ const App = (() => {
           break;
         }
         case 'menu': taskMenu(id); break;
+        case 'taskNote': taskNoteModal(id); break;
+        case 'doneMemo': S.settings.doneMemo = b.dataset.v; save(); render(); break;
+        case 'staffLockToggle': S.settings.staffLock = S.settings.staffLock === false; save(); render(); break;
 
         case 'addExtra': {
           modal('오늘만 할 일', `<label>내용<input id="exTitle" placeholder="예: 배달 파트너 미팅"></label>`, () => {
@@ -5130,6 +6131,11 @@ const App = (() => {
         case 'toggleSound': S.settings.sound = !S.settings.sound; save(); render(); break;
         case 'toggleAskWho': S.settings.askWho = !S.settings.askWho; save(); render(); break;
         case 'orderUnlock': orderUnlockModal(); break;
+        case 'dashRefresh': dashAt = 0; dashAsyncLoad(true); render(); break;
+        case 'trainBoardGo': trainTab = 'board'; view = 'training'; render(); window.scrollTo(0, 0); break;
+        case 'rankReward': { const v = prompt('랭킹 보상 문구 (직원에게 보입니다)', S.settings.rankReward || '이달 활동 1위와 배지 최다 보유자에게 사장님 보상'); if (v === null) return; S.settings.rankReward = v.trim() || undefined; save(); render(); break; }
+        case 'dashGo': { const sid = b.dataset.s, v = b.dataset.v || 'today'; if (sid && sid !== Store.meta.current) { switchStore(sid).then(() => { view = v; render(); window.scrollTo(0, 0); }); } else { view = v; render(); window.scrollTo(0, 0); } break; }
+        case 'skgView': S.ui.skg = b.dataset.k; save(); render(); break;
         case 'copyUrl': { const u = location.origin + '/'; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => banner('주소를 복사했습니다', u)).catch(() => alert('주소: ' + u)); break; }
         case 'tplNew': newTplModal(); break;
         case 'rtScope': rtScope = b.dataset.s; render(); break;
@@ -5180,7 +6186,7 @@ const App = (() => {
             }
             if (!r.ok) { alert('실패: ' + r.err); return; }
             if (!serverSends()) { alert('보냈습니다! 휴대폰 텔레그램을 확인하세요.'); return; }
-            const r2 = await Store.supaEvent('test', '해모닉 서버 알림 확인 🛰️ 이 메시지가 보이면 서버 알림(21:30 리포트 · 즉시 알림)도 준비된 것입니다.');
+            const r2 = await Store.supaEvent('test', '해모닉 서버 알림 확인 🛰️ 이 메시지가 보이면 서버 알림(21:50 리포트 · 즉시 알림)도 준비된 것입니다.');
             alert(r2.ok ? '2통을 보냈습니다 — 1통은 이 기기에서, 1통은 서버에서. 휴대폰에 둘 다 오면 끝입니다.\n(서버 것이 안 오면 서버/supabase_alerts.sql 을 아직 설치하지 않은 것입니다)'
               : '이 기기에서는 보냈지만 서버 알림 표가 없습니다: ' + r2.err + '\n서버/supabase_alerts.sql 을 SQL Editor 에서 실행하세요.');
           });
@@ -5195,7 +6201,17 @@ const App = (() => {
         }
         case 'showReport': showReport(b.dataset.k || viewKey()); break;
         case 'supaLogin': supaLoginModal(); break;
-        case 'supaLogout': { if (!confirm('서버 로그아웃할까요? 이 기기 기록은 남고, 동기화만 멈춥니다.')) return; Store.flush().then(() => Store.supaSignOut()).then(() => location.reload()); break; }
+        case 'supaRetry': Store.flush().then(() => location.reload()); break;
+        case 'ownerLogin': ownerLoginModal(); break;
+        case 'deviceRegister': deviceRegisterGo(); break;
+        case 'deviceLink': deviceLinkModal(false); break;
+        case 'deviceLinkCopy': { const l = Store.deviceLink(); const done = () => banner('주소를 복사했습니다', '이 기기의 홈 화면·즐겨찾기에 추가하세요.');
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(l).then(done).catch(() => prompt('아래 주소를 복사하세요', l)); else prompt('아래 주소를 복사하세요', l); break; }
+        case 'deviceRevoke': { if (!confirm(`"${b.dataset.name}" 기기를 끊을까요? 그 기기에서는 매장 기록이 바로 안 보이게 됩니다.`)) return;
+          Store.deviceRevoke(id).then(() => { devList = null; banner('기기를 끊었습니다', b.dataset.name); render(); }).catch((e) => alert('실패: ' + e.message)); break; }
+        case 'ownerPw': ownerPwModal(); break;
+        case 'ownerLock': ownerLock(false); break;
+        case 'supaLogout': { if (!confirm('서버 계정에서 로그아웃할까요? 이 기기는 자동 연결로 돌아갑니다.')) return; Store.flush().then(() => Store.supaSignOut()).then(() => location.reload()); break; }
         case 'supaClear': { if (!confirm('서버 주소와 열쇠를 이 기기에서 지울까요? 기록은 남습니다.')) return; Store.supaSignOut().then(() => { Store.supaSetConfig('', ''); location.reload(); }); break; }
         case 'export': doExport(); break;
         case 'import': doImport(); break;
@@ -5261,7 +6277,7 @@ const App = (() => {
       }
       if (b.dataset.act === 'biz') { bizOf()[b.dataset.f] = b.value.trim(); save(); }
       if (b.dataset.act === 'minWage') { S.settings.minWage = Math.max(0, Number(b.value) || 0) || MIN_WAGE.hour; save(); render(); }
-      if (b.dataset.act === 'reportAt') { S.settings.reportAt = b.value || '21:30'; save(); render(); }
+      if (b.dataset.act === 'reportAt') { S.settings.reportAt = b.value || '21:50'; save(); render(); }
       if (b.dataset.act === 'tgToken') { S.settings.tgToken = b.value.trim(); save(); }
       if (b.dataset.act === 'pmStart') { if (/^\d{2}:\d{2}$/.test(b.value)) { S.settings.pmStart = b.value; save(); render(); } }
       if (b.dataset.act === 'tgChat') { S.settings.tgChat = b.value.trim(); save(); }
@@ -5415,7 +6431,7 @@ const App = (() => {
     return doc;
   }
 
-  function hydrate() {
+  function hydrate(keepUi) {
     if (!S.ui) S.ui = { who: null, whoDate: null, filter: 'all' };
     migrateRoles(S);
 
@@ -5471,13 +6487,18 @@ const App = (() => {
       S.routineVer = ROUTINE_VER;
     }
     S.templates.forEach((t) => { if (!t.scope) t.scope = t.store || 'all'; });
+    // 마감 리포트 시각 21:30 → 21:50 (사장님 결정 2026-10-06). 한 번만 바꾸고 표시해 둔다 — 이후엔 설정에서 바꾼 값을 그대로 둔다
+    if (S.settings && !S.settings.askWhoV2) { S.settings.askWho = true; S.settings.askWhoV2 = 1; }   // 2026-10-08: 출근 때 이름 선택 대신 완료할 때마다 고른다
+    if (S.settings && !S.settings.reportAtV2) { if (!S.settings.reportAt || S.settings.reportAt === '21:30' || S.settings.reportAt === '22:30') S.settings.reportAt = '21:50'; S.settings.reportAtV2 = 1; }
     /* 앱을 새로 열면 항상 오늘·전체 보기로 시작한다.
        공용 PC라 역할 필터가 남아 있으면 다음 사람이 자기 항목을 못 보게 된다. */
-    S.ui.date = dateKey();
-    S.ui.filter = 'all';
-    S.ui.slot = null;          // 앱을 열면 지금 시간대부터 보여준다
-    S.ui.month = dateKey().slice(0, 7);
-    S.ui.mdate = dateKey();
+    if (!keepUi) {             // 다른 기기 저장이 도착해 갈아끼울 때(keepUi)는 보던 시간대·필터를 그대로 둔다
+      S.ui.date = dateKey();
+      S.ui.filter = 'all';
+      S.ui.slot = null;        // 앱을 열면 지금 시간대부터 보여준다
+      S.ui.month = dateKey().slice(0, 7);
+      S.ui.mdate = dateKey();
+    }
     if (!S.recipes) S.recipes = [];
     if (!S.purchases) S.purchases = [];
     if (!S.sales) S.sales = {};
@@ -5485,6 +6506,13 @@ const App = (() => {
     S.ui.smonth = null; S.ui.pmonth = null; S.ui.lmonth = null;   // 회계 화면은 열 때마다 이번 달부터
     if (!S.notices) S.notices = [];
     if (!S.issues) S.issues = [];
+    if (!S.deaths) S.deaths = [];
+    if (!S.deadUse) S.deadUse = {};
+    /* 실제 직원이 한 명이라도 있으면 기본 자리표시 직원(사장님 · 홀 1 · 주방 1 · 매니저 · 점장, id s1~s3)은 자동으로 치운다 — 사장님 지적 2026-10-08 */
+    if (Array.isArray(S.staff)) {
+      const ph = (x) => x && /^s[1-3]$/.test(String(x.id)) && ['사장님', '홀 1', '주방 1', '매니저', '점장'].includes(x.name);
+      if (S.staff.some((x) => x && x.name && !ph(x))) S.staff = S.staff.filter((x) => !ph(x));
+    }
     if (!S.contracts) S.contracts = [];
     if (!S.blobs) S.blobs = {};
     if (!S.settings) S.settings = { ...DEFAULT_SETTINGS };
@@ -5500,25 +6528,173 @@ const App = (() => {
 
   async function switchStore(id) {
     if (Store.meta && Store.meta.current === id) return;
+    if (LIMITED) { await Store.switchTo(id); location.reload(); return; }
     Store.save(S);
     S = (await Store.switchTo(id)) || freshState(id);
     staffTab = null; otherDoc = null; otherDocId = null; cOpen = null; cMode = null; cFilter = 'all';
     hydrate();
-    view = 'today';
+    dashLiveOff(); dashAt = 0;
+    if (!MENU.some((m) => m.items.some(([k]) => k === view))) view = 'dash';   // 보고 있던 화면은 그대로 둔다
     render();
     try { loadMarketCache(); } catch (e) {}   // 다른 매장 매입 단가(시세 참조)를 새 매장 기준으로 다시 읽는다
   }
 
+  /* ── 데모판 (10/14 공유회용, 2026-10-09) ─────────────────────────
+     demo.js 가 window.HM_DEMO 를 켜면: 서버 없음 · 저장소 따로 · 매일 처음 열 때 가짜 두 매장 자료를 오늘 날짜 기준으로 새로 만든다.
+     실제 직원·매출과 무관한 숫자만 쓴다. 사장님 비밀번호 1234. */
+  const DEMO = !!window.HM_DEMO, DEMO_VER = 2, DEMO_PW = '1234';
+  function demoRng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  const DEMO_STAFF = {
+    ansan: [
+      { id: 'd1', name: '김하늘', roles: [ROLE_MGR], pay: { type: 'month', amount: 3200000 } },
+      { id: 'd2', name: '박서준', roles: ['홀'], pay: { type: 'hour', amount: 11000 } },
+      { id: 'd3', name: '이도윤', roles: ['주방'], pay: { type: 'hour', amount: 11500 } },
+      { id: 'd4', name: '최유나', roles: ['홀'], pay: { type: 'hour', amount: 10500 } },
+      { id: 'd5', name: '정민호', roles: ['주방'], pay: { type: 'hour', amount: 11000 } },
+    ],
+    anyang: [
+      { id: 'd1', name: '한지우', roles: [ROLE_MGR, '홀'], pay: { type: 'month', amount: 3000000 } },
+      { id: 'd2', name: '오세린', roles: ['주방'], pay: { type: 'hour', amount: 11000 } },
+      { id: 'd3', name: '윤태오', roles: ['홀', '주방'], pay: { type: 'hour', amount: 10500 } },
+    ],
+  };
+  const DEMO_NOTES = ['특이사항 없음', '정상 완료', '확인 완료 · 이상 없음', '사진 찍어 단톡방 공유', '부족분 바로 채움', '평소보다 오래 걸림 — 손님 몰림', '같이 한 사람과 나눠서 끝냄', '처음 해 봐서 매니저에게 물어보고 함'];
+  const DEMO_FOOD = [['식자재', '양파·대파·마늘', 38000], ['식자재', '쌀 20kg', 62000], ['식자재', '버터·치즈', 45000], ['수산물', '전복·새우', 120000], ['주류·음료', '소주·맥주', 180000], ['소모품', '비닐장갑·랩·호일', 42000], ['식자재', '소스류', 56000]];
+  async function demoSeed() {
+    const today = dateKey(), now = nowMin();
+    const docs = {};
+    for (const st of ['ansan', 'anyang']) {
+      const R = demoRng(st === 'ansan' ? 17 : 29);
+      const pick = (a) => a[Math.floor(R() * a.length)];
+      S = freshState(st);
+      S.created = shift(today, -40);
+      S.staff = DEMO_STAFF[st].map((x) => ({ ...x, roles: x.roles.slice(), active: true }));
+      S.settings = { ...S.settings, askWho: true, askWhoV2: 1, reportAt: '21:50', reportAtV2: 1, doneMemo: 'req', staffLock: true, crew: st === 'ansan' ? 3 : 2 };
+      S.routineVer = ROUTINE_VER;
+      S.demo = { ver: DEMO_VER, day: today };
+      // 근무 편성 — 지난 30일 · 앞으로 14일
+      for (let i = -30; i <= 14; i++) {
+        const k = shift(today, i), wd = new Date(k + 'T00:00:00').getDay();
+        const pool = S.staff.slice(), mgr = pool.shift(), rest = pool.sort(() => R() - 0.5), busy = wd === 5 || wd === 6;
+        const am = st === 'ansan' ? [mgr, rest[0], rest[1]] : [mgr, rest[0]];
+        const pm = st === 'ansan' ? [mgr, rest[busy ? 0 : 2], rest[3]].concat(busy ? [rest[1]] : []) : [mgr, rest[busy ? 1 : 0]].concat(busy ? [rest[0]] : []);
+        applyShiftDay(k, [...new Set(am.filter(Boolean).map((x) => x.name))], [...new Set(pm.filter(Boolean).map((x) => x.name))]);
+      }
+      // 할 일 기록 — 지난 14일 + 오늘(지금 시각 이전 것만)
+      const totalBy = {};
+      for (let i = 14; i >= 0; i--) {
+        const k = shift(today, -i), day = ensureDay(k);
+        const crew = (S.roster[k] || []).map((e) => S.staff.find((x) => x.id === e.staffId)).filter(Boolean);
+        const pDay = i === 0 ? 0.93 : 0.8 + R() * 0.18;
+        Object.keys(day.inst).forEach((tid) => {
+          const rec = day.inst[tid], t = tpl(tid); if (!t || rec.s !== 'todo' || t.rest) return;
+          const m = minutesOf(t.sort); if (m == null) return;
+          if (i === 0 && m > now - 5) return;
+          if (R() > (t.crit ? Math.min(0.98, pDay + 0.08) : pDay)) return;
+          const late = R() < 0.12 ? 35 + Math.floor(R() * 40) : Math.floor(R() * 22) - 4;
+          const at = Math.max(0, Math.min(23 * 60 + 50, m + late));
+          const who = pick(crew.length ? crew : S.staff);
+          rec.s = 'done'; rec.by = who.name; rec.at = `${pad(Math.floor(at / 60))}:${pad(at % 60)}`;
+          if (R() < 0.85) rec.note = pick(DEMO_NOTES);
+          if (t.ev === 'deaths') rec.ev = { 대게: R() < 0.1 ? 1 : 0, 킹크랩: R() < 0.04 ? 1 : 0, 랍스터: 0 };
+          totalBy[k] = true;
+        });
+      }
+      // 매출 — 60일
+      S.sales = {};
+      const base = st === 'ansan' ? 2600000 : 1700000;
+      for (let i = 60; i >= 1; i--) {
+        const k = shift(today, -i), wd = new Date(k + 'T00:00:00').getDay();
+        const mul = wd === 5 ? 1.45 : wd === 6 ? 1.6 : wd === 0 ? 1.25 : wd === 1 ? 0.75 : 1;
+        const tot = Math.round(base * mul * (0.82 + R() * 0.36) / 1000) * 1000;
+        const deliv = Math.round(tot * (0.18 + R() * 0.1) / 100) * 100, take = Math.round(tot * (0.04 + R() * 0.04) / 100) * 100, store = tot - deliv - take;
+        const oS = Math.round(store / 98000), oD = Math.round(deliv / 72000);
+        const crab = Math.round(tot / 95000 * 10) / 10, king = Math.round(tot / 210000 * 10) / 10, lob = Math.round(R() * 3 * 10) / 10;
+        S.sales[k] = { orders: oS + oD, ordersS: oS, ordersD: oD, store, deliv, take, total: tot, liquor: Math.round(store * 0.16 / 100) * 100, crab, king, lob, by: '데모', at: k + ' 21:40', src: 'demo' };
+        const d = S.days[k]; const mt = S.templates.find((x) => x.ev === 'money'); if (d && mt && d.inst[mt.id] && d.inst[mt.id].s === 'done') d.inst[mt.id].ev = tot;
+      }
+      // 매입 — 갑각류(2~3일마다) + 식자재
+      S.purchases = [];
+      for (let i = 60; i >= 0; i--) {
+        const k = shift(today, -i);
+        if (i % (st === 'ansan' ? 2 : 3) === 0) {
+          const kg = Math.round((st === 'ansan' ? 19 : 12) * (0.8 + R() * 0.4) * 10) / 10, unit = 68000 + Math.round(R() * 9000 + (60 - i) * 60);
+          S.purchases.push({ id: newId('p'), date: k, cat: '대게', name: '대게(러시아)', qty: kg, unit: 'kg', amount: Math.round(kg * unit / 100) * 100, vendor: '데모수산', memo: '', by: '데모', createdAt: Date.now(), src: 'demo' });
+          if (R() < 0.6) { const kk = Math.round((st === 'ansan' ? 7 : 4.5) * (0.8 + R() * 0.4) * 10) / 10, ku = 118000 + Math.round(R() * 14000); S.purchases.push({ id: newId('p'), date: k, cat: '킹크랩', name: '킹크랩', qty: kk, unit: 'kg', amount: Math.round(kk * ku / 100) * 100, vendor: '데모수산', memo: '', by: '데모', createdAt: Date.now(), src: 'demo' }); }
+        }
+        if (i % 2 === 1) { const f = pick(DEMO_FOOD); S.purchases.push({ id: newId('p'), date: k, cat: f[0], name: f[1], qty: null, unit: 'kg', amount: Math.round(f[2] * 1.6 * (0.85 + R() * 0.3) / 100) * 100, vendor: '데모상회', memo: '', by: pick(S.staff).name, createdAt: Date.now(), src: 'demo' }); }
+      }
+      // 수조
+      const T = TANK_DEFAULT(); T.count = 4; T.items = []; T.care = []; T.log = [];
+      for (let n = 1; n <= 4; n++) {
+        const w = shift(today, -(2 + n * 2)), c = shift(today, -(8 + n * 7));
+        T.items.push({ n, water: { date: w, by: S.staff[0].name }, clean: { date: c, by: S.staff[0].name } });
+        T.care.push({ id: 'cw' + n, date: w, n, kind: 'water', by: S.staff[0].name }, { id: 'cc' + n, date: c, n, kind: 'clean', by: S.staff[0].name });
+        T.log.push({ id: 'l' + n, date: shift(today, -n), n, pos: 'top', species: n % 2 ? '대게' : '킹크랩', qty: 10 + n * 3, kg: Math.round((12 + n * 4) * 10) / 10, dead: 0, by: S.staff[0].name });
+      }
+      S.tanks = T;
+      S.deaths = [{ id: 'dd1', date: shift(today, -1), sp: '대게', n: 2, tank: '2', note: '활력 저하 후 폐사', by: S.staff[0].name, at: shift(today, -1) + ' 16:05' }];
+      S.deadUse = {};
+      deadEntries(30).forEach((e) => { if (e.date < shift(today, -1)) S.deadUse[e.key] = { at: e.date + ' 18:30', by: S.staff[0].name, how: pick(['찜 요리로 사용', '직원 식사', '폐기 — 상태 나쁨']) }; });   // 지난 폐사는 이미 처리한 것으로
+      // 공지 · 미션 · 교육 진도
+      const mon = today.slice(0, 7);
+      S.notices = [
+        { id: 'n1', month: mon, title: '이번 달 목표 — 할 일 완료율 95%', body: '중요 표시 업무는 시간대 시작할 때 먼저 끝냅니다.', pin: true, by: S.staff[0].name, createdAt: Date.now() - 864e5 * 6 },
+        { id: 'n2', month: mon, title: '주말 단체 예약 많음 — 룸 세팅 30분 일찍', body: '금·토 17:00 전까지 룸 세팅 완료', pin: false, by: S.staff[0].name, createdAt: Date.now() - 864e5 * 2 },
+      ];
+      seedTraining(true);
+      const urls = (S.training || []).map((x) => x.url).filter(Boolean);
+      S.trainDone = {}; S.staff.forEach((x, idx) => { S.trainDone[x.name] = {}; urls.slice(0, Math.max(2, 9 - idx * 2)).forEach((u, j) => { S.trainDone[x.name][u] = shift(today, -(j + 1)); }); });
+      S.missions = S.staff.slice(1, 4).map((x, j) => ({ id: 'ms' + j, who: x.name, text: ['손님 오시면 3초 안에 인사하기', '퇴근 전 작업대 물기까지 닦기', '대게 손질 순서 외워서 혼자 해 보기'][j] || '오늘 배운 것 적용하기', cat: '서비스', month: mon, createdAt: Date.now() - 864e5 * (j + 1), status: ['done', 'claimed', 'open'][j] || 'open', doneAt: j === 0 ? Date.now() - 864e5 : undefined }));
+      docs[st] = S;
+    }
+    for (const st of ['ansan', 'anyang']) await Store.saveStore(st, docs[st]);
+    // 두 매장 공용 — 사장님 비밀번호 · 게시판
+    const h = await hashPw(DEMO_PW), t0 = Date.now();
+    SH = { owner: { hash: h, at: t0 }, issues: [
+      { id: 'i1', cat: '앱 오류', title: '할 일 체크가 가끔 풀림', body: '📍 어느 화면 : 업무 › 할 일 › 미들\n👆 무엇을 눌렀나 : 갑각류 중간체크 완료\n❗ 어떻게 됐나 : 체크됐다가 2초 뒤 풀림\n✅ 이렇게 되면 좋겠다 : 한 번 누르면 그대로\n📱 기기 : 매장 아이패드\n🔁 다시 해도 같은가 : 가끔', status: 'done', replies: [{ text: '다른 기기 저장이 올 때 화면이 초기화되던 문제 — 고쳤습니다', by: '사장님', at: t0 - 864e5, fix: true }], by: '박서준', anon: false, createdAt: t0 - 864e5 * 2, store: '안산점', updatedAt: t0 - 864e5 },
+      { id: 'i2', cat: '앱 건의', title: '근무표에 내 이름 눌러서 넣기', body: '📍 어느 화면 : 인사관리 › 월간 근무표\n❗ 어떻게 됐나 : 이름을 매번 타자로 침\n✅ 이렇게 되면 좋겠다 : 직원 명단에서 눌러서 넣기', status: 'done', replies: [{ text: '직원 칩으로 바꿨습니다', by: '사장님', at: t0 - 864e5 * 3, fix: true }], by: '', anon: true, team: true, createdAt: t0 - 864e5 * 4, store: '안양점', updatedAt: t0 - 864e5 * 3 },
+      { id: 'i3', cat: '앱 오류', title: '폐사 기록 후 3일 표시가 안 보임', body: '📍 어느 화면 : 업무 › 수조 관리표\n❗ 어떻게 됐나 : 폐사 적었는데 사용 기한 표시 없음\n📱 기기 : 매장 포스', status: 'open', replies: [], by: '오세린', anon: false, createdAt: t0 - 3600e3 * 5, store: '안양점', updatedAt: t0 - 3600e3 * 5 },
+      { id: 'i4', cat: '시설·장비', title: '2번 수조 산소발생기 소리 큼', body: '어제부터 덜덜거림. 업체 점검 필요해 보임', status: 'open', replies: [{ text: '내일 오전 업체 방문 예정', by: '김하늘', at: t0 - 3600e3 * 2 }], by: '이도윤', anon: false, createdAt: t0 - 864e5, store: '안산점', updatedAt: t0 - 3600e3 * 2 },
+    ] };
+    await Store.saveShared('issues', SH);
+    await Store.setMeta({ ...(Store.meta || {}), current: 'ansan', stores: [{ id: 'ansan', name: '안산점' }, { id: 'anyang', name: '안양점' }] });
+    return docs.ansan;
+  }
+  function demoBar() {
+    if (!DEMO) return '';
+    return `<div class="demoBar"><b>🧪 데모판</b><span>이름·매출은 전부 가짜입니다. 마음껏 눌러 보세요.</span><span>사장님 비밀번호 <code>${DEMO_PW}</code></span><button class="btn sm ghost" data-act="demoReset">처음 상태로</button></div>`;
+  }
+  async function demoReset() {
+    try { await new Promise((res) => { const r = indexedDB.deleteDatabase('haemonic-demo'); r.onsuccess = r.onerror = r.onblocked = () => res(); }); } catch (e) { /* 무시 */ }
+    try { localStorage.clear(); sessionStorage.clear(); } catch (e) { /* 무시 */ }
+    location.reload();
+  }
+
   async function start() {
     await Store.init();
+    const spx = Store.supa || {};
+    if (spx.signedIn && spx.deviceOk === false) {
+      /* 등록 안 된 기기: 매장 기록 대신 교육 자료만. 이 기기에 남아 있던 캐시도 보여 주지 않는다 */
+      LIMITED = true; MENU = MENU_LIMITED; Store.save = () => {};
+      S = freshState();
+      try { const td = await Store.trainingDoc(Store.meta.current); if (td) { ['staff', 'trainDone', 'trainQuiz', 'missions', 'trainSeen'].forEach((k) => { if (td[k] != null) S[k] = td[k]; }); } } catch (e) { console.warn('교육 자료 불러오기 실패', e); }
+      hydrate();
+      view = 'register';
+      try { const want = new URLSearchParams(location.search).get('view'); if (want === 'training') view = 'training'; } catch (e) {}
+      document.head.insertAdjacentHTML('beforeend', '<style>' + PAPER_CSS + '</style>');
+      bind(); render();
+      return;
+    }
     S = (await Store.load()) || freshState();
+    if (DEMO && !(S.demo && S.demo.ver === DEMO_VER && S.demo.day === dateKey())) { S = await demoSeed(); await Store.switchTo('ansan'); S = (await Store.load()) || S; }   // 데모판: 매일 처음 열면 오늘 기준으로 새로 채운다
     hydrate();
     loadSharedIssues();
     try { loadMarketCache(); } catch (e) {}   // 매입 기록 없는 매장이 다른 매장 단가를 시세 참고로 쓰기 위해
     // 주소 뒤에 ?view=tanks 처럼 붙이면 그 화면으로 바로 연다 — 아이패드 홈 화면 바로가기용
     try {
       const want = new URLSearchParams(location.search).get('view');
-      if (want && MENU.some((m) => m.items.some(([k]) => k === want))) view = want;
+      if (want && (want === 'register' || MENU.some((m) => m.items.some(([k]) => k === want)))) view = want;   // ?view=register 로 기기 등록 화면 바로 열기
       const cid = new URLSearchParams(location.search).get('c');
       if (cid && cById(cid)) { view = 'contracts'; cOpen = cid; cMode = isSigned(cById(cid)) ? null : 'edit'; }
     } catch (e) {}
@@ -5549,7 +6725,8 @@ const App = (() => {
       if (k !== 'state:' + (Store.meta && Store.meta.current)) return;
       if (!$('#modal').hidden) return;      // 입력 중인 창을 날리지 않는다
       if (view === 'contracts' && cMode === 'edit') return;   // 계약서 작성 중 — 서명이 지워진다
-      S = doc; hydrate(); render();
+      const ui = S.ui;                       // 시간대 탭·필터·날짜는 이 기기 것 — 다른 기기 저장이 와도 튀지 않게 (사장님 요청 2026-10-08)
+      S = doc; S.ui = ui; hydrate(true); render();
     });
     document.addEventListener('cloud-status', () => { if (view === 'today' || view === 'settings') render(); });
     // 쓰다가 저장이 깨지는 경우(용량 초과 등)도 즉시 화면에 드러낸다

@@ -1,0 +1,6 @@
+.env*
+node_modules/
+.vercel/
+.DS_Store
+.vercel
+데모/dist/
