@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { mb } from "@/lib/storage/errors";
-import { readLastBackupAt, storageUsage, type StorageUsage } from "@/lib/storage/local";
+import { readLastBackupAt, readLastBackupConfirmedAt, storageUsage, type StorageUsage } from "@/lib/storage/local";
 
 // 규칙 탭 "데이터 관리" 안에 보이는 저장 공간·백업 상태.
 // 브라우저는 한도를 알려 주지 않으므로 "추정"이라고 적는다. 백업 시각은 "내려받기를 시작한" 시각이다.
@@ -24,9 +24,11 @@ const when = (iso: string) => {
 export default function StorageUsageCard({ refreshKey = 0 }: { refreshKey?: number }) {
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [lastAt, setLastAt] = useState<string | null>(null);
+  const [confirmedAt, setConfirmedAt] = useState<string | null>(null);
   useEffect(() => {
     setUsage(storageUsage());
     setLastAt(readLastBackupAt());
+    setConfirmedAt(readLastBackupConfirmedAt());
   }, [refreshKey]);
   if (!usage) return null;
 
@@ -51,7 +53,10 @@ export default function StorageUsageCard({ refreshKey = 0 }: { refreshKey?: numb
       </p>
       <div className={`rounded-lg px-2 py-1.5 text-xs ${backup.tone === "ok" ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}>
         <b>마지막 백업:</b> {lastAt ? `${when(lastAt)} 에 내려받기 시작` : "없음"} — {backup.text}
-        <span className="block text-[11px] opacity-80">파일이 실제로 저장됐는지는 다운로드 폴더에서 직접 확인해 주세요.</span>
+        <span className="block text-[11px] opacity-80">
+          파일이 실제로 저장됐는지는 다운로드 폴더에서 직접 확인해 주세요.
+          {confirmedAt ? ` 마지막으로 확인한 시각: ${when(confirmedAt)}` : " 확인했으면 '받은 파일 확인했어요'를 눌러 주세요."}
+        </span>
       </div>
     </div>
   );

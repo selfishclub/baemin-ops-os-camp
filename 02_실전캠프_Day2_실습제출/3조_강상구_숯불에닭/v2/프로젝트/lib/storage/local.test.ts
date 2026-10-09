@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { StorageDamagedError, StorageFullError, StorageWriteError } from "./errors";
 import { onStorageFailure, type StorageFailedDetail } from "./events";
-import { exportBackup, importBackup } from "./backup";
+import { applyBackup, exportBackup, inspectBackup } from "./backup";
 import { bytesOf, emptyData, inspectLocal, LOCAL_KEY, LocalStore, markBackupStarted, readLastBackupAt, readLocal, storageUsage, writeLocal } from "./local";
 import { backupStatus } from "@/components/StorageUsageCard";
 
@@ -131,7 +131,9 @@ describe("손상된 장부", () => {
   it("백업 파일로 복원하는 길은 열려 있다 (복구 경로)", () => {
     fake.map.set(LOCAL_KEY, damagedRaw);
     const backup = JSON.stringify({ app: "sootdak-ledger", version: 1, savedAt: "2026-10-01T00:00:00Z", data: { ...emptyData(), rules: [sampleRule], transactions: [] } });
-    importBackup(backup);
+    const ins = inspectBackup(backup);
+    expect(ins.ok).toBe(true);
+    if (ins.ok) applyBackup(ins);
     const r = inspectLocal();
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.data.rules).toEqual([sampleRule]);

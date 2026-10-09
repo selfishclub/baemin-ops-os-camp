@@ -7,6 +7,7 @@ import { monthLabel, nextMonth, prevMonth } from "@/lib/month";
 import { storageMode } from "@/lib/storage";
 import type { Month } from "@/lib/types";
 import { DamagedRecovery, StorageFailureToast, useLocalHealth, useStorageFailure } from "@/components/StorageGuard";
+import { isStorageError } from "@/lib/storage/errors";
 
 const MONTH_KEY = "sootdak-ledger-month";
 
@@ -50,6 +51,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setMonthState(readMonth() ?? defaultMonth());
+  }, []);
+
+  // 저장 실패는 이미 빨간 알림으로 보여 줬으므로, catch 가 없는 화면에서 올라온 같은 오류가 콘솔에 "Uncaught" 로 찍히지 않게 한다.
+  // 저장소 오류만 조용히 하고, 다른 오류는 그대로 둔다.
+  useEffect(() => {
+    const quiet = (e: PromiseRejectionEvent) => {
+      if (isStorageError(e.reason)) e.preventDefault();
+    };
+    window.addEventListener("unhandledrejection", quiet);
+    return () => window.removeEventListener("unhandledrejection", quiet);
   }, []);
 
   const setMonth = (m: Month) => {

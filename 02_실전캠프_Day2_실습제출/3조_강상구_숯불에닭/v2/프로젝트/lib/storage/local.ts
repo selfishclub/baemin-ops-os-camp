@@ -140,6 +140,20 @@ export function markBackupStarted(at = new Date().toISOString()) {
     window.localStorage.setItem(LAST_BACKUP_KEY, at);
   } catch {}
 }
+// 사장님이 "다운로드 폴더에 파일이 있다"고 직접 확인한 시각. 앱은 파일 저장을 검증할 수 없으므로 사람의 확인을 따로 적는다.
+export const LAST_BACKUP_CONFIRMED_KEY = "sootdak-ledger-last-backup-confirmed";
+export function readLastBackupConfirmedAt(): string | null {
+  try {
+    return window.localStorage.getItem(LAST_BACKUP_CONFIRMED_KEY);
+  } catch {
+    return null;
+  }
+}
+export function markBackupConfirmed(at = new Date().toISOString()) {
+  try {
+    window.localStorage.setItem(LAST_BACKUP_CONFIRMED_KEY, at);
+  } catch {}
+}
 
 const upsert = <T>(list: T[], item: T, same: (a: T, b: T) => boolean) =>
   list.some((x) => same(x, item)) ? list.map((x) => (same(x, item) ? item : x)) : [...list, item];

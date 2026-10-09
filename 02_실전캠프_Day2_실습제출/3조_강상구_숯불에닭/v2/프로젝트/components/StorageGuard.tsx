@@ -5,7 +5,7 @@ import { Notice } from "@/components/ui";
 import { mb } from "@/lib/storage/errors";
 import { onStorageFailure, type StorageFailedDetail } from "@/lib/storage/events";
 import { inspectLocal, type LocalRead } from "@/lib/storage/local";
-import { importBackup } from "@/lib/storage/backup";
+import RestoreDialog from "@/components/RestoreDialog";
 
 // 저장소가 실패했을 때 화면에 보이는 두 가지:
 //  1) StorageFailureToast — 어느 화면에서든 저장이 실패하면 위에 빨간 알림. 사장님이 닫기 전까지 남는다.
@@ -63,6 +63,7 @@ export function useLocalHealth(enabled: boolean) {
 
 export function DamagedRecovery({ read, onRecovered }: { read: Extract<LocalRead, { ok: false }>; onRecovered: () => void }) {
   const [note, setNote] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const rawBytes = read.raw.length * 2;
 
@@ -76,16 +77,10 @@ export function DamagedRecovery({ read, onRecovered }: { read: Extract<LocalRead
     setNote({ tone: "info", text: "손상된 원본 내려받기를 시작했어요. 다운로드 폴더에 파일이 있는지 확인하고, 지우지 말고 보관해 주세요." });
   }
 
-  async function restore(file: File) {
-    try {
-      importBackup(await file.text());
-      setNote({ tone: "ok", text: "백업을 불러왔어요. 장부를 다시 확인할게요." });
-      onRecovered();
-    } catch (e) {
-      setNote({ tone: "error", text: `복원하지 못했어요. 원본은 그대로예요. (${e instanceof Error ? e.message : String(e)})` });
-    } finally {
-      if (fileRef.current) fileRef.current.value = "";
-    }
+  // 복원은 규칙 탭과 같은 안전 절차(검사 → 미리보기 → 원본 내려받기 확인 + "복원" 입력)를 쓴다. 파일을 골라도 바로 덮어쓰지 않는다.
+  function pickRestore(file: File) {
+    setRestoreFile(file);
+    if (fileRef.current) fileRef.current.value = "";
   }
 
   return (
@@ -117,11 +112,23 @@ export function DamagedRecovery({ read, onRecovered }: { read: Extract<LocalRead
         <button className="btn-ghost" onClick={() => fileRef.current?.click()}>
           백업 파일로 복원
         </button>
-        <input ref={fileRef} type="file" accept=".json" aria-label="백업 파일" className="hidden" onChange={(e) => e.target.files?.[0] && restore(e.target.files[0])} />
+        <input ref={fileRef} type="file" accept=".json" aria-label="백업 파일" className="hidden" onChange={(e) => e.target.files?.[0] && pickRestore(e.target.files[0])} />
         <button className="btn-ghost" onClick={onRecovered}>
           다시 확인
         </button>
       </div>
+      {restoreFile && (
+        <RestoreDialog
+          file={restoreFile}
+          current={read}
+          onClose={() => setRestoreFile(null)}
+          onRestored={() => {
+            setRestoreFile(null);
+            setNote({ tone: "ok", text: "백업을 불러왔어요. 장부를 다시 확인할게요." });
+            onRecovered();
+          }}
+        />
+      )}
     </section>
   );
 }
