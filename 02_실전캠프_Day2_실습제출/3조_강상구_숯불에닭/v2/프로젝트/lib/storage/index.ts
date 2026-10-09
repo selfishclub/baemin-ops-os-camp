@@ -1,12 +1,18 @@
 import type { ChannelSale, DailySale, DailyWeather, Month, MonthClosing, Rule, Setting, Shift, Staff, Transaction, UploadRecord } from "../types";
+import type { BatchOp } from "./batch";
 import { LocalStore } from "./local";
 import { SupabaseStore } from "./supabase";
+export type { BatchOp } from "./batch";
 
 // 저장 방식이 둘이라 화면은 이 인터페이스만 본다.
 //  - 내 PC 모드(local): 이 컴퓨터 브라우저에만 저장. 실제 숫자는 여기서만.
 //  - 시연 모드(supabase): 인터넷 데이터 창고. 로그인이 없으니 가짜 데이터만.
 export interface Store {
   mode: "local" | "supabase";
+  // batch 가 "전부 되거나 전부 안 되는가". 내 PC 모드는 true(한 번의 setItem). 시연 모드(Supabase)는 false — 표마다 따로 쓰므로 중간에 실패하면 반쪽이 남는다.
+  readonly batchAtomic: boolean;
+  // 여러 항목을 한 번에 저장. 오늘 마감·올리기·영수증이 쓴다 (lib/storage/batch.ts)
+  batch(ops: BatchOp[]): Promise<void>;
   listTransactions(month: Month): Promise<Transaction[]>;
   saveTransactions(txs: Transaction[]): Promise<void>;
   deleteTransaction(id: string): Promise<void>;

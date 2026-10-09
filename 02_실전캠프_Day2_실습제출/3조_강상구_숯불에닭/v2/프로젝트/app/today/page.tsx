@@ -168,8 +168,11 @@ export default function TodayPage() {
     }
     const sales = [...cardSales, ...others];
     const shifts: Shift[] = rows.filter((r) => r.staffId && r.hours > 0).map((r) => ({ date, staffId: r.staffId, hours: r.hours, start: r.start || undefined, end: r.end || undefined }));
-    await store.saveDailySales(date, sales);
-    await store.saveShifts(date, shifts);
+    // 매출과 근무를 한 번에 저장 — 둘 중 하나만 남는 일이 없다 (내 PC 모드는 setItem 한 번)
+    await store.batch([
+      { kind: "dailySales", date, sales },
+      { kind: "shifts", date, shifts },
+    ]);
     await daily.reload();
     setSaved(true);
     weather.fillMissing().catch(() => {});

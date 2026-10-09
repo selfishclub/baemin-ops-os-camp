@@ -1,6 +1,7 @@
 import { seedRules } from "../seed";
 import type { ChannelSale, DailySale, DailyWeather, Month, MonthClosing, Rule, Setting, Shift, Staff, Transaction, UploadRecord } from "../types";
 import { looksLikeQuotaError, StorageDamagedError, StorageFullError, StorageWriteError } from "./errors";
+import { applyOp, applyOps, type BatchOp } from "./batch";
 import { notifyLedgerChanged, notifyStorageFailure } from "./events";
 import type { Store } from "./index";
 
@@ -161,8 +162,10 @@ const upsert = <T>(list: T[], item: T, same: (a: T, b: T) => boolean) =>
 
 export class LocalStore implements Store {
   mode = "local" as const;
+  readonly batchAtomic = true;
 
   // 모든 쓰기는 여기를 지난다. 읽을 수 없거나(손상) 쓰지 못하면(공간 부족 등) 알리고 그대로 던진다.
+  // 읽기 → 바꾸기 → setItem 한 번. 그래서 fn 안에서 몇 항목을 바꾸든 전부 되거나 전부 안 된다.
   private update(fn: (d: LocalData) => LocalData) {
     try {
       writeLocal(fn(readLocal()));
@@ -172,14 +175,17 @@ export class LocalStore implements Store {
     }
   }
 
+  // 여러 항목을 한 번에 — 원자적 (setItem 한 번)
+  async batch(ops: BatchOp[]) {
+    if (ops.length === 0) return;
+    this.update((d) => applyOps(d, ops));
+  }
+
   async listTransactions(month: Month) {
     return readLocal().transactions.filter((t) => t.month === month);
   }
   async saveTransactions(txs: Transaction[]) {
-    this.update((d) => ({
-      ...d,
-      transactions: txs.reduce((acc, t) => upsert(acc, t, (a, b) => a.id === b.id), d.transactions),
-    }));
+    this.update((d) => applyOp(d, { kind: "transactions", txs }));
   }
   async deleteTransaction(id: string) {
     this.update((d) => ({ ...d, transactions: d.transactions.filter((t) => t.id !== id) }));
@@ -215,7 +221,7 @@ export class LocalStore implements Store {
     return readLocal().uploads;
   }
   async saveUpload(u: UploadRecord) {
-    this.update((d) => ({ ...d, uploads: [...d.uploads, u] }));
+    this.update((d) => applyOp(d, { kind: "upload", record: u }));
   }
   async deleteMonth(month: Month) {
     this.update((d) => ({
@@ -232,13 +238,13 @@ export class LocalStore implements Store {
     return readLocal().dailySales.filter((s) => s.date.startsWith(month));
   }
   async saveDailySales(date: string, sales: DailySale[]) {
-    this.update((d) => ({ ...d, dailySales: [...d.dailySales.filter((s) => s.date !== date), ...sales.filter((s) => s.date === date)] }));
+    this.update((d) => applyOp(d, { kind: "dailySales", date, sales }));
   }
   async listShifts(month: Month) {
     return readLocal().shifts.filter((s) => s.date.startsWith(month));
   }
   async saveShifts(date: string, shifts: Shift[]) {
-    this.update((d) => ({ ...d, shifts: [...d.shifts.filter((s) => s.date !== date), ...shifts.filter((s) => s.date === date)] }));
+    this.update((d) => applyOp(d, { kind: "shifts", date, shifts }));
   }
   async listStaff() {
     return readLocal().staff;
@@ -262,6 +268,6 @@ export class LocalStore implements Store {
     return (readLocal().settings.find((s) => s.key === key)?.value as T | undefined) ?? null;
   }
   async saveSetting<T>(key: string, value: T) {
-    this.update((d) => ({ ...d, settings: upsert(d.settings, { key, value }, (a, b) => a.key === b.key) }));
+    this.update((d) => applyOp(d, { kind: "setting", key, value }));
   }
 }

@@ -30,7 +30,7 @@ import { num, won } from "@/lib/format";
 import { monthLabel, nextMonth } from "@/lib/month";
 import { countPhotosByOwner, deletePhotosOf, getPhotoBlob, listPhotos, photosAvailable, type PhotoMeta } from "@/lib/photos";
 import PhotoStrip from "@/components/PhotoStrip";
-import { getStore } from "@/lib/storage";
+import { getStore, type BatchOp } from "@/lib/storage";
 
 // 매입 영수증 — 마트·거래처 영수증을 품목별로 적고, 품목에 연결하면 기준단가가 최근 매입가로 바뀐다.
 const LIQUOR_VENDOR_KEY = "liquor_vendor"; // 주류 도매상 이름 (한 번 적으면 다음에도)
@@ -112,15 +112,15 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
     }
     const store = getStore();
     const next = [...purchases.filter((x) => x.id !== clean.id), clean];
-    await store.saveSetting(key, next);
+    // 영수증 목록 · 품목 단가 · 통장 줄 분류를 한 번에 저장한다 — 셋 중 일부만 남지 않게
+    const ops: BatchOp[] = [{ kind: "setting", key, value: next }];
     const applied = applyPurchaseToItems(items, clean, await purchasesSince(clean.date.slice(0, 7)));
-    if (applied.updated.length) {
-      await store.saveSetting(ITEMS_KEY, applied.items);
-      await onItemsChange();
-    }
+    if (applied.updated.length) ops.push({ kind: "setting", key: ITEMS_KEY, value: applied.items });
     // 같은 지출을 통장에서 또 분류하지 않게, 짝이 맞는 체크카드 줄의 분류를 대신 채운다 (아직 분류 안 한 줄만)
     const filled = txFromPurchase(clean, bankTxs);
-    if (filled) await store.saveTransactions([filled]);
+    if (filled) ops.push({ kind: "transactions", txs: [filled] });
+    await store.batch(ops);
+    if (applied.updated.length) await onItemsChange();
     setEditing(null);
     setEditingIsNew(false);
     await load();
