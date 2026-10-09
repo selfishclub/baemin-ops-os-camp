@@ -2,6 +2,8 @@
 //  - 장부 숫자는 localStorage(내 PC 모드)에 있지만 사진은 커서 같이 두면 장부가 터진다. 그래서 사진만 따로 IndexedDB에 넣는다.
 //  - 백업 JSON에는 사진이 들어가지 않고, 다른 기기·시연 모드에서는 보이지 않는다.
 //    여러 기기에서 같은 사진을 보는 건 캠프 뒤 개인용 버전(로그인 + Supabase Storage)에서 붙인다.
+import { notifyPhotosChanged } from "./storage/events";
+
 const DB_NAME = "sootdak-ledger-photos";
 const STORE = "photos";
 const VERSION = 1;
@@ -90,6 +92,7 @@ export async function addPhoto(ownerId: string, file: File): Promise<PhotoMeta> 
   };
   const record: PhotoRecord = { ...meta, blob };
   await run("readwrite", (s) => s.put(record) as IDBRequest<IDBValidKey>);
+  notifyPhotosChanged();
   return meta;
 }
 
@@ -110,6 +113,7 @@ export async function getPhotoBlob(id: string): Promise<Blob | null> {
 export async function deletePhoto(id: string): Promise<void> {
   if (!photosAvailable()) return;
   await run("readwrite", (s) => s.delete(id) as IDBRequest<undefined>);
+  notifyPhotosChanged();
 }
 
 export async function deletePhotosOf(ownerId: string): Promise<void> {
@@ -164,6 +168,7 @@ export async function addPhotosAtomic(records: PhotoRecord[]): Promise<void> {
     }
     tx.oncomplete = () => {
       db.close();
+      notifyPhotosChanged();
       resolve();
     };
     const fail = () => {

@@ -1,7 +1,7 @@
 import { seedRules } from "../seed";
 import type { ChannelSale, DailySale, DailyWeather, Month, MonthClosing, Rule, Setting, Shift, Staff, Transaction, UploadRecord } from "../types";
 import { looksLikeQuotaError, StorageDamagedError, StorageFullError, StorageWriteError } from "./errors";
-import { notifyStorageFailure } from "./events";
+import { notifyLedgerChanged, notifyStorageFailure } from "./events";
 import type { Store } from "./index";
 
 export const LOCAL_KEY = "sootdak-ledger-v1";
@@ -94,6 +94,7 @@ export function writeLocal(d: LocalData) {
     if (looksLikeQuotaError(e)) throw new StorageFullError(storageUsage().totalBytes, bytesOf(text), e);
     throw new StorageWriteError(e instanceof Error ? e.name : "알 수 없는 오류", e);
   }
+  notifyLedgerChanged(); // 저장이 됐을 때만 — 자동 백업이 이걸 듣는다
 }
 
 // ── 사용량 ───────────────────────────────────────────────────────

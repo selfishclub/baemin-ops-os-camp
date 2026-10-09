@@ -37,6 +37,34 @@ export function toFailedDetail(e: unknown): StorageFailedDetail {
   return { kind: "unknown", message: `저장하지 못했어요 (${e instanceof Error ? e.name : "알 수 없는 오류"}). 입력한 내용은 저장되지 않았어요.`, at };
 }
 
+// ── 변경 알림 (자동 백업용) ───────────────────────────────────────
+// 장부가 저장되거나 사진이 바뀌면 알린다. 내용은 싣지 않고 "바뀌었다"만.
+type ChangeListener = () => void;
+const ledgerChanged = new Set<ChangeListener>();
+const photosChanged = new Set<ChangeListener>();
+export function onLedgerChanged(fn: ChangeListener): () => void {
+  ledgerChanged.add(fn);
+  return () => ledgerChanged.delete(fn);
+}
+export function onPhotosChanged(fn: ChangeListener): () => void {
+  photosChanged.add(fn);
+  return () => photosChanged.delete(fn);
+}
+export function notifyLedgerChanged() {
+  for (const fn of ledgerChanged) {
+    try {
+      fn();
+    } catch {}
+  }
+}
+export function notifyPhotosChanged() {
+  for (const fn of photosChanged) {
+    try {
+      fn();
+    } catch {}
+  }
+}
+
 // 실패를 알리고, 받은 오류를 그대로 돌려준다 (부른 쪽은 다시 던진다)
 export function notifyStorageFailure(e: unknown): StorageFailedDetail {
   const detail = toFailedDetail(e);

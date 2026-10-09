@@ -13,6 +13,7 @@ import { inspectLocal, markBackupConfirmed, markBackupStarted } from "@/lib/stor
 import StorageUsageCard from "@/components/StorageUsageCard";
 import RestoreDialog from "@/components/RestoreDialog";
 import PhotoBackupCard from "@/components/PhotoBackupCard";
+import AutoBackupCard from "@/components/AutoBackupCard";
 import type { Rule } from "@/lib/types";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, parsePayDays } from "@/lib/paydays";
 import { amountFor, emptyFixedCost, fixedCostGaps, FIXED_COSTS_KEY, setAmountFor, type FixedCost } from "@/lib/fixedCosts";
@@ -297,6 +298,7 @@ export default function RulesPage() {
             </p>
             <StorageUsageCard refreshKey={usageTick} />
             <PhotoBackupCard onLedgerBackup={() => setUsageTick((t) => t + 1)} />
+            <AutoBackupCard />
             <div className="flex flex-wrap gap-2">
               <button className="btn-primary" onClick={downloadBackup}>
                 백업 파일 저장

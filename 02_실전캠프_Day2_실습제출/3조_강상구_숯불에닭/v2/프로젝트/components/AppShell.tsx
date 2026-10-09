@@ -8,6 +8,7 @@ import { storageMode } from "@/lib/storage";
 import type { Month } from "@/lib/types";
 import { DamagedRecovery, StorageFailureToast, useLocalHealth, useStorageFailure } from "@/components/StorageGuard";
 import { isStorageError } from "@/lib/storage/errors";
+import AutoBackupAgent from "@/components/AutoBackupAgent";
 
 const MONTH_KEY = "sootdak-ledger-month";
 
@@ -73,6 +74,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-3xl flex-col">
       <StorageFailureToast failure={failure} onDismiss={dismiss} />
+      {/* 내 PC 모드이고 장부를 읽을 수 있을 때만 자동 백업 일꾼을 띄운다 */}
+      {mode === "local" && health?.ok && <AutoBackupAgent />}
       <div
         role="status"
         className={`px-4 py-1.5 text-center text-xs font-semibold ${
