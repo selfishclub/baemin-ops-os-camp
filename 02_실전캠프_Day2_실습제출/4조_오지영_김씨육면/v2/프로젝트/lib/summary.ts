@@ -6,6 +6,7 @@ import {
   behaviorOf,
   type Behavior,
   type BehaviorConfig,
+  tierOf,
 } from "./accounts";
 import type { RevenueLine, Transaction } from "./types";
 import { pendingOf } from "./confirm";
@@ -43,6 +44,18 @@ export interface Summary {
     byChannel: ChannelFee[];
   };
   expense: { total: number; byAccount: AccountTotal[] };
+  /** 매출원가 — 식자재비 등 '원가' 단 계정의 합 */
+  cogs: number;
+  /** 매출총이익 = 매출 − 원가 */
+  grossProfit: number;
+  grossMargin: number;
+  /** 판매관리비 — '판관비' 단 계정의 합. 미분류도 여기 들어간다 */
+  sga: number;
+  /** 영업외비용 — 대출이자·세금 등 */
+  nonOperating: number;
+  /** 당기순이익 = 영업이익 − 영업외 */
+  netProfit: number;
+  netMargin: number;
   operatingProfit: number;
   operatingMargin: number;
   primeCost: number;
@@ -119,9 +132,11 @@ export function summarize(
 
   // §4-2 수수료 — 매출액 − 입금액으로 자동 계산한다
   const byChannel: ChannelFee[] = revenue.map((r) => {
-    // 매출액을 아직 안 넣었거나 덜 적었으면 수수료를 셀 수 없다.
-    // 그대로 빼면 음수가 나와 비용이 줄어든 것처럼 보인다.
-    const fee = r.gross > r.deposit ? r.gross - r.deposit : 0;
+    // 입금 자료를 **아직 안 넣은 것**과 입금이 0인 것은 다르다.
+    // 안 넣었는데 그대로 빼면 매출 전액이 수수료가 되어, 영업이익이 0으로 주저앉는다.
+    // 매출만 올려 본 달이 통째로 망가져 보이므로, 입금이 없으면 수수료를 세지 않는다.
+    // 값을 조용히 0으로 만들지 않는다 — 화면에는 '입금 자료 없음'으로 따로 알린다.
+    const fee = r.deposit > 0 && r.gross > r.deposit ? r.gross - r.deposit : 0;
     return { ...r, fee, feeRate: r.gross ? fee / r.gross : 0 };
   });
   const feeFromRevenue = byChannel.reduce((s, r) => s + r.fee, 0);
@@ -193,7 +208,21 @@ export function summarize(
   const labor = byAccount.find((a) => a.account === "인건비")?.amount ?? 0;
   const primeCost = food + labor;
 
-  const operatingProfit = gross - expenseTotal;
+  // 손익계산서 단 나누기 (§ 표준 구조)
+  //   매출 − 원가 = 매출총이익 − 판관비 = 영업이익 − 영업외 = 당기순이익
+  // 대출이자·세금을 영업이익에서 빼면 "장사를 잘했나"가 가려진다.
+  let cogs = 0;
+  let sga = 0;
+  let nonOperating = 0;
+  for (const a of byAccount) {
+    const t = tierOf(a.account);
+    if (t === "원가") cogs += a.amount;
+    else if (t === "영업외") nonOperating += a.amount;
+    else sga += a.amount;
+  }
+  const grossProfit = gross - cogs;
+  const operatingProfit = grossProfit - sga;
+  const netProfit = operatingProfit - nonOperating;
 
   return {
     month,
@@ -205,6 +234,13 @@ export function summarize(
       byChannel,
     },
     expense: { total: expenseTotal, byAccount },
+    cogs,
+    grossProfit,
+    grossMargin: gross ? grossProfit / gross : 0,
+    sga,
+    nonOperating,
+    netProfit,
+    netMargin: gross ? netProfit / gross : 0,
     operatingProfit,
     operatingMargin: gross ? operatingProfit / gross : 0,
     primeCost,

@@ -1,4 +1,5 @@
 import type { DailySale } from "./dailySales";
+import type { MenuTotal } from "./menu";
 import { asText, unzip } from "./unzip";
 
 /**
@@ -22,8 +23,15 @@ const CHANNEL: Record<string, string> = {
   "키오스크": "홀",
 };
 
+/** 한 달·한 메뉴의 집계. 상품명은 페이히어가 보낸 원문 그대로다 */
+export interface MenuRow extends MenuTotal {
+  month: string;
+}
+
 export interface PayhereResult {
   sales: DailySale[];
+  /** 메뉴별 판매 — 달마다 따로 */
+  menu: MenuRow[];
   /** 영업일 기준 몇 일치인가 */
   days: number;
   rows: number;
@@ -74,8 +82,12 @@ const num = (s: string | undefined) => {
 
 export async function parsePayhereXlsx(buf: ArrayBuffer): Promise<PayhereResult> {
   const files = await unzip(buf);
-  const sheetName = [...files.keys()].find((k) => /^xl\/worksheets\/sheet\d+\.xml$/.test(k));
-  if (!sheetName) throw new Error("엑셀 안에서 시트를 찾지 못했습니다.");
+  // 페이히어는 여러 달을 받으면 **달마다 시트를 따로** 만든다.
+  // 첫 시트만 읽으면 7~9월 파일에서 7월만 들어오고 나머지는 소리 없이 사라진다.
+  const sheetNames = [...files.keys()]
+    .filter((k) => /^xl\/worksheets\/sheet\d+\.xml$/.test(k))
+    .sort((a, b) => Number(a.match(/\d+/)![0]) - Number(b.match(/\d+/)![0]));
+  if (!sheetNames.length) throw new Error("엑셀 안에서 시트를 찾지 못했습니다.");
 
   const sharedXml = files.get("xl/sharedStrings.xml");
   const shared = sharedXml
@@ -84,7 +96,8 @@ export async function parsePayhereXlsx(buf: ArrayBuffer): Promise<PayhereResult>
       )
     : [];
 
-  const rows = readSheet(asText(files.get(sheetName)!), shared);
+  // 시트마다 머리글이 다시 나오지만, 그 줄은 '구분'이 결제·환불·합계가 아니라 그냥 걸러진다.
+  const rows = sheetNames.flatMap((n) => readSheet(asText(files.get(n)!), shared));
 
   // 머리글 — 열 위치를 고정하지 않고 이름으로 찾는다
   let head: Row | null = null;
@@ -105,25 +118,67 @@ export async function parsePayhereXlsx(buf: ArrayBuffer): Promise<PayhereResult>
   const cChannel = colOf("주문 채널");
   const cApp = colOf("배달앱");
   const cAmount = colOf("결제 금액");
+  // 메뉴 줄 — 결제 한 건 아래에 상품이 줄줄이 딸려 온다
+  const cCat = colOf("카테고리");
+  const cItem = colOf("상품");
+  const cQty = colOf("수량");
+  const cItemAmt = colOf("상품 주문 금액");
   const warnings: string[] = [];
   if (!cDate || !cAmount) throw new Error("영업일 또는 결제 금액 열을 찾지 못했습니다.");
   if (!cApp) warnings.push("'배달앱' 열이 없어 배달이 한 덩어리로 잡힙니다.");
 
   // 합계 행 — 파일이 스스로 적어둔 값. 우리 집계와 맞춰 본다
-  let stated: number | null = null;
+  // 시트마다 합계 행이 하나씩 있다. 페이히어는 거기에 **그 시트가 아니라 파일 전체 합계**를
+  // 똑같이 적어 둔다 — 그래서 더하면 달 수만큼 부풀고, 하나만 쓰면 맞는다.
+  // 다만 카드사마다 다를 수 있으니 값이 서로 다르면 그때는 더한다.
+  const statedRows: number[] = [];
   const by = new Map<string, { count: number; amount: number }>();
   const daily = new Map<string, number>();
+  const menu = new Map<string, MenuRow>();
   let used = 0;
+
+  // 상품 줄은 구분·영업일이 비어 있다 — 바로 위 결제 줄의 것을 끌고 내려온다.
+  let lastKind = "";
+  let lastMonth = "";
 
   for (const r of rows) {
     const kind = cKind ? (r[cKind] ?? "").trim() : "";
     if (kind === "합계") {
-      stated = num(r[cAmount]);
+      statedRows.push(num(r[cAmount]));
+      lastKind = "";
       continue;
     }
+
+    // 결제·환불 줄이면 기준을 새로 잡고, 빈 줄이면 앞의 것을 그대로 쓴다
+    const rowDate = (r[cDate] ?? "").trim().slice(0, 10);
+    if (kind === "결제" || kind === "환불") {
+      lastKind = kind;
+      lastMonth = /^\d{4}-\d{2}-\d{2}$/.test(rowDate) ? rowDate : "";
+    } else if (kind) {
+      // 시트가 바뀌며 머리글이 다시 나온 줄 등 — 기준을 끊는다
+      lastKind = "";
+      lastMonth = "";
+    }
+
+    // 상품 줄 집계 — 결제 줄 자신에도 첫 상품이 실려 있다
+    if (cItem && cItemAmt && lastKind && lastMonth) {
+      const item = (r[cItem] ?? "").trim();
+      if (item) {
+        const sign = lastKind === "환불" ? -1 : 1;
+        const month = lastMonth.slice(0, 7);
+        const key = `${month}\u0000${item}`;
+        const cur =
+          menu.get(key) ?? { month, item, category: cCat ? (r[cCat] ?? "").trim() : "", qty: 0, amount: 0 };
+        cur.qty += (cQty ? num(r[cQty]) : 0) * sign;
+        cur.amount += num(r[cItemAmt]) * sign;
+        if (!cur.category && cCat) cur.category = (r[cCat] ?? "").trim();
+        menu.set(key, cur);
+      }
+    }
+
     if (kind !== "결제" && kind !== "환불") continue;
 
-    const date = (r[cDate] ?? "").trim().slice(0, 10);
+    const date = rowDate;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
 
     const raw = (cApp ? (r[cApp] ?? "").trim() : "") || (cChannel ? (r[cChannel] ?? "").trim() : "");
@@ -148,6 +203,12 @@ export async function parsePayhereXlsx(buf: ArrayBuffer): Promise<PayhereResult>
     .sort((a, b) => a.date.localeCompare(b.date) || a.channel.localeCompare(b.channel));
 
   const sum = sales.reduce((a, b) => a + b.amount, 0);
+  const stated =
+    statedRows.length === 0
+      ? null
+      : statedRows.every((v) => v === statedRows[0])
+        ? statedRows[0]
+        : statedRows.reduce((a, b) => a + b, 0);
   if (stated !== null && Math.abs(stated - sum) > 1) {
     warnings.push(
       `합계가 파일에 적힌 값과 ${Math.abs(stated - sum).toLocaleString("ko-KR")}원 다릅니다. 거래가 빠졌을 수 있습니다.`
@@ -156,6 +217,7 @@ export async function parsePayhereXlsx(buf: ArrayBuffer): Promise<PayhereResult>
 
   return {
     sales,
+    menu: [...menu.values()].filter((m) => m.qty !== 0 || m.amount !== 0),
     days: new Set(sales.map((s) => s.date)).size,
     rows: used,
     sum,

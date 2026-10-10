@@ -115,11 +115,6 @@ export function PersonalStep({ state, update }: { state: MonthState; update: Upd
         </div>
       )}
 
-      <p className="note-line" style={{ marginBottom: 8 }}>
-        대분류를 <b>개인</b>이 아닌 것으로 바꾸면 이 목록에서 빠져 <b>2. 지출 분류</b>로 돌아갑니다.
-        잘못 넣은 건 여기서 바로 빼시면 됩니다.
-      </p>
-
       <div className="txwrap">
         <div className="txline txhead" aria-hidden>
           <span />

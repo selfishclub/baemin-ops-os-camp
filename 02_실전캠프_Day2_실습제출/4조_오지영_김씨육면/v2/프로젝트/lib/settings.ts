@@ -11,6 +11,7 @@ import {
   type AccountDef,
   type Behavior,
   type BehaviorConfig,
+  type Tier,
 } from "./accounts";
 import { DEFAULT_FIXED_TEMPLATE, configureFixedTemplate, type FixedTemplateItem } from "./fixedTemplate";
 
@@ -154,6 +155,14 @@ export function setAccountBehavior(s: Settings, name: string, b: Behavior | null
     ...s,
     accounts: s.accounts.map((a) => (a.name === name ? { ...a, behavior: b } : a)),
     behavior: { ...s.behavior, accounts },
+  };
+}
+
+/** 손익계산서 단(원가·판관비·영업외)을 바꾼다 */
+export function setAccountTier(s: Settings, name: string, tier: Tier): Settings {
+  return {
+    ...s,
+    accounts: s.accounts.map((a) => (a.name === name ? { ...a, tier } : a)),
   };
 }
 
