@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>부찌대학 오늘근무 — 10/14 성과 발표</title>
+<style>
+  /* 한 장씩 넘겨 보는 세로 발표자료. 색은 도구 화면과 같은 종이색·먹색·된장빛 포인트 */
+  :root{
+    --paper:#F5F4F0; --surface:#FFFFFF; --ink:#1B1A17; --muted:#6C675D; --line:#E3DFD5;
+    --accent:#C07609; --accent-soft:#F6E7CC; --ok:#2E7A57; --ok-bg:#E5F0EA; --red:#B2382A;
+    --sans:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',system-ui,sans-serif;
+    --serif:'Nanum Myeongjo','AppleMyungjo','Noto Serif KR',serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-snap-type:y proximity}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:18px;line-height:1.6}
+  section{min-height:100vh;scroll-snap-align:start;display:flex;flex-direction:column;justify-content:center;gap:22px;
+          max-width:1080px;margin:0 auto;padding-inline:28px;padding-block:56px;border-bottom:1px solid var(--line)}
+  .step{font-family:var(--mono);font-size:14px;letter-spacing:.08em;color:var(--accent);font-weight:600}
+  h1{font-family:var(--serif);font-size:clamp(34px,6vw,58px);line-height:1.2;margin:0;text-wrap:balance}
+  h2{font-family:var(--serif);font-size:clamp(26px,4.2vw,40px);line-height:1.25;margin:0;text-wrap:balance}
+  p{margin:0;max-width:34em}
+  .lead{font-size:clamp(19px,2.4vw,24px);color:var(--muted)}
+  ul{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:8px;max-width:36em}
+  b{font-weight:700}
+  .quote{border-left:4px solid var(--accent);padding:6px 0 6px 18px;font-family:var(--serif);font-size:clamp(20px,2.6vw,26px);max-width:30em}
+  .quote small{display:block;font-family:var(--sans);font-size:14px;color:var(--muted);margin-top:8px}
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px;align-items:start}
+  .cols>*{min-width:0}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+  .card h3{margin:0;font-size:15px;color:var(--accent);letter-spacing:.04em}
+  .big{font-family:var(--mono);font-size:clamp(30px,5vw,46px);font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+  .big small{font-size:.45em;font-weight:500;color:var(--muted);font-family:var(--sans)}
+  .how{font-size:14px;color:var(--muted)}
+  .shots{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+  .shots.two{grid-template-columns:repeat(2,1fr)}
+  figure{margin:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+  figure img{width:100%;height:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface);display:block}
+  figcaption{font-size:14px;color:var(--muted)}
+  figcaption b{color:var(--ink)}
+  .tag{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:2px 12px;font-size:14px;font-weight:600}
+  .demo{background:var(--ink);color:#fff;border-radius:14px;padding:18px 22px;display:flex;flex-direction:column;gap:6px;max-width:40em}
+  .demo a{color:#F3C56B;word-break:break-all}
+  .demo span{font-size:15px;color:#D9D4C8}
+  table{border-collapse:collapse;width:100%;font-size:16px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.04em}
+  .tablewrap{overflow-x:auto}
+  .fine{font-size:14px;color:var(--muted)}
+  @media (max-width:720px){ .shots{grid-template-columns:1fr 1fr} .shots.two{grid-template-columns:1fr} section{padding-inline:18px} }
+  @media print{ section{min-height:auto;page-break-after:always} }
+</style>
+</head>
+<body>
+
+<section>
+  <span class="step">배민 AI 장사사관학교 실전 캠프 · 1조 · 2026.10.14</span>
+  <h1>직원이 이름을 누르면<br>급여 계산이 끝나 있는 출근부</h1>
+  <p class="lead">부찌대학 오늘근무 — 소문난의정부부대찌개 고대본점 · 이범례</p>
+  <p class="fine">이 자료의 화면은 모두 데모판(가상 직원 · 가상 기록)에서 찍었습니다. 실제 직원 이름과 시급은 나오지 않습니다.</p>
+</section>
+
+<section>
+  <span class="step">① 우리 가게 이야기</span>
+  <h2>고려대 정문 앞, 2013년부터 끓여 온 부대찌개집</h2>
+  <div class="cols">
+    <ul>
+      <li>채소와 남해 다시마로 매일 2시간 우린 채수, 직접 담가 숙성한 찌개전용김치</li>
+      <li>홀 매장과 배달 전문 매장, 두 곳을 부부가 나눠 맡습니다</li>
+      <li>직원은 11명 안팎. 대부분 시급제라 <b>출퇴근 시각에 따라 급여가 매번 달라집니다</b></li>
+    </ul>
+    <div class="card">
+      <h3>이번 캠프에서 고른 주제</h3>
+      <p>1조 · 직원 급여 산정표</p>
+      <p class="how">9/17 v1(근무·급여 원터치) → 9/26 출근부를 새로 만들기 시작 → 9/27부터 매장에서 사용</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="step">② 우리 가게의 문제</span>
+  <h2>급여날마다 근무표를 펴 놓고 계산기를 두드렸습니다</h2>
+  <div class="quote">급여날마다 근무표 펴놓고 계산기 두드리는 시간이 길고, 휴게시간·주휴수당 계산이 헷갈려 혹시 틀릴까 늘 마음이 쓰여서요. 계산은 도구에 맡기고, 저는 확인만 하고 싶습니다.
+    <small>9/17 캠프 첫날 우리 가게 소개에 적은 글</small></div>
+  <div class="cols">
+    <div class="card"><h3>그때 하던 순서</h3>
+      <ul>
+        <li>종이 근무표와 수첩을 편다</li>
+        <li>직원마다 카톡으로 "그날 몇 시에 왔고 몇 시에 갔는지" 서로 맞춘다</li>
+        <li>근무시간에서 휴게를 빼고, 주 15시간이 넘는지 보고 주휴수당을 따로 계산한다</li>
+      </ul></div>
+    <div class="card"><h3>걸린 시간과 실수</h3>
+      <p>주급 한 번에 <b>30분~1시간</b>, 주급 직원은 매주</p>
+      <p>급여를 준 뒤에 "그날 더 일했는데요"라는 말을 듣고 다시 계산한 적이 있습니다</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="step">③ AI로 이렇게 만들어 써 봤어요</span>
+  <h2>근무표 사진 한 장과 말 한마디에서 시작했습니다</h2>
+  <div class="quote">10월달 직원 주간근무표야. 이자료를 토대로 월간 달력처럼 보기쉽게 실제 출근 상황을 체크하는 걸 만들고싶어. 가능할까?
+    <small>맨 처음 AI에게 한 말 — 배달 매장 주간근무표 사진과 함께</small></div>
+  <ul>
+    <li>홀 매장 근무표를 더하고 "시급과 근무시간을 넣으면 주급까지" 계산하게 넓혔습니다</li>
+    <li>그다음은 매장에서 쓰면서 필요한 것을 하나씩 말로 요청했습니다 — PIN 단말, 관리자 모드, 편성표 수정, 급여 명세서, 3.3% 공제, 공휴일 단축 영업, 결근·대체, 월급 정산</li>
+    <li>계획은 "매장 QR 찍기"였는데, 써 보니 <b>이름 누르기 + PIN 4자리</b>가 더 쉬워서 바꿨습니다</li>
+  </ul>
+</section>
+
+<section>
+  <span class="step">③ 시연 · 장면 1 — 직원이 찍는다</span>
+  <h2>매장 폰에서 자기 이름을 누르고 숫자 네 자리</h2>
+  <div class="shots">
+    <figure><img src="발표자료_이미지/장면1_전.png" alt="단말 모드: 오늘 근무자 이름과 출근·퇴근 버튼"><figcaption><b>누르기 전</b> — 오늘 편성된 사람만 나옵니다</figcaption></figure>
+    <figure><img src="발표자료_이미지/장면1_PIN.png" alt="PIN 입력 화면"><figcaption><b>출근</b>을 누르고 PIN 4자리</figcaption></figure>
+    <figure><img src="발표자료_이미지/장면1_후.png" alt="출근 시각이 기록된 화면"><figcaption><b>누른 뒤</b> — 찍은 시각이 바로 기록됩니다</figcaption></figure>
+  </div>
+  <p class="fine">일흔 가까운 직원분도 거부감 없이 쓰고 계십니다.</p>
+</section>
+
+<section>
+  <span class="step">③ 시연 · 장면 2 · 3 — 사장이 확인하고, 계산은 끝나 있다</span>
+  <h2>달력에서 한눈에 보고, 명세서는 복사해서 보냅니다</h2>
+  <div class="shots two">
+    <figure><img src="발표자료_이미지/장면2_달력.png" alt="관리자 달력: 출근은 초록, 결근은 빨강, 휴무는 회색"><figcaption><b>장면 2 · 관리자 달력</b> — 출근·지각·조퇴·결근·휴무가 색으로 보이고, 칸을 눌러 그날만 고칩니다</figcaption></figure>
+    <figure><img src="발표자료_이미지/장면3_후.png" alt="임금명세서 문구가 만들어진 화면"><figcaption><b>장면 3 · 명세서</b> — 근무일·휴게·주휴수당·공제가 적힌 글이 만들어져 있어, 복사해서 직원에게 보냅니다</figcaption></figure>
+  </div>
+  <div class="demo">
+    <b>직접 눌러 보는 데모 (가상 직원 · 가상 기록)</b>
+    <a href="https://claude.ai/artifact/UwXUMwkHfbNZhjPvVpjdUU">https://claude.ai/artifact/UwXUMwkHfbNZhjPvVpjdUU</a>
+    <span>직원 PIN 0000 · 관리자 PIN 1234 · 먼저 "📱 단말 모드"를 눌러 보세요</span>
+  </div>
+</section>
+
+<section>
+  <span class="step">④ 매장 적용 &amp; 변화</span>
+  <h2>저는 급여날 계산기 두드리던 문제를 "이름 눌러 찍는 출근부"로 풀었고, 주급 주는 시간이 30분쯤에서 10분 안으로 줄었어요</h2>
+  <div class="cols">
+    <div class="card"><h3>실제로 쓴 기록</h3>
+      <div class="big">14<small>일째 사용</small></div>
+      <p>9/27 ~ 10/10 · 배달 매장 12일, 홀 매장 13일</p>
+      <p>직원이 단말에서 찍은 출근·퇴근 <b>165번</b></p>
+      <p class="how">도구에 쌓인 기록을 10/10에 세었습니다</p></div>
+    <div class="card"><h3>주급 한 번 주는 데</h3>
+      <div class="big">30분쯤 → 10분 안</div>
+      <p>송금과 명세서 보내기까지 포함</p>
+      <p class="how">지난 주급 1회 기준의 체감 시간입니다. 시계로 잰 값이 아니고, 같은 직원을 두 방법으로 비교한 것도 아닙니다</p></div>
+    <div class="card"><h3>달라진 것</h3>
+      <ul>
+        <li>직원과 카톡으로 시각을 맞추던 일이 없어졌습니다</li>
+        <li>찍은 시각이 분 단위로 남아, 급여 근거를 직원에게 그대로 보여 줍니다</li>
+        <li>급여 줄 때 보내야 하는 명세서가 버튼 하나로 나옵니다</li>
+      </ul></div>
+  </div>
+</section>
+
+<section>
+  <span class="step">④ 시행착오</span>
+  <h2>써 보면서 우리 가게 규칙에 맞게 고쳤습니다</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>써 보니</th><th>그래서 고친 것</th></tr></thead>
+    <tbody>
+      <tr><td>5분 일찍 찍으면 그 5분까지 급여에 들어갔습니다. 우리 가게는 그렇게 정한 적이 없습니다</td><td>단말은 <b>찍은 시각만 기록</b>하고, 급여는 <b>편성표 시간대로</b>. 연장은 사장이 인정한 것만 넣습니다</td></tr>
+      <tr><td>10월부터 주급에서 월급으로 바꿉니다</td><td>10/1부터 월급 정산으로 계산하고, 주급으로 받는 사람만 "이번 주 지급"에 남겼습니다</td></tr>
+      <tr><td>편성이 바뀌는 주가 있습니다</td><td>시작일을 정해 "이 날부터 새 편성". 지난 날짜의 기록과 급여는 그대로 둡니다 (10/10에도 토요일 편성을 이렇게 바꿨습니다)</td></tr>
+      <tr><td>출근부를 열 때마다 오늘 상황부터 보고 싶습니다</td><td>맨 위에 "오늘 한눈에" — 두 매장 출근 현황, 챙길 일, 이번 달 인건비</td></tr>
+    </tbody>
+  </table></div>
+  <p class="fine">명세서는 자동 발송이 아니라 복사·공유해서 보냅니다. 카카오톡 자동 발송은 불안정하다는 젬마쌤 의견대로 그대로 두었습니다.</p>
+</section>
+
+<section>
+  <span class="step">⑤ 마음의 변화 &amp; 한마디</span>
+  <h2>계산은 도구가, 확인과 확정은 사장이</h2>
+  <div class="quote">직원과 서로 맞춰 보고 달력에 적던 번거로움이 없어졌고, 주급 줄 때 계산기 대신 기록을 보고 명세서까지 바로 보낼 수 있어서 정말 좋았습니다.
+    <small>v2 제출서에 적은 한 줄 소감</small></div>
+  <div class="cols">
+    <div class="card"><h3>다른 사장님께</h3>
+      <p>직원을 한 명이라도 둔 사장님이면 쓰기 좋겠습니다. 직원이 없어도 사장 본인의 출퇴근을 찍고 "내 시급"을 따져 보는 데 쓸 수 있습니다.</p></div>
+    <div class="card"><h3>앞으로 해 보고 싶은 것</h3>
+      <ul>
+        <li>다른 가게도 자기 직원·시급을 넣어 쓸 수 있는 배포판</li>
+        <li>매장에 놀고 있는 키오스크를 출퇴근 단말로 쓰기</li>
+        <li>명세서를 문자·이메일로 보내는 방법</li>
+      </ul></div>
+  </div>
+</section>
+
+</body>
+</html>
