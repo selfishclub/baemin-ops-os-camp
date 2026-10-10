@@ -10,7 +10,8 @@ export async function GET(request: Request) {
   if ("error" in ctx) return ctx.error;
   const url = new URL(request.url);
   const days = Math.max(1, Math.min(90, Number(url.searchParams.get("days") ?? 14) || 14));
-  const userId = url.searchParams.get("user") ?? "";
+  const rawUser = url.searchParams.get("user") ?? "";
+  const userId = /^[0-9a-f-]{36}$/i.test(rawUser) ? rawUser : "";
   const [{ data: staff, error: staffError }, rows, origin] = await Promise.all([
     ctx.db.from("profiles").select("id, login_id, display_name, role, active").order("created_at", { ascending: true }),
     readViewLogs(ctx.db, { days, userId: userId || undefined }).catch((error: Error) => error),

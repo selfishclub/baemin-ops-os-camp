@@ -61,3 +61,20 @@ test("practice/read quests prefer things not yet done, and auto-complete from tr
   assert.equal(countCleared(views), 3);
   assert.ok(views.every((v) => !("answer" in v)));
 });
+
+test("done sets: before-week records pick quests, all records complete them", async () => {
+  const { splitDoneSets } = await import("../db/quest-store.ts");
+  const rows = [
+    { recipe_id: "r-old", practiced_at: "2026-10-03T05:00:00Z" },   // 지난주
+    { recipe_id: "r-new", practiced_at: "2026-10-06T05:00:00Z" },   // 이번 주
+    { recipe_id: "manual:d-old", practiced_at: "2026-10-04T14:59:00Z" }, // 10/4 23:59 KST → 지난주
+    { recipe_id: "manual:d-edge", practiced_at: "2026-10-04T15:00:00Z" }, // 10/5 00:00 KST → 이번 주
+    { recipe_id: "exam:x:1", practiced_at: "2026-10-01T00:00:00Z" },
+    { recipe_id: "r-none", practiced_at: null },
+  ];
+  const sets = splitDoneSets(rows, "2026-10-05");
+  assert.deepEqual([...sets.before.practicedRecipeIds], ["r-old"]);
+  assert.deepEqual([...sets.before.readDocIds], ["d-old"]);
+  assert.deepEqual([...sets.all.practicedRecipeIds].sort(), ["r-new", "r-old"]);
+  assert.deepEqual([...sets.all.readDocIds].sort(), ["d-edge", "d-old"]);
+});

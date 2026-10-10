@@ -70,7 +70,7 @@ export default async function proxy(request: NextRequest) {
         httpOnly: true,
         sameSite: "lax",
         secure: request.nextUrl.protocol === "https:",
-        maxAge: idleMinutes * 60 + 86_400,
+        maxAge: 60 * 60 * 24 * 400, // 오래 남겨서 며칠 뒤에 와도 "오래됨"으로 잡히게 (쿠키가 없으면 처음 로그인으로 본다)
       });
     }
   }

@@ -8,6 +8,7 @@ import { buildCheckDocs, buildDaySummaries, checkItemKey, isCheckDate, isSchedul
 import type { ViewRow } from "../manage/views/view-data";
 import { breakdown, buildBoard, defaultLevels, emptyCounts, highlights, levelFor, periodStart, totalPoints, type ActivityCounts, type Period } from "../score/score-data";
 import { buildWeeklyQuests, countCleared, isCorrect, mergeProgress, previousWeekStart, weekStartSeoul, type QuestProgressRow } from "../quest/quest-data";
+import { splitDoneSets } from "../../db/quest-store";
 import { sentToday, shouldRelay, summarizePraise, validatePraise, type PraiseRow } from "../praise/praise-data";
 import { buildHandoverViews, handoverDays, unreadCount, validateHandover, type HandoverRow, type HandoverShift } from "../handover/handover-data";
 
@@ -15,104 +16,18 @@ import { buildHandoverViews, handoverDays, unreadCount, validateHandover, type H
 // 전부 이 브라우저(localStorage)에만 있고 서버·데이터 창고로 가는 길은 없다. 실제 직원 이름은 쓰지 않는다.
 
 // 예시 기록의 모양이 바뀌면 숫자를 올린다 — 예전 버전을 눌러 본 브라우저에 남은 옛 예시가 새 화면을 가리지 않게
-const storageKey = "beansoop-preview-people-v4";
-const oldStorageKeys = ["beansoop-preview-people-v1", "beansoop-preview-people-v2", "beansoop-preview-people-v3"];
+const storageKey = "beansoop-preview-people-v5";
+const oldStorageKeys = ["beansoop-preview-people-v1", "beansoop-preview-people-v2", "beansoop-preview-people-v3", "beansoop-preview-people-v4"];
 const roleCookie = "bs_preview_role";
 
-const ownerId = "preview-owner";
-const staffId = "preview-staff-a";
+import { buildDemoPeople, ownerId, staffId, type PreviewPeople, type StaffRow, type QuestRow } from "./demo-data";
 
-type StaffRow = { id: string; login_id: string; display_name: string; role: "owner" | "staff"; active: boolean; created_at: string };
-type CheckRow = { user_id: string; recipe_id: string; practiced_at: string | null; confirmed_at: string | null; confirmed_by: string | null };
-// examId 가 있으면 시험 필기 결과, 없으면 연습 퀴즈
-type QuizRow = { id: number; user_id: string; score: number; total: number; created_at: string; examId?: string };
-type NoticeRow = { id: number; version: number; recipe_id: string; recipe_name: string; change_reason: string; published_by: string; created_at: string; acks: { user_id: string; acked_at: string }[] };
-type DailyCheckRow = DailyRow & { check_date: string };
-type QuestRow = QuestProgressRow & { user_id: string; week_start: string };
-type PreviewPeople = { staff: StaffRow[]; checks: CheckRow[]; quiz: QuizRow[]; notices: NoticeRow[]; daily: DailyCheckRow[]; views?: ViewRow[]; quests?: QuestRow[]; praises?: PraiseRow[]; handovers?: HandoverRow[] };
-
-function daysAgo(days: number) {
-  return new Date(Date.now() - days * 86_400_000).toISOString();
+// 처음 열었을 때(또는 "데모 데이터 다시 채우기") 넣는 가상 기록 — demo-data.ts 한 파일에서 만든다
+function freshPeople(): PreviewPeople {
+  return buildDemoPeople(currentContent);
 }
-
-const openSteps = ["(예시) 출근 기록을 남긴다", "(예시) 전원·조명·기기 예열: ○○ 순서로", "(예시) 재료 상태 확인: ○○", "(예시) 냉장고 온도 확인 [숫자: ℃]", "(예시) 진열·청결 확인", "(~09:30) (예시) 영업 시작 전 책임자에게 확인받는다"];
-
-function seedDaily(): DailyCheckRow[] {
-  const today = todayInSeoul();
-  const yesterday = lastDates(today, 2)[1];
-  const at = (date: string, time: string) => new Date(`${date}T${time}:00+09:00`).toISOString();
-  const row = (date: string, text: string, by: string, name: string, time: string, key = checkItemKey(text)): DailyCheckRow => ({ check_date: date, doc_id: "demo-open-prep", item_key: key, item_text: text, checked_by: by, checked_by_name: name, checked_at: at(date, time), value: text.includes("[숫자") ? "4" : "" });
-  return [
-    ...openSteps.map((text, index) => row(yesterday, text, staffId, "직원 A", `08:${String(10 + index * 7).padStart(2, "0")}`)),
-    row(yesterday, "확인함", ownerId, "미리보기 사장", "09:05", signoffItemKey),
-    row(today, openSteps[0], "preview-staff-b", "직원 B", "08:12"),
-    row(today, openSteps[1], "preview-staff-b", "직원 B", "08:20"),
-  ];
-}
-
-// 미리보기 열람 기록 예시: 직원 A는 매장에서, 직원 B는 한 번 매장 밖에서 연 것으로
-function seedViews(recipes: Recipe[]): ViewRow[] {
-  const [first, second] = recipes;
-  const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
-  const row = (id: number, user_id: string, user_name: string, kind: ViewRow["kind"], target_id: string, target_name: string, hours: number, outside = false, device = "아이폰 · Safari"): ViewRow =>
-    ({ id, user_id, user_name, kind, target_id, target_name, ip: outside ? "198.51.100.23" : "203.0.113.5", outside, device, viewed_at: hoursAgo(hours) });
-  return [
-    row(1, staffId, "직원 A", "login", "", "", 30),
-    ...(first ? [row(2, staffId, "직원 A", "recipe", first.id, first.name, 29.8)] : []),
-    row(3, staffId, "직원 A", "manual", "demo-open-prep", "예시 · 오픈 준비", 29.5),
-    row(4, staffId, "직원 A", "logout", "", "한동안 쓰지 않아 자동", 28.9),
-    row(5, "preview-staff-b", "직원 B", "login", "", "", 6, true, "안드로이드 · Chrome"),
-    ...(second ? [row(6, "preview-staff-b", "직원 B", "recipe", second.id, second.name, 5.9, true, "안드로이드 · Chrome")] : []),
-    row(7, "preview-staff-b", "직원 B", "chat", second?.id ?? "", "마감 순서 알려줘", 5.8, true, "안드로이드 · Chrome"),
-    row(8, "preview-staff-b", "직원 B", "login", "", "", 1.5, false, "윈도우 PC · Chrome"),
-    row(9, "preview-staff-b", "직원 B", "manual", "demo-close-closing", "예시 · 마감 순서", 1.4, false, "윈도우 PC · Chrome"),
-  ];
-}
-
-// 처음 열었을 때 화면이 비어 보이지 않게 넣어 두는 가짜 기록
-function freshPeople(recipes: Recipe[]): PreviewPeople {
-  const [first, second, third] = recipes;
-  return {
-    views: seedViews(recipes),
-    handovers: [
-      { id: 1, author_id: "preview-staff-b", author_name: "직원 B", shift: "close", text: "(예시) 우유 2팩 남음 — 내일 아침 발주 필요\n(예시) 2번 그라인더 분쇄도 한 칸 굵게 조정함", created_at: daysAgo(0.6), reads: [{ user_id: ownerId, user_name: "미리보기 사장", read_at: daysAgo(0.5) }] },
-      { id: 2, author_id: staffId, author_name: "직원 A", shift: "open", text: "(예시) 15시 단체 예약 6명 · 디카페인 원두 거의 떨어짐", created_at: daysAgo(1.3), reads: [{ user_id: "preview-staff-b", user_name: "직원 B", read_at: daysAgo(1.1) }] },
-    ],
-    praises: [
-      { id: 1, from_user: "preview-staff-b", from_name: "직원 B", to_user: staffId, to_name: "직원 A", text: "(예시) 피크 때 먼저 설거지 맡아 줘서 고마워요", created_at: daysAgo(1.2) },
-      { id: 2, from_user: ownerId, from_name: "미리보기 사장", to_user: "preview-staff-b", to_name: "직원 B", text: "(예시) 환불 손님을 침착하게 응대해서 좋았어요", created_at: daysAgo(0.4) },
-    ],
-    quests: [{ user_id: "preview-staff-b", week_start: weekStartSeoul(), quest_id: "mission", status: "pending", attempts: 0, note: "(예시) 라떼 스팀 때 피처 온도계 꼭 꽂기", done_at: daysAgo(0.3), confirmed_at: null }],
-    staff: [
-      { id: ownerId, login_id: "owner", display_name: "미리보기 사장", role: "owner", active: true, created_at: daysAgo(90) },
-      { id: staffId, login_id: "staff-a", display_name: "직원 A", role: "staff", active: true, created_at: daysAgo(30) },
-      { id: "preview-staff-b", login_id: "staff-b", display_name: "직원 B", role: "staff", active: true, created_at: daysAgo(20) },
-      { id: "preview-staff-c", login_id: "staff-c", display_name: "직원 C", role: "staff", active: false, created_at: daysAgo(60) },
-    ],
-    checks: [
-      ...(first ? [{ user_id: staffId, recipe_id: first.id, practiced_at: daysAgo(5), confirmed_at: daysAgo(4), confirmed_by: ownerId }] : []),
-      ...(second ? [{ user_id: staffId, recipe_id: second.id, practiced_at: daysAgo(2), confirmed_at: null, confirmed_by: null }] : []),
-      ...(first ? [{ user_id: "preview-staff-b", recipe_id: first.id, practiced_at: daysAgo(9), confirmed_at: daysAgo(8), confirmed_by: ownerId }] : []),
-      { user_id: "preview-staff-b", recipe_id: examCheckKey("demo-exam-1", "p1"), practiced_at: daysAgo(7), confirmed_at: daysAgo(6), confirmed_by: ownerId },
-      { user_id: "preview-staff-b", recipe_id: examCheckKey("demo-exam-1", "p2"), practiced_at: daysAgo(7), confirmed_at: daysAgo(6), confirmed_by: ownerId },
-      { user_id: "preview-staff-b", recipe_id: examCheckKey("demo-exam-1", "p3"), practiced_at: daysAgo(1), confirmed_at: null, confirmed_by: null },
-      // 매뉴얼 문서 읽음 기록 (교육 경로 1일차의 예시 문서)
-      { user_id: staffId, recipe_id: `${manualCheckPrefix}demo-standard-motto`, practiced_at: daysAgo(6), confirmed_at: daysAgo(5), confirmed_by: ownerId },
-      { user_id: staffId, recipe_id: `${manualCheckPrefix}demo-hygiene-daily`, practiced_at: daysAgo(6), confirmed_at: null, confirmed_by: null },
-    ],
-    quiz: [
-      { id: 1, user_id: "preview-staff-b", score: 8, total: 10, created_at: daysAgo(3) },
-      // 시험 예시: 직원 B는 1단계 필기 합격 + 실기 2/3, 직원 A는 필기 한 번 떨어짐
-      { id: 2, user_id: "preview-staff-b", score: 9, total: 10, created_at: daysAgo(7), examId: "demo-exam-1" },
-      { id: 3, user_id: staffId, score: 6, total: 10, created_at: daysAgo(4), examId: "demo-exam-1" },
-    ],
-    // 오늘 체크 예시: 어제 오픈은 다 하고 사장 확인까지, 오늘 오픈은 직원 B가 두 개 해 둔 상태
-    daily: seedDaily(),
-    notices: third
-      ? [{ id: 2, version: 1, recipe_id: `${manualNoticePrefix}demo-close-closing`, recipe_name: "예시 · 마감 순서", change_reason: "시연용 알림 · 순서 변경", published_by: "미리보기 사장", created_at: daysAgo(2), acks: [] }, { id: 1, version: 1, recipe_id: third.id, recipe_name: third.name, change_reason: "시연용 알림 · 정량 변경", published_by: "미리보기 사장", created_at: daysAgo(1), acks: [{ user_id: "preview-staff-b", acked_at: daysAgo(0.5) }] }]
-      : [],
-  };
-}
+// handlePeople 이 호출될 때의 공식본 (freshPeople 이 레시피·문서를 알아야 하므로)
+let currentContent: RecipeContent = { recipes: [], sharedStandards: [], sharedGuides: [] } as unknown as RecipeContent;
 
 function load(recipes: Recipe[]): PreviewPeople {
   try {
@@ -121,16 +36,16 @@ function load(recipes: Recipe[]): PreviewPeople {
   } catch {
     // 저장소를 못 쓰는 브라우저면 매번 새로 시작한다
   }
-  return freshPeople(recipes);
+  return freshPeople();
 }
 
 function save(people: PreviewPeople) {
   try {
     people.notices = people.notices.slice(-30);
-    people.quiz = people.quiz.slice(-40);
-    people.daily = (people.daily ?? []).slice(-400);
-    people.views = (people.views ?? []).slice(-300);
-    people.quests = (people.quests ?? []).slice(-200);
+    people.quiz = people.quiz.slice(-80);
+    people.daily = (people.daily ?? []).slice(-1500);
+    people.views = (people.views ?? []).slice(-2000);
+    people.quests = (people.quests ?? []).slice(-600);
     people.praises = (people.praises ?? []).slice(-300);
     people.handovers = (people.handovers ?? []).slice(-200);
     window.localStorage.setItem(storageKey, JSON.stringify(people));
@@ -250,6 +165,7 @@ export function addPreviewNotices(recipes: Recipe[], changed: { id: string; name
 }
 
 export async function handlePeople(path: string, method: string, url: string, body: Record<string, unknown>, content: RecipeContent): Promise<Response | null> {
+  currentContent = content;
   const recipes = content.recipes;
   const role = currentRole();
   const me = role === "owner" ? ownerId : staffId;
@@ -276,7 +192,7 @@ export async function handlePeople(path: string, method: string, url: string, bo
       notices: [...people.notices].reverse().map(({ acks, ...notice }) => ({
         ...notice,
         acked: active.filter((person) => acks.some((ack) => ack.user_id === person.id)).map((person) => ({ id: person.id, name: person.display_name, at: acks.find((ack) => ack.user_id === person.id)?.acked_at ?? "" })),
-        pending: active.filter((person) => !acks.some((ack) => ack.user_id === person.id)).map((person) => ({ id: person.id, name: person.display_name })),
+        pending: active.filter((person) => person.role !== "owner" && !acks.some((ack) => ack.user_id === person.id)).map((person) => ({ id: person.id, name: person.display_name })),
       })),
     });
   }
@@ -468,7 +384,7 @@ export async function handlePeople(path: string, method: string, url: string, bo
         quiz_passed: quiz.filter((row) => !row.examId && row.score * 10 >= row.total * 7).length,
         exam_written: quiz.filter((row) => row.examId && row.score * 10 >= row.total * 8).length,
         acks: people.notices.reduce((sum, notice) => sum + notice.acks.filter((ack) => ack.user_id === person.id && after(ack.acked_at)).length, 0),
-        reads: (people.views ?? seedViews(recipes)).filter((row) => row.user_id === person.id && (row.kind === "recipe" || row.kind === "manual") && after(row.viewed_at)).length,
+        reads: (people.views ?? freshPeople().views ?? []).filter((row) => row.user_id === person.id && (row.kind === "recipe" || row.kind === "manual") && after(row.viewed_at)).length,
         quests_done: (people.quests ?? []).filter((row) => row.user_id === person.id && row.status === "done" && row.quest_id !== "mission" && after(row.done_at)).length,
         missions_done: (people.quests ?? []).filter((row) => row.user_id === person.id && row.status === "confirmed" && after(row.confirmed_at)).length,
         praises_received: (people.praises ?? []).filter((row) => row.to_user === person.id && after(row.created_at)).length,
@@ -575,15 +491,20 @@ export async function handlePeople(path: string, method: string, url: string, bo
     const lastWeek = previousWeekStart(weekStart);
     const docs = readableManuals(content).filter((doc) => !lockedForMe.includes(doc.sectionId));
     const mine = people.checks.filter((row) => row.user_id === me && row.practiced_at);
-    const done = {
-      practicedRecipeIds: new Set(mine.filter((row) => !row.recipe_id.startsWith(manualCheckPrefix) && !row.recipe_id.startsWith(examCheckPrefix)).map((row) => row.recipe_id)),
-      readDocIds: new Set(mine.filter((row) => row.recipe_id.startsWith(manualCheckPrefix)).map((row) => row.recipe_id.slice(manualCheckPrefix.length))),
-    };
-    const quests = buildWeeklyQuests({ userId: me, weekStart, content, docs, practicedRecipeIds: done.practicedRecipeIds, readDocIds: done.readDocIds });
+    const sets = splitDoneSets(mine, weekStart);
+    const done = sets.all;
+    const quests = buildWeeklyQuests({ userId: me, weekStart, content, docs, practicedRecipeIds: sets.before.practicedRecipeIds, readDocIds: sets.before.readDocIds });
     const rowsOf = (week: string, user = me) => people.quests!.filter((row) => row.user_id === user && row.week_start === week);
     if (method === "GET") {
       const views = mergeProgress(quests, rowsOf(weekStart), done);
-      const lastQuests = buildWeeklyQuests({ userId: me, weekStart: lastWeek, content, docs, practicedRecipeIds: done.practicedRecipeIds, readDocIds: done.readDocIds });
+      for (const view of views) {
+        if ((view.kind === "practice" || view.kind === "read") && view.status === "done" && !rowsOf(weekStart).some((row) => row.quest_id === view.id)) {
+          people.quests.push({ user_id: me, week_start: weekStart, quest_id: view.id, status: "done", attempts: 0, note: "", done_at: new Date().toISOString(), confirmed_at: null });
+          save(people);
+        }
+      }
+      const lastSets = splitDoneSets(mine, lastWeek);
+      const lastQuests = buildWeeklyQuests({ userId: me, weekStart: lastWeek, content, docs, practicedRecipeIds: lastSets.before.practicedRecipeIds, readDocIds: lastSets.before.readDocIds });
       const payload: Record<string, unknown> = { weekStart, quests: views, cleared: countCleared(views), lastWeek: { weekStart: lastWeek, cleared: countCleared(mergeProgress(lastQuests, rowsOf(lastWeek), done)), total: lastQuests.length } };
       if (role === "owner") {
         payload.missions = people.quests
@@ -617,7 +538,9 @@ export async function handlePeople(path: string, method: string, url: string, bo
     if (body.action === "mission" || body.action === "claim") {
       const text = String(body.note ?? "").trim().slice(0, 200);
       if (!text) return json({ error: "적용할 것을 한 줄 적어 주세요." }, 400);
-      upsert(me, weekStart, "mission", { status: body.action === "claim" ? "pending" : "open", note: text, done_at: body.action === "claim" ? now() : null });
+      const wasPending = rowsOf(weekStart).find((row) => row.quest_id === "mission")?.status === "pending";
+      const missionStatus = body.action === "claim" || wasPending ? "pending" : "open";
+      upsert(me, weekStart, "mission", { status: missionStatus, note: text, done_at: missionStatus === "pending" ? now() : null });
       return json({ ok: true });
     }
     if (body.action === "confirm") {
@@ -634,7 +557,7 @@ export async function handlePeople(path: string, method: string, url: string, bo
     const kind = body.kind === "recipe" || body.kind === "manual" || body.kind === "login" ? body.kind : null;
     if (!kind) return json({ error: "기록할 내용이 없습니다." }, 400);
     const people = load(recipes);
-    people.views ??= seedViews(recipes);
+    people.views ??= freshPeople().views ?? [];
     const id = String(body.id ?? "");
     const name = kind === "recipe" ? recipes.find((recipe) => recipe.id === id)?.name ?? "" : kind === "manual" ? readableManuals(content).find((doc) => doc.id === id)?.title ?? "" : "";
     const person = people.staff.find((row) => row.id === me);
@@ -653,7 +576,7 @@ export async function handlePeople(path: string, method: string, url: string, bo
     const userId = params.get("user") ?? "";
     const people = load(recipes);
     const since = Date.now() - days * 86_400_000;
-    const rows = (people.views ?? seedViews(recipes)).filter((row) => new Date(row.viewed_at).getTime() >= since && (!userId || row.user_id === userId)).sort((a, b) => (a.viewed_at < b.viewed_at ? 1 : -1));
+    const rows = (people.views ?? freshPeople().views ?? []).filter((row) => new Date(row.viewed_at).getTime() >= since && (!userId || row.user_id === userId)).sort((a, b) => (a.viewed_at < b.viewed_at ? 1 : -1));
     return json({ rows, staff: people.staff, days, settings: { shopIps: ["203.0.113.5"], blockOutsideStaff: false, idleMinutes: 30, myIp: "203.0.113.5", myDevice: "미리보기 브라우저", myOutside: false } });
   }
 

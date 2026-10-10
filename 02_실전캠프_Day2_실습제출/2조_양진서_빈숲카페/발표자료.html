@@ -28,6 +28,10 @@
   .cover { text-align: center; background: linear-gradient(135deg, #173f31, #2f6b47); color: white; border: 0; }
   .cover h1, .cover .big { color: white; }
   .cover .muted { color: rgba(255,255,255,.8); }
+  .shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 8px; }
+  .shots figure { margin: 0; }
+  .shots img { display: block; width: 100%; border: 1px solid var(--line); border-radius: 12px; background: white; }
+  .shots figcaption { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.4; }
   .url { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: clamp(16px, 2.2vw, 26px); color: var(--green); font-weight: 800; word-break: break-all; }
   .nav { position: fixed; right: 16px; bottom: 16px; display: flex; gap: 6px; }
   .nav button { padding: 10px 14px; border: 0; border-radius: 999px; background: var(--deep); color: white; font-weight: 800; cursor: pointer; }
@@ -107,6 +111,20 @@
     <div class="tile"><b>인수인계</b><span>교대 때 남기는 메모. 읽었어요를 누르면 누가 안 읽었는지 보입니다.</span></div>
   </div>
   <p class="quote">점수는 재미와 격려용. 급여·승급은 시험·인증에서 사장이 따로 정합니다.</p>
+</section>
+
+<section class="slide" id="s6b">
+  <span class="num">5-2 / 10</span>
+  <small class="step">③ 시연 장면 3개 — 전 → 후</small>
+  <h2>누르면 이렇게 바뀝니다</h2>
+  <div class="shots">
+    <figure><img src="발표자료_이미지/장면1_전_폰_직원_공지.png" alt="직원 눈: 공지·변경 이력에서 확인했어요 누르기 전"><figcaption>장면 1 전 · 직원이 ‘확인했어요’</figcaption></figure>
+    <figure><img src="발표자료_이미지/장면1_후_폰_사장_확인현황.png" alt="사장 눈: 확인 현황에 최지우가 확인함으로 이동"><figcaption>장면 1 후 · 사장은 누가 안 봤는지</figcaption></figure>
+    <figure><img src="발표자료_이미지/장면2_중_폰_직원_온도입력.png" alt="오늘 체크 냉장고 온도 숫자 입력"><figcaption>장면 2 · 숫자를 적어야 체크</figcaption></figure>
+    <figure><img src="발표자료_이미지/장면2_후_패드_사장_지난14일표.png" alt="사장 눈: 지난 14일 표, 빠진 마감과 확인 없는 날"><figcaption>장면 2 후 · 빠진 날이 표에 보임</figcaption></figure>
+    <figure><img src="발표자료_이미지/장면3_전_폰_직원_퀘스트.png" alt="이번 주 퀘스트 1/5"><figcaption>장면 3 전 · 신입의 퀘스트 1/5</figcaption></figure>
+    <figure><img src="발표자료_이미지/장면3_후_폰_직원_퀘스트정답.png" alt="정답, 2/5"><figcaption>장면 3 후 · 2번 만에 맞힘, 2/5</figcaption></figure>
+  </div>
 </section>
 
 <section class="slide" id="s7">

@@ -27,19 +27,17 @@ export default function PreviewBanner({ what, role }: { what: string; role?: "ow
         실제 데이터와 다른 사람 화면은 바뀌지 않아요.
       </p>
       {role && <PreviewRoleSwitch role={role} />}
-      {edited && (
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm("미리보기에서 고친 내용(레시피·교육 기록·확인 기록·잠금)을 모두 지우고 처음 상태로 되돌릴까요?")) {
-              resetPreview();
-              window.location.reload();
-            }
-          }}
-        >
-          처음 상태로
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => {
+          if (window.confirm(edited ? "미리보기에서 고친 내용(레시피·교육 기록·확인 기록·잠금)을 모두 지우고 데모 데이터를 다시 채울까요?" : "데모 데이터를 오늘 기준으로 다시 채울까요?")) {
+            resetPreview();
+            window.location.reload();
+          }
+        }}
+      >
+        {edited ? "데모 데이터 다시 채우기" : "데모 데이터 새로고침"}
+      </button>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { requireViewerApi } from "../../auth";
 import { allowedSections } from "../../../db/portal-store";
 import { readPublishedContent } from "../../../db/recipe-store";
-import { confirmMission, readDoneSets, readMissions, readQuestProgress, recordAnswer, saveMission } from "../../../db/quest-store";
+import { confirmMission, markAutoDone, readDoneSets, readMissions, readQuestProgress, recordAnswer, saveMission } from "../../../db/quest-store";
 import { manualSectionIds, readableManuals } from "../../manual/manual-data";
 import { buildWeeklyQuests, countCleared, isCorrect, mergeProgress, previousWeekStart, weekStartSeoul, type Quest } from "../../quest/quest-data";
 
@@ -13,10 +13,15 @@ async function weeklyQuests(ctx: { db: Parameters<typeof readPublishedContent>[0
   const content = await readPublishedContent(db);
   const allowed = await allowedSections({ mode: "auth", viewer: { ...ctx.viewer, loginId: "", displayName: "", active: true }, db }, [...manualSectionIds]);
   const docs = readableManuals(content).filter((doc) => allowed.has(doc.sectionId));
-  const done = await readDoneSets(db, ctx.viewer.id);
-  const quests = buildWeeklyQuests({ userId: ctx.viewer.id, weekStart, content, docs, practicedRecipeIds: done.practicedRecipeIds, readDocIds: done.readDocIds });
-  const lastQuests = lastWeek ? buildWeeklyQuests({ userId: ctx.viewer.id, weekStart: lastWeek, content, docs, practicedRecipeIds: done.practicedRecipeIds, readDocIds: done.readDocIds }) : [];
-  return { quests, lastQuests, done };
+  // 퀘스트는 "그 주가 시작되기 전" 기록으로 고른다 (주 중에 해도 과녁이 안 움직이게), 완료 판정은 전체 기록으로
+  const sets = await readDoneSets(db, ctx.viewer.id, weekStart);
+  const quests = buildWeeklyQuests({ userId: ctx.viewer.id, weekStart, content, docs, practicedRecipeIds: sets.before.practicedRecipeIds, readDocIds: sets.before.readDocIds });
+  let lastQuests: Quest[] = [];
+  if (lastWeek) {
+    const lastSets = await readDoneSets(db, ctx.viewer.id, lastWeek);
+    lastQuests = buildWeeklyQuests({ userId: ctx.viewer.id, weekStart: lastWeek, content, docs, practicedRecipeIds: lastSets.before.practicedRecipeIds, readDocIds: lastSets.before.readDocIds });
+  }
+  return { quests, lastQuests, done: sets.all };
 }
 
 export async function GET() {
@@ -27,6 +32,9 @@ export async function GET() {
     const lastWeek = previousWeekStart(weekStart);
     const [{ quests, lastQuests, done }, rows, lastRows] = await Promise.all([weeklyQuests(ctx, weekStart, lastWeek), readQuestProgress(ctx.db, ctx.viewer.id, weekStart), readQuestProgress(ctx.db, ctx.viewer.id, lastWeek)]);
     const views = mergeProgress(quests, rows, done);
+    // 교육 기록으로 자동 완료된 것은 표에도 남긴다 (점수판 반영)
+    const known = new Set(rows.map((row) => row.quest_id));
+    await markAutoDone(ctx.db, ctx.viewer.id, weekStart, views.filter((view) => (view.kind === "practice" || view.kind === "read") && view.status === "done" && !known.has(view.id)).map((view) => view.id));
     const body: Record<string, unknown> = {
       weekStart,
       quests: views,
@@ -65,7 +73,7 @@ export async function POST(request: Request) {
       if (ctx.viewer.role !== "owner") return Response.json({ error: "사장님만 확인할 수 있어요." }, { status: 403 });
       const target = String(body.userId ?? "");
       const week = String(body.weekStart ?? weekStart);
-      if (!target) return Response.json({ error: "누구 미션인지 없어요." }, { status: 400 });
+      if (!/^[0-9a-f-]{36}$/i.test(target) || !/^\d{4}-\d{2}-\d{2}$/.test(week)) return Response.json({ error: "누구 미션인지 없어요." }, { status: 400 });
       await confirmMission(ctx.db, ctx.viewer.id, target, week);
       return Response.json({ ok: true });
     }
