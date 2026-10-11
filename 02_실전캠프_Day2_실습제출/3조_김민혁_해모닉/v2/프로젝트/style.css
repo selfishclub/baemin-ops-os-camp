@@ -1491,7 +1491,11 @@ input.cpTarget{outline:2px solid var(--ink);outline-offset:1px}
 /* 데모판 안내 줄 (demo.js 가 켤 때만 보인다) */
 .demoBar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;background:var(--wk-soft);border:1px solid var(--wk);color:var(--ink);border-radius:9px;padding:8px 12px;margin:0 0 12px;font-size:13.5px}
 .demoBar code{background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:1px 6px;font-weight:700}
-.demoBar .btn{margin-left:auto}
+.demoBar .btn{margin-left:0}
+.demoBar .demoScenes{display:flex;flex-wrap:wrap;gap:4px}
+.demoBar .demoScenes .btn{font-size:12px;padding:3px 8px}
+.demoBar>.btn:last-child{margin-left:auto}
+@media (max-width:600px){.demoBar{font-size:12.5px;padding:7px 10px}.demoBar .demoScenes{width:100%}}
 
 /* 수조 칸 안 여러 묶음 (2026-10-11) */
 .tkLots{display:flex;flex-direction:column;gap:3px;text-align:left;margin:0 auto;max-width:220px}
