@@ -19,7 +19,7 @@ import { monthFindings, monthSources, type FindingsInput } from "@/lib/findings"
 import { missingFixedCosts } from "@/lib/missingFixed";
 import { dayTotals } from "@/lib/weekday";
 import { PURCHASES_KEY_PREFIX, type Purchase } from "@/lib/costing/purchases";
-import { ledgerIsEmpty, loadSampleData, SAMPLE_LABEL } from "@/lib/sampleData";
+import { findMonthWithData, ledgerIsEmpty, loadSampleData, SAMPLE_LABEL } from "@/lib/sampleData";
 import { loadStoreProfile, taxFileName } from "@/lib/storeProfile";
 import { buildTaxSheets } from "@/lib/taxExport";
 import type { Transaction } from "@/lib/types";
@@ -34,8 +34,11 @@ export default function PnlPage() {
   // 빈 화면에 "둘러보기"를 띄울지 — 장부가 통째로 비었을 때만 (lib/sampleData.ts)
   const [canTour, setCanTour] = useState(false);
   const [touring, setTouring] = useState(false);
+  // 이 달은 비었는데 다른 달에 자료가 있으면 그 달로 건너가게 (시연 주소가 딱 이렇다)
+  const [elsewhere, setElsewhere] = useState<string | null>(null);
   useEffect(() => {
     void ledgerIsEmpty().then(setCanTour);
+    void findMonthWithData().then((m) => setElsewhere(m && m !== month ? m : null));
   }, [month]);
   async function startTour() {
     setTouring(true);
@@ -108,6 +111,19 @@ export default function PnlPage() {
               {touring ? "넣는 중…" : `가짜 자료로 둘러보기 (${SAMPLE_LABEL})`}
             </button>
             <p className="pt-1 text-sm text-stone-600">내 통장으로 시작하려면</p>
+            <Link href="/upload" className="btn-ghost">
+              거래내역 올리러 가기
+            </Link>
+          </>
+        ) : elsewhere ? (
+          <>
+            <p className="text-sm text-stone-600">
+              이 달은 아직 비어 있어요. <b>{monthLabel(elsewhere)}</b>에 자료가 있어요.
+            </p>
+            <button className="btn-primary w-full" onClick={() => setMonth(elsewhere)}>
+              {monthLabel(elsewhere)} 보러 가기
+            </button>
+            <p className="pt-1 text-sm text-stone-600">이 달 자료를 넣으려면</p>
             <Link href="/upload" className="btn-ghost">
               거래내역 올리러 가기
             </Link>

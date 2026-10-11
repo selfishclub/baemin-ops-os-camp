@@ -36,3 +36,17 @@ export async function ledgerIsEmpty(): Promise<boolean> {
   const [sales, uploads] = await Promise.all([store.listAllDailySales(), store.listUploads()]);
   return canOfferTour(sales.length, uploads.length);
 }
+
+// 이 달만 비었고 다른 달에는 자료가 있을 때 — 시연 주소가 딱 이렇다
+//  (가짜 자료는 9월에 있는데 앱은 이번 달로 열린다). 그 달로 건너갈 수 있게 알려 준다.
+export function latestMonthWithData(saleDates: string[], uploadMonths: string[]): string | null {
+  const months = [...new Set([...saleDates.map((d) => d.slice(0, 7)), ...uploadMonths])].sort();
+  return months.length ? months[months.length - 1] : null;
+}
+
+/** 자료가 있는 가장 최근 달 (없으면 null) */
+export async function findMonthWithData(): Promise<string | null> {
+  const store = getStore();
+  const [sales, uploads] = await Promise.all([store.listAllDailySales(), store.listUploads()]);
+  return latestMonthWithData(sales.map((s) => s.date), uploads.map((u) => u.month));
+}
