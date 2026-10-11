@@ -150,9 +150,28 @@ const Store = (() => {
     } catch (e) { cloudFail(e); return null; }
   }
 
+  /* 저장 직전 합치기 (2026-10-10, 안산점 "체크가 다 풀림" 신고 뒤):
+     문서를 통째로 덮어쓰는 구조라, 실시간 신호를 놓쳐 옛 상태를 든 기기가 저장하면 다른 기기의 체크가 전부 되돌아갔다.
+     이제 서버에 내가 모르는 더 새 저장이 있으면 먼저 항목 단위로 합친 뒤 올린다 — 완료는 미완료에 지지 않고, 더 나중에 손댄 쪽이 이긴다. */
+  async function mergeBeforePut(k, v) {
+    if (!(k.startsWith('state:') || k.startsWith('shared:'))) return v;
+    try {
+      const { data, error } = await supa.client.from('docs').select('doc, saved_at').eq('key', k).maybeSingle();
+      if (error || !data || !data.doc) return v;
+      const srv = data.doc, srvAt = srv.savedAt || Number(data.saved_at) || 0;
+      if (!(srvAt > (lastUp[k] || 0)) || srvAt === v.savedAt) return v;
+      const merged = mergeDocs(v, srv);
+      merged.savedAt = Date.now();
+      Object.keys(v).forEach((f) => { if (!(f in merged)) delete v[f]; });
+      Object.assign(v, merged);           // 앱이 들고 있는 상태(S) 자체를 합친 결과로 바꾼다
+      document.dispatchEvent(new CustomEvent('doc-merged', { detail: { key: k } }));
+    } catch (_) { /* 합치기 실패 시 그냥 저장 */ }
+    return v;
+  }
   async function cloudPut(k, v) {
     if (supa) {
       try {
+        v = await mergeBeforePut(k, v);
         lastUp[k] = v.savedAt;
         const { error } = await supa.client.from('docs').upsert({ key: k, doc: v, saved_at: v.savedAt || Date.now(), updated_at: new Date().toISOString() }, { onConflict: 'key' });
         if (error) throw error;
@@ -269,7 +288,7 @@ const Store = (() => {
     });
     const mergeDay = (n, o) => ({
       ...o, ...n,
-      inst: unionObj(n.inst, o.inst, (ni, oi) => ((ni.s && ni.s !== 'todo') || !(oi.s && oi.s !== 'todo')) ? ni : oi),
+      inst: unionObj(n.inst, o.inst, (ni, oi) => (ni.u || oi.u) ? ((ni.u || 0) >= (oi.u || 0) ? ni : oi) : (((ni.s && ni.s !== 'todo') || !(oi.s && oi.s !== 'todo')) ? ni : oi)),   // 손댄 시각이 있는 쪽(더 늦은 쪽)이 이기고, 둘 다 없으면 완료 우선
       extras: unionBy(n.extras, o.extras, 'id') || [],
       notified: { ...(o.notified || {}), ...(n.notified || {}) },
     });
@@ -301,18 +320,23 @@ const Store = (() => {
       if (!(savedAt > (lastUp[k] || 0))) return;
       clearTimeout(timer);
       timer = setTimeout(async () => {
-        if (pending && k === curKey) return;   // 내 쪽에 아직 안 올라간 변경이 있으면 그게 곧 이긴다
+        if (pending && k === curKey) return;   // 내 쪽에 아직 안 올라간 변경이 있으면 저장 때 합쳐진다
         const doc = await cloudGet(k, null);
         if (!doc || !(doc.savedAt > (lastUp[k] || 0))) return;
+        /* 앱이 실제로 받아들였을 때만 "서버 최신본을 봤다"고 기록한다. 입력 창이 열려 있어 받아들이지 못했는데
+           기록만 앞당기면, 그 뒤 저장 때 합칠 필요가 없다고 보고 덮어써 버린다 (2026-10-11 두 매장 실제 시험에서 발견) */
+        const applied = remoteCb ? remoteCb(k, doc) !== false : true;
+        if (!applied) return;
         lastUp[k] = doc.savedAt;
         await localPut(k, doc);
-        if (remoteCb) remoteCb(k, doc);
       }, 300);
     };
     const ch = supa.client.channel('doc-' + k.replace(/[^a-zA-Z0-9]/g, '_'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'docs_poke', filter: 'key=eq.' + k }, (payload) => { const row = payload.new || {}; poke(Number(row.saved_at) || 0); })
       .subscribe();
-    list.push(() => { try { supa.client.removeChannel(ch); } catch (_) { /* 무시 */ } });
+    // 실시간 신호를 놓쳤을 때를 대비해 60초마다 서버 저장 시각만 가볍게 확인한다 (포스가 잠들었다 깨어난 뒤 옛 상태로 남는 것 방지)
+    const iv = setInterval(async () => { try { const { data } = await supa.client.from('docs_poke').select('saved_at').eq('key', k).maybeSingle(); if (data) poke(Number(data.saved_at) || 0); } catch (_) { /* 무시 */ } }, 60000);
+    list.push(() => { clearInterval(iv); try { supa.client.removeChannel(ch); } catch (_) { /* 무시 */ } });
   }
   /* 다른 문서(예: 다른 매장)의 변경을 받는다 — 대시보드용. 돌려주는 함수를 부르면 구독을 끊는다 */
   function watchDoc(k, cb) {
@@ -334,12 +358,13 @@ const Store = (() => {
       if (!(savedAt > (lastUp[k] || 0))) return;
       clearTimeout(timer);
       timer = setTimeout(async () => {
-        if (pending) return;                 // 내 쪽에 아직 안 올라간 변경이 있으면 그게 곧 이긴다
+        if (pending) return;                 // 내 쪽에 아직 안 올라간 변경이 있으면 저장 때 합쳐진다
         const doc = await cloudGet(k, ((await localGet(k)) || {}).blobs);
         if (!doc || !(doc.savedAt > (lastUp[k] || 0))) return;
+        const applied = remoteCb ? remoteCb(k, doc) !== false : true;
+        if (!applied) return;
         lastUp[k] = doc.savedAt;
         await localPut(k, doc);
-        if (remoteCb) remoteCb(k, doc);
       }, 400);
     };
     const onErr = (e) => cloudFail(e);
@@ -406,8 +431,9 @@ const Store = (() => {
       const u = data.session.user || {};
       let deviceOk = true;
       try { const r = await client.rpc('device_ok'); if (!r.error && typeof r.data === 'boolean') deviceOk = r.data; } catch (_) { /* 서버에 아직 없으면 허용 */ }
-      supa = { client, url: cfg.url, email: u.email || '', anon: !!u.is_anonymous || !u.email, deviceOk, device: !!devKey() };
+      supa = { client, url: cfg.url, email: u.email || '', anon: !!u.is_anonymous || !u.email, deviceOk, device: !!devKey(), viaNet: deviceOk && !devKey() };   // viaNet: 열쇠 없이 매장 인터넷으로 통과
       if (deviceOk && devKey()) client.rpc('device_touch').then(() => {}, () => {});
+      else if (deviceOk) client.rpc('net_touch').then(() => {}, () => {});
       client.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { supa = null; document.dispatchEvent(new Event('cloud-status')); } });
       return supa;
     } catch (e) { cloudFail(e); return null; }
@@ -469,6 +495,20 @@ const Store = (() => {
     const { data, error } = await supa.client.from('devices').select('id, name, store, created_at, last_seen, active, key_hash').order('created_at');
     if (error) throw new Error(error.message); return data || [];
   }
+  /* 매장 인터넷(IP) 목록 — 사장님이 매장에서 기기를 등록하면 서버가 기억한다. 같은 인터넷에서는 열쇠 없이 열린다 */
+  async function netList() {
+    if (!supa) return [];
+    const { data, error } = await supa.client.from('store_nets').select('ip, store, name, created_at, last_seen, active').order('created_at');
+    if (error) throw new Error(error.message); return data || [];
+  }
+  async function netRevoke(ip) {
+    if (!supa) return false;
+    const { error } = await supa.client.from('store_nets').update({ active: false }).eq('ip', ip);
+    if (error) throw new Error(error.message); return true;
+  }
+  /* 낮에도 주기적으로 '살아 있음'을 알린다 — 등록된 포스가 켜져 있는 동안 매장 인터넷 주소가 서버에 기억되도록 (재시작 없이도) */
+  function deviceTouch() { if (!supa || supa.deviceOk === false) return; supa.client.rpc(devKey() ? 'device_touch' : 'net_touch').then(() => {}, () => {}); }
+  async function myIp() { if (!supa) return ''; const { data } = await supa.client.rpc('req_ip'); return data || ''; }
   async function deviceRevoke(id) {
     if (!supa) return false;
     const { error } = await supa.client.from('devices').update({ active: false }).eq('id', id);
@@ -650,8 +690,8 @@ const Store = (() => {
   return {
     init, load, save, flush, setMeta, switchTo, dumpAll, restoreAll, loadStore, saveStore, loadShared, saveShared, watchShared,
     supaSetConfig, supaSignIn, supaSignOut, supaEvent, supaEvents, supaTgUpdates, watchDoc,
-    deviceRegister, deviceList, deviceRevoke, deviceHash, deviceForget, deviceLink, trainingDoc, trainingSave,
-    get supa() { const cfg = supaCfg || supaConfig(); return { configured: !!(cfg && cfg.url && cfg.key), url: cfg ? cfg.url : '', signedIn: !!supa, anon: !!(supa && supa.anon), deviceOk: supa ? supa.deviceOk !== false : true, device: !!devKey(), email: supa ? supa.email : '', libLoaded: !!(window.supabase && window.supabase.createClient) }; },
+    deviceRegister, deviceList, deviceRevoke, deviceHash, deviceForget, deviceLink, netList, netRevoke, myIp, deviceTouch, trainingDoc, trainingSave,
+    get supa() { const cfg = supaCfg || supaConfig(); return { configured: !!(cfg && cfg.url && cfg.key), url: cfg ? cfg.url : '', signedIn: !!supa, anon: !!(supa && supa.anon), deviceOk: supa ? supa.deviceOk !== false : true, device: !!devKey(), viaNet: !!(supa && supa.viaNet), email: supa ? supa.email : '', libLoaded: !!(window.supabase && window.supabase.createClient) }; },
     get mode() { return mode; },
     get ok() { return writable; },
     get label() {

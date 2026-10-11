@@ -898,6 +898,7 @@ const App = (() => {
     </div>
     ${cur ? `<div class="notice pin"><b>지금은 ${cur.n} 테스트 기간입니다 (${mdShort(cur.from)}~${mdShort(cur.to)}).</b> 이번 회차에서 보는 것: ${esc(cur.focus)}</div>` : ''}
     ${fbNotice()}
+    <button class="btn sm ghost onlyMin" data-act="uiDetail">📖 자세한 안내 보기</button>
     <div class="guide">
       <p class="lead"><b>목적은 하나.</b> 쓰기 불편한 것과 잘못 움직이는 것을 찾아서 고치는 것. 잘하고 못하고를 보는 자리가 아닙니다.</p>
 
@@ -954,18 +955,30 @@ const App = (() => {
   function vRegister() {
     const sp = Store.supa || {};
     const revoked = sp.device && sp.deviceOk === false;
+    if (!LIMITED && sp.signedIn && sp.deviceOk !== false) {   // 이미 열리는 기기에서 ?view=register 로 들어온 경우 — "등록 안 됨"처럼 보이지 않게
+      return `<div class="hd"><div><h2>🔐 기기 등록</h2><div class="sub">이 기기는 매장 기록을 볼 수 있습니다.</div></div></div>
+        <div class="lockBox regBox"><div class="lockIc">✅</div>
+          <p><b>${sp.device ? '이 기기는 등록되어 있습니다.' : '이 기기는 매장 인터넷으로 열려 있습니다.'}</b><br><span class="mut">${sp.device ? '등록이 풀리는 기기라면 아래 전용 주소를 홈 화면에 두세요.' : '매장 밖에서도 쓰려면 사장님이 아래에서 이 기기를 등록할 수 있습니다.'}</span></p>
+          <div class="rowbtns"><button class="btn primary" data-act="view" data-v="dash">대시보드로</button>${sp.device ? '<button class="btn" data-act="deviceLink">📌 이 기기 전용 주소</button>' : ''}</div>
+          ${sp.device ? '' : `<details style="margin-top:14px"><summary class="hint">이 기기를 따로 등록하기 (사장님)</summary><div class="regForm" style="margin-top:8px">
+            <label>기기 이름<input id="rgName" placeholder="예: 사장님 폰" autocomplete="off"></label>
+            <label>매장<select id="rgStore">${(Store.meta ? Store.meta.stores : []).map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}<option value="" selected>공용 (사장님 기기)</option></select></label>
+            <label>사장님 비밀번호<input id="rgPw" type="password" autocomplete="current-password"></label>
+            <button class="btn primary" data-act="deviceRegister">이 기기 등록</button></div></details>`}
+        </div>`;
+    }
     const st = Store.meta ? (Store.meta.stores.find((x) => x.id === Store.meta.current) || {}) : {};
     return `<div class="hd"><div><h2>🔐 기기 등록</h2><div class="sub">해모닉 업무 체크리스트는 사장님이 등록한 기기에서만 매장 기록을 보여 줍니다.</div></div></div>
       <div class="lockBox regBox">
         <div class="lockIc">${revoked ? '⛔' : '🔐'}</div>
-        <p>${revoked ? '<b>이 기기의 등록이 해제되었습니다.</b><br><span class="mut">다시 쓰려면 사장님이 아래에서 다시 등록해 주세요.</span>' : '<b>이 기기는 아직 등록되지 않았습니다.</b><br><span class="mut">매장 아이패드·사장님 폰처럼 매장에서 쓰는 기기만 사장님이 직접 등록합니다. 직원 개인 폰은 등록하지 않습니다.</span>'}</p>
+        <p>${revoked ? '<b>이 기기의 등록이 해제되었습니다.</b><br><span class="mut">사장님이 아래에서 다시 등록해 주세요.</span>' : '<b>등록되지 않은 기기입니다.</b><br><span class="mut">사장님이 매장에서 한 번 등록하면 그 매장 인터넷에서는 다시 묻지 않습니다.</span>'}</p>
         <div class="regForm">
           <label>기기 이름<input id="rgName" placeholder="예: ${esc(st.name || '안산점')} 아이패드 · 사장님 폰" autocomplete="off"></label>
           <label>매장<select id="rgStore">${(Store.meta ? Store.meta.stores : []).map((x) => `<option value="${x.id}"${x.id === (Store.meta || {}).current ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="">공용 (사장님 기기)</option></select></label>
           <label>사장님 비밀번호<input id="rgPw" type="password" autocomplete="current-password"></label>
           <button class="btn primary" data-act="deviceRegister">이 기기 등록</button>
           <p class="hint">첫 등록이면 지금 넣는 비밀번호가 사장님 비밀번호가 됩니다 (안산점·안양점 공통). 등록은 사장님만 합니다.</p>
-          <p class="hint">어제 등록했는데 또 뜨나요? 이 브라우저가 껐다 켤 때 저장소를 지우고 있는 것입니다. 등록 뒤에 나오는 <b>이 기기 전용 주소</b>를 홈 화면에 추가해 두면 그 주소로 열 때마다 자동으로 복구됩니다.</p>
+          <p class="hint"><b>매장에서 한 번 등록하면 그 매장 인터넷에서는 어떤 기기든 원래 주소로 그냥 열립니다.</b> 이 화면이 매장에서 떴다면 이 매장 인터넷이 아직 기억되지 않은 것이니, 사장님이 여기서 한 번만 등록해 주세요.</p>
         </div>
       </div>
       <div class="card" style="margin-top:14px"><b>🎓 교육 자료는 등록 없이 볼 수 있습니다.</b>
@@ -980,7 +993,11 @@ const App = (() => {
     try {
       const h = await hashPw(pw);
       await Store.deviceRegister(h, name, store || null);
-      deviceLinkModal(true);
+      if (store) {   // 매장 소속 기기 — 이 매장 인터넷이 서버에 기억되어, 이제 어떤 기기든 원래 주소로 그냥 열린다 (사장님 결정 2026-10-11: 전용 주소 안내 없음)
+        modal('기기를 등록했습니다', `<p><b>이 기기는 이제 매장 기록을 볼 수 있습니다.</b></p>
+          <p class="hint">${esc((Store.meta.stores.find((x) => x.id === store) || {}).name || '이 매장')} 인터넷도 함께 기억했습니다. 이제 이 매장 인터넷에 붙은 기기는 <b>원래 주소(haemonic-ops.vercel.app)로 그냥 열립니다.</b> 포스가 껐다 켜져도, 다른 포스여도 다시 등록할 필요가 없습니다.</p>`, () => { location.href = location.pathname; }, '앱 열기');
+        const x = $('#modal [data-act="mClose"]'); if (x) x.hidden = true;
+      } else deviceLinkModal(true);   // 공용(사장님 폰 등) — 매장 밖에서 쓰므로 전용 주소를 안내
     } catch (e) { alert('등록 실패: ' + (e.message || e)); if (btn) { btn.disabled = false; btn.textContent = '이 기기 등록'; } }
   }
   /* 이 기기 전용 주소 — 홈 화면·즐겨찾기에 두면 브라우저가 저장소를 지워도 그 주소로 열 때 자동 복구된다 */
@@ -993,25 +1010,32 @@ const App = (() => {
         <input class="mono" readonly value="${esc(link)}" onfocus="this.select()" style="width:100%;font-size:12px">
         <div class="rowbtns" style="margin-top:8px"><button class="btn" data-act="deviceLinkCopy">주소 복사</button></div></div>
       <p class="hint">브라우저 설정에서 "종료 시 쿠키·사이트 데이터 삭제"가 켜져 있으면 끄는 게 가장 확실합니다. 시크릿(프라이빗) 창에서는 등록이 남지 않습니다.</p>`,
-      justRegistered ? () => { location.reload(); } : null, justRegistered ? '앱 열기' : undefined);
+      justRegistered ? () => { location.href = location.pathname; } : null, justRegistered ? '앱 열기' : undefined);   // ?view=register 를 떼고 첫 화면으로
     if (justRegistered) { const x = $('#modal [data-act="mClose"]'); if (x) x.hidden = true; }   // 등록 직후엔 '앱 열기'로만 닫는다 (새로 불러와야 기록이 보인다)
   }
   /* 설정 › 등록된 기기 — 사장님 모드에서 목록·해제 */
-  let devList = null, devMine = '';
+  let devList = null, devMine = '', netsL = null, myIpV = '';
   function deviceSettings() {
     const sp = Store.supa || {};
     if (!sp.signedIn) return '';
-    if (devList === null) { devList = []; Promise.all([Store.deviceList().catch(() => []), Store.deviceHash()]).then(([l, h]) => { devList = l; devMine = h; if (view === 'settings') render(); }); }
+    if (devList === null) { devList = []; netsL = []; Promise.all([Store.deviceList().catch(() => []), Store.deviceHash(), Store.netList().catch(() => []), Store.myIp().catch(() => '')]).then(([l, h, n, ip]) => { devList = l; devMine = h; netsL = n; myIpV = ip; if (view === 'settings') render(); }); }
     const fmt = (t) => t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
     const stName = (id) => id ? ((Store.meta.stores.find((x) => x.id === id) || {}).name || id) : '공용';
     const act = devList.filter((d) => d.active);
     return `<div class="hd sub2"><h3>등록된 기기</h3></div>
-      <p class="hint" style="margin:0 0 8px">매장 기록은 여기 있는 기기에서만 보입니다. 새 기기는 그 기기에서 앱을 열어 "기기 등록"으로 추가합니다. 잃어버린 기기는 <b>끊기</b>로 바로 막을 수 있습니다.${act.length ? '' : ' <b>아직 등록된 기기가 없어 지금은 어디서나 열립니다.</b> 이 기기부터 등록하세요.'}</p>
+      <p class="hint" style="margin:0 0 8px">매장 밖에서 매장 기록을 볼 수 있는 기기 목록입니다. 새 기기는 그 기기에서 앱을 열어 "기기 등록"으로 추가합니다. 쓰지 않거나 잃어버린 기기는 <b>삭제</b>로 바로 막을 수 있습니다.${act.length ? '' : ' <b>아직 등록된 기기가 없어 지금은 어디서나 열립니다.</b> 이 기기부터 등록하세요.'}</p>
       ${act.length ? `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>기기</th><th>매장</th><th>등록</th><th>마지막 사용</th><th></th></tr></thead><tbody>
         ${act.map((d) => `<tr><td><b>${esc(d.name)}</b>${d.key_hash === devMine ? ' <span class="chip today">이 기기</span>' : ''}</td><td>${esc(stName(d.store))}</td><td class="mut">${fmt(d.created_at)}</td><td class="mut">${fmt(d.last_seen)}</td>
-          <td>${d.key_hash === devMine ? '' : `<button class="btn sm danger" data-act="deviceRevoke" data-id="${d.id}" data-name="${esc(d.name)}">끊기</button>`}</td></tr>`).join('')}</tbody></table></div>` : ''}
+          <td>${d.key_hash === devMine ? '<span class="mut" style="font-size:11px">사용 중</span>' : `<button class="btn sm danger" data-act="deviceRevoke" data-id="${d.id}" data-name="${esc(d.name)}">삭제</button>`}</td></tr>`).join('')}</tbody></table></div>
+      <p class="hint" style="margin-top:6px">삭제하면 그 기기는 매장 밖에서 더 이상 열 수 없습니다. 매장 인터넷 안에서는 등록 없이도 열리므로, 매일 새로 생겼던 포스 기기들은 지워도 됩니다. 지금 쓰고 있는 이 기기는 지울 수 없습니다.</p>` : ''}
       ${!sp.device && act.length === 0 ? `<div class="rowbtns" style="margin-top:8px"><button class="btn primary" data-act="view" data-v="register">이 기기 등록하기</button></div>` : ''}
-      ${sp.device ? `<div class="rowbtns" style="margin-top:8px"><button class="btn sm" data-act="deviceLink">📌 이 기기 전용 주소 보기</button><span class="hint" style="margin:0">매일 등록이 풀리는 기기는 이 주소를 홈 화면에 두면 자동 복구됩니다.</span></div>` : ''}`;
+      ${sp.device ? `<div class="rowbtns" style="margin-top:8px"><button class="btn sm" data-act="deviceLink">📌 이 기기 전용 주소 보기</button><span class="hint" style="margin:0">매장 밖에서 쓰는 기기(사장님 폰 등)는 이 주소를 홈 화면에 두면 등록이 풀려도 자동 복구됩니다.</span></div>` : ''}
+      <div class="hd sub2"><h3>등록된 매장 인터넷</h3></div>
+      <p class="hint" style="margin:0 0 8px">사장님이 매장에서 기기를 등록하면 그 매장의 인터넷 주소를 서버가 기억합니다. <b>같은 매장 인터넷에서는 어떤 기기든 등록 없이 그냥 열립니다</b> — 포스 브라우저가 저장소를 지워도 됩니다. 매장 밖(집·LTE)은 전처럼 등록된 기기만 열립니다. 인터넷 주소가 바뀌면 등록된 포스가 한 번 열 때 자동으로 따라갑니다.${sp.viaNet ? ' <b>이 기기는 지금 매장 인터넷으로 열렸습니다.</b>' : ''}${myIpV ? ` <span class="mut">지금 주소 ${esc(myIpV)}</span>` : ''}</p>
+      ${(netsL || []).filter((n) => n.active).length ? `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>매장</th><th>인터넷 주소</th><th>기억한 때</th><th>마지막 사용</th><th></th></tr></thead><tbody>
+        ${(netsL || []).filter((n) => n.active).map((n) => `<tr><td><b>${esc(stName(n.store))}</b>${n.ip === myIpV ? ' <span class="chip today">지금 여기</span>' : ''}<div class="mut" style="font-size:11px">${esc(n.name || '')}</div></td><td class="mono">${esc(n.ip)}</td><td class="mut">${fmt(n.created_at)}</td><td class="mut">${fmt(n.last_seen)}</td>
+          <td><button class="btn sm danger" data-act="netRevoke" data-id="${esc(n.ip)}" data-name="${esc(stName(n.store))}">끊기</button></td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="hint"><b>아직 기억된 매장 인터넷이 없습니다.</b> 각 매장에서 사장님이 기기를 한 번 등록하거나, 이미 등록된 포스가 앱을 한 번 열면 자동으로 기억됩니다.</p>'}`;
   }
   function vLocked() {
     const g = groupOf(view) || {};
@@ -1049,9 +1073,13 @@ const App = (() => {
     return (m.stores.find((x) => x.id === m.current) || {}).name || '';
   };
 
+  /* 간단히 보기(기본) — 설명 문구·보조 글귀·범례를 숨긴다. 기기마다 기억. 사장님 요청 2026-10-11: 글자가 너무 많다 */
+  const uiDetail = () => { try { return localStorage.getItem('hm.uiDetail') === '1'; } catch (_) { return false; } };
+  const uiBtn = () => `<button class="btn sm ghost uiBtn" data-act="uiDetail" title="${uiDetail() ? '설명 문구를 숨깁니다' : '설명 문구를 모두 보여 줍니다'}">${uiDetail() ? '간단히' : '자세히'}</button>`;
   function render() {
+    document.body.classList.toggle('minimal', !uiDetail());
     const who = S.ui.whoDate === dateKey() ? S.ui.who : null;
-    const whoBtn = S.settings.askWho ? '<div class="hint" style="margin:0">완료할 때마다 이름을 고릅니다</div>' : `<button class="whoBtn" data-act="pickWho">${who ? esc(who) : '지금 누구세요?'}</button>`;
+    const whoBtn = S.settings.askWho ? uiBtn() : `<button class="whoBtn" data-act="pickWho">${who ? esc(who) : '지금 누구세요?'}</button>${uiBtn()}`;
 
     const mt = Store.meta;
     const storeBtns = mt ? mt.stores.map((st) =>
@@ -1066,7 +1094,7 @@ const App = (() => {
     $('#side').innerHTML = `<div class="slogo">🦀 해모닉<small>업무 체크리스트</small><button class="sideX" data-act="sideClose" aria-label="메뉴 닫기">✕</button></div>
       <div class="sstore">${storeBtns}</div>
       <nav class="smenu">${sideMenu()}</nav>
-      <div class="sfoot"><div class="sfl">지금 사용 중</div>${whoBtn}${ownerOn() ? '<button class="btn sm ghost ownerBtn" data-act="ownerLock">👑 사장님 모드 · 잠그기</button>' : ''}</div>`;
+      <div class="sfoot">${whoBtn}${ownerOn() ? '<button class="btn sm ghost ownerBtn" data-act="ownerLock">👑 잠그기</button>' : ''}</div>`;
 
     $('#nav').innerHTML = topNav();
     $('#who').innerHTML = whoBtn;
@@ -1204,8 +1232,8 @@ const App = (() => {
     const curSlot = (SLOTS.slice().reverse().find((s2) => now >= minutesOf(s2.from)) || SLOTS[0]).key;
     const openIssues = issuesAll().filter((x) => x.status !== 'done').sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
     const d = new Date(tk + 'T00:00:00');
-    let h = `<div class="hd"><div><h2>대시보드</h2><div class="sub">${d.getMonth() + 1}월 ${d.getDate()}일 ${WD[d.getDay()]}요일 · 지금 ${pad(Math.floor(now / 60))}:${pad(now % 60)} 기준 · 안산점과 안양점을 나란히 봅니다. 다른 매장은 서버에 저장된 최신 기록입니다.</div></div>
-      <button class="btn sm" data-act="dashRefresh">새로고침</button></div>`;
+    let h = `<div class="hd"><div><h2>대시보드</h2><div class="sub keep">${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]}) ${pad(Math.floor(now / 60))}:${pad(now % 60)}</div></div>
+      <button class="btn sm" data-act="dashRefresh" style="margin-left:auto">새로고침</button></div>`;
 
     /* 0. 매장 점수판 — 원형 게이지 + 급한 업무는 숫자로만 (사장님 요청 2026-10-06: 위쪽 목록 없애고 매장별 숫자) */
     const noLogin0 = !(Store.supa && Store.supa.signedIn);
@@ -1244,7 +1272,7 @@ const App = (() => {
     /* 2. 최근 7일 완료율 */
     h += sec('📈', '최근 7일 완료율', 'report', two((sn) => `
       <div class="dtrend">${sn.trend.map((x) => `<div class="dtb" title="${x.k} · ${x.v == null ? '기록 없음' : x.v + '%'}"><i style="height:${x.v == null ? 2 : Math.max(3, x.v)}%" class="${x.v == null ? 'none' : x.v >= 90 ? 'good' : x.v >= 70 ? 'mid' : 'low'}"></i><span>${x.k.slice(8)}</span></div>`).join('')}</div>
-      <div class="mut" style="font-size:12px">초록 90% 이상 · 노랑 70~89% · 빨강 70% 미만 · 회색 기록 없음</div>`));
+      <div class="mut dLegend" style="font-size:12px">초록 90% 이상 · 노랑 70~89% · 빨강 70% 미만 · 회색 기록 없음</div>`));
 
     /* 3. 수조·갑각류 */
     h += sec('🦀', '수조 · 폐사', 'tanks', two((sn) => `
@@ -1327,8 +1355,17 @@ const App = (() => {
         if (c && c.species) T.log.push({ id: 'l' + Date.now() + pos + it.n, date: c.date || dateKey(), n: it.n, pos, species: c.species, qty: c.qty || 0, kg: c.kg, dead: c.dead || 0, by: '' });
       }));
     }
+    /* 2026-10-11 안양점 신고: 한 칸에 품목 하나만 기록돼 입고하면 기존 기록이 덮이고, 대게·킹크랩(레드·브라운)이 섞이면 같이 못 적음
+       → 칸마다 묶음(lots) 여러 개를 둔다. 예전 기록은 묶음 하나로 옮긴다 */
+    T.items.forEach((it) => ['top', 'bottom'].forEach((pos) => {
+      const c = it[pos]; if (!c || Array.isArray(c.lots)) return;
+      it[pos] = { lots: (c.species && c.qty > 0) ? [{ id: 'lt' + Date.now().toString(36) + pos + it.n, species: c.species, label: '', qty: Number(c.qty) || 0, kg: c.kg, date: c.date || dateKey(), dead: c.dead || 0, by: c.by || '' }] : [] };
+    }));
     return T;
   }
+  const lotsOf = (it, pos) => ((it && it[pos] && Array.isArray(it[pos].lots)) ? it[pos].lots : []);
+  const lotName = (l) => (l.species || '') + (l.label ? `(${l.label})` : '');
+  const posLabel = (pos) => (pos === 'top' ? '상단' : '하단');
   const fmtKg = (v) => (v == null || v === '' || isNaN(v)) ? '' : (Math.round(Number(v) * 10) / 10).toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + ' kg';
 
   const md = (k) => k ? `${Number(k.slice(5, 7))}/${Number(k.slice(8, 10))}` : '';
@@ -1345,7 +1382,7 @@ const App = (() => {
   function fifoSet(T) {
     const bySp = {};
     T.items.forEach((it) => ['top', 'bottom'].forEach((pos) => {
-      const c = it[pos]; if (c && c.species && c.qty > 0 && c.date) (bySp[c.species] = bySp[c.species] || []).push({ key: it.n + pos, date: c.date });
+      lotsOf(it, pos).forEach((l) => { if (l.species && l.qty > 0 && l.date) (bySp[l.species] = bySp[l.species] || []).push({ key: l.id, date: l.date }); });
     }));
     const out = new Set();
     Object.values(bySp).forEach((list) => { if (list.length >= 2) out.add(list.slice().sort((a, b) => a.date.localeCompare(b.date))[0].key); });
@@ -1457,19 +1494,22 @@ const App = (() => {
         ${r.date ? `<div class="tkDate">${md(r.date)}</div>${ageBadge(r.date, cy.every, cy.late)}
           <div class="tkSub">${over > 0 ? `예정 ${md(due)} — ${over}일 지남` : `다음 예정 ${md(due)}`}</div>
           ${r.by ? `<div class="tkSub">${esc(r.by)}</div>` : ''}`
-          : `<div class="tkEmpty">기록 없음</div><div class="tkSub">눌러서 기록</div>`}
+          : `<div class="tkEmpty">기록 없음</div><div class="tkSub tkHint">눌러서 기록</div>`}
       </button></td>`;
     };
     const stockCell = (it, pos) => {
-      const r = it[pos] || {};
-      const first = fifo.has(it.n + pos);
-      return `<td class="${first ? 'fifo' : ''}"><button class="tkCell" data-act="tankStock" data-n="${it.n}" data-pos="${pos}">
-        ${r.species && r.qty > 0 ? `<div class="tkSp">${esc(r.species)}<small>${r.qty}미</small></div>
-          ${r.kg ? `<div class="tkKg">${fmtKg(r.kg)}</div>` : ''}
-          <div class="tkDate sm">${md(r.date)} ${ageBadge(r.date, 10, 9999)}</div>
-          <div class="tkSub">폐사 ${r.dead || 0}${r.by ? ` · ${esc(r.by)}` : ''}</div>
-          ${first ? '<div class="tkFirst">먼저 사용 ①</div>' : ''}`
-          : `<div class="tkEmpty">비어 있음</div><div class="tkSub">눌러서 입고</div>`}
+      const lots = lotsOf(it, pos).filter((l) => l.qty > 0);
+      const anyFirst = lots.some((l) => fifo.has(l.id));
+      const qty = lots.reduce((a, l) => a + (Number(l.qty) || 0), 0), kg = lots.reduce((a, l) => a + (Number(l.kg) || 0), 0), dead = lots.reduce((a, l) => a + (Number(l.dead) || 0), 0);
+      return `<td class="${anyFirst ? 'fifo' : ''}"><button class="tkCell" data-act="tankStock" data-n="${it.n}" data-pos="${pos}">
+        ${lots.length ? `${lots.length === 1
+          ? `<div class="tkSp">${esc(lotName(lots[0]))}<small>${lots[0].qty}미</small></div>${lots[0].kg ? `<div class="tkKg">${fmtKg(lots[0].kg)}</div>` : ''}
+             <div class="tkDate sm">${md(lots[0].date)} ${ageBadge(lots[0].date, 10, 9999)}</div>`
+          : `<div class="tkLots">${lots.map((l) => `<div class="tkLotLine${fifo.has(l.id) ? ' first' : ''}"><b>${esc(lotName(l))}</b> ${l.qty}미${l.kg ? ` · ${fmtKg(l.kg)}` : ''} <span class="mut">${md(l.date)}</span>${fifo.has(l.id) ? ' ①' : ''}</div>`).join('')}</div>
+             <div class="tkKg">합 ${qty}미${kg ? ` · ${fmtKg(kg)}` : ''}</div>`}
+          <div class="tkSub">폐사 ${dead}${lots.length > 1 ? ` · ${lots.length}묶음` : (lots[0].by ? ` · ${esc(lots[0].by)}` : '')}</div>
+          ${anyFirst ? '<div class="tkFirst">먼저 사용 ①</div>' : ''}`
+          : `<div class="tkEmpty">비어 있음</div><div class="tkSub tkHint">눌러서 입고</div>`}
       </button></td>`;
     };
     const row = (label, sub, cells) => `<tr><th><div class="tkLabel">${label}</div>${sub ? `<div class="tkSub">${sub}</div>` : ''}</th>${cells}</tr>`;
@@ -1506,14 +1546,14 @@ const App = (() => {
 
     <div class="hd sub2"><h3>입고 기록</h3><span class="hint" style="margin:0">위 입고 칸에서 기록할 때마다 한 줄씩 쌓입니다 · 최근 것이 위</span></div>
     ${T.log.length ? `<div class="tkLogWrap"><table class="tkLog">
-      <thead><tr><th>날짜</th><th>수조</th><th>위치</th><th>품종</th><th class="r">마릿수</th><th class="r">kg</th><th class="r">폐사</th><th>기록</th><th></th></tr></thead>
+      <thead><tr><th>날짜</th><th>수조</th><th>위치</th><th>구분</th><th>품종</th><th class="r">마릿수</th><th class="r">kg</th><th class="r">폐사</th><th>기록</th><th></th></tr></thead>
       <tbody>${T.log.slice().sort((a, b) => (b.date + (b.at || '')).localeCompare(a.date + (a.at || ''))).map((L) => `<tr>
         <td>${L.date.slice(5).replace('-', '/')} (${WD[new Date(L.date + 'T00:00:00').getDay()]})</td>
-        <td>${L.n}</td><td>${L.pos === 'top' ? '상단' : '하단'}</td><td><b>${esc(L.species)}</b></td>
+        <td>${L.n}</td><td>${posLabel(L.pos)}</td><td>${{ in: '입고', edit: '고침', move: '이동', out: '출고' }[L.kind] || '입고'}${L.note ? ` <span class="mut">${esc(L.note)}</span>` : ''}</td><td><b>${esc(L.species)}${L.label ? `(${esc(L.label)})` : ''}</b></td>
         <td class="r">${L.qty}</td><td class="r">${L.kg != null && L.kg !== '' ? (Math.round(L.kg * 10) / 10) : '—'}</td><td class="r">${L.dead || 0}</td>
         <td class="mut">${esc(L.by || '')}${L.at ? ' ' + L.at : ''}</td>
         <td><button class="more" data-act="tankLogDel" data-id="${L.id}" aria-label="삭제">✕</button></td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="4">합계 ${T.log.length}건</td><td class="r">${T.log.reduce((a, L) => a + (Number(L.qty) || 0), 0)}</td><td class="r">${Math.round(T.log.reduce((a, L) => a + (Number(L.kg) || 0), 0) * 10) / 10}</td><td class="r">${T.log.reduce((a, L) => a + (Number(L.dead) || 0), 0)}</td><td colspan="2"></td></tr></tfoot>
+      <tfoot><tr><td colspan="5">합계 ${T.log.length}건</td><td class="r">${T.log.reduce((a, L) => a + (Number(L.qty) || 0), 0)}</td><td class="r">${Math.round(T.log.reduce((a, L) => a + (Number(L.kg) || 0), 0) * 10) / 10}</td><td class="r">${T.log.reduce((a, L) => a + (Number(L.dead) || 0), 0)}</td><td colspan="2"></td></tr></tfoot>
     </table></div>` : '<div class="tkEmptyLog">아직 입고 기록이 없습니다. 위 입고 칸을 눌러 첫 기록을 남기세요.</div>'}`;
   }
 
@@ -1552,23 +1592,40 @@ const App = (() => {
   }
 
   function tankStockModal(n, pos) {
-    const T = tanksOf(), it = T.items[n - 1], r = it[pos] || {};
-    modal(`수조 ${n} ${pos === 'top' ? '상단' : '하단'} — 입고`, `
-      <div class="mlabel">품종</div>
-      <div class="roles big wrap" id="tkSp">${SPECIES.map((x) => `<button type="button" class="rl${x === r.species ? ' on' : ''}" data-sp="${esc(x)}">${esc(x)}</button>`).join('')}
-        <input id="tkSpOther" placeholder="다른 품종 직접 입력" value="${r.species && !SPECIES.includes(r.species) ? esc(r.species) : ''}" style="flex:1 1 100%;margin-top:6px"></div>
+    const T = tanksOf(), it = T.items[n - 1];
+    if (!it[pos] || !Array.isArray(it[pos].lots)) it[pos] = { lots: [] };
+    const lots = it[pos].lots, fifo = fifoSet(T);
+    const whoNow0 = (S.ui.whoDate === dateKey() ? S.ui.who : '') || '';
+    const stamp2 = () => { const now = new Date(); return `${pad(now.getHours())}:${pad(now.getMinutes())}`; };
+    const logIt = (kind, l, extra) => T.log.push({ id: 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), date: extra && extra.date || l.date || dateKey(), n: extra && extra.n || n, pos: extra && extra.pos || pos, kind, species: l.species, label: l.label || '', qty: l.qty, kg: l.kg, dead: l.dead || 0, by: extra && extra.by || l.by || '', at: stamp2(), note: extra && extra.note || '' });
+    const targets = []; T.items.forEach((x) => ['top', 'bottom'].forEach((p) => { if (!(x.n === n && p === pos)) targets.push([x.n, p]); }));
+    modal(`수조 ${n} ${posLabel(pos)}`, `
+      <div class="mlabel">지금 들어 있는 것 <span class="opt">${lots.length ? `${lots.length}묶음` : '없음'}</span></div>
+      <div class="tkLotList">${lots.length ? lots.map((l) => `<div class="tkLot" data-id="${l.id}">
+          <div class="tkLotMain"><b>${esc(lotName(l))}</b> ${l.qty}미${l.kg ? ` · ${fmtKg(l.kg)}` : ''} · ${md(l.date)} 입고${l.dead ? ` · 폐사 ${l.dead}` : ''}${fifo.has(l.id) ? ' <span class="chip today">먼저 사용 ①</span>' : ''}${l.by ? `<div class="tkSub">${esc(l.by)}</div>` : ''}</div>
+          <div class="tkLotBtns"><button type="button" class="btn sm" data-lot="edit" data-id="${l.id}">고치기</button><button type="button" class="btn sm" data-lot="move" data-id="${l.id}">옮기기</button><button type="button" class="btn sm danger" data-lot="out" data-id="${l.id}">꺼내기</button></div></div>`).join('')
+        : '<div class="hint">비어 있습니다. 아래에서 입고를 적으세요.</div>'}</div>
+      <div id="tkMove" hidden class="notice"><b>어디로 옮길까요?</b> <select id="tkMoveTo">${targets.map(([tn, tp]) => `<option value="${tn}|${tp}">수조 ${tn} ${posLabel(tp)}${lotsOf(T.items[tn - 1], tp).length ? ` (${lotsOf(T.items[tn - 1], tp).map(lotName).join(', ')})` : ' (비어 있음)'}</option>`).join('')}</select>
+        <div class="rowbtns" style="margin-top:8px"><button type="button" class="btn primary sm" id="tkMoveGo">옮기기</button><button type="button" class="btn sm ghost" id="tkMoveCancel">취소</button></div><p class="hint" style="margin:6px 0 0">기존 기록은 지워지지 않고 "이동"으로 남습니다.</p></div>
+      <div class="mlabel" id="tkFormTitle" style="margin-top:14px">➕ 입고 추가 <span class="opt">기존 것은 그대로 두고 더합니다</span></div>
+      <div class="roles big wrap" id="tkSp">${SPECIES.map((x) => `<button type="button" class="rl" data-sp="${esc(x)}">${esc(x)}</button>`).join('')}
+        <input id="tkSpOther" placeholder="다른 품종 직접 입력" style="flex:1 1 100%;margin-top:6px"></div>
+      <label>상세 <span class="opt">선택 — 같은 품종을 나눠 적을 때</span><input id="tkLabel" placeholder="예: 레드 · 브라운 · 러시아산" autocomplete="off"></label>
       <div class="row2">
-        <label>마릿수<input type="number" id="tkQty" min="0" step="1" inputmode="numeric" value="${r.qty != null ? r.qty : ''}" placeholder="예: 8"></label>
-        <label>킬로수 (kg)<input type="number" id="tkKg" min="0" step="0.1" inputmode="decimal" value="${r.kg != null ? r.kg : ''}" placeholder="예: 25.6"></label>
+        <label>마릿수<input type="number" id="tkQty" min="0" step="1" inputmode="numeric" placeholder="예: 8"></label>
+        <label>킬로수 (kg)<input type="number" id="tkKg" min="0" step="0.1" inputmode="decimal" placeholder="예: 25.6"></label>
       </div>
-      <label>입고일<input type="date" id="tkD" value="${r.date || dateKey()}" max="${dateKey()}"></label>
-      <label>폐사 (입고 후 누적)<input type="number" id="tkDead" min="0" step="1" inputmode="numeric" value="${r.dead || 0}"></label>
-      ${whoInput((S.ui.whoDate === dateKey() ? S.ui.who : '') || r.by || '')}
-      ${r.species ? `<button type="button" class="btn danger sm" id="tkClear" style="margin-top:12px">비우기 (다 나갔음)</button>` : ''}
+      <div class="row2">
+        <label>입고일<input type="date" id="tkD" value="${dateKey()}" max="${dateKey()}"></label>
+        <label>폐사 (입고 후 누적)<input type="number" id="tkDead" min="0" step="1" inputmode="numeric" value="0"></label>
+      </div>
+      ${whoInput(whoNow0)}
+      <input type="hidden" id="tkEditId" value="">
+      <button type="button" class="btn sm ghost" id="tkEditCancel" hidden style="margin-top:6px">고치기 취소 — 새 입고로 돌아가기</button>
     `, () => {
       const sel = document.querySelector('#tkSp .rl.on');
       const sp = ($('#tkSpOther').value.trim()) || (sel ? sel.dataset.sp : '');
-      const qty = Number($('#tkQty').value), d = $('#tkD').value;
+      const qty = Number($('#tkQty').value), d = $('#tkD').value, label = $('#tkLabel').value.trim();
       if (!sp) { alert('품종을 골라 주세요.'); return false; }
       if (!(qty > 0)) { alert('마릿수를 적어 주세요.'); return false; }
       if (!d) { alert('입고일을 골라 주세요.'); return false; }
@@ -1576,23 +1633,56 @@ const App = (() => {
       const dead = Math.max(0, Number($('#tkDead').value) || 0);
       const who = whoValue();
       if (!who) { alert('누가 입력하는지 적어 주세요.'); return false; }
-      const prev = it[pos] || {};
-      it[pos] = { species: sp, qty, date: d, dead, kg, by: who };
-      // 새 입고(품종·마릿수·kg·날짜 중 하나라도 바뀜)면 기록에 한 줄 추가, 폐사만 고친 거면 그 줄만 갱신
-      const same = prev.species === sp && prev.qty === qty && prev.date === d && (prev.kg == null ? kg == null : prev.kg === kg);
-      const now = new Date(), at = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-      if (!same || !T.log.length) {
-        T.log.push({ id: 'l' + Date.now(), date: d, n, pos, species: sp, qty, kg, dead, by: who, at });
+      const editId = $('#tkEditId').value;
+      if (editId) {
+        const l = lots.find((x) => x.id === editId); if (!l) return false;
+        Object.assign(l, { species: sp, label, qty, kg, date: d, dead, by: who });
+        logIt('edit', l, { by: who });
       } else {
-        const L = T.log.slice().reverse().find((x) => x.n === n && x.pos === pos && x.date === d && x.species === sp);
-        if (L) { L.dead = dead; L.by = who; L.at = at; }
+        const l = { id: 'lt' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), species: sp, label, qty, kg, date: d, dead, by: who };
+        lots.push(l);
+        logIt('in', l, { by: who });
       }
       save(); render();
     }, '기록');
-    $('#tkSp').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return;
-      $('#tkSp').querySelectorAll('.rl').forEach((x) => x.classList.remove('on')); b.classList.add('on'); $('#tkSpOther').value = ''; });
+    const box = $('#modal');
+    box.querySelector('#tkSp').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return;
+      box.querySelector('#tkSp').querySelectorAll('.rl').forEach((x) => x.classList.remove('on')); b.classList.add('on'); box.querySelector('#tkSpOther').value = ''; });
     bindWhoChips();
-    const cl = $('#tkClear'); if (cl) cl.addEventListener('click', () => { delete it[pos]; save(); closeModal(); render(); });
+    const okBtn = box.querySelector('[data-act="mOk"]');
+    const resetForm = () => { box.querySelector('#tkEditId').value = ''; box.querySelector('#tkFormTitle').innerHTML = '➕ 입고 추가 <span class="opt">기존 것은 그대로 두고 더합니다</span>'; if (okBtn) okBtn.textContent = '기록'; box.querySelector('#tkEditCancel').hidden = true; };
+    box.querySelector('#tkEditCancel').addEventListener('click', () => { resetForm(); ['tkQty', 'tkKg', 'tkLabel', 'tkSpOther'].forEach((id) => { box.querySelector('#' + id).value = ''; }); box.querySelector('#tkDead').value = '0'; box.querySelector('#tkD').value = dateKey(); box.querySelectorAll('#tkSp .rl').forEach((x) => x.classList.remove('on')); });
+    let moveId = null;
+    box.querySelector('.tkLotList').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-lot]'); if (!b) return;
+      const l = lots.find((x) => x.id === b.dataset.id); if (!l) return;
+      if (b.dataset.lot === 'edit') {
+        box.querySelector('#tkEditId').value = l.id;
+        box.querySelectorAll('#tkSp .rl').forEach((x) => x.classList.toggle('on', x.dataset.sp === l.species));
+        box.querySelector('#tkSpOther').value = SPECIES.includes(l.species) ? '' : l.species;
+        box.querySelector('#tkLabel').value = l.label || ''; box.querySelector('#tkQty').value = l.qty; box.querySelector('#tkKg').value = l.kg != null ? l.kg : ''; box.querySelector('#tkD').value = l.date || dateKey(); box.querySelector('#tkDead').value = l.dead || 0;
+        box.querySelector('#tkFormTitle').innerHTML = `✏️ 고치기 — ${esc(lotName(l))} <span class="opt">마릿수·kg·폐사를 바로잡습니다</span>`; if (okBtn) okBtn.textContent = '고친 내용 저장'; box.querySelector('#tkEditCancel').hidden = false;
+        box.querySelector('#tkFormTitle').scrollIntoView({ block: 'nearest' });
+      } else if (b.dataset.lot === 'move') {
+        moveId = l.id; box.querySelector('#tkMove').hidden = false; box.querySelector('#tkMove b').textContent = `${lotName(l)} ${l.qty}미 — 어디로 옮길까요?`;
+      } else if (b.dataset.lot === 'out') {
+        if (!confirm(`${lotName(l)} ${l.qty}미를 꺼낼까요? (다 나갔음)\n기록은 "출고"로 남습니다.`)) return;
+        const who = whoValue() || l.by || '';
+        it[pos].lots = lots.filter((x) => x.id !== l.id);
+        logIt('out', l, { by: who, date: dateKey() });
+        save(); closeModal(); render();
+      }
+    });
+    box.querySelector('#tkMoveCancel').addEventListener('click', () => { box.querySelector('#tkMove').hidden = true; moveId = null; });
+    box.querySelector('#tkMoveGo').addEventListener('click', () => {
+      const l = lots.find((x) => x.id === moveId); if (!l) return;
+      const [tn, tp] = box.querySelector('#tkMoveTo').value.split('|'); const tgt = T.items[Number(tn) - 1]; if (!tgt) return;
+      if (!tgt[tp] || !Array.isArray(tgt[tp].lots)) tgt[tp] = { lots: [] };
+      it[pos].lots = lots.filter((x) => x.id !== l.id); tgt[tp].lots.push(l);
+      const who = whoValue() || l.by || '';
+      logIt('move', l, { by: who, date: dateKey(), n: Number(tn), pos: tp, note: `수조 ${n} ${posLabel(pos)} → 수조 ${tn} ${posLabel(tp)}` });
+      save(); closeModal(); render();
+    });
   }
 
   /* ── 공지사항 필독 ───────────────────────────────────────── */
@@ -1776,7 +1866,7 @@ const App = (() => {
     if (crew === 2 && filter === '홀') filter = 'all';
     h += `<div class="filters">
       ${['all', ...roleBtns].map((r) => `<button class="fl${filter === r ? ' on' : ''}" data-act="filter" data-r="${r}">${r === 'all' ? '전체' : r}</button>`).join('')}
-      <button class="crewTag" data-act="view" data-v="month" title="근무표의 오전·오후 조 인원에 따라 시간대별로 정해집니다">${crew}인 기준${split ? ` (${slot.key === 'open' ? '오전' : '오후'} 조 ${(slot.key === 'open' ? split.am : split.pm).length}명)` : ''}${crew === 2 ? ' · 홀 업무는 관리자가, 일부는 주방이' : ''}</button>
+      <button class="crewTag" data-act="view" data-v="month" title="근무표의 오전·오후 조 인원에 따라 시간대별로 정해집니다 — ${crew}인 기준${split ? ` (${slot.key === 'open' ? '오전 조' : '오후 조'} ${(slot.key === 'open' ? split.am : split.pm).length}명)` : ''}">👥 ${crew}인<span class="crewMore">${split ? ` (${slot.key === 'open' ? '오전' : '오후'} 조 ${(slot.key === 'open' ? split.am : split.pm).length}명)` : ''}${crew === 2 ? ' · 홀 업무는 관리자가, 일부는 주방이' : ''}</span></button>
     </div>`;
 
     /* 중요 지연 — 오늘일 때만, 어느 시간대든 위로 올린다 */
@@ -1823,9 +1913,9 @@ const App = (() => {
     const unlocked = orderUnlocked();
     const hasCustom = S.templates.some((t) => t.ord != null);
     h += `<div class="orderBar${unlocked ? ' on' : ''}">${unlocked
-      ? `<span>🔓 <b>순서 편집 중</b> — 손잡이(⠿)를 끌어 순서를 바꾸세요. 다른 시각 묶음에 놓으면 그 시각으로 바뀝니다. 모든 기기·매일 그대로 갑니다.</span>
+      ? `<span>🔓 <b>순서 편집 중</b> — ⠿를 끌어 옮기세요</span>
          <span class="obBtns">${hasCustom ? `<button class="btn sm" data-act="orderReset">시간순으로 되돌리기</button>` : ''}<button class="btn sm primary" data-act="orderLock">잠그기</button></span>`
-      : `<span class="hint">🔒 순서 잠김${hasCustom ? ' · 사장님이 정한 순서' : ' · 시각순'}</span><button class="btn sm" data-act="orderUnlock">순서 바꾸기</button>`}</div>`;
+      : `<span class="hint">🔒 순서 잠김${hasCustom ? ' · 사장님이 정한 순서' : ' · 시각순'}</span><button class="btn sm ghost" data-act="orderUnlock">순서 바꾸기</button>`}</div>`;
 
     h += `<div class="splitCols">
       <section class="colBox todoCol">
@@ -1891,12 +1981,12 @@ const App = (() => {
         ${rec.note ? `<div class="tcNote">📝 ${esc(rec.note)}</div>` : (rec.s === 'done' && !rec.auto && !opt.isFuture ? `<div class="tcNote empty">📝 메모 없음</div>` : '')}
         <div class="tcBody">
           ${t.memo ? `<div class="tcMemo">${esc(t.memo)}</div>` : ''}
-          <div class="tcMeta">담당 ${role}${tplScope(t) !== 'all' ? ` · ${esc(scopeName(tplScope(t)))}만` : ''}${t.support ? ` · 보조 ${t.support}` : ''}${t.deadline ? ` · 마감 ${t.deadline}` : ''}${evLabel ? ` · ${evLabel}` : ''}</div>
+          <div class="tcMeta"><span class="tcRole">담당 ${role}</span>${tplScope(t) !== 'all' ? `<span> · ${esc(scopeName(tplScope(t)))}만</span>` : ''}${t.support ? `<span> · 보조 ${t.support}</span>` : ''}${t.deadline ? `<span> · 마감 ${t.deadline}</span>` : ''}${evLabel ? `<span> · ${evLabel}</span>` : ''}</div>
         </div>
       </button>
       <span class="tcRight">
         ${canDrag ? `<button class="tTime" data-act="cardTime" data-id="${tid}" title="시각 바꾸기">${esc(t.time || '')} ✎</button>` : ''}
-        <span class="repBadge">${repLabel}</span>
+        <span class="repBadge${rep.t === 'weekly' ? '' : ' daily'}">${repLabel}</span>
         ${opt.isFuture || rec.auto ? '' : `<button class="more" data-act="taskNote" data-id="${tid}" title="메모 남기기" aria-label="메모">📝</button>`}
         ${opt.isFuture ? '' : `<button class="more" data-act="menu" data-id="${tid}" aria-label="더보기">⋯</button>`}
       </span>
@@ -2486,9 +2576,9 @@ const App = (() => {
         <label>날짜<input type="date" id="puD" value="${esc(x.date)}"></label>
         <label>분류<select id="puC">${cats.map((c) => `<option${c === x.cat ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
       </div>
-      <label>품목<input id="puN" value="${esc(x.name || '')}" placeholder="${mode === 'crab' ? '예: 러시아 대게 활' : '예: 깻잎 10단 · 소주 2박스 · 위생장갑'}"></label>
+      <label>품목<input id="puN" value="${esc(x.name || '')}" placeholder="${mode === 'crab' ? '예: 러시아 대게 활' : '예: 파 · 깻잎 · 소주 · 위생장갑'}"></label>
       <div class="frow">
-        <label>수량 <span class="opt">선택</span><input type="number" id="puQ" min="0" step="0.1" value="${x.qty ?? ''}" inputmode="decimal"></label>
+        <label>수량 <span class="opt">선택</span><input type="number" id="puQ" min="0" step="0.1" value="${x.qty ?? ''}" inputmode="decimal" placeholder="${mode === 'crab' ? '예: 12.5' : '예: 2 (파 두 단)'}"></label>
         <label>단위<select id="puU">${PURCHASE_UNITS.map((u) => `<option${u === x.unit ? ' selected' : ''}>${u}</option>`).join('')}</select></label>
       </div>
       <label>금액 (원)<input type="number" id="puA" min="0" step="100" value="${x.amount ?? ''}" inputmode="numeric" placeholder="예: 480000"></label>
@@ -2635,7 +2725,7 @@ const App = (() => {
     modal(isNew ? '글 쓰기' : '글 수정', `
       <div class="mlabel">종류</div>
       <div class="roles wrap" id="isCats">${[...FB_CATS, ...ISSUE_CATS].map((c) => `<button type="button" class="rl${c === x.cat ? ' on' : ''}${FB_CATS.includes(c) ? ' fb' : ''}" data-cat="${esc(c)}">${FB_CATS.includes(c) ? (c === '앱 오류' ? '🐛 ' : '🙋 ') : ''}${esc(c)}</button>`).join('')}</div>
-      <input id="isCOther" placeholder="다른 종류 직접 입력" value="${x.cat && !ISSUE_CATS.includes(x.cat) && !FB_CATS.includes(x.cat) ? esc(x.cat) : ''}" style="margin-top:6px">
+      <input id="isCOther" placeholder="기타 — 종류를 짧게 적어 주세요 (선택)" value="${x.cat && !ISSUE_CATS.includes(x.cat) && !FB_CATS.includes(x.cat) ? esc(x.cat) : ''}" style="margin-top:6px"${(x.cat === '기타' || (x.cat && !ISSUE_CATS.includes(x.cat) && !FB_CATS.includes(x.cat))) ? '' : ' hidden'}>
       <label>제목<input id="isT" value="${esc(x.title || '')}" placeholder="${FB_CATS.includes(x.cat) ? '예: 할 일 체크가 풀림 (어디 + 무엇)' : '예: 룸2 에어컨 소음 — 손님 컴플레인'}"></label>
       <label>무슨 일이 있었나요<textarea id="isB" rows="${FB_CATS.includes(x.cat) ? 8 : 4}" placeholder="상황을 그대로 적으세요. 잘잘못보다 다음에 어떻게 할지가 중요합니다.">${esc(x.body || (FB_CATS.includes(x.cat) ? FB_TEMPLATE : ''))}</textarea></label>
       <label class="chk impChk" id="isTeamWrap"${x.cat === '앱 건의' ? '' : ' hidden'}><input type="checkbox" id="isTeam"${x.team ? ' checked' : ''}> <span class="chip crit">중요</span> 이 건의는 <b>팀원들과 상의한 내용</b>입니다 (혼자 판단한 건의는 올리지 않습니다)</label>
@@ -2647,7 +2737,7 @@ const App = (() => {
       const title = $('#isT').value.trim();
       if (!title) { alert('제목을 입력하세요.'); return false; }
       const catSel = document.querySelector('#isCats .rl.on');
-      const cat = $('#isCOther').value.trim() || (catSel ? catSel.dataset.cat : '');
+      const cat = (catSel && catSel.dataset.cat === '기타' && $('#isCOther').value.trim()) || (catSel ? catSel.dataset.cat : '');   // 직접 입력은 '기타'일 때만 (제목을 종류 칸에 적던 혼동 방지, 2026-10-11)
       if (!cat) { alert('종류를 골라 주세요.'); return false; }
       const anon = $('#isAnon').checked;
       const team = !!($('#isTeam') && $('#isTeam').checked);
@@ -2670,13 +2760,13 @@ const App = (() => {
       }
     }, '저장');
     $('#isCats').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return;
-      $('#isCats').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); $('#isCOther').value = '';
+      $('#isCats').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); $('#isCOther').value = ''; $('#isCOther').hidden = b.dataset.cat !== '기타';
       // 앱 오류·건의를 고르면 본문이 비어 있거나 양식 그대로일 때 양식을 채운다 (다른 종류로 바꾸면 양식 그대로인 경우만 비운다)
       const tw = $('#isTeamWrap'); if (tw) tw.hidden = b.dataset.cat !== '앱 건의';
       const ta = $('#isB'), isFb = FB_CATS.includes(b.dataset.cat), raw = ta.value.trim();
       if (isFb && (!raw || raw === FB_TEMPLATE)) { ta.value = FB_TEMPLATE; ta.rows = 8; $('#isT').placeholder = '예: 할 일 체크가 풀림 (어디 + 무엇)'; }
       else if (!isFb && raw === FB_TEMPLATE) { ta.value = ''; ta.rows = 4; } });
-    $('#isCOther').addEventListener('input', () => { if ($('#isCOther').value.trim()) { $('#isCats').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); const tw = $('#isTeamWrap'); if (tw) tw.hidden = true; } });
+    $('#isCOther').addEventListener('input', () => { const tw = $('#isTeamWrap'); if (tw) tw.hidden = true; });   // '기타' 선택은 그대로 둔다
     $('#isByChips').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return; $('#isBy').value = b.dataset.who; });
     $('#isAnon').addEventListener('change', () => { $('#isByWrap').hidden = $('#isAnon').checked; });
   }
@@ -3829,11 +3919,12 @@ const App = (() => {
     ['ordersS', '매장 주문', '건', 1], ['ordersD', '배달 주문', '건', 1], ['deliv', '배달 매출', '원', 100], ['take', '포장 매출', '원', 100],   // 2026-10-07 매장·배달 주문 건 분리 — 총주문은 자동 합
     ['total', '총매출', '원', 100], ['crab', '대게', 'kg', 0.1], ['king', '킹크랩', 'kg', 0.1], ['lob', '랍스터', 'kg', 0.1], ['liquor', '그중 주류 매출', '원', 100],
     ['crabS', '대게 매장', 'kg', 0.1], ['crabD', '대게 배달', 'kg', 0.1], ['kingS', '킹크랩 매장', 'kg', 0.1], ['kingD', '킹크랩 배달', 'kg', 0.1], ['lobS', '랍스터 매장', 'kg', 0.1], ['lobD', '랍스터 배달', 'kg', 0.1],
+    ['crabP', '대게 포장', 'kg', 0.1], ['kingP', '킹크랩 포장', 'kg', 0.1], ['lobP', '랍스터 포장', 'kg', 0.1],   // 2026-10-10 안산점 건의: 포장 매출 칸은 있는데 포장 kg 칸이 없음
   ];
   /* kg 는 품종별 합계(crab·king·lob)가 기준이고, 매장(S)·배달(D)로 나눠 넣으면 합계는 자동으로 채워진다 — 사장님 요청 2026-10-02 */
   const KG_SP = [['crab', '대게'], ['king', '킹크랩'], ['lob', '랍스터']];
   const kgCh = (r, ch) => KG_SP.reduce((acc, [k]) => acc + (Number((r || {})[k + ch]) || 0), 0);   // ch: 'S' 매장 · 'D' 배달
-  const hasKgSplit = (r) => !!r && KG_SP.some(([k]) => r[k + 'S'] != null || r[k + 'D'] != null);
+  const hasKgSplit = (r) => !!r && KG_SP.some(([k]) => r[k + 'S'] != null || r[k + 'D'] != null || r[k + 'P'] != null);
   const salesTotal = (r) => { if (!r) return 0; if (r.total != null && !isNaN(r.total)) return Number(r.total) || 0; return (Number(r.store) || 0) + (Number(r.deliv) || 0) + (Number(r.take) || 0); };
   const salesKg = (r) => (Number(r.crab) || 0) + (Number(r.king) || 0) + (Number(r.lob) || 0);
   const salesOf = (k) => (S.sales || {})[k] || null;
@@ -3864,24 +3955,24 @@ const App = (() => {
       <div class="mlabel">매출 — 매장 · 배달 · 포장을 넣으면 총매출은 자동</div>
       <div class="frow3">${inp(SALES_F[1])}${inp(SALES_F[4])}${inp(SALES_F[5])}</div>
       <div class="frow">${auto(SALES_F[6])}${inp(SALES_F[10])}</div>
-      <div class="mlabel">판매 kg — 매장 · 배달 따로 넣으면 합계는 자동</div>
-      <table class="kgTbl"><thead><tr><th></th><th>매장 kg</th><th>배달 kg</th><th>합계 kg</th></tr></thead><tbody>
-        ${KG_SP.map(([k, n]) => `<tr><th>${n}</th><td>${kgIn(k + 'S')}</td><td>${kgIn(k + 'D')}</td><td>${kgIn(k, '자동')}</td></tr>`).join('')}
-        <tr class="sum"><th>합계</th><td id="kgSumS">–</td><td id="kgSumD">–</td><td id="kgSumT">–</td></tr>
+      <div class="mlabel">판매 kg — 매장 · 배달 · 포장 따로 넣으면 합계는 자동</div>
+      <table class="kgTbl"><thead><tr><th></th><th>매장 kg</th><th>배달 kg</th><th>포장 kg</th><th>합계 kg</th></tr></thead><tbody>
+        ${KG_SP.map(([k, n]) => `<tr><th>${n}</th><td>${kgIn(k + 'S')}</td><td>${kgIn(k + 'D')}</td><td>${kgIn(k + 'P')}</td><td>${kgIn(k, '자동')}</td></tr>`).join('')}
+        <tr class="sum"><th>합계</th><td id="kgSumS">–</td><td id="kgSumD">–</td><td id="kgSumP">–</td><td id="kgSumT">–</td></tr>
       </tbody></table>
       <p class="hint">빈칸은 0이 아니라 "미입력"으로 남습니다. 총주문·총매출은 나눠 넣은 값의 합으로 자동 계산되고, 나눠 넣지 않았을 때만 직접 적습니다. 주류 매출은 매장 매출 안에 포함된 금액을 따로 적는 칸입니다(총매출에 더해지지 않음). 합계 kg 만 알면 합계 칸에만 넣어도 됩니다.</p>`;
   }
   function syncKgTotals() {
     const g = (k) => { const el = document.querySelector(`.sfIn[data-k="${k}"]`); if (!el) return null; const v = el.value.trim(); return v === '' ? null : Number(v); };
-    let sS = 0, sD = 0, sT = 0, anyS = false, anyD = false, anyT = false;
+    let sS = 0, sD = 0, sP = 0, sT = 0, anyS = false, anyD = false, anyP = false, anyT = false;
     KG_SP.forEach(([k]) => {
-      const s = g(k + 'S'), d = g(k + 'D'), tEl = document.querySelector(`.sfIn[data-k="${k}"]`);
-      if (s != null || d != null) { const t = Math.round(((s || 0) + (d || 0)) * 100) / 100; if (tEl) tEl.value = t; }
-      if (s != null) { sS += s; anyS = true; } if (d != null) { sD += d; anyD = true; }
+      const s = g(k + 'S'), d = g(k + 'D'), pv = g(k + 'P'), tEl = document.querySelector(`.sfIn[data-k="${k}"]`);
+      if (s != null || d != null || pv != null) { const t = Math.round(((s || 0) + (d || 0) + (pv || 0)) * 100) / 100; if (tEl) tEl.value = t; }
+      if (s != null) { sS += s; anyS = true; } if (d != null) { sD += d; anyD = true; } if (pv != null) { sP += pv; anyP = true; }
       const t = g(k); if (t != null) { sT += t; anyT = true; }
     });
     const put = (id, v, any) => { const el = document.getElementById(id); if (el) el.textContent = any ? fmtKg(Math.round(v * 100) / 100) : '–'; };
-    put('kgSumS', sS, anyS); put('kgSumD', sD, anyD); put('kgSumT', sT, anyT);
+    put('kgSumS', sS, anyS); put('kgSumD', sD, anyD); put('kgSumP', sP, anyP); put('kgSumT', sT, anyT);
   }
   /* 총주문 = 매장 주문 + 배달 주문, 총매출 = 매장 + 배달 + 포장. 나눠 넣은 값이 하나라도 있으면 자동, 없으면 직접 입력 가능 */
   function syncSalesTotals() {
@@ -3899,6 +3990,9 @@ const App = (() => {
     if (!e.target.closest) return;
     if (e.target.closest('.kgTbl')) syncKgTotals();
     else if (e.target.classList.contains('sfIn')) syncSalesTotals();
+    else if (e.target.dataset && e.target.dataset.act === 'biz') { bizOf()[e.target.dataset.f] = e.target.value; save(); }   // 치는 즉시 상태에 반영 — 화면이 다시 그려져도 글자가 안 지워진다
+    else if (e.target.dataset && e.target.dataset.act === 'healthMemo') { const h = healthList().find((x) => x.staffId === e.target.dataset.id); if (h) { h.memo = e.target.value; save(); } }
+    else if (e.target.dataset && e.target.dataset.act === 'hyStaff' && e.target.dataset.f === 'memo') { const hs = hygieneOf().staff; hs[e.target.dataset.id] = hs[e.target.dataset.id] || {}; hs[e.target.dataset.id].memo = e.target.value; save(); }
   });
   /* 입력값 읽기 — 음수·글자는 붉게 표시하고 null 반환(저장 안 함) */
   function readSalesFields() {
@@ -3913,7 +4007,7 @@ const App = (() => {
     if (bad) { alert('음수나 글자는 넣을 수 없습니다. 붉게 표시된 칸을 확인하세요.'); return null; }
     if (out.store != null || out.deliv != null || out.take != null) out.total = (out.store || 0) + (out.deliv || 0) + (out.take || 0);
     if (out.ordersS != null || out.ordersD != null) out.orders = (out.ordersS || 0) + (out.ordersD || 0);
-    KG_SP.forEach(([k]) => { if (out[k + 'S'] != null || out[k + 'D'] != null) out[k] = Math.round(((out[k + 'S'] || 0) + (out[k + 'D'] || 0)) * 100) / 100; });
+    KG_SP.forEach(([k]) => { if (out[k + 'S'] != null || out[k + 'D'] != null || out[k + 'P'] != null) out[k] = Math.round(((out[k + 'S'] || 0) + (out[k + 'D'] || 0) + (out[k + 'P'] || 0)) * 100) / 100; });
     if (SALES_F.every(([k]) => out[k] == null)) { alert('숫자를 하나도 넣지 않았습니다.'); return null; }
     return out;
   }
@@ -3957,13 +4051,13 @@ const App = (() => {
       <div class="card"><div class="cl">입력한 날</div><div class="cv">${filled.length}<small>일</small></div></div>
       <div class="card${dates.length - filled.length ? ' warn' : ''}"><div class="cl">미입력</div><div class="cv">${dates.length - filled.length}<small>일</small></div><div class="cs">오늘까지 기준</div></div>
       <div class="card"><div class="cl">총 kg</div><div class="cv sm2">${fmtKg(filled.reduce((a, k) => a + salesKg(S.sales[k]), 0)) || '–'}</div>
-        ${filled.some((k) => hasKgSplit(S.sales[k])) ? `<div class="cs">매장 ${fmtKg(filled.reduce((a, k) => a + kgCh(S.sales[k], 'S'), 0)) || '0kg'} · 배달 ${fmtKg(filled.reduce((a, k) => a + kgCh(S.sales[k], 'D'), 0)) || '0kg'}</div>` : ''}</div></div>`;
+        ${filled.some((k) => hasKgSplit(S.sales[k])) ? `<div class="cs">매장 ${fmtKg(filled.reduce((a, k) => a + kgCh(S.sales[k], 'S'), 0)) || '0kg'} · 배달 ${fmtKg(filled.reduce((a, k) => a + kgCh(S.sales[k], 'D'), 0)) || '0kg'} · 포장 ${fmtKg(filled.reduce((a, k) => a + kgCh(S.sales[k], 'P'), 0)) || '0kg'}</div>` : ''}</div></div>`;
     if (!dates.length) return h + `<div class="notice"><b>아직 오지 않은 달입니다.</b></div>`;
     const kv = S.ui.skg || 'all';   // kg 열 보기: all 합계 · S 매장 · D 배달
-    h += `<div class="filters" style="margin:4px 0 10px"><span class="hint" style="margin:0 6px 0 0">kg 보기</span>${[['all', '합계'], ['S', '매장'], ['D', '배달']].map(([k, n]) => `<button class="fl${kv === k ? ' on' : ''}" data-act="skgView" data-k="${k}">${n}</button>`).join('')}</div>`;
+    h += `<div class="filters" style="margin:4px 0 10px"><span class="hint" style="margin:0 6px 0 0">kg 보기</span>${[['all', '합계'], ['S', '매장'], ['D', '배달'], ['P', '포장']].map(([k, n]) => `<button class="fl${kv === k ? ' on' : ''}" data-act="skgView" data-k="${k}">${n}</button>`).join('')}</div>`;
     const cell = (v, u) => (v == null ? '<span class="dim">–</span>' : (u === 'kg' ? fmtKg(v) : Number(v).toLocaleString('ko-KR')));
-    const kgCell = (r, k) => { const t = r[k]; if (kv !== 'all') return cell(r[k + kv], 'kg'); const s = r[k + 'S'], d = r[k + 'D']; return `${cell(t, 'kg')}${(s != null || d != null) ? `<br><small class="dim">매장 ${fmtKg(s || 0) || '0kg'} · 배달 ${fmtKg(d || 0) || '0kg'}</small>` : ''}`; };
-    const kgHead = kv === 'S' ? ' (매장)' : kv === 'D' ? ' (배달)' : '';
+    const kgCell = (r, k) => { const t = r[k]; if (kv !== 'all') return cell(r[k + kv], 'kg'); const s = r[k + 'S'], d = r[k + 'D'], pv = r[k + 'P']; return `${cell(t, 'kg')}${(s != null || d != null || pv != null) ? `<br><small class="dim">매장 ${fmtKg(s || 0) || '0kg'} · 배달 ${fmtKg(d || 0) || '0kg'}${pv != null ? ` · 포장 ${fmtKg(pv) || '0kg'}` : ''}</small>` : ''}`; };
+    const kgHead = kv === 'S' ? ' (매장)' : kv === 'D' ? ' (배달)' : kv === 'P' ? ' (포장)' : '';
     h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>날짜</th><th class="r">총주문</th><th class="r">매장</th><th class="r">배달</th><th class="r">포장</th><th class="r">총매출</th><th class="r">대게${kgHead}</th><th class="r">킹크랩${kgHead}</th><th class="r">랍스터${kgHead}</th><th class="r">주류</th><th>입력자</th></tr></thead><tbody>`;
     dates.slice().reverse().forEach((k) => {
       const r = salesOf(k), d = new Date(k + 'T00:00:00'), lb = `${k.slice(5)} ${WD[d.getDay()]}`;
@@ -3983,7 +4077,7 @@ const App = (() => {
     return { head: split(lines[0]), rows: lines.slice(1).map(split) };
   }
   const CSV_MAP = { '날짜': 'date', '매장': 'storeName', '총주문': 'orders', '매장주문': 'ordersS', '배달주문': 'ordersD', '매장매출': 'store', '배달매출': 'deliv', '포장매출': 'take', '총매출': 'total', '대게kg': 'crab', '킹크랩kg': 'king', '랍스타kg': 'lob', '랍스터kg': 'lob', '주류매출': 'liquor',
-    '대게매장kg': 'crabS', '대게배달kg': 'crabD', '킹크랩매장kg': 'kingS', '킹크랩배달kg': 'kingD', '랍스터매장kg': 'lobS', '랍스타매장kg': 'lobS', '랍스터배달kg': 'lobD', '랍스타배달kg': 'lobD' };
+    '대게매장kg': 'crabS', '대게배달kg': 'crabD', '킹크랩매장kg': 'kingS', '킹크랩배달kg': 'kingD', '랍스터매장kg': 'lobS', '랍스타매장kg': 'lobS', '랍스터배달kg': 'lobD', '랍스타배달kg': 'lobD', '대게포장kg': 'crabP', '킹크랩포장kg': 'kingP', '랍스터포장kg': 'lobP', '랍스타포장kg': 'lobP' };
   function salesCsvImport() {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = '.csv,text/csv';
@@ -4001,11 +4095,11 @@ const App = (() => {
           const d = (r[idx.date] || '').slice(0, 10);
           if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d > dateKey()) { skipped++; return; }
           const v = {};
-          ['orders', 'ordersS', 'ordersD', 'store', 'deliv', 'take', 'total', 'crab', 'king', 'lob', 'liquor', 'crabS', 'crabD', 'kingS', 'kingD', 'lobS', 'lobD'].forEach((k) => {
+          ['orders', 'ordersS', 'ordersD', 'store', 'deliv', 'take', 'total', 'crab', 'king', 'lob', 'liquor', 'crabS', 'crabD', 'kingS', 'kingD', 'lobS', 'lobD', 'crabP', 'kingP', 'lobP'].forEach((k) => {
             if (idx[k] == null) return;
             const x = r[idx[k]]; v[k] = (x === '' || x == null) ? null : Number(x); if (isNaN(v[k]) || v[k] < 0) v[k] = null;
           });
-          KG_SP.forEach(([k]) => { if (v[k] == null && (v[k + 'S'] != null || v[k + 'D'] != null)) v[k] = (v[k + 'S'] || 0) + (v[k + 'D'] || 0); });
+          KG_SP.forEach(([k]) => { if (v[k] == null && (v[k + 'S'] != null || v[k + 'D'] != null || v[k + 'P'] != null)) v[k] = (v[k + 'S'] || 0) + (v[k + 'D'] || 0) + (v[k + 'P'] || 0); });
           if (!v.total && v.orders == null && v.store == null) { skipped++; return; }   // 아무 숫자도 없는 날(휴무·빈 줄)
           if (idx.storeName != null && r[idx.storeName] && r[idx.storeName] !== storeName()) otherStore.add(r[idx.storeName]);
           recs.push({ d, v });
@@ -4072,16 +4166,16 @@ const App = (() => {
     const spmx = Math.max(...Object.values(sp), 1);
     if (kg) {
       const split = recs.some((x) => hasKgSplit(x.r));
-      const chS = {}, chD = {};
-      KG_SP.forEach(([k, n]) => { chS[n] = recs.reduce((a, x) => a + (Number(x.r[k + 'S']) || 0), 0); chD[n] = recs.reduce((a, x) => a + (Number(x.r[k + 'D']) || 0), 0); });
-      h += `<div class="hd sub2"><h3>품종별 kg${split ? ' — 매장 · 배달' : ''}</h3>${split ? '<span class="hint" style="margin:0"><i class="legS"></i> 매장 <i class="legD"></i> 배달 <i class="legN"></i> 구분 없음</span>' : ''}</div><div class="loads">${Object.entries(sp).map(([n, v]) => {
-        const s = chS[n], d = chD[n], rest = Math.max(0, v - s - d);
-        return `<div class="lrow"><span class="ln">${n}</span><span class="lbar stack">${split ? `<i class="s" style="width:${s / spmx * 100}%"></i><i class="d" style="width:${d / spmx * 100}%"></i><i class="n" style="width:${rest / spmx * 100}%"></i>` : `<i style="width:${v / spmx * 100}%"></i>`}</span><span class="lv">${fmtKg(v)}${split ? `<small class="dim"> (매장 ${fmtKg(s) || '0kg'} · 배달 ${fmtKg(d) || '0kg'})</small>` : ''}</span></div>`; }).join('')}</div>`;
+      const chS = {}, chD = {}, chP = {};
+      KG_SP.forEach(([k, n]) => { chS[n] = recs.reduce((a, x) => a + (Number(x.r[k + 'S']) || 0), 0); chD[n] = recs.reduce((a, x) => a + (Number(x.r[k + 'D']) || 0), 0); chP[n] = recs.reduce((a, x) => a + (Number(x.r[k + 'P']) || 0), 0); });
+      h += `<div class="hd sub2"><h3>품종별 kg${split ? ' — 매장 · 배달 · 포장' : ''}</h3>${split ? '<span class="hint" style="margin:0"><i class="legS"></i> 매장 <i class="legD"></i> 배달 <i class="legP"></i> 포장 <i class="legN"></i> 구분 없음</span>' : ''}</div><div class="loads">${Object.entries(sp).map(([n, v]) => {
+        const s = chS[n], d = chD[n], pp = chP[n], rest = Math.max(0, v - s - d - pp);
+        return `<div class="lrow"><span class="ln">${n}</span><span class="lbar stack">${split ? `<i class="s" style="width:${s / spmx * 100}%"></i><i class="d" style="width:${d / spmx * 100}%"></i><i class="p" style="width:${pp / spmx * 100}%"></i><i class="n" style="width:${rest / spmx * 100}%"></i>` : `<i style="width:${v / spmx * 100}%"></i>`}</span><span class="lv">${fmtKg(v)}${split ? `<small class="dim"> (매장 ${fmtKg(s) || '0kg'} · 배달 ${fmtKg(d) || '0kg'}${pp ? ` · 포장 ${fmtKg(pp)}` : ''})</small>` : ''}</span></div>`; }).join('')}</div>`;
       if (split) {
-        const tS = kgCh({ crabS: chS['대게'], kingS: chS['킹크랩'], lobS: chS['랍스터'] }, 'S'), tD = kgCh({ crabD: chD['대게'], kingD: chD['킹크랩'], lobD: chD['랍스터'] }, 'D'), tt = tS + tD;
-        h += `<div class="hd sub2"><h3>채널별 kg</h3></div><div class="tkLogWrap"><table class="tkLog cList"><thead><tr><th></th><th class="r">매장</th><th class="r">배달</th><th class="r">합계</th><th class="r">배달 비중</th></tr></thead><tbody>
-          ${KG_SP.map(([k, n]) => { const s = chS[n], d = chD[n]; return `<tr><td><b>${n}</b></td><td class="r">${fmtKg(s) || '–'}</td><td class="r">${fmtKg(d) || '–'}</td><td class="r"><b>${fmtKg(s + d) || '–'}</b></td><td class="r">${s + d ? Math.round(d / (s + d) * 100) + '%' : '–'}</td></tr>`; }).join('')}
-          <tr><td><b>전체</b></td><td class="r">${fmtKg(tS) || '–'}</td><td class="r">${fmtKg(tD) || '–'}</td><td class="r"><b>${fmtKg(tt) || '–'}</b></td><td class="r">${tt ? Math.round(tD / tt * 100) + '%' : '–'}</td></tr></tbody></table></div>`;
+        const tS = kgCh({ crabS: chS['대게'], kingS: chS['킹크랩'], lobS: chS['랍스터'] }, 'S'), tD = kgCh({ crabD: chD['대게'], kingD: chD['킹크랩'], lobD: chD['랍스터'] }, 'D'), tP = kgCh({ crabP: chP['대게'], kingP: chP['킹크랩'], lobP: chP['랍스터'] }, 'P'), tt = tS + tD + tP;
+        h += `<div class="hd sub2"><h3>채널별 kg</h3></div><div class="tkLogWrap"><table class="tkLog cList"><thead><tr><th></th><th class="r">매장</th><th class="r">배달</th><th class="r">포장</th><th class="r">합계</th><th class="r">배달 비중</th></tr></thead><tbody>
+          ${KG_SP.map(([k, n]) => { const s = chS[n], d = chD[n], pp = chP[n], all = s + d + pp; return `<tr><td><b>${n}</b></td><td class="r">${fmtKg(s) || '–'}</td><td class="r">${fmtKg(d) || '–'}</td><td class="r">${fmtKg(pp) || '–'}</td><td class="r"><b>${fmtKg(all) || '–'}</b></td><td class="r">${all ? Math.round(d / all * 100) + '%' : '–'}</td></tr>`; }).join('')}
+          <tr><td><b>전체</b></td><td class="r">${fmtKg(tS) || '–'}</td><td class="r">${fmtKg(tD) || '–'}</td><td class="r">${fmtKg(tP) || '–'}</td><td class="r"><b>${fmtKg(tt) || '–'}</b></td><td class="r">${tt ? Math.round(tD / tt * 100) + '%' : '–'}</td></tr></tbody></table></div>`;
       }
     }
     const lq = recs.reduce((a, x) => a + (Number(x.r.liquor) || 0), 0);
@@ -4321,12 +4415,29 @@ const App = (() => {
   }
   /* 보건증 목록 — 직원 명단과 별개로 이름을 직접 적는다. S.health[{id, name, issued, memo}]
      예전 staff.health 기록과 재직 직원 이름은 처음 열 때 한 번 옮겨 넣는다 */
+  /* 보건증 명단은 직원 명단(활성 직원)을 그대로 따른다 — 사장님 요청 2026-10-11.
+     직원마다 기록 하나(staffId 로 연결). 이름은 직원 명단 것을 쓰고, 명단에 없는 사람(옛 자리표시·퇴사)은 보이지 않는다. */
   function healthList() {
-    if (!Array.isArray(S.health)) {
-      S.health = [];
-      S.staff.filter((s) => s.active).forEach((s) => S.health.push({ id: newId('h'), name: s.name, issued: (s.health && s.health.issued) || '', memo: (s.health && s.health.memo) || '' }));
-    }
-    return S.health;
+    if (!Array.isArray(S.health)) S.health = [];
+    const act = S.staff.filter((s) => s.active);
+    S.health.forEach((e) => { if (!e.staffId) { const st = act.find((x) => x.name === e.name && !S.health.some((o) => o.staffId === x.id)); if (st) e.staffId = st.id; } });
+    /* 직원당 기록 하나로 — 기기마다 따로 만든 기록이 합쳐지면 같은 직원에게 두 개가 생겨 빈 쪽이 보이던 문제(메모가 사라짐, 2026-10-11).
+       번호는 'h:직원번호'로 모든 기기에서 같게 만들고, 겹치면 값이 있는 쪽을 남긴다 */
+    const byStaff = {};
+    S.health.forEach((e) => {
+      if (!e.staffId) return;
+      const cur = byStaff[e.staffId];
+      if (!cur) { byStaff[e.staffId] = e; return; }
+      if (!cur.issued && e.issued) cur.issued = e.issued;
+      if (!cur.memo && e.memo) cur.memo = e.memo;
+    });
+    act.forEach((st) => {
+      let e = byStaff[st.id];
+      if (!e) { e = { id: 'h:' + st.id, staffId: st.id, name: st.name, issued: (st.health && st.health.issued) || '', memo: (st.health && st.health.memo) || '' }; byStaff[st.id] = e; }
+      e.name = st.name;
+    });
+    S.health = Object.values(byStaff).filter((e) => S.staff.some((x) => x.id === e.staffId));   // 명단에 없는 사람은 정리
+    return S.health.filter((e) => act.some((x) => x.id === e.staffId));
   }
   const healthEntry = (name) => healthList().find((x) => x.name === name);
   const healthOf = (st) => { const e = st && healthEntry(st.name); return dueStatus(e && e.issued, healthMonths()); };
@@ -4355,19 +4466,19 @@ const App = (() => {
     const bad = list.filter((e) => dueBad(stat(e))), none = list.filter((e) => stat(e).level === 'none');
     let h = `<div class="hd"><div><h2>보건증 관리</h2><div class="sub">식품을 다루는 사람은 건강진단(보건증)을 받아야 합니다. 이름과 발급일만 적어 두면 만료 30일·7일 전에 할 일 화면에 알림이 뜹니다.</div></div>
       <div class="mnav"><span class="hint" style="margin:0">유효기간</span><input type="number" class="tkIn" data-act="healthMonths" value="${healthMonths()}" min="1" max="36"><span class="hint" style="margin:0">개월</span>
-        <button class="btn primary" data-act="healthAdd">+ 사람 추가</button></div></div>`;
+        <button class="btn" data-act="view" data-v="staff">👥 직원 명단</button></div></div>`;
     h += `<div class="cards m4">
       <div class="card"><div class="cl">등록 인원</div><div class="cv">${list.length}<small>명</small></div></div>
       <div class="card${bad.length ? ' warn' : ''}"><div class="cl">만료 · 임박</div><div class="cv">${bad.length}<small>명</small></div><div class="cs">30일 이내</div></div>
       <div class="card${none.length ? ' warn' : ''}"><div class="cl">발급일 미입력</div><div class="cv">${none.length}<small>명</small></div></div>
       <div class="card"><div class="cl">정상</div><div class="cv">${list.length - bad.length - none.length}<small>명</small></div></div></div>`;
-    h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>이름</th><th>발급일</th><th>만료일</th><th>상태</th><th>메모</th><th></th></tr></thead><tbody>
-      ${list.map((e) => { const st = stat(e); return `<tr><td><input class="tkIn wide" data-act="healthName" data-id="${e.id}" value="${esc(e.name || '')}" placeholder="이름"></td>
-        <td><input type="date" class="tkIn wide" data-act="healthDate" data-id="${e.id}" value="${esc(e.issued || '')}" max="${dateKey()}"></td>
+    h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>이름</th><th>발급일</th><th>만료일</th><th>상태</th><th>메모</th></tr></thead><tbody>
+      ${list.map((e) => { const st = stat(e), sp = S.staff.find((x) => x.id === e.staffId) || {}; return `<tr><td><b>${esc(e.name || '')}</b>${(sp.roles || []).length ? `<div class="mut" style="font-size:11px">${esc(sp.roles.join('·'))}</div>` : ''}</td>
+        <td><input type="date" class="tkIn wide" data-act="healthDate" data-id="${e.staffId}" value="${esc(e.issued || '')}" max="${dateKey()}"></td>
         <td class="mut">${st.due || '—'}</td><td>${lvlChip(st)}</td>
-        <td><input class="tkIn wide2" data-act="healthMemo" data-id="${e.id}" value="${esc(e.memo || '')}" placeholder="보건소 · 검진기관 등"></td>
-        <td><button class="btn sm ghost danger" data-act="healthDel" data-id="${e.id}">삭제</button></td></tr>`; }).join('')}
-      ${list.length ? '' : '<tr><td colspan="6">아직 등록한 사람이 없습니다. <b>+ 사람 추가</b>로 시작하세요.</td></tr>'}</tbody></table></div>
+        <td><input class="tkIn wide2" data-act="healthMemo" data-id="${e.staffId}" value="${esc(e.memo || '')}" placeholder="보건소 · 검진기관 등"></td></tr>`; }).join('')}
+      ${list.length ? '' : '<tr><td colspan="5">직원 명단에 활성 직원이 없습니다. 인사관리 › 직원 명단에서 먼저 추가하세요.</td></tr>'}</tbody></table></div>
+      <p class="hint keep" style="margin-top:8px">이름은 <b>직원 명단</b>과 같이 움직입니다. 사람을 넣거나 빼려면 직원 명단에서 하세요.</p>
       <p class="hint">기준 — 식품위생법 제40조: 식품 조리·판매 종사자는 건강진단을 받아야 하며 유효기간은 통상 1년으로 봅니다(관할 보건소 기준 확인). 여기 적은 이름이 직원 명단의 이름과 같으면, 만료된 사람을 근무표에 배치할 때 배치 창에 경고가 보입니다.</p>`;
     return h;
   }
@@ -4633,7 +4744,7 @@ const App = (() => {
   /* 수조 관리표 입고 kg 합계 — 품종별 현재 재고 */
   function tankStockKg(sp) {
     const T = S.tanks; if (!T || !T.items) return 0;
-    let kg = 0; T.items.forEach((it) => ['top', 'bottom'].forEach((pos) => { const c = it[pos]; if (c && c.species === sp && Number(c.kg) > 0) kg += Number(c.kg); }));
+    let kg = 0; T.items.forEach((it) => ['top', 'bottom'].forEach((pos) => { lotsOf(it, pos).forEach((l) => { if (l.species === sp && Number(l.kg) > 0) kg += Number(l.kg); }); }));
     return Math.round(kg * 10) / 10;
   }
   /* 연간 단가 선 그래프 — 해마다 한 줄, x는 1~12월(날짜), y는 kg당 단가. 추석·설 위치 표시 */
@@ -5551,16 +5662,47 @@ const App = (() => {
     const key = viewKey(), rec = S.days[key].inst[tid], t = tpl(tid); if (!rec) return;
     modal(`메모 — ${t.title}`, `<label>어떻게 했나요<textarea id="tnNote" rows="4" placeholder="예: 수조 3번 온도 1도 내림 · 이끼 닦음 · 특이사항 없음">${esc(rec.note || '')}</textarea></label>
       <p class="hint">${rec.s === 'done' ? `${esc(rec.by || '')} ${rec.at || ''} 완료` : '아직 완료 전입니다. 메모만 먼저 남겨 둘 수 있습니다.'}</p>`, () => {
-      const v = $('#tnNote').value.trim(); if (v) rec.note = v; else delete rec.note;
+      const v = $('#tnNote').value.trim(); if (v) rec.note = v; else delete rec.note; rec.u = Date.now();
       rec.noteBy = (S.ui.whoDate === dateKey() ? S.ui.who : '') || rec.noteBy || '';
+      journal(key, tid);
       save(); render();
     }, '저장');
+  }
+
+  /* 기기 수첩 — 이 기기가 손댄 할 일 기록(완료·되돌림·건너뜀·메모)을 48시간 동안 이 기기에 적어 둔다.
+     서버에서 받은 기록에서 그 체크가 풀려 있고, 그 뒤에 누가 일부러 바꾼 흔적(u 가 더 나중)이 없으면 되살려 다시 저장한다.
+     "오전에 체크한 게 다 풀림"(안산점 신고 2026-10-10)이 어떤 경로로든 다시 생겨도 이 기기 체크는 살아남게 하는 안전장치. */
+  const JOURNAL_MAX = 300, JOURNAL_MS = 48 * 3600 * 1000;
+  const jKey = () => 'hm.journal:' + ((Store.meta && Store.meta.current) || 'x');
+  const jRead = () => { try { return JSON.parse(localStorage.getItem(jKey()) || '[]'); } catch (_) { return []; } };
+  const jWrite = (list) => { try { localStorage.setItem(jKey(), JSON.stringify(list.slice(-JOURNAL_MAX))); } catch (_) { /* 무시 */ } };
+  function journal(key, tid) {
+    if (DEMO) return;
+    const rec = S.days[key] && S.days[key].inst && S.days[key].inst[tid]; if (!rec || !rec.u) return;
+    const list = jRead().filter((e) => !(e.key === key && e.tid === tid));
+    list.push({ key, tid, u: rec.u, rec: JSON.parse(JSON.stringify(rec)) });
+    jWrite(list);
+  }
+  function reconcileJournal(why) {
+    if (DEMO) return 0;
+    const now = Date.now(), list = jRead().filter((e) => now - e.u < JOURNAL_MS); let fixed = 0; const names = [];
+    list.forEach((e) => {
+      const d = S.days && S.days[e.key]; if (!d || !d.inst) return;
+      const cur = d.inst[e.tid]; if (!cur) return;
+      if (cur.u && cur.u >= e.u) return;                                   // 그 뒤에 누가 일부러 바꾼 것 — 존중
+      if (cur.s === e.rec.s && (cur.note || '') === (e.rec.note || '') && (cur.by || '') === (e.rec.by || '')) return;
+      d.inst[e.tid] = JSON.parse(JSON.stringify(e.rec)); fixed++; const t = tpl(e.tid); if (t && names.length < 3) names.push(t.title);
+    });
+    jWrite(list);
+    if (fixed) { console.warn('[기기 수첩] 풀린 기록 되살림', fixed, why); save(); banner(`이 기기에서 한 체크 ${fixed}건이 풀려 있어 되살렸습니다`, names.join(' · ') + (fixed > 3 ? ' 외' : '')); }
+    return fixed;
   }
 
   function doComplete(tid, extra) {
     const key = viewKey(), rec = S.days[key].inst[tid];
     const d = new Date();
-    Object.assign(rec, { s: 'done', by: S.ui.who, at: `${pad(d.getHours())}:${pad(d.getMinutes())}` }, extra);
+    Object.assign(rec, { s: 'done', by: S.ui.who, at: `${pad(d.getHours())}:${pad(d.getMinutes())}`, u: Date.now() }, extra);   // u: 마지막으로 손댄 시각 — 기기 간 합칠 때 더 나중 것이 이긴다
+    journal(key, tid);
     save(); render();
     instantAlert(tid, key, rec);
   }
@@ -5692,16 +5834,17 @@ const App = (() => {
       if (mm) {
         const tid = m.dataset.tid, key = viewKey(), rec = S.days[key].inst[tid], v = mm.dataset.menu;
         if (staffLocked() && (v === 'title' || v === 'memo' || v.startsWith('role:'))) { blockedBanner(); return; }
-        if (v === 'undo') { S.days[key].inst[tid] = { s: 'todo', role: rec.role }; }
+        if (v === 'undo') { S.days[key].inst[tid] = { s: 'todo', role: rec.role, u: Date.now() }; }
         else if (v === 'skip') {
           const why = prompt('건너뛰는 이유를 적어주세요.\n(예: 재료 미입고)');
           if (why === null) return;
-          Object.assign(rec, { s: 'skip', reason: why.trim() || '사유 없음', by: S.ui.who });
+          Object.assign(rec, { s: 'skip', reason: why.trim() || '사유 없음', by: S.ui.who, u: Date.now() });
         } else if (v === 'memo') { closeModal(); editMemo(tid); return; }
         else if (v === 'note') { closeModal(); taskNoteModal(tid); return; }
         else if (v === 'title') { closeModal(); editTitle(tid); return; }
-        else if (v.startsWith('role:')) { rec.role = v.slice(5); }
-        else if (v.startsWith('by:')) { rec.by = v.slice(3); }
+        else if (v.startsWith('role:')) { rec.role = v.slice(5); rec.u = Date.now(); }
+        else if (v.startsWith('by:')) { rec.by = v.slice(3); rec.u = Date.now(); }
+        journal(key, tid);
         save(); closeModal(); render(); return;
       }
 
@@ -5714,6 +5857,7 @@ const App = (() => {
 
       switch (a) {
         case 'demoReset': demoReset(); break;
+        case 'uiDetail': { try { localStorage.setItem('hm.uiDetail', uiDetail() ? '0' : '1'); } catch (_) { /* 무시 */ } render(); break; }
         case 'sideToggle': if (document.body.classList.contains('sideOpen')) sideClose(); else sideOpen(); break;
         case 'sideClose': sideClose(); break;
         case 'view': view = b.dataset.v; if (view !== 'contracts') { cOpen = null; cMode = null; } if (view !== 'dash') dashLiveOff(); render(); window.scrollTo(0, 0); break;
@@ -5748,8 +5892,6 @@ const App = (() => {
         case 'biSp': S.ui.biSp = b.dataset.sp; save(); render(); break;
         case 'buyEvAdd': buyEvForm(); break;
         case 'biEv': S.ui.biEv = b.dataset.d; save(); render(); break;
-        case 'healthAdd': healthList().push({ id: newId('h'), name: '', issued: '', memo: '' }); save(); render(); setTimeout(() => { const el = document.querySelector('input[data-act="healthName"][value=""]'); if (el) el.focus(); }, 50); break;
-        case 'healthDel': { const e = healthList().find((x) => x.id === id); if (!e) return; if (e.name && !confirm(`${e.name} 보건증 기록을 지울까요?`)) return; S.health = healthList().filter((x) => x.id !== id); save(); render(); break; }
         case 'sampleLoad': loadSampleData(); break;
         case 'sampleClear': if (!confirm('샘플 자료를 지울까요? 직접 넣은 기록은 그대로 남습니다.')) return; clearSampleData(); break;
         case 'buyEvDel': S.settings.buyEvents = (S.settings.buyEvents || []).filter((e) => !(e.date === b.dataset.d && e.name === b.dataset.n)); save(); render(); break;
@@ -5923,7 +6065,7 @@ const App = (() => {
         case 'toggle': {
           const rec = S.days[key].inst[id];
           if (rec.s === 'todo') completeTask(id);
-          else { S.days[key].inst[id] = { s: 'todo', role: rec.role }; save(); render(); }
+          else { S.days[key].inst[id] = { s: 'todo', role: rec.role, u: Date.now() }; journal(key, id); save(); render(); }
           break;
         }
         case 'menu': taskMenu(id); break;
@@ -6207,10 +6349,11 @@ const App = (() => {
         case 'ownerLogin': ownerLoginModal(); break;
         case 'deviceRegister': deviceRegisterGo(); break;
         case 'deviceLink': deviceLinkModal(false); break;
+        case 'netRevoke': { if (!confirm(`${b.dataset.name} 인터넷(${id})을 끊을까요?\n이 인터넷에서는 다시 등록된 기기만 열립니다.`)) break; Store.netRevoke(id).then(() => { devList = null; render(); banner('매장 인터넷을 끊었습니다', id); }).catch((e) => alert('끊지 못했습니다: ' + (e.message || e))); break; }
         case 'deviceLinkCopy': { const l = Store.deviceLink(); const done = () => banner('주소를 복사했습니다', '이 기기의 홈 화면·즐겨찾기에 추가하세요.');
           if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(l).then(done).catch(() => prompt('아래 주소를 복사하세요', l)); else prompt('아래 주소를 복사하세요', l); break; }
-        case 'deviceRevoke': { if (!confirm(`"${b.dataset.name}" 기기를 끊을까요? 그 기기에서는 매장 기록이 바로 안 보이게 됩니다.`)) return;
-          Store.deviceRevoke(id).then(() => { devList = null; banner('기기를 끊었습니다', b.dataset.name); render(); }).catch((e) => alert('실패: ' + e.message)); break; }
+        case 'deviceRevoke': { if (!confirm(`"${b.dataset.name}" 기기를 삭제할까요?\n매장 밖에서는 바로 안 보이게 됩니다. (매장 인터넷 안에서는 그대로 열립니다)`)) return;
+          Store.deviceRevoke(id).then(() => { devList = null; banner('기기를 삭제했습니다', b.dataset.name); render(); }).catch((e) => alert('실패: ' + e.message)); break; }
         case 'ownerPw': ownerPwModal(); break;
         case 'ownerLock': ownerLock(false); break;
         case 'supaLogout': { if (!confirm('서버 계정에서 로그아웃할까요? 이 기기는 자동 연결로 돌아갑니다.')) return; Store.flush().then(() => Store.supaSignOut()).then(() => location.reload()); break; }
@@ -6260,18 +6403,21 @@ const App = (() => {
       if (b.dataset.act === 'slipTax') { const p = payrollOf(S.ui.lmonth || curMonth()); if (p) { p.slips = p.slips || {}; p.slips[b.dataset.n] = p.slips[b.dataset.n] || {}; p.slips[b.dataset.n].tax = Math.max(0, Number(b.value) || 0); save(); render(); } }
       if (b.dataset.act === 'tankMaxKg') { S.settings.tankMaxKg = Math.max(10, Number(b.value) || 700); save(); render(); }
       if (b.dataset.act === 'crabHold') { S.settings.crabHold = S.settings.crabHold || {}; S.settings.crabHold[b.dataset.sp] = Math.max(1, Number(b.value) || 28); save(); render(); }
-      if (b.dataset.act === 'healthMonths') { S.settings.healthMonths = Math.max(1, Number(b.value) || 12); save(); render(); }
-      if (b.dataset.act === 'healthDate' || b.dataset.act === 'healthMemo' || b.dataset.act === 'healthName') {
-        const e = healthList().find((x) => x.id === b.dataset.id); if (!e) return;
-        if (b.dataset.act === 'healthDate') e.issued = b.value; else if (b.dataset.act === 'healthMemo') e.memo = b.value.trim(); else e.name = b.value.trim();
-        save(); if (b.dataset.act === 'healthDate') render();
+      /* 날짜 칸은 한 자리씩 고칠 때마다 change 가 나는데, 그때마다 화면을 다시 그리면 입력 칸이 새로 만들어져 치던 날짜가 사라진다
+         (보건증 신고 2026-10-09). 칸에 아직 커서가 있으면 손을 뗀 뒤에 다시 그린다. */
+      const renderLater = () => { if (document.activeElement === b) b.addEventListener('blur', () => render(), { once: true }); else render(); };
+      if (b.dataset.act === 'healthMonths') { S.settings.healthMonths = Math.max(1, Number(b.value) || 12); save(); renderLater(); }
+      if (b.dataset.act === 'healthDate' || b.dataset.act === 'healthMemo') {
+        const e = healthList().find((x) => x.staffId === b.dataset.id); if (!e) return;
+        if (b.dataset.act === 'healthDate') e.issued = b.value; else e.memo = b.value.trim();
+        save(); if (b.dataset.act === 'healthDate') renderLater();
       }
-      if (b.dataset.act === 'hyOwner') { const o = hygieneOf().owner; o[b.dataset.f] = b.dataset.f === 'every' ? Math.max(1, Number(b.value) || 12) : b.value.trim(); save(); if (b.dataset.f !== 'org') render(); }
-      if (b.dataset.act === 'hyStaff') { const hs = hygieneOf().staff; hs[b.dataset.id] = hs[b.dataset.id] || {}; hs[b.dataset.id][b.dataset.f] = b.value.trim(); save(); if (b.dataset.f === 'done') render(); }
+      if (b.dataset.act === 'hyOwner') { const o = hygieneOf().owner; o[b.dataset.f] = b.dataset.f === 'every' ? Math.max(1, Number(b.value) || 12) : b.value.trim(); save(); if (b.dataset.f !== 'org') renderLater(); }
+      if (b.dataset.act === 'hyStaff') { const hs = hygieneOf().staff; hs[b.dataset.id] = hs[b.dataset.id] || {}; hs[b.dataset.id][b.dataset.f] = b.value.trim(); save(); if (b.dataset.f === 'done') renderLater(); }
       if (b.dataset.act === 'sfrom' || b.dataset.act === 'sto') {
         const v = b.value; if (v && v <= dateKey()) S.ui[b.dataset.act] = v;
         if (S.ui.sfrom && S.ui.sto && S.ui.sfrom > S.ui.sto) S.ui.sto = S.ui.sfrom;
-        save(); render();
+        save(); renderLater();
       }
       if (b.dataset.act === 'supaUrl' || b.dataset.act === 'supaKey') {
         const u = (document.querySelector('[data-act="supaUrl"]') || {}).value || '', k = (document.querySelector('[data-act="supaKey"]') || {}).value || '';
@@ -6500,6 +6646,7 @@ const App = (() => {
       S.ui.slot = null;        // 앱을 열면 지금 시간대부터 보여준다
       S.ui.month = dateKey().slice(0, 7);
       S.ui.mdate = dateKey();
+      ['cmonth', 'pmonth', 'smonth', 'lmonth', 'nmonth'].forEach((k) => { delete S.ui[k]; });   // 원가·손익·매출·인건비·공지도 이번 달부터 (지난달에 머물러 있던 문제, 2026-10-11)
     }
     if (!S.recipes) S.recipes = [];
     if (!S.purchases) S.purchases = [];
@@ -6544,7 +6691,7 @@ const App = (() => {
   /* ── 데모판 (10/14 공유회용, 2026-10-09) ─────────────────────────
      demo.js 가 window.HM_DEMO 를 켜면: 서버 없음 · 저장소 따로 · 매일 처음 열 때 가짜 두 매장 자료를 오늘 날짜 기준으로 새로 만든다.
      실제 직원·매출과 무관한 숫자만 쓴다. 사장님 비밀번호 1234. */
-  const DEMO = !!window.HM_DEMO, DEMO_VER = 2, DEMO_PW = '1234';
+  const DEMO = !!window.HM_DEMO, DEMO_VER = 3, DEMO_PW = '1234';   // DEMO_VER 3 (10/11): 수조 묶음·보건증·포장 kg·단 단위·퀴즈·사업장 정보 샘플
   function demoRng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   const DEMO_STAFF = {
     ansan: [
@@ -6612,7 +6759,9 @@ const App = (() => {
         const deliv = Math.round(tot * (0.18 + R() * 0.1) / 100) * 100, take = Math.round(tot * (0.04 + R() * 0.04) / 100) * 100, store = tot - deliv - take;
         const oS = Math.round(store / 98000), oD = Math.round(deliv / 72000);
         const crab = Math.round(tot / 95000 * 10) / 10, king = Math.round(tot / 210000 * 10) / 10, lob = Math.round(R() * 3 * 10) / 10;
-        S.sales[k] = { orders: oS + oD, ordersS: oS, ordersD: oD, store, deliv, take, total: tot, liquor: Math.round(store * 0.16 / 100) * 100, crab, king, lob, by: '데모', at: k + ' 21:40', src: 'demo' };
+        const sp = (v) => { const d1 = Math.round(v * 0.14 * 10) / 10, p1 = Math.round(v * 0.06 * 10) / 10; return [Math.round((v - d1 - p1) * 10) / 10, d1, p1]; };   // 매장 · 배달 · 포장 kg
+        const [crabS, crabD, crabP] = sp(crab), [kingS, kingD, kingP] = sp(king);
+        S.sales[k] = { orders: oS + oD, ordersS: oS, ordersD: oD, store, deliv, take, total: tot, liquor: Math.round(store * 0.16 / 100) * 100, crab, king, lob, crabS, crabD, crabP, kingS, kingD, kingP, lobS: lob, lobD: 0, lobP: 0, by: '데모', at: k + ' 21:40', src: 'demo' };
         const d = S.days[k]; const mt = S.templates.find((x) => x.ev === 'money'); if (d && mt && d.inst[mt.id] && d.inst[mt.id].s === 'done') d.inst[mt.id].ev = tot;
       }
       // 매입 — 갑각류(2~3일마다) + 식자재
@@ -6624,6 +6773,7 @@ const App = (() => {
           S.purchases.push({ id: newId('p'), date: k, cat: '대게', name: '대게(러시아)', qty: kg, unit: 'kg', amount: Math.round(kg * unit / 100) * 100, vendor: '데모수산', memo: '', by: '데모', createdAt: Date.now(), src: 'demo' });
           if (R() < 0.6) { const kk = Math.round((st === 'ansan' ? 7 : 4.5) * (0.8 + R() * 0.4) * 10) / 10, ku = 118000 + Math.round(R() * 14000); S.purchases.push({ id: newId('p'), date: k, cat: '킹크랩', name: '킹크랩', qty: kk, unit: 'kg', amount: Math.round(kk * ku / 100) * 100, vendor: '데모수산', memo: '', by: '데모', createdAt: Date.now(), src: 'demo' }); }
         }
+        if (i % 3 === 0) S.purchases.push({ id: newId('p'), date: k, cat: '식자재', name: '대파', qty: 2 + Math.floor(R() * 3), unit: '단', amount: (2 + Math.floor(R() * 3)) * 3500, vendor: '데모상회', memo: '', by: pick(S.staff).name, createdAt: Date.now(), src: 'demo' });   // 야채는 '단' 단위
         if (i % 2 === 1) { const f = pick(DEMO_FOOD); S.purchases.push({ id: newId('p'), date: k, cat: f[0], name: f[1], qty: null, unit: 'kg', amount: Math.round(f[2] * 1.6 * (0.85 + R() * 0.3) / 100) * 100, vendor: '데모상회', memo: '', by: pick(S.staff).name, createdAt: Date.now(), src: 'demo' }); }
       }
       // 수조
@@ -6632,8 +6782,27 @@ const App = (() => {
         const w = shift(today, -(2 + n * 2)), c = shift(today, -(8 + n * 7));
         T.items.push({ n, water: { date: w, by: S.staff[0].name }, clean: { date: c, by: S.staff[0].name } });
         T.care.push({ id: 'cw' + n, date: w, n, kind: 'water', by: S.staff[0].name }, { id: 'cc' + n, date: c, n, kind: 'clean', by: S.staff[0].name });
-        T.log.push({ id: 'l' + n, date: shift(today, -n), n, pos: 'top', species: n % 2 ? '대게' : '킹크랩', qty: 10 + n * 3, kg: Math.round((12 + n * 4) * 10) / 10, dead: 0, by: S.staff[0].name });
       }
+      const lotSets = {   // [수조번호-칸]: 묶음들 — 한 칸에 여러 품목(레드·브라운)도 같이 기록된다
+        '1-top': [['대게', '러시아', 14, 18.2, 2], ['대게', '국내산', 6, 7.1, 1]],
+        '1-bottom': [['대게', '러시아', 9, 11.6, 3]],
+        '2-top': [['킹크랩', '레드', 5, 12.4, 2], ['킹크랩', '브라운', 4, 8.9, 1]],
+        '2-bottom': [['랍스터', '', 12, 7.2, 4]],
+        '3-top': [['대게', '러시아', 11, 14.3, 1]],
+        '4-top': [['킹크랩', '레드', 3, 7.8, 5]],
+      };
+      const lotRows = [];
+      Object.entries(lotSets).forEach(([key, arr]) => {
+        const [n, pos] = key.split('-'); const it = T.items[Number(n) - 1];
+        if (!it[pos]) it[pos] = { lots: [] };
+        arr.forEach(([species, label, qty, kg, ago], j) => {
+          const l = { id: `lt${n}${pos}${j}`, species, label, qty, kg, date: shift(today, -ago), dead: 0, by: S.staff[0].name };
+          it[pos].lots.push(l); lotRows.push([Number(n), pos, l]);
+        });
+      });
+      lotRows.sort((a, b) => a[2].date.localeCompare(b[2].date)).forEach(([n, pos, l]) => T.log.push({ id: 'lg' + l.id, date: l.date, n, pos, kind: 'in', species: l.species, label: l.label, qty: l.qty, kg: l.kg, dead: 0, by: l.by, at: '11:20', note: '' }));
+      T.log.push({ id: 'lgout1', date: shift(today, -1), n: 3, pos: 'bottom', kind: 'out', species: '대게', label: '러시아', qty: 8, kg: 10.4, dead: 0, by: S.staff[0].name, at: '18:40', note: '주말 판매분 소진' });
+      T.log.push({ id: 'lgmv1', date: today, n: 4, pos: 'bottom', kind: 'move', species: '킹크랩', label: '레드', qty: 3, kg: 7.8, dead: 0, by: S.staff[0].name, at: '10:05', note: '4번 하단 → 4번 상단 (수온 안정 칸으로)' });
       S.tanks = T;
       S.deaths = [{ id: 'dd1', date: shift(today, -1), sp: '대게', n: 2, tank: '2', note: '활력 저하 후 폐사', by: S.staff[0].name, at: shift(today, -1) + ' 16:05' }];
       S.deadUse = {};
@@ -6644,9 +6813,15 @@ const App = (() => {
         { id: 'n1', month: mon, title: '이번 달 목표 — 할 일 완료율 95%', body: '중요 표시 업무는 시간대 시작할 때 먼저 끝냅니다.', pin: true, by: S.staff[0].name, createdAt: Date.now() - 864e5 * 6 },
         { id: 'n2', month: mon, title: '주말 단체 예약 많음 — 룸 세팅 30분 일찍', body: '금·토 17:00 전까지 룸 세팅 완료', pin: false, by: S.staff[0].name, createdAt: Date.now() - 864e5 * 2 },
       ];
+      // 보건증 — 직원마다 하나(h:직원번호). 한 명은 곧 만료, 한 명은 미등록
+      const hIssued = [-320, -40, -350, -120, -200];
+      S.health = S.staff.map((x, idx) => ({ id: 'h:' + x.id, staffId: x.id, name: x.name, issued: idx === 3 ? '' : shift(today, hIssued[idx] || -90), memo: idx === 0 ? (st === 'ansan' ? '상록수보건소' : '동안구보건소') : idx === 2 ? '만료 전 재발급 예약함' : '' }));
+      S.hygiene = { owner: { done: shift(today, -210), every: 12, org: '한국외식업중앙회', memo: '온라인 보수교육' }, staff: { d2: { done: shift(today, -100), memo: '' }, d3: { done: shift(today, -330), memo: '다음 달 재교육' } } };
+      S.settings.biz = { name: '해모닉 ' + (st === 'ansan' ? '안산점' : '안양점'), rep: '김데모', reg: '000-00-00000', addr: st === 'ansan' ? '경기 안산시 상록구 데모로 12' : '경기 안양시 동안구 데모대로 34', phone: st === 'ansan' ? '031-000-0001' : '031-000-0002' };
       seedTraining(true);
       const urls = (S.training || []).map((x) => x.url).filter(Boolean);
-      S.trainDone = {}; S.staff.forEach((x, idx) => { S.trainDone[x.name] = {}; urls.slice(0, Math.max(2, 9 - idx * 2)).forEach((u, j) => { S.trainDone[x.name][u] = shift(today, -(j + 1)); }); });
+      S.trainDone = {}; S.trainQuiz = {};
+      S.staff.forEach((x, idx) => { S.trainDone[x.name] = {}; S.trainQuiz[x.name] = {}; urls.slice(0, Math.max(2, 9 - idx * 2)).forEach((u, j) => { S.trainDone[x.name][u] = shift(today, -(j + 1)); if (quizOf(u)) S.trainQuiz[x.name][u] = { tries: j % 3 === 0 ? 2 : 1, at: shift(today, -(j + 1)) }; }); });
       S.missions = S.staff.slice(1, 4).map((x, j) => ({ id: 'ms' + j, who: x.name, text: ['손님 오시면 3초 안에 인사하기', '퇴근 전 작업대 물기까지 닦기', '대게 손질 순서 외워서 혼자 해 보기'][j] || '오늘 배운 것 적용하기', cat: '서비스', month: mon, createdAt: Date.now() - 864e5 * (j + 1), status: ['done', 'claimed', 'open'][j] || 'open', doneAt: j === 0 ? Date.now() - 864e5 : undefined }));
       docs[st] = S;
     }
@@ -6657,6 +6832,9 @@ const App = (() => {
       { id: 'i1', cat: '앱 오류', title: '할 일 체크가 가끔 풀림', body: '📍 어느 화면 : 업무 › 할 일 › 미들\n👆 무엇을 눌렀나 : 갑각류 중간체크 완료\n❗ 어떻게 됐나 : 체크됐다가 2초 뒤 풀림\n✅ 이렇게 되면 좋겠다 : 한 번 누르면 그대로\n📱 기기 : 매장 아이패드\n🔁 다시 해도 같은가 : 가끔', status: 'done', replies: [{ text: '다른 기기 저장이 올 때 화면이 초기화되던 문제 — 고쳤습니다', by: '사장님', at: t0 - 864e5, fix: true }], by: '박서준', anon: false, createdAt: t0 - 864e5 * 2, store: '안산점', updatedAt: t0 - 864e5 },
       { id: 'i2', cat: '앱 건의', title: '근무표에 내 이름 눌러서 넣기', body: '📍 어느 화면 : 인사관리 › 월간 근무표\n❗ 어떻게 됐나 : 이름을 매번 타자로 침\n✅ 이렇게 되면 좋겠다 : 직원 명단에서 눌러서 넣기', status: 'done', replies: [{ text: '직원 칩으로 바꿨습니다', by: '사장님', at: t0 - 864e5 * 3, fix: true }], by: '', anon: true, team: true, createdAt: t0 - 864e5 * 4, store: '안양점', updatedAt: t0 - 864e5 * 3 },
       { id: 'i3', cat: '앱 오류', title: '폐사 기록 후 3일 표시가 안 보임', body: '📍 어느 화면 : 업무 › 수조 관리표\n❗ 어떻게 됐나 : 폐사 적었는데 사용 기한 표시 없음\n📱 기기 : 매장 포스', status: 'open', replies: [], by: '오세린', anon: false, createdAt: t0 - 3600e3 * 5, store: '안양점', updatedAt: t0 - 3600e3 * 5 },
+      { id: 'i5', cat: '수조·상품', title: '2번 수조 킹크랩 레드·브라운 같이 들어옴', body: '한 칸에 두 종류라 따로 적고 싶음. 오늘 입고 레드 5미 · 브라운 4미', status: 'done', replies: [{ text: '수조 칸마다 묶음을 여러 개 넣을 수 있게 바꿨습니다. 입고 추가로 따로 적어 주세요', by: '사장님', at: t0 - 3600e3 * 20, fix: true }], by: '한지우', anon: false, createdAt: t0 - 864e5 - 3600e3 * 2, store: '안양점', updatedAt: t0 - 3600e3 * 20 },
+      { id: 'i6', cat: '앱 오류', title: '보건증 메모 적으면 사라짐', body: '📍 어느 화면 : 업무 › 보건증 관리\n👆 무엇을 눌렀나 : 메모 칸에 보건소 이름 입력\n❗ 어떻게 됐나 : 날짜 넣으니 메모가 지워짐\n📱 기기 : 매장 포스', status: 'done', replies: [{ text: '기기마다 기록이 따로 생겨 합쳐질 때 빈 쪽이 보이던 문제 — 직원당 하나로 합치고 메모는 즉시 저장되게 고쳤습니다', by: '사장님', at: t0 - 3600e3 * 6, fix: true }], by: '최유나', anon: false, createdAt: t0 - 3600e3 * 9, store: '안산점', updatedAt: t0 - 3600e3 * 6 },
+      { id: 'i7', cat: '앱 건의', title: '매입 단위에 "단" 추가', body: '📍 어느 화면 : 운영 › 원가 관리 › 매입 입력\n✅ 이렇게 되면 좋겠다 : 파 두 단처럼 단 단위로 적고 싶음', status: 'done', replies: [{ text: '단위 목록에 단을 넣었습니다', by: '사장님', at: t0 - 864e5 * 2, fix: true }], by: '', anon: true, team: true, createdAt: t0 - 864e5 * 2 - 3600e3, store: '안산점', updatedAt: t0 - 864e5 * 2 },
       { id: 'i4', cat: '시설·장비', title: '2번 수조 산소발생기 소리 큼', body: '어제부터 덜덜거림. 업체 점검 필요해 보임', status: 'open', replies: [{ text: '내일 오전 업체 방문 예정', by: '김하늘', at: t0 - 3600e3 * 2 }], by: '이도윤', anon: false, createdAt: t0 - 864e5, store: '안산점', updatedAt: t0 - 3600e3 * 2 },
     ] };
     await Store.saveShared('issues', SH);
@@ -6691,6 +6869,7 @@ const App = (() => {
     S = (await Store.load()) || freshState();
     if (DEMO && !(S.demo && S.demo.ver === DEMO_VER && S.demo.day === dateKey())) { S = await demoSeed(); await Store.switchTo('ansan'); S = (await Store.load()) || S; }   // 데모판: 매일 처음 열면 오늘 기준으로 새로 채운다
     hydrate();
+    try { reconcileJournal('start'); } catch (e) { console.warn(e); }
     loadSharedIssues();
     try { loadMarketCache(); } catch (e) {}   // 매입 기록 없는 매장이 다른 매장 단가를 시세 참고로 쓰기 위해
     // 주소 뒤에 ?view=tanks 처럼 붙이면 그 화면으로 바로 연다 — 아이패드 홈 화면 바로가기용
@@ -6705,9 +6884,29 @@ const App = (() => {
     checkAlarms();
     checkReport();
 
-    let lastKey = dateKey(), lastSig = null;
+    /* 새 판 자동 반영 (2026-10-11) — 포스는 앱을 하루 종일 열어 두므로, 고친 것이 올라가도 새로고침 전까지 옛 판으로 돈다.
+       5분마다 index.html 의 app.js 판 번호를 확인해 달라졌으면, 입력 창·글자 입력·끌기 중이 아닐 때 안내 뒤 새로 불러온다. */
+    const myVer = (() => { const sc = [...document.scripts].find((x) => /app\.js\?v=/.test(x.src)); return sc ? (sc.src.match(/v=([0-9a-z]+)/) || [])[1] : ''; })();
+    let newVer = '', lastVerCheck = 0;
+    const checkVersion = async () => {
+      if (!myVer || !/^https?:/.test(location.protocol)) return;
+      lastVerCheck = Date.now();
+      try { const html = await (await fetch(location.pathname + '?v=' + Date.now(), { cache: 'no-store' })).text(); const m = html.match(/app\.js\?v=([0-9a-z]+)/); if (m && m[1] !== myVer) newVer = m[1]; } catch (_) { /* 오프라인 등 — 다음에 */ }
+    };
+    const applyVersion = () => {
+      if (!newVer || !$('#modal').hidden || typing() || dragSt) return;
+      banner('새 판으로 바뀝니다', '잠시 뒤 화면을 새로 불러옵니다. 하던 입력은 저장돼 있습니다.');
+      Store.flush().finally(() => setTimeout(() => location.reload(), 2500));
+      newVer = '';
+    };
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastVerCheck > 60 * 1000) checkVersion().then(applyVersion); });
+    setTimeout(checkVersion, 90 * 1000);
+
+    let lastKey = dateKey(), lastSig = null, tickN = 0;
     tickTimer = setInterval(() => {
       const k = dateKey();
+      if (++tickN % 40 === 0) Store.deviceTouch();   // 20분마다 — 켜 둔 포스가 매장 인터넷 주소를 서버에 남긴다
+      if (tickN % 10 === 0) checkVersion().then(applyVersion); else if (newVer) applyVersion();   // 5분마다 판 확인, 바뀌었으면 조용한 때 새로 불러오기
       if (k !== lastKey) { lastKey = k; S.ui.date = k; S.ui.filter = 'all'; S.ui.slot = null; backfill(); save(); render(); }   // 자정 롤오버
       checkAlarms();
       // 지연 표시가 실제로 바뀔 때만 다시 그린다.
@@ -6722,15 +6921,23 @@ const App = (() => {
     window.addEventListener('pagehide', () => Store.flush());
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') Store.flush(); });
     // 다른 기기(휴대폰·매장 PC)에서 바뀐 게 도착하면 지금 보는 매장 것일 때만 갈아끼운다
-    Store.onRemote((k, doc) => {
-      if (k === 'shared:issues') { if (doc && Array.isArray(doc.issues)) { SH = doc; if (view === 'issues' && $('#modal').hidden) render(); } return; }
-      if (k !== 'state:' + (Store.meta && Store.meta.current)) return;
-      if (!$('#modal').hidden) return;      // 입력 중인 창을 날리지 않는다
-      if (view === 'contracts' && cMode === 'edit') return;   // 계약서 작성 중 — 서명이 지워진다
+    /* 글자를 치는 중이면 화면을 다시 그리지 않는다 — 설정 화면에서 입력하던 글자가 다른 기기 저장이 도착할 때 지워지던 문제 (사장님 신고 2026-10-11).
+       보류된 서버 변경은 다음 저장 때 합쳐지거나 60초 확인 때 다시 받는다. */
+    const typing = () => { const a = document.activeElement; return !!(a && a.closest && a.closest('#main') && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !['checkbox', 'radio', 'button', 'submit'].includes(a.type)); };
+    Store.onRemote((k, doc) => {   // false 를 돌려주면 "아직 받아들이지 않음" — 저장소가 서버 최신 표시를 앞당기지 않고, 다음 저장 때 합친다
+      if (k === 'shared:issues') { if (doc && Array.isArray(doc.issues)) { SH = doc; if (view === 'issues' && $('#modal').hidden) render(); } return true; }
+      if (k !== 'state:' + (Store.meta && Store.meta.current)) return true;
+      if (!$('#modal').hidden) return false;      // 입력 중인 창을 날리지 않는다
+      if (typing()) return false;                  // 설정 등에서 글자 치는 중
+      if (view === 'contracts' && cMode === 'edit') return false;   // 계약서 작성 중 — 서명이 지워진다
       const ui = S.ui;                       // 시간대 탭·필터·날짜는 이 기기 것 — 다른 기기 저장이 와도 튀지 않게 (사장님 요청 2026-10-08)
-      S = doc; S.ui = ui; hydrate(true); render();
+      S = doc; S.ui = ui; hydrate(true);
+      reconcileJournal('remote');
+      render();
+      return true;
     });
-    document.addEventListener('cloud-status', () => { if (view === 'today' || view === 'settings') render(); });
+    document.addEventListener('cloud-status', () => { if ((view === 'today' || view === 'settings') && !typing()) render(); });
+    document.addEventListener('doc-merged', (e) => { if (e.detail && e.detail.key === 'state:' + (Store.meta && Store.meta.current) && $('#modal').hidden && !typing()) render(); });   // 저장 직전 다른 기기 기록과 합쳐졌으면 화면도 맞춘다
     // 쓰다가 저장이 깨지는 경우(용량 초과 등)도 즉시 화면에 드러낸다
     document.addEventListener('storage-broken', () => { view = 'today'; render(); });
   }

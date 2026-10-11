@@ -1234,9 +1234,10 @@ table.tkLog td small{display:block;font-size:11px;color:var(--muted);font-weight
 .lbar.stack i{display:block;height:100%}
 .lbar.stack i.s{background:var(--accent)}
 .lbar.stack i.d{background:var(--wk)}
+.lbar.stack i.p{background:var(--crit-soft)}
 .lbar.stack i.n{background:var(--rule)}
-.legS,.legD,.legN{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;margin:0 2px 0 6px}
-.legS{background:var(--accent)}.legD{background:var(--wk)}.legN{background:var(--rule)}
+.legS,.legD,.legP,.legN{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;margin:0 2px 0 6px}
+.legS{background:var(--accent)}.legD{background:var(--wk)}.legP{background:var(--crit-soft)}.legN{background:var(--rule)}
 
 /* 대시보드 */
 .durgent{border:1px solid var(--crit);background:var(--crit-soft);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;flex-direction:column;gap:6px}
@@ -1491,3 +1492,30 @@ input.cpTarget{outline:2px solid var(--ink);outline-offset:1px}
 .demoBar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;background:var(--wk-soft);border:1px solid var(--wk);color:var(--ink);border-radius:9px;padding:8px 12px;margin:0 0 12px;font-size:13.5px}
 .demoBar code{background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:1px 6px;font-weight:700}
 .demoBar .btn{margin-left:auto}
+
+/* 수조 칸 안 여러 묶음 (2026-10-11) */
+.tkLots{display:flex;flex-direction:column;gap:3px;text-align:left;margin:0 auto;max-width:220px}
+.tkLotLine{font-size:13px;line-height:1.35;padding:3px 6px;border-radius:6px;background:var(--surface-2)}
+.tkLotLine.first{outline:1px solid var(--accent)}
+.tkLotList{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.tkLot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;background:var(--surface-2);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;font-size:14px}
+.tkLotMain{min-width:0;flex:1 1 180px}
+.tkLotBtns{display:flex;gap:4px;flex-wrap:wrap}
+
+/* ═══ 간단히 보기 (기본) — 설명 문구·보조 글귀·범례 숨김. '자세히' 버튼으로 켠다 (2026-10-11) ═══ */
+.onlyMin{display:none}
+body.minimal .onlyMin{display:inline-flex;margin:0 0 12px}
+body.minimal #main .hint:not(.keep),body.minimal #modal .hint:not(.keep),body.minimal #main .sub:not(.keep),body.minimal #main .dLegend,body.minimal #main .tkHint,body.minimal #main .tkEmptyLog,body.minimal #main .rpolicy,body.minimal #main .rnote{display:none}
+body.minimal #main .tcRole,body.minimal #main .repBadge.daily,body.minimal #main .crewMore,body.minimal #main .tcMeta:not(:has(span:not(.tcRole))){display:none}
+body.minimal #main .tcMemo{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+body.minimal #main .guide{display:none}
+body.minimal #main .orderBar:not(.on){display:none}   /* 순서 바꾸기는 '자세히'에서 */
+body.minimal #main .fbTpl{display:none}
+body.minimal #main .hd{margin:2px 0 8px}
+body.minimal #main .card{padding:12px 14px}
+body.minimal #main .notice{padding:10px 12px;margin:8px 0}
+body.minimal #main .slotTabs{margin:8px 0 8px}
+body.minimal .demoBar{padding:6px 10px}
+.uiBtn{margin-left:6px;font-size:12px;padding:4px 9px;min-height:30px;color:var(--muted)}
+#who .uiBtn{margin-left:8px}
+.sfoot .uiBtn{width:auto;margin:0 0 6px}
