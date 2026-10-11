@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, Notice } from "@/components/ui";
 import { BreakevenCard } from "@/components/BreakevenCard";
@@ -19,17 +19,32 @@ import { monthFindings, monthSources, type FindingsInput } from "@/lib/findings"
 import { missingFixedCosts } from "@/lib/missingFixed";
 import { dayTotals } from "@/lib/weekday";
 import { PURCHASES_KEY_PREFIX, type Purchase } from "@/lib/costing/purchases";
+import { ledgerIsEmpty, loadSampleData, SAMPLE_LABEL } from "@/lib/sampleData";
 import { loadStoreProfile, taxFileName } from "@/lib/storeProfile";
 import { buildTaxSheets } from "@/lib/taxExport";
 import type { Transaction } from "@/lib/types";
 
 export default function PnlPage() {
-  const { month } = useMonth();
+  const { month, setMonth } = useMonth();
   const cur = useMonthPnl(month);
   const prev = useMonthPnl(prevMonth(month)); // 지난달도 같은 잣대로 계산해서 비교한다
   const { ledger, daily, settlement, summary, pnl, purchaseCount, today } = cur;
   const [open, setOpen] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  // 빈 화면에 "둘러보기"를 띄울지 — 장부가 통째로 비었을 때만 (lib/sampleData.ts)
+  const [canTour, setCanTour] = useState(false);
+  const [touring, setTouring] = useState(false);
+  useEffect(() => {
+    void ledgerIsEmpty().then(setCanTour);
+  }, [month]);
+  async function startTour() {
+    setTouring(true);
+    try {
+      setMonth(await loadSampleData());
+    } finally {
+      setTouring(false);
+    }
+  }
 
   if (cur.loading || prev.loading) return <p className="py-10 text-center text-sm text-stone-500">불러오는 중…</p>;
   if (ledger.error) return <Notice tone="error">{ledger.error}</Notice>;
@@ -84,10 +99,27 @@ export default function PnlPage() {
       <section className="card space-y-3 text-center">
         <p className="text-4xl">📥</p>
         <h2 className="text-base font-bold">{monthLabel(month)} 데이터가 아직 없어요</h2>
-        <p className="text-sm text-stone-600">은행 거래내역 엑셀을 올리면 자동으로 분류해서 손익을 보여 드려요.</p>
-        <Link href="/upload" className="btn-primary">
-          거래내역 올리러 가기
-        </Link>
+        {canTour ? (
+          <>
+            <p className="text-sm text-stone-600">
+              처음이세요? <b>가짜 자료로 한 바퀴 둘러보면</b> 무엇을 보여 주는 도구인지 1분이면 알 수 있어요.
+            </p>
+            <button className="btn-primary w-full" disabled={touring} onClick={startTour}>
+              {touring ? "넣는 중…" : `가짜 자료로 둘러보기 (${SAMPLE_LABEL})`}
+            </button>
+            <p className="pt-1 text-sm text-stone-600">내 통장으로 시작하려면</p>
+            <Link href="/upload" className="btn-ghost">
+              거래내역 올리러 가기
+            </Link>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-stone-600">은행 거래내역 엑셀을 올리면 자동으로 분류해서 손익을 보여 드려요.</p>
+            <Link href="/upload" className="btn-primary">
+              거래내역 올리러 가기
+            </Link>
+          </>
+        )}
       </section>
     );
   }
