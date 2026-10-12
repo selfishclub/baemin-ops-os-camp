@@ -3920,7 +3920,11 @@ const App = (() => {
     ['total', '총매출', '원', 100], ['crab', '대게', 'kg', 0.1], ['king', '킹크랩', 'kg', 0.1], ['lob', '랍스터', 'kg', 0.1], ['liquor', '그중 주류 매출', '원', 100],
     ['crabS', '대게 매장', 'kg', 0.1], ['crabD', '대게 배달', 'kg', 0.1], ['kingS', '킹크랩 매장', 'kg', 0.1], ['kingD', '킹크랩 배달', 'kg', 0.1], ['lobS', '랍스터 매장', 'kg', 0.1], ['lobD', '랍스터 배달', 'kg', 0.1],
     ['crabP', '대게 포장', 'kg', 0.1], ['kingP', '킹크랩 포장', 'kg', 0.1], ['lobP', '랍스터 포장', 'kg', 0.1],   // 2026-10-10 안산점 건의: 포장 매출 칸은 있는데 포장 kg 칸이 없음
+    ['cash', '현금', '원', 100], ['transfer', '계좌이체', '원', 100], ['voucher', '상품권', '원', 100], ['gifticon', '기프티콘', '원', 100], ['petty', '시제(시재금)', '원', 100],   // 2026-10-12 사장님 요청: 포스 정산 메시지의 결제 수단·시재
+    ['priceCrab', '대게 단가', '원/kg', 1000], ['priceKing', '킹크랩 단가', '원/kg', 1000], ['priceLob', '랍스터 단가', '원/kg', 1000],   // 오늘의 단가
   ];
+  const PAY_F = [['cash', '현금'], ['transfer', '계좌이체'], ['voucher', '상품권'], ['gifticon', '기프티콘'], ['petty', '시제']];
+  const payLine = (r) => PAY_F.filter(([k]) => r && r[k] != null).map(([k, n]) => `${n} ${Number(r[k]).toLocaleString('ko-KR')}`).join(' · ');
   /* kg 는 품종별 합계(crab·king·lob)가 기준이고, 매장(S)·배달(D)로 나눠 넣으면 합계는 자동으로 채워진다 — 사장님 요청 2026-10-02 */
   const KG_SP = [['crab', '대게'], ['king', '킹크랩'], ['lob', '랍스터']];
   const kgCh = (r, ch) => KG_SP.reduce((acc, [k]) => acc + (Number((r || {})[k + ch]) || 0), 0);   // ch: 'S' 매장 · 'D' 배달
@@ -3960,7 +3964,13 @@ const App = (() => {
         ${KG_SP.map(([k, n]) => `<tr><th>${n}</th><td>${kgIn(k + 'S')}</td><td>${kgIn(k + 'D')}</td><td>${kgIn(k + 'P')}</td><td>${kgIn(k, '자동')}</td></tr>`).join('')}
         <tr class="sum"><th>합계</th><td id="kgSumS">–</td><td id="kgSumD">–</td><td id="kgSumP">–</td><td id="kgSumT">–</td></tr>
       </tbody></table>
-      <p class="hint">빈칸은 0이 아니라 "미입력"으로 남습니다. 총주문·총매출은 나눠 넣은 값의 합으로 자동 계산되고, 나눠 넣지 않았을 때만 직접 적습니다. 주류 매출은 매장 매출 안에 포함된 금액을 따로 적는 칸입니다(총매출에 더해지지 않음). 합계 kg 만 알면 합계 칸에만 넣어도 됩니다.</p>`;
+      <div class="mlabel">결제 수단 · 시재 — 포스 정산 메시지에 있는 대로</div>
+      <div class="frow3">${inp(SALES_F.find(([k]) => k === 'cash'))}${inp(SALES_F.find(([k]) => k === 'transfer'))}${inp(SALES_F.find(([k]) => k === 'voucher'))}</div>
+      <div class="frow3">${inp(SALES_F.find(([k]) => k === 'gifticon'))}${inp(SALES_F.find(([k]) => k === 'petty'))}<label class="autoF">카드·배달앱 등 나머지 <small class="opt">원 · 자동</small><input type="number" id="payRest" readonly placeholder="자동" inputmode="decimal"></label></div>
+      <div class="mlabel">오늘의 단가 <span class="opt">원/kg · 선택</span></div>
+      <div class="frow3">${inp(SALES_F.find(([k]) => k === 'priceCrab'))}${inp(SALES_F.find(([k]) => k === 'priceKing'))}${inp(SALES_F.find(([k]) => k === 'priceLob'))}</div>
+      <label>비고 <span class="opt">선택</span><textarea id="sfNote" rows="2" placeholder="예: 잔돈이 없어 직원에게 1만원 빌림 · 상품권 손님 2팀">${esc(r.note || '')}</textarea></label>
+      <p class="hint">빈칸은 0이 아니라 "미입력"으로 남습니다. 총주문·총매출은 나눠 넣은 값의 합으로 자동 계산되고, 나눠 넣지 않았을 때만 직접 적습니다. 결제 수단은 총매출에서 현금·이체·상품권·기프티콘을 뺀 나머지가 카드·배달앱으로 자동 표시됩니다(시제는 매출이 아니라 거스름돈용 시재금이라 빼지 않습니다). 주류 매출은 매장 매출 안에 포함된 금액을 따로 적는 칸입니다(총매출에 더해지지 않음). 합계 kg 만 알면 합계 칸에만 넣어도 됩니다.</p>`;
   }
   function syncKgTotals() {
     const g = (k) => { const el = document.querySelector(`.sfIn[data-k="${k}"]`); if (!el) return null; const v = el.value.trim(); return v === '' ? null : Number(v); };
@@ -3985,6 +3995,8 @@ const App = (() => {
     };
     setAuto('orders', ['ordersS', 'ordersD']);
     setAuto('total', ['store', 'deliv', 'take']);
+    const rest = document.getElementById('payRest');
+    if (rest) { const tot = g('total'); const paid = ['cash', 'transfer', 'voucher', 'gifticon'].map(g); rest.value = (tot != null && paid.some((v) => v != null)) ? Math.max(0, tot - paid.reduce((a, v) => a + (v || 0), 0)) : ''; }
   }
   document.addEventListener('input', (e) => {
     if (!e.target.closest) return;
@@ -4009,6 +4021,8 @@ const App = (() => {
     if (out.ordersS != null || out.ordersD != null) out.orders = (out.ordersS || 0) + (out.ordersD || 0);
     KG_SP.forEach(([k]) => { if (out[k + 'S'] != null || out[k + 'D'] != null || out[k + 'P'] != null) out[k] = Math.round(((out[k + 'S'] || 0) + (out[k + 'D'] || 0) + (out[k + 'P'] || 0)) * 100) / 100; });
     if (SALES_F.every(([k]) => out[k] == null)) { alert('숫자를 하나도 넣지 않았습니다.'); return null; }
+    const noteEl = document.getElementById('sfNote'); const note = noteEl ? noteEl.value.trim() : '';
+    if (note) out.note = note; else delete out.note;
     return out;
   }
   function saveSales(k, vals, src) {
@@ -4061,7 +4075,7 @@ const App = (() => {
     h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>날짜</th><th class="r">총주문</th><th class="r">매장</th><th class="r">배달</th><th class="r">포장</th><th class="r">총매출</th><th class="r">대게${kgHead}</th><th class="r">킹크랩${kgHead}</th><th class="r">랍스터${kgHead}</th><th class="r">주류</th><th>입력자</th></tr></thead><tbody>`;
     dates.slice().reverse().forEach((k) => {
       const r = salesOf(k), d = new Date(k + 'T00:00:00'), lb = `${k.slice(5)} ${WD[d.getDay()]}`;
-      h += r ? `<tr class="rowbtn" data-act="salesEdit" data-k="${k}"><td>${lb}</td><td class="r">${cell(r.orders)}${(r.ordersS != null || r.ordersD != null) ? `<br><small class="dim">매장 ${r.ordersS ?? 0} · 배달 ${r.ordersD ?? 0}</small>` : ''}</td><td class="r">${cell(r.store)}</td><td class="r">${cell(r.deliv)}</td><td class="r">${cell(r.take)}</td><td class="r"><b>${fmtWon(salesTotal(r))}</b></td><td class="r">${kgCell(r, 'crab')}</td><td class="r">${kgCell(r, 'king')}</td><td class="r">${kgCell(r, 'lob')}</td><td class="r">${cell(r.liquor)}</td><td>${esc(r.by || '')}${r.src === 'csv' ? ' <span class="chip missed">CSV</span>' : ''}</td></tr>`
+      h += r ? `<tr class="rowbtn" data-act="salesEdit" data-k="${k}"><td>${lb}</td><td class="r">${cell(r.orders)}${(r.ordersS != null || r.ordersD != null) ? `<br><small class="dim">매장 ${r.ordersS ?? 0} · 배달 ${r.ordersD ?? 0}</small>` : ''}</td><td class="r">${cell(r.store)}</td><td class="r">${cell(r.deliv)}</td><td class="r">${cell(r.take)}</td><td class="r"><b>${fmtWon(salesTotal(r))}</b>${payLine(r) ? `<br><small class="dim">${payLine(r)}</small>` : ''}${r.note ? `<br><small class="dim" title="${esc(r.note)}">📝 ${esc(r.note.length > 18 ? r.note.slice(0, 18) + '…' : r.note)}</small>` : ''}</td><td class="r">${kgCell(r, 'crab')}</td><td class="r">${kgCell(r, 'king')}</td><td class="r">${kgCell(r, 'lob')}</td><td class="r">${cell(r.liquor)}</td><td>${esc(r.by || '')}${r.src === 'csv' ? ' <span class="chip missed">CSV</span>' : ''}</td></tr>`
         : `<tr class="rowbtn empty" data-act="salesEdit" data-k="${k}"><td>${lb}</td><td colspan="10" style="text-align:left"><span class="chip missed">미입력</span> <small>눌러서 입력</small></td></tr>`;
     });
     h += `</tbody></table></div>`;
@@ -4077,7 +4091,8 @@ const App = (() => {
     return { head: split(lines[0]), rows: lines.slice(1).map(split) };
   }
   const CSV_MAP = { '날짜': 'date', '매장': 'storeName', '총주문': 'orders', '매장주문': 'ordersS', '배달주문': 'ordersD', '매장매출': 'store', '배달매출': 'deliv', '포장매출': 'take', '총매출': 'total', '대게kg': 'crab', '킹크랩kg': 'king', '랍스타kg': 'lob', '랍스터kg': 'lob', '주류매출': 'liquor',
-    '대게매장kg': 'crabS', '대게배달kg': 'crabD', '킹크랩매장kg': 'kingS', '킹크랩배달kg': 'kingD', '랍스터매장kg': 'lobS', '랍스타매장kg': 'lobS', '랍스터배달kg': 'lobD', '랍스타배달kg': 'lobD', '대게포장kg': 'crabP', '킹크랩포장kg': 'kingP', '랍스터포장kg': 'lobP', '랍스타포장kg': 'lobP' };
+    '대게매장kg': 'crabS', '대게배달kg': 'crabD', '킹크랩매장kg': 'kingS', '킹크랩배달kg': 'kingD', '랍스터매장kg': 'lobS', '랍스타매장kg': 'lobS', '랍스터배달kg': 'lobD', '랍스타배달kg': 'lobD', '대게포장kg': 'crabP', '킹크랩포장kg': 'kingP', '랍스터포장kg': 'lobP', '랍스타포장kg': 'lobP',
+    '현금': 'cash', '계좌이체': 'transfer', '이체': 'transfer', '상품권': 'voucher', '기프티콘': 'gifticon', '시제': 'petty', '시재': 'petty', '대게단가': 'priceCrab', '킹크랩단가': 'priceKing', '랍스터단가': 'priceLob', '랍스타단가': 'priceLob' };
   function salesCsvImport() {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = '.csv,text/csv';
@@ -4095,7 +4110,7 @@ const App = (() => {
           const d = (r[idx.date] || '').slice(0, 10);
           if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d > dateKey()) { skipped++; return; }
           const v = {};
-          ['orders', 'ordersS', 'ordersD', 'store', 'deliv', 'take', 'total', 'crab', 'king', 'lob', 'liquor', 'crabS', 'crabD', 'kingS', 'kingD', 'lobS', 'lobD', 'crabP', 'kingP', 'lobP'].forEach((k) => {
+          ['orders', 'ordersS', 'ordersD', 'store', 'deliv', 'take', 'total', 'crab', 'king', 'lob', 'liquor', 'crabS', 'crabD', 'kingS', 'kingD', 'lobS', 'lobD', 'crabP', 'kingP', 'lobP', 'cash', 'transfer', 'voucher', 'gifticon', 'petty', 'priceCrab', 'priceKing', 'priceLob'].forEach((k) => {
             if (idx[k] == null) return;
             const x = r[idx[k]]; v[k] = (x === '' || x == null) ? null : Number(x); if (isNaN(v[k]) || v[k] < 0) v[k] = null;
           });

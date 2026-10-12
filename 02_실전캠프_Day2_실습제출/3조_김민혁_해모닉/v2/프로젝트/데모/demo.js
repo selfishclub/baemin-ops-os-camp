@@ -158,7 +158,10 @@ window.HM_DEMO_SEED = async function (api) {
       const crab = Math.round(tot / SC.kgPer.crab * 10) / 10, king = Math.round(tot / SC.kgPer.king * 10) / 10, lob = Math.round(R() * 3 * 10) / 10;
       const sp = (v) => { const d1 = Math.round(v * SC.kgSplit.deliv * 10) / 10, p1 = Math.round(v * SC.kgSplit.take * 10) / 10; return [Math.round((v - d1 - p1) * 10) / 10, d1, p1]; };
       const [crabS, crabD, crabP] = sp(crab), [kingS, kingD, kingP] = sp(king);
-      S.sales[k] = { orders: oS + oD, ordersS: oS, ordersD: oD, store, deliv, take, total: tot, liquor: Math.round(store * SC.liquorOfStore / 100) * 100, crab, king, lob, crabS, crabD, crabP, kingS, kingD, kingP, lobS: lob, lobD: 0, lobP: 0, by: pick(S.staff).name, at: k + ' 21:40', src: 'demo' };
+      const cash = Math.round(store * (0.08 + R() * 0.1) / 10000) * 10000, transfer = R() < 0.35 ? Math.round(store * 0.04 / 10000) * 10000 : null, voucher = R() < 0.25 ? 50000 * (1 + Math.floor(R() * 3)) : null, gifticon = R() < 0.15 ? 30000 : null;   // 결제 수단 (포스 정산 메시지)
+      S.sales[k] = { orders: oS + oD, ordersS: oS, ordersD: oD, store, deliv, take, total: tot, liquor: Math.round(store * SC.liquorOfStore / 100) * 100, crab, king, lob, crabS, crabD, crabP, kingS, kingD, kingP, lobS: lob, lobD: 0, lobP: 0,
+        cash, transfer, voucher, gifticon, petty: 50000, priceCrab: 100000 + Math.round(R() * 12) * 1000, priceKing: 128000 + Math.round(R() * 10) * 1000, priceLob: 118000 + Math.round(R() * 8) * 1000,
+        note: i === 2 ? '잔돈 없어 직원에게 1만원 빌림 — 내일 갚기' : voucher ? '상품권 손님 ' + (voucher / 50000) + '팀' : undefined, by: pick(S.staff).name, at: k + ' 21:40', src: 'demo' };
       const d = S.days[k]; const mt = S.templates.find((x) => x.ev === 'money'); if (d && mt && d.inst[mt.id] && d.inst[mt.id].s === 'done') d.inst[mt.id].ev = tot;
     }
 
