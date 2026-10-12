@@ -169,6 +169,7 @@ main{max-width:860px;margin:0 auto;padding:18px 16px 96px}
 .chip.hall{background:var(--hall-bg);color:var(--hall)}
 .chip.kit{background:var(--kit-bg);color:var(--kit)}
 .chip.any{background:var(--any-bg);color:var(--any)}
+.chip.part{background:var(--any-bg);color:var(--any)}
 
 .add{
   display:block;width:100%;padding:14px;background:none;border:0;border-top:1px solid var(--rule-soft);

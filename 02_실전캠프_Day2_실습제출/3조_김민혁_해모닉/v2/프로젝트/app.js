@@ -419,7 +419,7 @@ const App = (() => {
     if (crewOf(key, t.slot) === 2) {
       // 안양점 2인: 반반 담당표(ANYANG_TWO)가 우선 — 사장님 요청 2026-10-08
       if (Store.meta && Store.meta.current === 'anyang' && typeof ANYANG_TWO !== 'undefined' && ANYANG_TWO[tid]) return ANYANG_TWO[tid];
-      if (t.role2) return t.role2; if (t.role === '홀') return ROLE_MGR;
+      if (t.role2) return t.role2; if (t.role === ROLE_HALL) return ROLE_MGR;
     }
     return t.role;
   }
@@ -1862,8 +1862,8 @@ const App = (() => {
     /* 역할 필터 */
     const crew = crewOf(key, slot.key);
     const split = dayCrewSplit(key);
-    const roleBtns = crew === 2 ? ROLES.filter((r) => r !== '홀') : ROLES;   // 2인이면 홀 담당이 없다
-    if (crew === 2 && filter === '홀') filter = 'all';
+    const roleBtns = (crew === 2 ? ROLES.filter((r) => r !== ROLE_HALL) : ROLES).filter((r) => r !== ROLE_PART);   // 2인이면 홀 담당이 없다 · 고정알바는 업무 담당이 아니라 필터에 없음
+    if (crew === 2 && filter === ROLE_HALL) filter = 'all';
     h += `<div class="filters">
       ${['all', ...roleBtns].map((r) => `<button class="fl${filter === r ? ' on' : ''}" data-act="filter" data-r="${r}">${r === 'all' ? '전체' : r}</button>`).join('')}
       <button class="crewTag" data-act="view" data-v="month" title="근무표의 오전·오후 조 인원에 따라 시간대별로 정해집니다 — ${crew}인 기준${split ? ` (${slot.key === 'open' ? '오전 조' : '오후 조'} ${(slot.key === 'open' ? split.am : split.pm).length}명)` : ''}">👥 ${crew}인<span class="crewMore">${split ? ` (${slot.key === 'open' ? '오전' : '오후'} 조 ${(slot.key === 'open' ? split.am : split.pm).length}명)` : ''}${crew === 2 ? ' · 홀 업무는 관리자가, 일부는 주방이' : ''}</span></button>
@@ -1964,7 +1964,7 @@ const App = (() => {
     const late = isOverdue(key, tid) && key === dateKey();
     const missed = opt.isPast && rec.s === 'todo';
     const role = roleOf(key, tid);
-    const rc = { [ROLE_MGR]: 'mgr', '홀': 'hall', '주방': 'kit', '공통': 'any' }[role] || 'mgr';
+    const rc = { [ROLE_MGR]: 'mgr', [ROLE_HALL]: 'hall', [ROLE_KIT]: 'kit', [ROLE_PART]: 'part', '공통': 'any' }[role] || 'mgr';
     const rep = t.repeat || { t: 'daily' };
     const repLabel = rep.t === 'weekly' ? `주 ${rep.days.length}회` : '매일';
 
@@ -2163,7 +2163,7 @@ const App = (() => {
   }
   /* 직원 칩 선택기 — 이름을 타이핑하지 않고 명단에서 눌러 넣는다 (사장님 요청 2026-10-07).
      data-for 가 있으면 그 입력칸에, 없으면 마지막으로 누른(포커스한) 입력칸에 이름을 넣고 뺀다. */
-  const roleShort = (r) => ({ '갑각류 관리자': '관리', '관리자': '관리', '홀': '홀', '주방': '주방' })[r] || (r || '').slice(0, 2);
+  const roleShort = (r) => ({ [ROLE_MGR]: '관리', '관리자': '관리', [ROLE_HALL]: '홀', '홀': '홀', [ROLE_KIT]: '주방', '주방': '주방', [ROLE_PART]: '알바' })[r] || (r || '').slice(0, 2);
   function crewChips(forId, date) {
     const list = S.staff.filter((st) => st.active && st.name);
     if (!list.length) return `<p class="hint">직원 명단이 비어 있습니다. 인사관리 › 직원 명단에 등록하면 여기서 눌러 넣을 수 있습니다.</p>`;
@@ -2884,7 +2884,7 @@ const App = (() => {
   const minWage = () => Number(S.settings.minWage) || MIN_WAGE.hour;
 
   const DUTY_OPTS = ['갑각류(수조) 관리', '홀 서빙·고객 응대', '주방 조리', '주방 보조', '카운터·예약 응대', '청소·마감'];
-  const DUTY_BY_ROLE2 = { [ROLE_MGR]: ['갑각류(수조) 관리', '카운터·예약 응대'], '홀': ['홀 서빙·고객 응대', '청소·마감'], '주방': ['주방 조리', '주방 보조'] };
+  const DUTY_BY_ROLE2 = { [ROLE_MGR]: ['갑각류(수조) 관리', '카운터·예약 응대'], [ROLE_HALL]: ['홀 서빙·고객 응대', '청소·마감'], [ROLE_KIT]: ['주방 조리', '주방 보조'], [ROLE_PART]: ['홀 서빙 보조', '청소·정리'] };
   const WORK_TYPES = ['주간근무제', '교대근무제', '야간근무제', '격일근무제', '기타'];
   const WEEKLY_NOTE = '주휴수당은 4주 평균 1주 소정근로시간이 15시간 이상이고 해당 주의 소정근로일을 개근하는 등 관계 법령상 요건을 충족할 때 적용합니다. 약정하지 않은 대타 근무는 당초 약정한 소정근로시간에 포함되는지에 따라 판단하며, 주휴수당 산정 대상이 아닌 대타 근로시간은 약정 시급을 기준으로 지급합니다.';
   const ACKS = [
@@ -2956,7 +2956,7 @@ const App = (() => {
   const typeOf = (f) => (f.end ? 'fixed' : (f.type === 'part' ? 'part' : 'regular'));
 
   function contractDefaults(st) {
-    const role = (st && st.roles && st.roles[0]) || '홀';
+    const role = (st && st.roles && st.roles[0]) || ROLE_HALL;
     const prev = st ? (S.contracts || []).filter((c) => c.staffId === st.id).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0] : null;
     const pw = (prev && prev.f && prev.f.worker) || {};
     const bz = bizOf();
@@ -3661,7 +3661,7 @@ const App = (() => {
       h += list.map((t) => {
         const rep = t.repeat || { t: 'daily' };
         const repLabel = rep.t === 'weekly' ? `주 ${rep.days.length}회 (${rep.days.map((d) => WD[d]).join('·')})` : '매일';
-        const rc = { [ROLE_MGR]: 'mgr', '홀': 'hall', '주방': 'kit' }[t.role];
+        const rc = { [ROLE_MGR]: 'mgr', [ROLE_HALL]: 'hall', [ROLE_KIT]: 'kit', [ROLE_PART]: 'part' }[t.role];
         return `<div class="task rt${t.active ? '' : ' off'}">
           <button class="ck sw${t.crit ? ' on' : ''}" data-act="critToggle" data-id="${t.id}" aria-label="중요 지정">${t.crit ? '중요' : '일반'}</button>
           <div class="tb"><div class="tt">${esc(t.title)}</div>
@@ -3798,13 +3798,13 @@ const App = (() => {
     h += `<div class="hd sub2"><h3>인원 기준 — ${esc(storeName())}</h3></div>
       <div class="setrow"><span>기본 인원<div class="hint">근무 편성이 있는 날은 편성 인원을 따라갑니다. 편성 전에만 이 값이 쓰입니다.</div></span>
         <span class="v">
-          <button class="btn sm${S.settings.crew === 2 ? ' on' : ''}" data-act="crew" data-n="2">2인 (관리자가 홀 겸직)</button>
+          <button class="btn sm${S.settings.crew === 2 ? ' on' : ''}" data-act="crew" data-n="2">2인 (관리자가 홀 매니저 겸직)</button>
           <button class="btn sm${S.settings.crew === 3 ? ' on' : ''}" data-act="crew" data-n="3">3인 (관리자·홀·주방)</button>
         </span></div>
       <div class="setrow"><span>오후 조 시작 시각 <span class="hint" style="margin:0">이 시각 전 구간이 오전 조, 이후가 오후 조</span></span>
         <span class="v"><input type="time" class="num wide" value="${esc(S.settings.pmStart || '17:00')}" data-act="pmStart">
         </span></div>
-      <div class="setrow"><span>2인일 때 주방이 맡는 홀 업무</span>
+      <div class="setrow"><span>2인일 때 주방 실장이 맡는 홀 업무</span>
         <span class="v hint">${S.templates.filter((t) => t.role2 && !t.rest).map((t) => t.time).join(' · ') || '없음'}</span></div>
 
       <div class="hd sub2"><h3>알림</h3></div>
@@ -6591,6 +6591,7 @@ const App = (() => {
     Object.values(doc.days || {}).forEach((day) => Object.values(day.inst || {}).forEach((rec) => {
       if (rec && rec.role) rec.role = fix(rec.role);
     }));
+    (doc.templates || []).forEach((tp) => { ['role', 'role2', 'support'].forEach((f) => { if (tp && tp[f]) tp[f] = fix(tp[f]); }); });   // 사장님이 고친 담당(edited)도 옛 이름이면 바꾼다
     return doc;
   }
 

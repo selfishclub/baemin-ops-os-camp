@@ -12,15 +12,15 @@ window.HM_DEMO_CFG = {
   staff: {   // 가상 이름 — 실제 직원 이름과 겹치지 않게 확인함(10/11)
     ansan: [
       { id: 'd1', name: '김하늘', roles: ['갑각류 관리자'], pay: { type: 'month', amount: 3200000 }, pattern: '오전·마감 (주 6일)' },
-      { id: 'd2', name: '박서준', roles: ['홀'], pay: { type: 'hour', amount: 11000 }, pattern: '오후 조' },
-      { id: 'd3', name: '이도윤', roles: ['주방'], pay: { type: 'hour', amount: 11500 }, pattern: '오전 조' },
-      { id: 'd4', name: '최유나', roles: ['홀'], pay: { type: 'hour', amount: 10500 }, pattern: '주말 알바' },
-      { id: 'd5', name: '정민호', roles: ['주방'], pay: { type: 'hour', amount: 11000 }, pattern: '오후 조' },
+      { id: 'd2', name: '박서준', roles: ['홀 매니저'], pay: { type: 'hour', amount: 11000 }, pattern: '오후 조' },
+      { id: 'd3', name: '이도윤', roles: ['주방 실장'], pay: { type: 'hour', amount: 11500 }, pattern: '오전 조' },
+      { id: 'd4', name: '최유나', roles: ['고정알바'], pay: { type: 'hour', amount: 10500 }, pattern: '주말 고정알바' },
+      { id: 'd5', name: '정민호', roles: ['주방 실장'], pay: { type: 'hour', amount: 11000 }, pattern: '오후 조' },
     ],
     anyang: [
-      { id: 'd1', name: '한지우', roles: ['갑각류 관리자', '홀'], pay: { type: 'month', amount: 3000000 }, pattern: '매니저' },
-      { id: 'd2', name: '오세린', roles: ['주방'], pay: { type: 'hour', amount: 11000 }, pattern: '오전 조' },
-      { id: 'd3', name: '윤태오', roles: ['홀', '주방'], pay: { type: 'hour', amount: 10500 }, pattern: '오후·주말' },
+      { id: 'd1', name: '한지우', roles: ['갑각류 관리자', '홀 매니저'], pay: { type: 'month', amount: 3000000 }, pattern: '매니저' },
+      { id: 'd2', name: '오세린', roles: ['주방 실장'], pay: { type: 'hour', amount: 11000 }, pattern: '오전 조' },
+      { id: 'd3', name: '윤태오', roles: ['홀 매니저', '고정알바'], pay: { type: 'hour', amount: 10500 }, pattern: '오후·주말' },
     ],
   },
   sales: {
