@@ -16,76 +16,78 @@
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; line-height: 1.6; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; line-height: 1.8; font-size: 17px; word-break: keep-all; }
   a { color: var(--forest); }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
   header.site { position: sticky; top: 0; z-index: 10; background: rgba(18,53,42,.96); color: #f7f3ea; backdrop-filter: blur(6px); }
   header.site .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 60px; }
   .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .02em; }
   .logo span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid #e6c98a; color: #e6c98a; font-family: var(--serif); }
   nav.top a { color: rgba(247,243,234,.85); text-decoration: none; font-size: 14px; margin-left: 18px; }
   nav.top a:hover { color: #e6c98a; }
-  section { padding: clamp(44px, 7vw, 88px) 0; }
+  section { padding: clamp(64px, 9vw, 120px) 0; }
   section + section { border-top: 1px solid var(--line); }
-  .kicker { font-size: 13px; letter-spacing: .2em; color: var(--gold); font-weight: 700; text-transform: uppercase; margin: 0 0 12px; }
-  h1 { font-family: var(--serif); font-size: clamp(32px, 5vw, 56px); line-height: 1.22; color: var(--deep); margin: 0 0 18px; letter-spacing: -.02em; font-weight: 600; }
-  h2 { font-family: var(--serif); font-size: clamp(26px, 3.6vw, 40px); line-height: 1.25; color: var(--deep); margin: 0 0 10px; letter-spacing: -.02em; font-weight: 600; }
-  h2 + p.sub { margin: 0 0 28px; color: var(--muted); font-size: clamp(15px, 1.5vw, 18px); max-width: 720px; }
-  h3 { margin: 0 0 6px; font-size: clamp(17px, 1.7vw, 21px); color: var(--deep); }
-  .lead { font-size: clamp(17px, 1.9vw, 22px); font-weight: 300; max-width: 760px; margin: 0 0 24px; }
+  .kicker { font-size: 13px; letter-spacing: .22em; color: var(--gold); font-weight: 700; text-transform: uppercase; margin: 0 0 16px; }
+  h1 { font-family: var(--serif); font-size: clamp(32px, 4.8vw, 54px); line-height: 1.3; color: var(--deep); margin: 0 0 24px; letter-spacing: -.01em; font-weight: 600; }
+  h2 { font-family: var(--serif); font-size: clamp(26px, 3.4vw, 38px); line-height: 1.35; color: var(--deep); margin: 0 0 14px; letter-spacing: -.01em; font-weight: 600; }
+  h2 + p.sub { margin: 0 0 40px; color: var(--muted); font-size: clamp(16px, 1.5vw, 18px); max-width: 680px; line-height: 1.8; }
+  h3 { margin: 0 0 10px; font-size: clamp(18px, 1.7vw, 21px); color: var(--deep); line-height: 1.4; }
+  .lead { font-size: clamp(17px, 1.8vw, 21px); font-weight: 300; max-width: 720px; margin: 0 0 30px; line-height: 1.85; }
   .lead b { font-weight: 700; color: var(--deep); }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chips a { padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--deep); font-size: 14px; text-decoration: none; }
+  .chips a { padding: 10px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--deep); font-size: 14px; text-decoration: none; }
   .chips a:hover { border-color: var(--gold); }
   .hero { background: linear-gradient(180deg, #fbf9f4, var(--bg)); }
   .demo { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 16px; border-radius: 999px; background: var(--deep); color: #fbf7ee; text-decoration: none; font-weight: 700; font-size: 14px; }
-  .grid { display: grid; gap: 14px; }
+  .grid { display: grid; gap: 20px; }
   .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .card { background: var(--paper); border: 1px solid var(--line); border-radius: 18px; padding: 22px; box-shadow: 0 10px 28px rgba(18,53,42,.05); }
-  .card p { margin: 0; font-size: 15px; color: var(--ink); }
+  .card { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; padding: 28px 26px; box-shadow: 0 10px 28px rgba(18,53,42,.04); }
+  .card p { margin: 0; font-size: 16px; color: var(--ink); line-height: 1.8; }
   .card .num { display: inline-block; margin-bottom: 10px; font-size: 12px; letter-spacing: .16em; color: var(--gold); font-weight: 700; }
   .timeline { display: grid; gap: 14px; }
-  .timeline .row { display: grid; grid-template-columns: 120px 1fr; gap: 14px; padding: 16px 0; border-top: 1px solid var(--line); }
+  .timeline .row { display: grid; grid-template-columns: 140px 1fr; gap: 20px; padding: 22px 0; border-top: 1px solid var(--line); }
   .timeline .row:last-child { border-bottom: 1px solid var(--line); }
   .timeline .date { font-family: var(--serif); color: var(--gold); font-weight: 600; font-size: 15px; }
   .timeline .row b { display: block; color: var(--deep); font-size: 17px; margin-bottom: 4px; }
-  .timeline .row span { color: var(--muted); font-size: 15px; }
-  .quote { font-family: var(--serif); font-size: clamp(19px, 2.2vw, 26px); line-height: 1.55; color: var(--deep); padding: 20px 24px; border-left: 4px solid var(--gold); background: var(--paper); border-radius: 0 16px 16px 0; margin: 0 0 20px; }
+  .timeline .row span { color: var(--muted); font-size: 16px; line-height: 1.75; }
+  .quote { font-family: var(--serif); font-size: clamp(19px, 2vw, 24px); line-height: 1.7; color: var(--deep); padding: 26px 30px; border-left: 4px solid var(--gold); background: var(--paper); border-radius: 0 16px 16px 0; margin: 0 0 20px; }
   .quote small { display: block; margin-top: 10px; font-family: var(--sans); font-size: 14px; color: var(--muted); }
-  .map { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-  .map .group { grid-column: 1 / -1; margin-top: 10px; font-size: 12px; letter-spacing: .16em; color: var(--gold); font-weight: 700; }
-  .map .item { padding: 14px 16px; border-radius: 14px; background: var(--paper); border: 1px solid var(--line); font-size: 14px; }
+  .map { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .map .group { grid-column: 1 / -1; margin-top: 18px; font-size: 12px; letter-spacing: .16em; color: var(--gold); font-weight: 700; }
+  .map .item { padding: 18px 20px; border-radius: 16px; background: var(--paper); border: 1px solid var(--line); font-size: 15px; line-height: 1.7; }
   .map .item b { display: block; color: var(--deep); margin-bottom: 2px; }
-  .map .item span { color: var(--muted); font-size: 13px; }
-  .scene { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; padding: 28px 0; border-top: 1px solid var(--line); }
+  .map .item span { color: var(--muted); font-size: 14px; }
+  .scene { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; padding: 48px 0; border-top: 1px solid var(--line); }
   .scene:first-of-type { border-top: 0; }
-  .scene ul { margin: 10px 0 0; padding-left: 18px; font-size: 15px; }
-  .scene li { margin-bottom: 6px; }
+  .scene ul { margin: 12px 0 0; padding-left: 20px; font-size: 16px; line-height: 1.8; }
+  .scene li { margin-bottom: 10px; }
   .phones { display: flex; gap: 16px; justify-content: center; align-items: flex-start; }
-  .phone { width: min(44%, 200px); margin: 0; }
+  .phone { width: min(44%, 220px); margin: 0; }
   .phone .frame { position: relative; border-radius: 26px; padding: 8px; background: #1b1f1d; box-shadow: 0 18px 40px rgba(0,0,0,.22); }
   .phone img { display: block; width: 100%; aspect-ratio: 390 / 844; object-fit: cover; object-position: top; border-radius: 20px; background: white; }
   .phone figcaption { margin-top: 8px; text-align: center; font-size: 13px; color: var(--muted); }
   .phone figcaption b { color: var(--deep); }
   .arrow { align-self: center; font-size: 26px; color: var(--gold); }
   .pad { display: block; max-width: 100%; border: 1px solid var(--line); border-radius: 14px; background: white; box-shadow: 0 14px 30px rgba(18,53,42,.08); }
-  .ba { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .ba { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   .ba .card:first-child { border-color: #e8cfc8; }
   .ba .card:last-child { border-color: #bcd6c6; background: #f3f9f5; }
   .ba h3 { font-size: 13px; letter-spacing: .16em; color: var(--muted); }
-  .ba ul { margin: 0; padding-left: 18px; font-size: 15px; }
-  .ba li { margin-bottom: 8px; }
+  .ba ul { margin: 0; padding-left: 20px; font-size: 16px; line-height: 1.8; }
+  .ba li { margin-bottom: 12px; }
   .pill { display: inline-block; padding: 4px 12px; border-radius: 999px; background: var(--sand); color: var(--deep); font-size: 12px; font-weight: 700; letter-spacing: .04em; }
   .pill.warn { background: #f7ded8; color: var(--warn); }
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 18px; }
-  .stats .card { text-align: center; padding: 18px 12px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 32px; }
+  .stats .card { text-align: center; padding: 26px 14px; }
   .stats .n { font-family: var(--serif); font-size: clamp(30px, 3.6vw, 44px); color: var(--deep); line-height: 1; }
   .stats small { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; }
-  footer { padding: 40px 0 60px; color: var(--muted); font-size: 13px; text-align: center; }
+  footer { padding: 56px 0 80px; line-height: 1.8; color: var(--muted); font-size: 13px; text-align: center; }
   footer a { color: var(--forest); }
   @media (max-width: 760px) {
+    body { font-size: 16px; }
+    section { padding: 56px 0; }
     .cols-2, .cols-3, .cols-4, .map, .scene, .ba, .stats { grid-template-columns: 1fr; }
     .stats { grid-template-columns: 1fr 1fr; }
     .timeline .row { grid-template-columns: 1fr; gap: 4px; }
@@ -139,7 +141,7 @@
       <div class="card"><span class="num">02 · 만든 것</span><h3>묻지 않아도 찾고, 똑같이 만들고, 기록이 남게</h3><p>레시피·매뉴얼·응대북·오늘 체크·교육·시험·퀘스트·칭찬·인수인계·물어보기가 한 주소에. 바뀐 건 알림으로, 누가 확인했는지 사장이 봅니다.</p></div>
       <div class="card"><span class="num">03 · 지킨 것</span><h3>레시피는 영업 비밀</h3><p>"외부 유출이 완전 싫거든" — 로그인 없이는 메뉴 이름도 안 보이고, 사진엔 보는 사람 이름·날짜가 새겨지고, 누가 언제 무엇을 봤는지 남습니다. 공개 시연판엔 실제 레시피가 한 줄도 없습니다.</p></div>
     </div>
-    <p class="quote" style="margin-top:22px">캠프 전부터 "자영업자야말로 AI를 무조건 써야 한다"고 생각했어요. 반복 업무가 많고 신경 쓸 게 너무 많으니까, 체계화되면 진짜 좋을 것 같았거든요. 컴퓨터 전공자보다 <b>실무 경험 많은 사람</b>이 잘 쓸 때 효과가 더 크다고 믿었습니다.<small>— 주변 친구들에게도 "무궁무진하다, 공부해 봐라" 하고 다녔습니다. 그러다 배민에서 체계적으로 배우게 돼서 너무 좋았습니다.</small></p>
+    <p class="quote" style="margin-top:36px">캠프 전부터 "자영업자야말로 AI를 무조건 써야 한다"고 생각했어요. 반복 업무가 많고 신경 쓸 게 너무 많으니까, 체계화되면 진짜 좋을 것 같았거든요. 컴퓨터 전공자보다 <b>실무 경험 많은 사람</b>이 잘 쓸 때 효과가 더 크다고 믿었습니다.<small>— 주변 친구들에게도 "무궁무진하다, 공부해 봐라" 하고 다녔습니다. 그러다 배민에서 체계적으로 배우게 돼서 너무 좋았습니다.</small></p>
   </div>
 </section>
 
@@ -170,7 +172,7 @@
       <div class="item"><b>열람 기록</b><span>누가 언제 무엇을 · 기기 · 매장 밖 접속</span></div>
       <div class="item"><b>직원 계정 · 메뉴 잠금</b><span>앱 안에서 계정 만들기 · 영역별 잠금</span></div>
     </div>
-    <div class="grid cols-3" style="margin-top:22px">
+    <div class="grid cols-3" style="margin-top:36px">
       <div class="card"><span class="num">결과를 바꾼 말 ①</span><p>"외부 유출이 완전 싫거든" → 로그인·워터마크·열람 기록·자동 로그아웃</p></div>
       <div class="card"><span class="num">결과를 바꾼 말 ②</span><p>"문제가 다 공개되어 있으면 안 돼, 사람마다 문제가 달랐으면" → 사람마다 다른 퀘스트, 정답은 서버에만</p></div>
       <div class="card"><span class="num">결과를 바꾼 말 ③</span><p>"나중에 엑셀로 주면 네가 알아서 자리에 넣어 줄 거지?" → 엑셀 표 붙여 넣기 '가져오기'</p></div>
@@ -267,7 +269,7 @@
     </div>
     <p style="margin-top:14px;font-size:14px;color:var(--muted)"><span class="pill warn">직접 잰 값은 아직 없음</span>&nbsp; 위는 느낌입니다. 레시피 질문 횟수와 연락 건수는 실제 데이터를 넣은 뒤 1주일 재서 숫자로 말하겠습니다.</p>
 
-    <div class="grid cols-3" style="margin-top:28px">
+    <div class="grid cols-3" style="margin-top:40px">
       <div class="card"><span class="num">직원</span><p>AI가 나온 건 알아도 어떻게 쓸지 몰랐던 친구에게 포스터 만드는 법을 알려줬더니, 흥미가 생겨 <b>직접 맡게</b> 됐습니다. 바리스타로 일하면서 "이런 추가적인 일도 할 수 있구나" 하는 만족감.</p></div>
       <div class="card"><span class="num">가게</span><p>대학 다니며 일하는 친구들이 제가 OS·발주표·레시피를 만드는 걸 보면서 좋아하고, <b>직장에 자부심</b>이 생겼습니다. 서로 AI를 써 보고 업그레이드하려고 함께 노력합니다.</p></div>
       <div class="card"><span class="num">나</span><p>작게 하나씩 만들던 것들이 한 곳에 모인 <b>집약체</b>가 됐습니다. 계속 고도화해서 <b>'빈숲 백과사전'</b>처럼 체계적인 데이터로 쓸 겁니다. 이번에 만든 건 전부 씁니다.</p></div>
@@ -280,9 +282,9 @@
       <div class="card"><div class="n">26<span style="font-size:45%;color:var(--gold)">일</span></div><small>9/17 → 10/12</small></div>
     </div>
 
-    <div class="card" style="margin-top:22px"><span class="num">막혔다가 푼 것</span><p>문서 1장만 고쳤는데 알림이 26건 나간 것(창고가 항목 순서를 바꿔서 → 순서 무관 비교) · 직원이 동료 이름을 못 읽어 칭찬을 못 보낼 뻔한 창고 규칙(코드 검토에서 잡음) · "만들어 보기" 퀘스트의 과녁이 움직이던 것(주 시작 전 기록으로 고정) · 다른 사장님에게 배운 것은 그대로 베끼지 않고 카페에 맞게 바꿈.</p></div>
+    <div class="card" style="margin-top:36px"><span class="num">막혔다가 푼 것</span><p>문서 1장만 고쳤는데 알림이 26건 나간 것(창고가 항목 순서를 바꿔서 → 순서 무관 비교) · 직원이 동료 이름을 못 읽어 칭찬을 못 보낼 뻔한 창고 규칙(코드 검토에서 잡음) · "만들어 보기" 퀘스트의 과녁이 움직이던 것(주 시작 전 기록으로 고정) · 다른 사장님에게 배운 것은 그대로 베끼지 않고 카페에 맞게 바꿈.</p></div>
 
-    <div class="card" style="margin-top:14px"><span class="num">앞으로 할 일</span><p>① 실제 레시피·매뉴얼을 엑셀로 한 번에 넣고 직원과 써 보기 → 질문 횟수·연락 건수를 숫자로 &nbsp;② 챗봇에 AI 붙이기(찾은 한 건만 풀어 말하게) &nbsp;③ 매장 공용 패드 모드 &nbsp;④ 뼈대를 다른 사장님이 엑셀만 넣어 쓸 수 있게 정리</p></div>
+    <div class="card" style="margin-top:20px"><span class="num">앞으로 할 일</span><p>① 실제 레시피·매뉴얼을 엑셀로 한 번에 넣고 직원과 써 보기 → 질문 횟수·연락 건수를 숫자로 &nbsp;② 챗봇에 AI 붙이기(찾은 한 건만 풀어 말하게) &nbsp;③ 매장 공용 패드 모드 &nbsp;④ 뼈대를 다른 사장님이 엑셀만 넣어 쓸 수 있게 정리</p></div>
   </div>
 </section>
 
