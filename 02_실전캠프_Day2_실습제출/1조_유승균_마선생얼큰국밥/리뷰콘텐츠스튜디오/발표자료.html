@@ -1,0 +1,157 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>리뷰 콘텐츠 스튜디오 성과 발표</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#ddd;font-family:'Malgun Gothic','Noto Sans KR','Apple SD Gothic Neo',sans-serif;color:#2a1f1a}
+.slide{width:1280px;height:720px;background:#f8f4ee;position:relative;overflow:hidden;padding:36px 56px 40px;page-break-after:always;margin:0 auto 12px}
+.slide.cover{background:linear-gradient(135deg,#b8431f,#7d2a12);color:#fff}
+.cover-in{height:100%;display:flex;flex-direction:column;justify-content:center}
+.kicker{font-size:26px;opacity:.85;margin-bottom:18px}
+h1{font-size:92px;font-weight:800;letter-spacing:-2px;margin-bottom:22px}
+.big{font-size:44px;line-height:1.4;font-weight:600}
+.who{margin-top:40px;font-size:30px;opacity:.9}
+.demo{margin-top:14px;font-size:24px;opacity:.85}
+h2{font-size:40px;font-weight:800;margin-bottom:14px;color:#8a2f12}
+.two{display:flex;gap:36px;align-items:center;height:490px}
+.two>*{flex:1}
+.txt{display:flex;flex-direction:column;justify-content:center;gap:16px}
+.lead{font-size:36px;font-weight:700;line-height:1.4}
+.lead.mt{margin-top:20px;font-size:30px}
+.sub{font-size:28px;line-height:1.5;color:#4a3a34}
+.logo{border-radius:16px;overflow:hidden;line-height:0}
+.logo img{width:100%;height:auto;display:block}
+.flow{display:flex;gap:14px;align-items:stretch;margin:18px 0 18px;height:300px}
+.fbox{flex:1;background:#fff;border:2px solid #d8cfc4;border-radius:14px;padding:20px;font-size:23px;line-height:1.45;display:flex;flex-direction:column;gap:10px}
+.fbox b{font-size:27px;color:#8a2f12}
+.fbox.red{border-color:#d9534f;background:#fff1f0}
+.chips{display:flex;flex-direction:column;gap:6px}
+.chips span{background:#f1ebe3;border-radius:8px;padding:6px 10px;font-size:21px}
+.flow .arrow{align-self:center;font-size:46px}
+.pair{display:flex;align-items:center;justify-content:center;gap:24px;height:430px}
+figure{margin:0;text-align:center}
+figcaption{font-size:20px;color:#555;margin-top:6px}
+.shot{border:2px solid #cfc6bb;border-radius:10px;background:#fff;display:block;margin:0 auto}
+.pair .crop{height:380px;width:440px;object-fit:cover;object-position:top}
+.arrow{font-size:60px;color:#b8431f;font-weight:800}
+.quote{margin-top:10px;background:#fff;border-left:8px solid #b8431f;padding:12px 20px;font-size:25px;line-height:1.4;border-radius:6px}
+.line{text-align:center;font-size:30px;font-weight:700;margin-top:6px}
+.timeline{display:flex;gap:10px;margin:14px 0 16px}
+.tl{flex:1;background:#fff;border:2px solid #d8cfc4;border-radius:12px;padding:14px 12px;font-size:20px;display:flex;flex-direction:column;gap:6px;text-align:center}
+.tl b{font-size:25px;color:#8a2f12}
+.tl.on{background:#b8431f;color:#fff;border-color:#b8431f}.tl.on b{color:#fff}
+.four{display:flex;gap:16px;justify-content:center;margin:8px 0}
+.four figure{flex:1}
+.four .sq{width:100%;height:370px;object-fit:cover;object-position:center 55%}
+.frames{display:flex;gap:16px;justify-content:center;margin:6px 0 10px}
+.frames figure{flex:1}
+.frames .vid{height:400px;width:auto;max-width:100%;object-fit:cover}
+.resgrid{display:flex;gap:18px;align-items:flex-start;height:420px;margin-top:6px}
+.resgrid figure{flex:1;min-width:0}
+.resgrid .sq2{width:100%;height:370px;object-fit:cover;object-position:center 55%}
+.resgrid .tallres{width:100%;height:370px;object-fit:cover;object-position:top}
+.stats{display:flex;gap:24px;margin:20px 0 14px}
+.stat{flex:1;background:#fff;border-radius:16px;padding:28px 18px;text-align:center;border:2px solid #ddd;height:300px;display:flex;flex-direction:column;justify-content:center;gap:12px}
+.stat .n{font-size:84px;font-weight:800;color:#b8431f;letter-spacing:-2px}
+.stat .n.long{font-size:56px}
+.stat .l{font-size:25px;line-height:1.35}
+.tag{display:inline-block;align-self:center;font-size:22px;padding:6px 14px;border-radius:999px;font-weight:700}
+.t-guess{background:#fff0c9;color:#7a5410}.t-todo{background:#ffe0dc;color:#9a2a22}.t-done{background:#d9f0e3;color:#0f5c3a}
+.tbl{width:100%;border-collapse:collapse;font-size:23px;margin:10px 0 12px;background:#fff}
+.tbl th{background:#8a2f12;color:#fff;padding:10px;text-align:left}
+.tbl td{border:1px solid #d8cfc4;padding:10px 12px;line-height:1.4;vertical-align:top}
+.tbl small{color:#777;font-size:19px}
+.list{font-size:27px;line-height:1.5;padding-left:28px;display:flex;flex-direction:column;gap:12px}
+.list.sm{font-size:22px;gap:6px}
+.cap{position:absolute;left:56px;bottom:14px;font-size:20px;color:#6a6a6a}
+.slide.cover .cap{display:none}
+
+@media print{@page{size:1280px 720px;margin:0}body{background:#fff}.slide{margin:0}}</style></head><body>
+<section class="slide cover" id="s0"><div class="cover-in"><div class="kicker">배민 AI 장사스쿨 · 성과 발표</div><h1>리뷰 콘텐츠 스튜디오</h1><p class="big">손님 리뷰 한 줄이,<br>인스타 캐러셀과 릴스 영상이 됩니다</p><p class="who">마선생얼큰국밥 · 유승균</p><p class="demo">로그인 없이 눌러 보기 (가상 데이터) · review-content-studio-demo.vercel.app</p></div></section>
+<section class="slide " id="s1"><h2>① 우리 가게 이야기</h2>
+      <div class="two">
+        <div class="logo"><img src="발표자료_이미지/가게로고.png" alt="마선생얼큰국밥 로고"></div>
+        <div class="txt"><p class="lead">전남 목포에서 얼큰국밥을 배민으로 팔고 있어요.</p>
+        <div class="quote"><b>참여 전</b> · 업무는 집에 가야만, 집에서 하던 일을 이어서 할 수 있었어요.</div></div>
+      </div>
+      <p class="cap">가게 로고 · 사장님 말씀</p></section>
+<section class="slide " id="s2"><h2>② 우리 가게의 문제</h2>
+      <div class="flow">
+        <div class="fbox"><b>리뷰는 세 군데에 흩어져 있어요</b><div class="chips"><span>배민 사장님 사이트</span><span>쿠팡이츠 사장님 사이트</span><span>네이버 플레이스</span></div><p>각각 로그인해서 하나씩 열어 읽어요</p></div>
+        <div class="arrow">→</div>
+        <div class="fbox"><b>읽고, 고맙다고 답글만 달아요</b><p>“국물이 진해서 해장에 딱이었어요” 같은 말은 어떤 광고 문구보다 믿음이 가는데…</p></div>
+        <div class="arrow">→</div>
+        <div class="fbox red"><b>홍보로는 못 써요</b><p>글 쓰고, 카드 디자인하고, 영상 편집할 시간이 없어서 그냥 흘려보냈어요</p></div>
+      </div>
+      <div class="quote">리뷰가 쌓이는 건 좋은데, 그걸 한 번 더 쓸 방법이 없었어요.</div>
+      <p class="cap">예전 방식을 그림으로 다시 그린 것 · 가상 화면</p></section>
+<section class="slide " id="s3"><h2>③ AI로 만들어 봤어요</h2>
+      <div class="timeline">
+        <div class="tl"><b>v1 · 9/2</b><span>리뷰 모으기 + 3종 만들기</span></div>
+        <div class="tl"><b>v2 · 9/17</b><span>사이트 버튼으로 자동 수집</span></div>
+        <div class="tl"><b>v4 · 9/22</b><span>가상 고객 QA</span></div>
+        <div class="tl"><b>v7·v8</b><span>사진 슬라이드 · 릴스 영상</span></div>
+        <div class="tl"><b>v9·v10</b><span>리뷰 묶기 · 훅·스타일·트렌드</span></div>
+        <div class="tl on"><b>v11 · 10/13</b><span>누구나 눌러 보는 데모</span></div>
+      </div>
+      <div class="quote">AI에게 한 말: “사이트에서 버튼으로 수집할수있게 해줘, 크롤링 자동으로, 내가 사이트에서 리뷰를 클릭하거나 하지않게”</div>
+      <div class="quote">“여러가지 리뷰들을 종합해서 컨텐츠를 만들고 싶어요, 하나로 만들면 소재가 너무 없어서”</div>
+      <p class="cap">사장님이 한 말 그대로 · 코드는 직접 쓰지 않았어요</p></section>
+<section class="slide " id="s4"><h2>시연 ① 리뷰를 골라 한 번에 묶기</h2>
+      <div class="pair">
+        <figure><img class="shot crop" src="발표자료_이미지/02_리뷰선택_패드.png"><figcaption>사진 있는 리뷰 3개 ‘묶기’ 체크</figcaption></figure>
+        <div class="arrow">→</div>
+        <figure><img class="shot crop" src="발표자료_이미지/03_묶음결과_패드.png"><figcaption>약 1분 뒤 · 3종이 한 번에</figcaption></figure>
+      </div>
+      <p class="line">여러 손님의 말을 골고루 인용한 캐러셀 · 릴스 대본 · 새소식</p>
+      <p class="cap">데모 화면 · 가상 데이터 · 데모는 AI 대신 미리 정한 틀, 진짜 앱은 Claude가 새로 씀</p></section>
+<section class="slide " id="s5"><h2>시연 ② 캐러셀 이미지 — 스타일을 골라요</h2>
+      <div class="four">
+        <figure><img class="shot sq" src="발표자료_이미지/결과물_슬라이드_impact.png"><figcaption>임팩트 — 감탄·강한 칭찬</figcaption></figure>
+        <figure><img class="shot sq" src="발표자료_이미지/결과물_슬라이드_plain.png"><figcaption>담백 — 차분한 후기</figcaption></figure>
+        <figure><img class="shot sq" src="발표자료_이미지/결과물_슬라이드_emotional.png"><figcaption>감성 — 위로·따뜻함</figcaption></figure>
+        <figure><img class="shot sq" src="발표자료_이미지/결과물_슬라이드_friendly.png"><figcaption>친근 — 유머·ㅋㅋ</figcaption></figure>
+      </div>
+      <p class="line">같은 리뷰, 글꼴·색·분위기만 바뀌어요 · 인스타 4:5 / 스레드 1:1</p>
+      <p class="cap">데모 화면 · 가상 그림·가상 로고 · 진짜 앱은 손님이 올린 사진을 배경으로 써요</p></section>
+<section class="slide " id="s6"><h2>시연 ③ 릴스·쇼츠 영상 — 폰에서 바로</h2>
+      <div class="frames">
+        <figure><img class="shot vid" src="발표자료_이미지/결과물_영상장면_01초.png"><figcaption>0:01 오프닝</figcaption></figure>
+        <figure><img class="shot vid" src="발표자료_이미지/결과물_영상장면_09초.png"><figcaption>0:09 손님 한마디</figcaption></figure>
+        <figure><img class="shot vid" src="발표자료_이미지/결과물_영상장면_15초.png"><figcaption>0:15 다음 손님</figcaption></figure>
+        <figure><img class="shot vid" src="발표자료_이미지/결과물_영상장면_29초.png"><figcaption>0:29 마무리</figcaption></figure>
+      </div>
+      <p class="line">30초 세로 영상(MP4) · 만드는 데 PC에서 약 10~20초</p>
+      <p class="cap">데모 화면 · 가상 그림 · 음악은 인스타·유튜브 앱에서 올릴 때 고르면 돼요</p></section>
+<section class="slide " id="s7"><h2>④ 도구가 만들어 낸 결과물</h2>
+      <div class="resgrid">
+        <figure><img class="shot sq2" src="발표자료_이미지/결과물_슬라이드_스레드_사진없음.png"><figcaption>① 스레드용 정사각형 (사진 없을 때)</figcaption></figure>
+        <figure><img class="shot tallres" src="발표자료_이미지/05_요즘뜨는소재_패드.png"><figcaption>② 요즘 뜨는 소재 (진짜 앱은 AI 웹 검색)</figcaption></figure>
+        <figure><img class="shot sq2" src="발표자료_이미지/결과물_슬라이드_메인.png"><figcaption>③ 손님 문장을 그대로 인용한 메인 장</figcaption></figure>
+      </div>
+      <p class="line">+ 카톡으로 보내기 · 파일로 저장 · 3종을 글 하나로 묶어 전달</p>
+      <p class="cap">데모 화면 · 가상 데이터 — 우리 가게 실제 결과물은 손님 사진 때문에 공개하지 않았어요</p></section>
+<section class="slide " id="s8"><h2>④ 달라진 점 — 숫자와 반응</h2>
+      <div class="stats">
+        <div class="stat"><div class="n long">1개 → 65개</div><div class="l">쿠팡이츠 수집 (기본이 ‘오늘’이라 1개였던 것을 3개월로)</div><div class="tag t-done">직접 확인 · 9/22</div></div>
+        <div class="stat"><div class="n long">약 1분</div><div class="l">리뷰 4개 → 캐러셀·릴스·새소식 3종 (AI)</div><div class="tag t-done">직접 잼 · 60초</div></div>
+        <div class="stat"><div class="n long">직접 만들 때 ?</div><div class="l">글 쓰고 카드·영상 만드는 예전 시간</div><div class="tag t-todo">아직 안 잼</div></div>
+      </div>
+      <p class="line">가상 고객 5명 QA: 쓰겠다 2 · 조건부 2 · 안 쓰겠다 1 → 말한 것을 v4~v6에서 고쳤어요</p>
+      <p class="cap">직원·손님 반응: 아직 기록이 없어요 · 가상 고객 의견은 실제 고객 검증을 대신하지 않아요</p></section>
+<section class="slide " id="s9"><h2>④ 시행착오 — 가상 고객이 짚어 준 것</h2>
+      <table class="tbl">
+        <tr><th>가상 고객이 말한 것</th><th>그래서 고친 것</th></tr>
+        <tr><td>“폰에서 눌렀을 때 되는지 안 되는지 그 자리에서 알려주면.” <small>— 장승옥(51)</small><br><small>(실제로 쿠팡 수집을 3번 눌러 3번 다 ‘시작 전 취소’였어요)</small></td><td>노트북 앱이 꺼져 있으면 버튼을 잠그고 켜는 법 안내 (v4)</td></tr>
+        <tr><td>“올리는 것까지 해주거나, 딸한테 보내기 버튼이 있으면.” <small>— 고영자(60)</small></td><td>카톡·문자로 보내기 + 파일로 저장 (v6)</td></tr>
+        <tr><td>공용 폰에서 로그인이 30일 유지되는 점 <small>— 이지우(37)가 짚음</small></td><td>로그아웃 버튼 + ‘같이 쓰는 폰’ 체크 (v6)</td></tr>
+      </table>
+      <ul class="list sm"><li>AI가 조용히 다른 모델로 바뀌어 없는 메뉴를 지어낸 적이 있어서, 리뷰에 없는 말은 쓰지 않게 규칙을 박았어요.</li><li>영상이 1%에서 멈췄을 때 원인을 화면이 가려진 탓으로 찾아 고쳤어요.</li></ul>
+      <p class="cap">가상 고객 이름·말은 합성 인물의 의견이에요</p></section>
+<section class="slide last" id="s10"><h2>⑤ 마음의 변화, 그리고 앞으로</h2>
+      <div class="two">
+        <div class="txt"><div class="quote"><b>참여 후</b> · 깃허브 덕분에 노트북만 있으면 어디서든 업무를 이어 갈 수 있게 됐어요. 실제 업무 효율이 많이 좋아졌고, AI로 줄어든 시간에 매장의 다른 일을 할 수 있게 됐어요.</div>
+          <p class="lead mt">줄어든 시간에 해 보려는 일</p>
+          <p class="sub">매장 매뉴얼 개선 · 동선 재배치 · 식재료 관리 · 메뉴 구성 · 옵션 변경</p></div>
+        <div class="txt"><p class="lead">앞으로 할 것 (아직 안 됨)</p>
+          <ul class="list"><li>예전 방식 vs 지금, 시간 직접 재기</li><li>직원·손님 반응 기록</li><li>네이버 위주(홀) 매장용 첫 화면</li><li>실제 손님 사진은 양해를 구한 뒤 사용</li></ul></div>
+      </div>
+      <p class="cap">앞으로 할 것은 아직 만들지 않은 것입니다</p></section>
+</body></html>
