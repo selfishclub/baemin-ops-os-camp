@@ -1,0 +1,11 @@
+node_modules
+.next
+.next-build
+out
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+.vercel
+.env*
+data/*
+!data/.gitkeep

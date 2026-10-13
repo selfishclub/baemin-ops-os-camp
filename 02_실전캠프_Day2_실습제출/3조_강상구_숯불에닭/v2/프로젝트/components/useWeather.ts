@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DEFAULT_CHANNELS, type Channel } from "@/lib/categories";
 import { todayStr } from "@/lib/daily";
 import { getStore } from "@/lib/storage";
+import { loadStoreProfile, type StoreLocation } from "@/lib/storeProfile";
 import type { DailySale, Shift, Staff } from "@/lib/types";
 import { analyzeWeather, fetchForecast, fetchPastWeather, missingWeatherDates, type DailyWeather, type WeatherAnalysis } from "@/lib/weather";
 import { CHANNELS_KEY } from "./useDaily";
@@ -16,6 +17,7 @@ export interface WeatherState {
   forecast: DailyWeather[]; // 오늘부터 7일 (저장 안 함)
   channels: Channel[];
   analysis: WeatherAnalysis;
+  location: StoreLocation | null; // 설정에서 고른 날씨 지역. 없으면 날씨를 못 받는다
   fetching: boolean;
   fillMissing: () => Promise<number>; // 매출 있는 날의 빠진 날씨를 받아 저장. 받은 날 수
 }
@@ -30,6 +32,7 @@ export function useWeather(): WeatherState {
   const [weather, setWeather] = useState<DailyWeather[]>([]);
   const [forecast, setForecast] = useState<DailyWeather[]>([]);
   const [channels, setChannels] = useState<Channel[]>(DEFAULT_CHANNELS);
+  const [location, setLocation] = useState<StoreLocation | null>(null);
   const [fetching, setFetching] = useState(false);
 
   const load = useCallback(async () => {
@@ -51,16 +54,22 @@ export function useWeather(): WeatherState {
 
   useEffect(() => {
     void load();
-    // 예보는 저장하지 않고 열 때마다 받는다 (실패해도 화면은 뜬다)
-    fetchForecast(7).then(setForecast).catch(() => setForecast([]));
+    // 날씨 지역을 안 정했으면 예보도 안 받는다 (남의 동네 날씨를 보여 주지 않는다)
+    void loadStoreProfile().then((p) => {
+      setLocation(p.location);
+      if (!p.location) return setForecast([]);
+      // 예보는 저장하지 않고 열 때마다 받는다 (실패해도 화면은 뜬다)
+      fetchForecast(p.location, 7).then(setForecast).catch(() => setForecast([]));
+    });
   }, [load]);
 
   const fillMissing = useCallback(async () => {
+    if (!location) throw new Error("날씨 지역을 먼저 정해 주세요 (규칙 탭 → 내 가게)");
     const missing = missingWeatherDates(sales, weather, todayStr());
     if (missing.length === 0) return 0;
     setFetching(true);
     try {
-      const got = await fetchPastWeather(missing[0], missing[missing.length - 1]);
+      const got = await fetchPastWeather(location, missing[0], missing[missing.length - 1]);
       const need = new Set(missing);
       const records = got.filter((w) => need.has(w.date));
       await getStore().saveWeather(records);
@@ -69,9 +78,9 @@ export function useWeather(): WeatherState {
     } finally {
       setFetching(false);
     }
-  }, [sales, weather, load]);
+  }, [sales, weather, load, location]);
 
   const analysis = useMemo(() => analyzeWeather(sales, weather, channels, shifts, staff), [sales, weather, channels, shifts, staff]);
 
-  return { loading, error, sales, weather, forecast, channels, analysis, fetching, fillMissing };
+  return { loading, error, sales, weather, forecast, channels, analysis, location, fetching, fillMissing };
 }

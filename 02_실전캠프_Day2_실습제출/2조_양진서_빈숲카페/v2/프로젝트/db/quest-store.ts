@@ -13,18 +13,41 @@ export async function readQuestProgress(db: SupabaseClient, userId: string, week
   return (data ?? []).map((row) => ({ quest_id: row.quest_id, status: row.status as QuestStatus, attempts: row.attempts, note: row.note, done_at: row.done_at, confirmed_at: row.confirmed_at }));
 }
 
-// 이 사람의 교육 기록: 만들어 봤음 메뉴 id, 읽었어요 문서 id (자동 완료 판정과 "아직 안 한 것 먼저" 고르기에 쓴다)
-export async function readDoneSets(db: SupabaseClient, userId: string) {
+// 이 사람의 교육 기록: 만들어 봤음 메뉴 id, 읽었어요 문서 id.
+// before = 그 주가 시작되기 전까지의 기록 → "아직 안 한 것 먼저" 고르기에 쓴다 (주 중에 해도 퀘스트가 바뀌지 않게)
+// all = 지금까지 전부 → 자동 완료 판정에 쓴다
+export type DoneSets = { practicedRecipeIds: Set<string>; readDocIds: Set<string> };
+export async function readDoneSets(db: SupabaseClient, userId: string, weekStart: string): Promise<{ before: DoneSets; all: DoneSets }> {
   const { data, error } = await db.from("training_checks").select("recipe_id, practiced_at").eq("user_id", userId).not("practiced_at", "is", null);
   if (error) throw new Error(`교육 기록을 읽지 못했습니다: ${error.message}`);
-  const practicedRecipeIds = new Set<string>();
-  const readDocIds = new Set<string>();
-  for (const row of data ?? []) {
-    const id = row.recipe_id as string;
-    if (id.startsWith("manual:")) readDocIds.add(id.slice("manual:".length));
-    else if (!id.startsWith("exam:")) practicedRecipeIds.add(id);
+  return splitDoneSets((data ?? []) as { recipe_id: string; practiced_at: string }[], weekStart);
+}
+
+export function splitDoneSets(rows: { recipe_id: string; practiced_at: string | null }[], weekStart: string): { before: DoneSets; all: DoneSets } {
+  const weekStartIso = new Date(`${weekStart}T00:00:00+09:00`).toISOString();
+  const before: DoneSets = { practicedRecipeIds: new Set(), readDocIds: new Set() };
+  const all: DoneSets = { practicedRecipeIds: new Set(), readDocIds: new Set() };
+  for (const row of rows) {
+    if (!row.practiced_at) continue;
+    const id = row.recipe_id;
+    const targets = row.practiced_at < weekStartIso ? [before, all] : [all];
+    for (const set of targets) {
+      if (id.startsWith("manual:")) set.readDocIds.add(id.slice("manual:".length));
+      else if (!id.startsWith("exam:")) set.practicedRecipeIds.add(id);
+    }
   }
-  return { practicedRecipeIds, readDocIds };
+  return { before, all };
+}
+
+// 만들어 보기·읽기 퀘스트가 교육 기록으로 깨졌으면 표에도 done 줄을 남긴다 (점수판이 이 표를 세므로)
+export async function markAutoDone(db: SupabaseClient, userId: string, weekStart: string, questIds: string[]) {
+  if (!questIds.length) return;
+  const now = new Date().toISOString();
+  const { error } = await db.from("quest_progress").upsert(
+    questIds.map((questId) => ({ user_id: userId, week_start: weekStart, quest_id: questId, status: "done", done_at: now })),
+    { onConflict: "user_id,week_start,quest_id", ignoreDuplicates: true },
+  );
+  if (error) console.error("[quest] 자동 완료를 남기지 못했습니다:", error.message);
 }
 
 // 문제 풀이: 맞으면 done, 틀리면 시도 횟수만 올린다
@@ -45,8 +68,10 @@ export async function saveMission(db: SupabaseClient, userId: string, weekStart:
   if (existing?.status === "confirmed") return;
   const text = (note || existing?.note || "").trim().slice(0, 200);
   if (!text) throw new Error("적용할 것을 한 줄 적어 주세요.");
+  // 이미 '해냈어요'를 보낸 뒤 글만 고치면 확인 대기 상태는 그대로 둔다
+  const status = claim || existing?.status === "pending" ? "pending" : "open";
   const { error } = await db.from("quest_progress").upsert(
-    { user_id: userId, week_start: weekStart, quest_id: "mission", status: claim ? "pending" : "open", note: text, done_at: claim ? new Date().toISOString() : null },
+    { user_id: userId, week_start: weekStart, quest_id: "mission", status, note: text, done_at: status === "pending" ? new Date().toISOString() : null },
     { onConflict: "user_id,week_start,quest_id" },
   );
   if (error) throw new Error(`미션을 저장하지 못했습니다: ${error.message}`);

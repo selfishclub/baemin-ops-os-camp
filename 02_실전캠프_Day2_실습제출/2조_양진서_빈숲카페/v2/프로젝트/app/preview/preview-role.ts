@@ -20,5 +20,5 @@ export async function readPreviewRole(): Promise<PreviewRole> {
 export function previewViewer(role: PreviewRole) {
   return role === "owner"
     ? { id: "preview-owner", displayName: "미리보기 사장", role }
-    : { id: "preview-staff-a", displayName: "직원 A", role };
+    : { id: "preview-staff-e", displayName: "최지우", role };
 }

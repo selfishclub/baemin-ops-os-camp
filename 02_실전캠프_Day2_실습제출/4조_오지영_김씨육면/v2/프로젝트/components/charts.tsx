@@ -228,21 +228,19 @@ export function MonthlyChart({ months }: { months: MonthBar[] }) {
         }
         const rh = h(m.revenue);
         const eh = h(m.expense);
-        const up = m.profit >= 0;
         return (
           <g key={m.label}>
             <rect x={cx - bw - 2} y={base - rh} width={bw} height={rh} rx="4" fill="var(--info)" />
             <rect x={cx + 2} y={base - eh} width={bw} height={eh} rx="4" fill="var(--violet)" />
-            <text
-              x={cx}
-              y={base - Math.max(rh, eh) - 7}
-              fontSize="9.5"
-              fontWeight="800"
-              fill={up ? "var(--primary)" : "var(--danger)"}
-              textAnchor="middle"
-            >
-              {shortWon(m.profit)}
+            {/* 막대마다 제 금액을 단다 — 영업이익 한 줄만 띄우면 매출인지 비용인지가 안 보인다 */}
+            <text x={cx - bw / 2 - 2} y={base - rh - 6} fontSize="9" fontWeight="800" fill="var(--info)" textAnchor="middle">
+              {shortWon(m.revenue)}
             </text>
+            {m.expense > 0 && (
+              <text x={cx + bw / 2 + 2} y={base - eh - 6} fontSize="9" fontWeight="800" fill="var(--violet)" textAnchor="middle">
+                {shortWon(m.expense)}
+              </text>
+            )}
             <text x={cx} y={base + 18} fontSize="10" fontWeight="700" fill="var(--ink)" textAnchor="middle">
               {m.label}
             </text>
@@ -250,7 +248,7 @@ export function MonthlyChart({ months }: { months: MonthBar[] }) {
         );
       })}
       <g fontSize="10" fontWeight="700" textAnchor="middle" fill="var(--muted)">
-        <text x={W / 2} y={base + 40}>막대 위 숫자는 영업이익</text>
+        <text x={W / 2} y={base + 40}>막대 위 숫자는 왼쪽이 매출, 오른쪽이 비용</text>
       </g>
     </svg>
   );

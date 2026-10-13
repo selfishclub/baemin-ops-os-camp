@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LABOR_SUBS, type AccountDef, type AccountGroup, type Behavior } from "@/lib/accounts";
+import { LABOR_SUBS, type AccountDef, type AccountGroup, type Behavior, type Tier } from "@/lib/accounts";
 import { won } from "@/lib/csv";
 import { syncSettings } from "@/lib/useSettings";
 import { aliasesOf, forgetAlias, rememberAlias } from "@/lib/learned";
@@ -20,6 +20,7 @@ import {
   resetSettings,
   saveSettings,
   setAccountBehavior,
+  setAccountTier,
   setLaborBehavior,
   upsertFixed,
   type Settings,
@@ -201,6 +202,20 @@ function AccountRow({
           <span className="compose">소분류 {account.subs.length}개</span>
         </span>
         <span>
+          {account.group === "expense" && (
+            <select
+              className="inp"
+              style={{ marginRight: 6 }}
+              value={account.tier ?? "판관비"}
+              onChange={(e) => set(setAccountTier(settings, account.name, e.target.value as Tier))}
+              aria-label="손익계산서 단"
+              title="손익계산서에서 이 계정이 들어가는 자리"
+            >
+              <option value="원가">원가</option>
+              <option value="판관비">판관비</option>
+              <option value="영업외">영업외</option>
+            </select>
+          )}
           {account.group === "expense" && account.name !== "인건비" && (
             <select
               className="inp"

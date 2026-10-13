@@ -5,8 +5,9 @@
 /* 점장 역할은 2026-09-12 부터 갑각류 관리자로 부른다 — 이 역할이 맡는 일이 갑각류 상태·수조·염도 관리이기 때문.
    저장된 옛 기록의 옛 이름은 앱이 열릴 때 자동으로 바꿔 읽는다 (LEGACY_ROLES). */
 const ROLE_MGR = '갑각류 관리자';
-const LEGACY_ROLES = { '점장': ROLE_MGR };
-const ROLES = [ROLE_MGR, '홀', '주방'];
+const ROLE_HALL = '홀 매니저', ROLE_KIT = '주방 실장', ROLE_PART = '고정알바';   // 2026-10-12 사장님 요청: 홀 → 홀 매니저, 주방 → 주방 실장, 고정알바 추가
+const LEGACY_ROLES = { '점장': ROLE_MGR, '홀': ROLE_HALL, '주방': ROLE_KIT };   // 옛 이름으로 저장된 기록은 읽을 때 바꾼다 (migrateRoles)
+const ROLES = [ROLE_MGR, ROLE_HALL, ROLE_KIT, ROLE_PART];
 
 /* 특정 역할이 아니라 그날 있는 사람이 하는 업무.
    역할 필터를 무엇으로 놓아도 항상 보이고, 근무 편성에서 담당을 따지지 않는다. */
@@ -15,7 +16,7 @@ const ROLE_OPTS = [...ROLES, ROLE_ANY];
 
 /* 원가(매입) 분류·단위 */
 const PURCHASE_CATS = ['대게', '킹크랩', '랍스터', '수산물', '식자재', '주류·음료', '소모품', '기타'];
-const PURCHASE_UNITS = ['kg', '미', '박스', '개', '병', 'L'];
+const PURCHASE_UNITS = ['kg', '단', '미', '박스', '개', '봉', '팩', '병', 'L'];   // 단: 파 한 단·깻잎 두 단 같은 야채 단위 (사장님 요청 2026-10-09)
 
 /* 이슈 분류 */
 const ISSUE_CATS = ['고객 컴플레인', '서비스', '시설·장비', '수조·상품', '직원·교육', '기타'];
@@ -27,10 +28,29 @@ const RECIPE_CATS = ['대게', '킹크랩', '랍스터', '사이드', '소스·�
 const MIN_WAGE = { year: 2026, hour: 10320 };
 const CONTRACT_TYPES = { regular: '기간의 정함이 없는 근로계약', fixed: '기간제 근로계약', part: '단시간(아르바이트) 근로계약' };
 const PAY_TYPES = { hour: '시급', day: '일급', month: '월급' };
-const DUTY_BY_ROLE = { [ROLE_MGR]: '갑각류(수조) 관리 및 매장 운영 관리', '홀': '홀 서빙 및 고객 응대, 매장 청결 관리', '주방': '조리 및 주방 위생 관리' };
+const DUTY_BY_ROLE = { [ROLE_MGR]: '갑각류(수조) 관리 및 매장 운영 관리', [ROLE_HALL]: '홀 서빙 및 고객 응대, 매장 청결 관리', [ROLE_KIT]: '조리 및 주방 위생 관리', [ROLE_PART]: '홀 서빙 보조 및 청소·정리' };
 
 /* 폐사 집계 어종 — 여기만 고치면 입력칸·리포트·그래프가 전부 따라간다 */
 const SPECIES = ['대게', '킹크랩', '랍스터'];
+
+/* 안양점 2인 근무(갑각류 관리자 + 주방) 담당표 — 사장님 요청 2026-10-08.
+   원칙: 반반에 가깝게 나누되, 몸을 많이 쓰는 일(청소·배출·계단)은 갑각류 관리자에게. 안양점에서 2인일 때만 적용되고 안산점은 그대로.
+   여기 없는 업무(직접 만든 업무 등)는 기존 규칙(홀→관리자, role2)로 정해진다. */
+const ANYANG_TWO = {
+  // 오픈 — 관리자 10 · 주방 6 · 공통 1(t09)
+  t01: ROLE_MGR, t03: ROLE_MGR, t04: ROLE_MGR, t10: ROLE_MGR, t13: ROLE_MGR, t14: ROLE_MGR, t16: ROLE_MGR, t56: ROLE_MGR, t57: ROLE_MGR, t18: ROLE_MGR,
+  t02: ROLE_KIT, t05: ROLE_KIT, t19: ROLE_KIT, t08: ROLE_KIT, t15: ROLE_KIT, t17: ROLE_KIT,
+  t59: ROLE_MGR, t63: ROLE_MGR, t61: ROLE_KIT,   // 주 1회(오픈)
+  // 미들 — 관리자 4 · 주방 6 · 공통 1(t55)
+  t20: ROLE_MGR, t21: ROLE_MGR, t22: ROLE_MGR, t24: ROLE_MGR,
+  t27: ROLE_KIT, t25: ROLE_KIT, t29: ROLE_KIT, t28: ROLE_KIT, t32: ROLE_KIT, t30: ROLE_KIT,
+  t64: ROLE_MGR, t60: ROLE_MGR, t62: ROLE_KIT,   // 주 1회(미들)
+  // 마감 — 관리자 9 · 주방 8
+  t33: ROLE_MGR, t34: ROLE_MGR, t39: ROLE_MGR, t41: ROLE_MGR, t43: ROLE_MGR, t53: ROLE_MGR, t47: ROLE_MGR, t49: ROLE_MGR, t50: ROLE_MGR,
+  t35: ROLE_KIT, t36: ROLE_KIT, t37: ROLE_KIT, t38: ROLE_KIT, t44: ROLE_KIT, t54: ROLE_KIT, t42: ROLE_KIT, t48: ROLE_KIT,
+};
+/* 강도 높은 업무 — 카드에 💪 표시. 2인일 때 관리자 쪽으로 몰아 주는 기준 */
+const HEAVY_TASKS = new Set(['t04', 't10', 't34', 't39', 't41', 't53', 't56', 't57', 't24', 't60', 't63', 't64']);
 
 const SLOTS = [
   { key: 'open',  name: '오픈',   from: '11:00' },
@@ -39,7 +59,7 @@ const SLOTS = [
 ];
 
 /* 루틴 데이터 버전 — 올리면 저장된 기존 루틴을 새 목록으로 갈아끼운다 */
-const ROUTINE_VER = 10;   // 10판: 주 n회 업무 매일 표시(비해당 요일 자동 완료) — 2026-09-23   // 9판: 수조·이끼 상태 확인(t18) 월·수·금만 — 2026-09-23   // 8판: 안양점 17:00 입구·계단 불 켜기 추가 — 2026-09-22   // 6판: 안양점 전용 마감 루틴 2개(계단 쓸기 · 찜기 물 배출) 추가 — 2026-09-22 사장님 요청
+const ROUTINE_VER = 15;   // 14판: 주 1회 업무 6개를 안양점 전용으로 정정(13판을 받은 안산점에서 빼기 위해 판올림) — 2026-10-09   // 13판: 안양점 주 1회 업무 6개(t59~t64: 테이블 세제 세척 · 2층 쓰레기통 · 비닐장갑 케이스 · 얼음 필터 · 계단 화장실 · 벽면 기름기) — 2026-10-09 사장님 요청   // 12판: 13:00 매장 외부 쓰레기 줍기·정리(공통, t58) 추가 — 2026-10-08   // 11판: 12:30 홀 쓸고 닦기(공통, t56) · 안양점 계단 청소(t57) 추가 — 2026-10-08 사장님 요청   // 10판: 주 n회 업무 매일 표시(비해당 요일 자동 완료) — 2026-09-23   // 9판: 수조·이끼 상태 확인(t18) 월·수·금만 — 2026-09-23   // 8판: 안양점 17:00 입구·계단 불 켜기 추가 — 2026-09-22   // 6판: 안양점 전용 마감 루틴 2개(계단 쓸기 · 찜기 물 배출) 추가 — 2026-09-22 사장님 요청
 
 /* time    : 화면에 보이는 시각
    sort    : 정렬 기준 (마감 후 / 퇴점 전 처리용)
@@ -52,54 +72,64 @@ const ROUTINE_VER = 10;   // 10판: 주 n회 업무 매일 표시(비해당 요�
 
 const TEMPLATES = [
   // ── 오픈 (15) ─────────────────────────────────────────────
-  { id:'t01', slot:'open', time:'11:00', sort:'11:00', title:'당일 예약 확인 및 룸·좌석 배정', role:ROLE_MGR, support:'홀' },
-  { id:'t02', slot:'open', time:'11:00', sort:'11:00', title:'홀 조명·음악·냉장고 LED·포스·티오더 전원 켜기', role:'홀' },
+  { id:'t01', slot:'open', time:'11:00', sort:'11:00', title:'당일 예약 확인 및 룸·좌석 배정', role:ROLE_MGR, support:ROLE_HALL },
+  { id:'t02', slot:'open', time:'11:00', sort:'11:00', title:'홀 조명·음악·냉장고 LED·포스·티오더 전원 켜기', role:ROLE_HALL },
   { id:'t03', slot:'open', time:'11:05', sort:'11:05', title:'부재중 전화 콜백하기', role:ROLE_MGR },
-  { id:'t04', slot:'open', time:'11:05', sort:'11:05', title:'테이블·의자·유아의자·티오더·카트 청소', role:'홀', role2:'주방' },
-  { id:'t05', slot:'open', time:'11:05', sort:'11:05', title:'갑각류·식재·반찬·소스 재고 확인', role:ROLE_MGR, support:'주방' },
-  { id:'t19', slot:'open', time:'11:10', sort:'11:10', title:'입구·와인장·문유리·손잡이·카운터 청소', role:'홀', role2:'주방' },
-  { id:'t08', slot:'open', time:'11:20', sort:'11:20', title:'식재·주류·소모품 부족 여부 확인', role:'주방', support:ROLE_MGR },
+  { id:'t04', slot:'open', time:'11:05', sort:'11:05', title:'테이블·의자·유아의자·티오더·카트 청소', role:ROLE_HALL, role2:ROLE_KIT },
+  { id:'t05', slot:'open', time:'11:05', sort:'11:05', title:'갑각류·식재·반찬·소스 재고 확인', role:ROLE_MGR, support:ROLE_KIT },
+  { id:'t19', slot:'open', time:'11:10', sort:'11:10', title:'입구·와인장·문유리·손잡이·카운터 청소', role:ROLE_HALL, role2:ROLE_KIT },
+  { id:'t08', slot:'open', time:'11:20', sort:'11:20', title:'식재·주류·소모품 부족 여부 확인', role:ROLE_KIT, support:ROLE_MGR },
   { id:'t09', slot:'open', time:'11:30', sort:'11:30', title:'음식 상태 및 맛 체크', role:'공통' },
   { id:'t10', slot:'open', time:'11:30', sort:'11:30', title:'화장실 청소 및 휴지·비품 확인', memo:'하루씩 돌아가며 진행', role:'공통' },
   { id:'t13', slot:'open', time:'11:40', sort:'11:40', title:'갑각류 상태 확인', memo:'폐사 개체 즉시 제거 · 집게 반응과 활력도 · 마릿수 · 탈피 개체 격리', role:ROLE_MGR, crit:true, due:'11:40', grace:20, ev:'deaths', deadline:'12:00' },
   { id:'t14', slot:'open', time:'11:40', sort:'11:40', title:'염도 확인', memo:'굴절계·비중계로 측정 후 사진을 카톡방에 전송', role:ROLE_MGR, crit:true, due:'11:40', grace:20, ev:'kakao', deadline:'12:00' },
-  { id:'t15', slot:'open', time:'11:50', sort:'11:50', title:'작업대·싱크·바닥·쓰레기 상태 정리', role:'주방' },
+  { id:'t15', slot:'open', time:'11:50', sort:'11:50', title:'작업대·싱크·바닥·쓰레기 상태 정리', role:ROLE_KIT },
   { id:'t16', slot:'open', time:'오픈 전', sort:'11:58', title:'홀·주방 오픈 완료 최종 점검', role:ROLE_MGR },
-  { id:'t17', slot:'open', time:'12:00', sort:'12:00', title:'와인잔·수저 정리 및 홀 집기 점검', role:'홀' },
+  { id:'t17', slot:'open', time:'12:00', sort:'12:00', title:'와인잔·수저 정리 및 홀 집기 점검', role:ROLE_HALL },
+  { id:'t56', slot:'open', time:'12:30', sort:'12:29', title:'홀 쓸고 닦기', memo:'홀 바닥 쓸고 물걸레 · 테이블 밑 · 룸 입구까지 · 손님 있으면 빈 구역부터', role:ROLE_HALL, role2:ROLE_KIT },
+  { id:'t57', slot:'open', time:'12:30', sort:'12:29', title:'계단 청소', memo:'외부 계단 쓸고 닦기 · 난간 먼지 · 쓰레기·담배꽁초 정리 · 젖어 있으면 물기 제거', role:ROLE_HALL, role2:ROLE_KIT, store:'anyang' },
   { id:'t18', slot:'open', time:'12:30', sort:'12:30', title:'수조·이끼 상태 확인', memo:'이끼 · 수온 · 여과기와 산소발생기 작동음 · 물 탁도 · 배관 누수 / 수온계 사진 카톡 전송', role:ROLE_MGR, crit:true, due:'12:30', grace:30, ev:'kakao', note:true, repeat:{ t:'weekly', days:[1, 3, 5] }, showAlways:true },   // 월·수·금 업무, 다른 날은 자동 완료로 표시 — 사장님 요청 2026-09-23
+  { id:'t58', slot:'open', time:'13:00', sort:'13:00', title:'매장 외부 쓰레기 줍기 및 정리 (손님 없을 경우)', memo:'매장 앞 · 입구 주변 · 간판 밑 쓰레기와 담배꽁초 줍기, 입간판·화분 정리 · 손님 있으면 빈 시간에', role:ROLE_ANY, grace:120 },
+  // 안양점 주 1회 업무(13판, 2026-10-09 사장님 요청) — 해당 요일에만 나타난다. 오전·미들로 나눠 월~금에 배치
+  { id:'t59', slot:'open', time:'11:40', sort:'11:40', title:'테이블 세제(퐁퐁) 세척 — 주 1회', memo:'테이블 전체를 주방 세제로 닦고 물걸레로 두 번 헹굼 · 테이블 옆면·다리까지 · 끈적임 없게', role:ROLE_HALL, role2:ROLE_KIT, store:'anyang', repeat:{ t:'weekly', days:[1] } },
+  { id:'t61', slot:'open', time:'11:40', sort:'11:40', title:'비닐장갑 케이스 세척 — 주 1회', memo:'홀·주방 비닐장갑 케이스 전부 비우고 세제로 씻어 말린 뒤 다시 채움', role:ROLE_KIT, store:'anyang', repeat:{ t:'weekly', days:[3] } },
+  { id:'t63', slot:'open', time:'11:40', sort:'11:40', title:'계단 화장실 대청소 — 주 1회', memo:'변기·세면대·바닥·벽 타일 세제 청소 · 거울 · 배수구 · 휴지·비품 채움 (매일 청소와 별개로 꼼꼼히)', role:ROLE_HALL, role2:ROLE_KIT, store:'anyang', repeat:{ t:'weekly', days:[5] } },
 
   // ── 미들 (10 + 휴식) ──────────────────────────────────────
   // 15:00~16:00 은 휴식으로 비워 두고, 원래 이 시간에 있던 일은 16시 뒤로 밀었다
   { id:'t51', slot:'noon', time:'15:00', sort:'15:00', title:'휴식 (고객 없을 경우)', memo:'15:00~16:00 사이 고객이 없으면 교대로 쉽니다. 손님이 들어오면 바로 중단합니다.', role:'공통', rest:true },
   { id:'t20', slot:'noon', time:'16:00', sort:'16:00', title:'갑각류 중간체크', memo:'폐사 제거 · 활력 저하 개체 격리', role:ROLE_MGR, crit:true, due:'16:00', grace:30, ev:'deaths' },
-  { id:'t27', slot:'noon', time:'16:00', sort:'16:00', title:'손님 빠진 자리 청소 및 재세팅', role:'홀' },
+  { id:'t27', slot:'noon', time:'16:00', sort:'16:00', title:'손님 빠진 자리 청소 및 재세팅', role:ROLE_HALL },
   { id:'t21', slot:'noon', time:'16:10', sort:'16:10', title:'저녁 예약 최종 확인 및 룸·좌석 재배정', role:ROLE_MGR },
-  { id:'t25', slot:'noon', time:'16:10', sort:'16:10', title:'부족한 반찬·소스·사이드 메뉴 재준비', role:'주방' },
-  { id:'t22', slot:'noon', time:'16:20', sort:'16:20', title:'저녁 피크용 갑각류·식재 재점검', role:ROLE_MGR, support:'주방' },
-  { id:'t24', slot:'noon', time:'16:20', sort:'16:20', title:'소주·주류·음료·물병 여유분 정리', role:'홀', role2:'주방' },
-  { id:'t29', slot:'noon', time:'16:30', sort:'16:30', title:'룸 벽면·오염 구역 청소', memo:'고객 사용한 좌석은 반드시 체크', role:'홀', role2:'주방' },
-  { id:'t28', slot:'noon', time:'16:40', sort:'16:40', title:'예약 상차림 사전 준비', role:'주방', support:'홀' },
-  { id:'t30', slot:'noon', time:'17:00', sort:'17:00', title:'재고·발주 필요 항목 체크', role:ROLE_MGR, support:'주방' },
-  { id:'t32', slot:'noon', time:'17:00', sort:'17:00', title:'작업대·바닥·쓰레기 정리', role:'주방' },
+  { id:'t25', slot:'noon', time:'16:10', sort:'16:10', title:'부족한 반찬·소스·사이드 메뉴 재준비', role:ROLE_KIT },
+  { id:'t22', slot:'noon', time:'16:20', sort:'16:20', title:'저녁 피크용 갑각류·식재 재점검', role:ROLE_MGR, support:ROLE_KIT },
+  { id:'t24', slot:'noon', time:'16:20', sort:'16:20', title:'소주·주류·음료·물병 여유분 정리', role:ROLE_HALL, role2:ROLE_KIT },
+  { id:'t29', slot:'noon', time:'16:30', sort:'16:30', title:'룸 벽면·오염 구역 청소', memo:'고객 사용한 좌석은 반드시 체크', role:ROLE_HALL, role2:ROLE_KIT },
+  { id:'t64', slot:'noon', time:'16:30', sort:'16:31', title:'1·2층 벽면 기름기 제거 — 주 1회', memo:'테이블 주변·찜기 근처 벽면 기름때를 세제로 닦아내기 · 1층 끝낸 뒤 2층 · 손님 있는 구역은 건너뛰고 메모', role:ROLE_HALL, role2:ROLE_KIT, store:'anyang', repeat:{ t:'weekly', days:[1] } },
+  { id:'t60', slot:'noon', time:'16:30', sort:'16:31', title:'2층 쓰레기통 세척 — 주 1회', memo:'2층 쓰레기통 전부 비우고 세제로 안팎 세척 · 말린 뒤 새 봉투', role:ROLE_HALL, role2:ROLE_KIT, store:'anyang', repeat:{ t:'weekly', days:[2] } },
+  { id:'t62', slot:'noon', time:'16:30', sort:'16:31', title:'제빙기 얼음 필터 세척 — 주 1회', memo:'제빙기 전원 끄고 필터 분리 → 세척·헹굼 → 완전히 말려 끼움 · 얼음 통 안쪽도 닦기', role:ROLE_KIT, store:'anyang', repeat:{ t:'weekly', days:[4] } },
+  { id:'t28', slot:'noon', time:'16:40', sort:'16:40', title:'예약 상차림 사전 준비', role:ROLE_KIT, support:ROLE_HALL },
+  { id:'t30', slot:'noon', time:'17:00', sort:'17:00', title:'재고·발주 필요 항목 체크', role:ROLE_MGR, support:ROLE_KIT },
+  { id:'t32', slot:'noon', time:'17:00', sort:'17:00', title:'작업대·바닥·쓰레기 정리', role:ROLE_KIT },
   { id:'t55', slot:'noon', time:'17:00', sort:'17:01', title:'매장 입구·계단 불 켜기', memo:'입구 간판·계단 조명 ON · 안 켜지는 등이 있으면 트러블시트에 적기', role:ROLE_ANY, store:'anyang' },
 
   // ── 마감 (15) ─────────────────────────────────────────────
   { id:'t33', slot:'close', time:'20:00', sort:'20:00', title:'갑각류 중간체크', memo:'폐사 제거 · 활력 저하 개체 격리', role:ROLE_MGR, crit:true, due:'20:00', grace:30, ev:'deaths' },
-  { id:'t34', slot:'close', time:'20:30', sort:'20:30', title:'테이블·의자·유아의자·티오더·카트 청소', role:'홀' },
-  { id:'t35', slot:'close', time:'20:30', sort:'20:30', title:'작업대·화구·싱크·바닥 청소', role:'주방', support:ROLE_MGR },
-  { id:'t36', slot:'close', time:'20:50', sort:'20:50', title:'룸 의자 정리 및 다음날 예약석 선세팅', role:'홀' },
-  { id:'t37', slot:'close', time:'20:50', sort:'20:50', title:'식기 세척 및 다음날 오픈용 식기 정리', role:'주방' },
-  { id:'t38', slot:'close', time:'21:00', sort:'21:00', title:'남은 식재 밀폐·냉장·폐기 정리', role:'주방' },
-  { id:'t39', slot:'close', time:'21:10', sort:'21:10', title:'홀 바닥 쓸기·닦기', role:'홀' },
-  { id:'t41', slot:'close', time:'21:20', sort:'21:20', title:'음식물·일반·재활용 분리수거 및 배출', role:'주방' },
-  { id:'t42', slot:'close', time:'21:25', sort:'21:25', title:'주문 마감 안내 및 추가주문 최종 확인', role:ROLE_MGR, support:'홀' },
-  { id:'t43', slot:'close', time:'21:30', sort:'21:30', title:'수조 최종 점검', memo:'갑각류·수족관 상태 · 폐사 개체 완전 제거 · 산소와 여과기 작동 · 수온 · 저울과 장비 OFF', role:ROLE_MGR, support:'주방', crit:true, due:'21:30', grace:30, ev:'deaths' },
-  { id:'t44', slot:'close', time:'21:30', sort:'21:30', title:'가스·전기·냉장고 문·주방 전원 최종 확인', role:'주방', crit:true, due:'21:30', grace:30 },
+  { id:'t34', slot:'close', time:'20:30', sort:'20:30', title:'테이블·의자·유아의자·티오더·카트 청소', role:ROLE_HALL },
+  { id:'t35', slot:'close', time:'20:30', sort:'20:30', title:'작업대·화구·싱크·바닥 청소', role:ROLE_KIT, support:ROLE_MGR },
+  { id:'t36', slot:'close', time:'20:50', sort:'20:50', title:'룸 의자 정리 및 다음날 예약석 선세팅', role:ROLE_HALL },
+  { id:'t37', slot:'close', time:'20:50', sort:'20:50', title:'식기 세척 및 다음날 오픈용 식기 정리', role:ROLE_KIT },
+  { id:'t38', slot:'close', time:'21:00', sort:'21:00', title:'남은 식재 밀폐·냉장·폐기 정리', role:ROLE_KIT },
+  { id:'t39', slot:'close', time:'21:10', sort:'21:10', title:'홀 바닥 쓸기·닦기', role:ROLE_HALL },
+  { id:'t41', slot:'close', time:'21:20', sort:'21:20', title:'음식물·일반·재활용 분리수거 및 배출', role:ROLE_KIT },
+  { id:'t42', slot:'close', time:'21:25', sort:'21:25', title:'주문 마감 안내 및 추가주문 최종 확인', role:ROLE_MGR, support:ROLE_HALL },
+  { id:'t43', slot:'close', time:'21:30', sort:'21:30', title:'수조 최종 점검', memo:'갑각류·수족관 상태 · 폐사 개체 완전 제거 · 산소와 여과기 작동 · 수온 · 저울과 장비 OFF', role:ROLE_MGR, support:ROLE_KIT, crit:true, due:'21:30', grace:30, ev:'deaths' },
+  { id:'t44', slot:'close', time:'21:30', sort:'21:30', title:'가스·전기·냉장고 문·주방 전원 최종 확인', role:ROLE_KIT, crit:true, due:'21:30', grace:30 },
   /* 안양점 전용 — store 가 있으면 그 매장에서만 목록에 들어간다 */
   { id:'t53', slot:'close', time:'21:35', sort:'21:35', title:'계단 쓸기 (10분)', memo:'외부 계단 빗자루로 쓸고 쓰레기·담배꽁초 정리 · 젖어 있으면 물기 제거', role:ROLE_ANY, store:'anyang' },
-  { id:'t54', slot:'close', time:'21:45', sort:'21:45', title:'찜기 물 배출 (10분)', memo:'찜기 물 완전히 빼고 밸브 잠금 · 찜기 내부 헹굼 · 바닥 물기 정리', role:'주방', store:'anyang' },
+  { id:'t54', slot:'close', time:'21:45', sort:'21:45', title:'찜기 물 배출 (10분)', memo:'찜기 물 완전히 빼고 밸브 잠금 · 찜기 내부 헹굼 · 바닥 물기 정리', role:ROLE_KIT, store:'anyang' },
   { id:'t47', slot:'close', time:'마감 후', sort:'22:10', title:'포스 마감·매출 정산·특이사항 기록', role:ROLE_MGR, crit:true, ev:'money', evLabel:'매출 금액' },
-  { id:'t48', slot:'close', time:'마감 후', sort:'22:11', title:'갑각류·주류·소모품 잔량 및 발주 메모', role:ROLE_MGR, support:'주방', note:true },
+  { id:'t48', slot:'close', time:'마감 후', sort:'22:11', title:'갑각류·주류·소모품 잔량 및 발주 메모', role:ROLE_MGR, support:ROLE_KIT, note:true },
   { id:'t49', slot:'close', time:'퇴점 전', sort:'22:19', title:'홀·주방 마감 완료 최종 확인', role:ROLE_MGR },
   { id:'t50', slot:'close', time:'퇴점 전', sort:'22:20', title:'전원·문잠금·냉난방·다음날 예약 시트작성', role:ROLE_MGR, crit:true },
 ];
@@ -144,6 +174,9 @@ const BASE_RULES = [
   { scope:'ansan', title:'고객이 오고 갈 때 항상 큰소리로 인사합니다.' },
 
   // ── 안양점 전용 ──
+  { scope:'anyang', title:'출근과 퇴근은 정해진 시각에 맞춰 합니다.',
+    body:'너무 일찍 나오거나 일찍 마치는 것도, 늦는 것과 마찬가지로 교대 흐름을 흐트러뜨립니다. 근무표에 적힌 시각에 맞춰 시작하고 마치는 것을 원칙으로 합니다. 마감 정리가 일찍 끝났더라도 퇴근 시각까지는 자리를 지키며 다음 날 준비나 정리를 함께 합니다.',
+    note:'퇴근 시각보다 10~15분 먼저 나가는 것도 조기 퇴근입니다. 일찍 가야 할 사정이 있으면 당일 미리 관리자에게 알려 주세요. 사전에 이야기된 경우는 괜찮습니다.' },
   { scope:'anyang', title:'고객이 오고 갈 때 항상 큰소리로 인사합니다.' },
   { scope:'anyang', title:'룸 안내 시 성함 확인 → 룸 안내 순으로 반드시 이행합니다.',
     body:'그후 2층 인원에게 무전으로 공유합니다.',

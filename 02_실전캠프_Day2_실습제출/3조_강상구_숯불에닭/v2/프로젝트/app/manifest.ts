@@ -4,7 +4,7 @@ import type { MetadataRoute } from "next";
 //  주소창 없이 앱처럼 열리기만 하고, 오프라인으로는 안 돕니다 — 데이터는 그 기기 브라우저에만 남습니다.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "숯불에닭 한눈 손익 장부",
+    name: "한눈 손익 장부",
     short_name: "손익 장부",
     description: "은행 거래내역과 배달앱 실매출을 넣으면 이번 달 실제로 남은 돈을 한 장으로 보여 줍니다.",
     start_url: "/",

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, Notice } from "@/components/ui";
 import { BreakevenCard } from "@/components/BreakevenCard";
@@ -19,16 +19,35 @@ import { monthFindings, monthSources, type FindingsInput } from "@/lib/findings"
 import { missingFixedCosts } from "@/lib/missingFixed";
 import { dayTotals } from "@/lib/weekday";
 import { PURCHASES_KEY_PREFIX, type Purchase } from "@/lib/costing/purchases";
-import { buildTaxSheets, taxFileName } from "@/lib/taxExport";
+import { findMonthWithData, ledgerIsEmpty, loadSampleData, SAMPLE_LABEL } from "@/lib/sampleData";
+import { loadStoreProfile, taxFileName } from "@/lib/storeProfile";
+import { buildTaxSheets } from "@/lib/taxExport";
 import type { Transaction } from "@/lib/types";
 
 export default function PnlPage() {
-  const { month } = useMonth();
+  const { month, setMonth } = useMonth();
   const cur = useMonthPnl(month);
   const prev = useMonthPnl(prevMonth(month)); // 지난달도 같은 잣대로 계산해서 비교한다
   const { ledger, daily, settlement, summary, pnl, purchaseCount, today } = cur;
   const [open, setOpen] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  // 빈 화면에 "둘러보기"를 띄울지 — 장부가 통째로 비었을 때만 (lib/sampleData.ts)
+  const [canTour, setCanTour] = useState(false);
+  const [touring, setTouring] = useState(false);
+  // 이 달은 비었는데 다른 달에 자료가 있으면 그 달로 건너가게 (시연 주소가 딱 이렇다)
+  const [elsewhere, setElsewhere] = useState<string | null>(null);
+  useEffect(() => {
+    void ledgerIsEmpty().then(setCanTour);
+    void findMonthWithData().then((m) => setElsewhere(m && m !== month ? m : null));
+  }, [month]);
+  async function startTour() {
+    setTouring(true);
+    try {
+      setMonth(await loadSampleData());
+    } finally {
+      setTouring(false);
+    }
+  }
 
   if (cur.loading || prev.loading) return <p className="py-10 text-center text-sm text-stone-500">불러오는 중…</p>;
   if (ledger.error) return <Notice tone="error">{ledger.error}</Notice>;
@@ -83,10 +102,40 @@ export default function PnlPage() {
       <section className="card space-y-3 text-center">
         <p className="text-4xl">📥</p>
         <h2 className="text-base font-bold">{monthLabel(month)} 데이터가 아직 없어요</h2>
-        <p className="text-sm text-stone-600">은행 거래내역 엑셀을 올리면 자동으로 분류해서 손익을 보여 드려요.</p>
-        <Link href="/upload" className="btn-primary">
-          거래내역 올리러 가기
-        </Link>
+        {canTour ? (
+          <>
+            <p className="text-sm text-stone-600">
+              처음이세요? <b>가짜 자료로 한 바퀴 둘러보면</b> 무엇을 보여 주는 도구인지 1분이면 알 수 있어요.
+            </p>
+            <button className="btn-primary w-full" disabled={touring} onClick={startTour}>
+              {touring ? "넣는 중…" : `가짜 자료로 둘러보기 (${SAMPLE_LABEL})`}
+            </button>
+            <p className="pt-1 text-sm text-stone-600">내 통장으로 시작하려면</p>
+            <Link href="/upload" className="btn-ghost">
+              거래내역 올리러 가기
+            </Link>
+          </>
+        ) : elsewhere ? (
+          <>
+            <p className="text-sm text-stone-600">
+              이 달은 아직 비어 있어요. <b>{monthLabel(elsewhere)}</b>에 자료가 있어요.
+            </p>
+            <button className="btn-primary w-full" onClick={() => setMonth(elsewhere)}>
+              {monthLabel(elsewhere)} 보러 가기
+            </button>
+            <p className="pt-1 text-sm text-stone-600">이 달 자료를 넣으려면</p>
+            <Link href="/upload" className="btn-ghost">
+              거래내역 올리러 가기
+            </Link>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-stone-600">은행 거래내역 엑셀을 올리면 자동으로 분류해서 손익을 보여 드려요.</p>
+            <Link href="/upload" className="btn-primary">
+              거래내역 올리러 가기
+            </Link>
+          </>
+        )}
       </section>
     );
   }
@@ -329,7 +378,7 @@ function TaxExportCard({ month, txs, needsReview, closed }: { month: string; txs
     setMsg(null);
     try {
       const store = getStore();
-      const [sales, purchases] = await Promise.all([store.listDailySales(month), store.getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + month)]);
+      const [sales, purchases, profile] = await Promise.all([store.listDailySales(month), store.getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + month), loadStoreProfile()]);
       const sheets = buildTaxSheets(month, txs, sales, purchases ?? []);
       const XLSX = await import("xlsx");
       const wb = XLSX.utils.book_new();
@@ -338,8 +387,9 @@ function TaxExportCard({ month, txs, needsReview, closed }: { month: string; txs
         ws["!cols"] = sh.rows[0].map((h, i) => ({ wch: Math.max(8, String(h).length * 2, ...sh.rows.slice(1, 200).map((r) => String(r[i] ?? "").length + 2)) }));
         XLSX.utils.book_append_sheet(wb, ws, sh.name);
       }
-      XLSX.writeFile(wb, taxFileName(month));
-      setMsg(`${taxFileName(month)} 파일을 저장했어요 (다운로드 폴더). 세무사님께는 사장님이 직접 보내 주세요.`);
+      const file = taxFileName(profile, month);
+      XLSX.writeFile(wb, file);
+      setMsg(`${file} 파일을 저장했어요 (다운로드 폴더). 세무사님께는 사장님이 직접 보내 주세요.`);
     } catch (e) {
       setMsg(`파일을 만들지 못했어요 (${e instanceof Error ? e.message : e})`);
     } finally {

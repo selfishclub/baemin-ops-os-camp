@@ -4,6 +4,7 @@ import { behaviorOf, foldPersonal, getAccount } from "./accounts";
 import { assignIds } from "./dedupe";
 import type { SubMemo, SubRename } from "./mappings";
 import type { DailySale } from "./dailySales";
+import type { MenuTotal } from "./menu";
 import type { MapRule } from "./rules";
 import { needsConfirm } from "./confirm";
 import type { Reconciliation } from "./parseCard";
@@ -45,6 +46,8 @@ export interface MonthState {
   bankDeposits?: BankDeposit[];
   /** 일별 매출 — 판 날 기준. 입금일과 다르다 */
   dailySales?: DailySale[];
+  /** 메뉴별 판매. 상품명은 페이히어 원문 그대로 둔다 */
+  menu?: MenuTotal[];
 }
 
 /**
@@ -136,6 +139,7 @@ export const isEmptyMonth = (s: MonthState): boolean =>
   !s.imports.length &&
   !(s.bankDeposits ?? []).length &&
   !(s.dailySales ?? []).length &&
+  !(s.menu ?? []).length &&
   !s.closed;
 
 export function saveMonth(s: MonthState) {

@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { UNCLASSIFIED, getAccount } from "@/lib/accounts";
+import { UNCLASSIFIED, tierOf, type Tier } from "@/lib/accounts";
 import { won } from "@/lib/csv";
 import type { MonthState } from "@/lib/store";
 import type { Summary } from "@/lib/summary";
 import { ClassifyStep } from "./steps/Classify";
 import { DailyStep } from "./steps/Daily";
 import { DepositsStep } from "./steps/Deposits";
-import { PersonalStep } from "./steps/Personal";
 
 import { UploadStep } from "./steps/Upload";
 import { Btn, pct, shortWon } from "./ui";
@@ -93,7 +92,7 @@ export function Settlement({
       <div className="phead">
         <div>
           <h1>{`${state.month.split("-")[0]}년 ${Number(state.month.split("-")[1])}월 정산`}</h1>
-          <div className="eyebrow sub">4단계 · 마감 뒤에도 고칠 수 있습니다</div>
+          <div className="eyebrow sub">3단계 · 마감 뒤에도 고칠 수 있습니다</div>
         </div>
         <div className="sp">
           {summary.pending.count > 0 && <span className="delta down">확정 전 {summary.pending.count}건</span>}
@@ -113,7 +112,7 @@ export function Settlement({
           warn={summary.reviewCount > 0}
           done={variableCount > 0 && !summary.reviewCount}
         />
-        <Cell label="개인 지출" value={personalCount ? `${personalCount}건 · ${shortWon(personalTotal)}` : "없음"} done={personalCount > 0} />
+        <Cell label="개인 지출 → 권빈이네" value={personalCount ? `${personalCount}건 · ${shortWon(personalTotal)}` : "없음"} done={personalCount > 0} />
         <Cell label="입금 내역" value={depositCount ? `${depositCount}건 · ${shortWon(depositTotal)}` : "없음"} done={depositCount > 0} />
         <Cell label="마감" value={state.closed ? "마감됨" : "마감 전"} done={state.closed} />
       </div>
@@ -137,17 +136,7 @@ export function Settlement({
           <VariableStep state={state} update={update} revenueGross={summary.revenue.gross} refreshKey={refreshKey} />
         </Step>
 
-        <Step n={3} title="개인 지출" hint="2단계에서 개인으로 뺀 것 — 여기서 소분류를 정합니다"
-          status={
-            personalCount
-              ? { text: `${personalCount}건 · ${shortWon(personalTotal)}`, tone: "ok" }
-              : undefined
-          }
-          open={open.has(3)} onToggle={() => toggle(3)}>
-          <PersonalStep state={state} update={update} />
-        </Step>
-
-        <Step n={4} title="입금 내역" hint="들어온 돈을 매출 / 기타수입 / 제외로 가릅니다"
+        <Step n={3} title="입금 내역" hint="들어온 돈을 매출 / 기타수입 / 제외로 가릅니다"
           status={
             depositCount
               ? { text: `${depositCount}건 · ${shortWon(depositTotal)}`, tone: "ok" }
@@ -188,37 +177,67 @@ export function Settlement({
  * 매출이 아직 없으면 '매출 대비' 대신 불러온 총액 대비 구성비를 보여준다.
  */
 function AccountTable({ state, summary }: { state: MonthState; summary: Summary }) {
-  const rows = useMemo(() => {
-    const by = new Map<string, { amount: number; count: number; group: string }>();
+  // 개인지출은 손익에 안 들어간다. 합계만 따로 보여준다 (§5)
+  const personal = useMemo(() => {
+    const by = new Map<string, { amount: number; count: number }>();
     for (const t of state.transactions) {
-      const cur = by.get(t.account) ?? { amount: 0, count: 0, group: t.group };
+      if (t.group !== "personal") continue;
+      const cur = by.get(t.account) ?? { amount: 0, count: 0 };
       cur.amount += t.amount;
       cur.count += 1;
       by.set(t.account, cur);
     }
-    return [...by.entries()].map(([account, v]) => ({
-      account,
-      ...v,
-      group: getAccount(account)?.group ?? v.group,
-    }));
+    return [...by.entries()].map(([account, v]) => ({ account, ...v }));
   }, [state.transactions]);
 
-  if (!rows.length) return null;
-
-  const unclassified = rows.find((r) => r.account === UNCLASSIFIED);
-  const business = rows.filter((r) => r.group === "expense").sort((a, b) => b.amount - a.amount);
-  const personal = rows.filter((r) => r.group === "personal").sort((a, b) => b.amount - a.amount);
-  const income = rows.filter((r) => r.group === "excluded" || r.group === "revenue");
-
-  const bizTotal = business.reduce((a, b) => a + b.amount, 0);
-  const bizCount = business.reduce((a, b) => a + b.count, 0);
-  const perTotal = personal.reduce((a, b) => a + b.amount, 0);
-  const perCount = personal.reduce((a, b) => a + b.count, 0);
-  const loaded = rows.reduce((a, b) => a + b.amount, 0);
+  const rows = summary.expense.byAccount;
+  if (!rows.length && !summary.revenue.gross) return null;
 
   const gross = summary.revenue.gross;
-  const ratio = (v: number) => (gross > 0 ? v / gross : loaded > 0 ? v / loaded : 0);
-  const ratioLabel = gross > 0 ? "매출 대비" : "구성비";
+  const pctOf = (v: number) => (gross > 0 ? pct(v / gross) : "—");
+
+  const tierRows = (t: Tier) => rows.filter((r) => tierOf(r.account) === t && r.amount !== 0);
+  const cogsRows = tierRows("원가");
+  const sgaRows = tierRows("판관비");
+  const nonOpRows = tierRows("영업외");
+
+  const perTotal = personal.reduce((a, b) => a + b.amount, 0);
+  const perCount = personal.reduce((a, b) => a + b.count, 0);
+
+  /** 계정 한 줄 */
+  const line = (r: { account: string; amount: number; count: number }, muted = false) => (
+    <tr key={r.account}>
+      <td style={{ paddingLeft: 22, color: muted ? "var(--muted)" : undefined }}>
+        {r.account === UNCLASSIFIED ? (
+          <b style={{ color: "var(--warn)" }}>
+            미분류 <span style={{ fontWeight: 600, fontSize: 11 }}>아직 어디로 갈지 안 정해졌습니다</span>
+          </b>
+        ) : (
+          r.account
+        )}
+      </td>
+      <td className="num" style={{ color: r.account === UNCLASSIFIED ? "var(--warn)" : undefined }}>
+        {won(r.amount)}
+      </td>
+      <td className="num" style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>{r.count}건</td>
+      <td className="num" style={{ color: "var(--muted)" }}>{pctOf(r.amount)}</td>
+    </tr>
+  );
+
+  /** 합계 한 줄 — 손익계산서의 뼈대 */
+  const step = (label: string, value: number, strong = false, hint?: string) => (
+    <tr style={{ borderTop: "1px solid var(--line-2)", background: strong ? "var(--primary-soft)" : undefined }}>
+      <td style={{ fontWeight: 800 }}>
+        {label}
+        {hint && <span style={{ fontWeight: 600, fontSize: 11, color: "var(--muted)" }}> {hint}</span>}
+      </td>
+      <td className="num" style={{ fontWeight: 800, color: value < 0 ? "var(--danger)" : undefined }}>
+        {won(value)}
+      </td>
+      <td />
+      <td className="num" style={{ fontWeight: 700, color: "var(--muted)" }}>{pctOf(value)}</td>
+    </tr>
+  );
 
   return (
     <section className="panel" style={{ padding: "18px 22px" }}>
@@ -226,83 +245,42 @@ function AccountTable({ state, summary }: { state: MonthState; summary: Summary 
         <table className="data">
           <thead>
             <tr>
-              <th style={{ textAlign: "left" }}>계정</th>
-              <th>금액</th>
-              <th>건수</th>
-              <th>{ratioLabel}</th>
+              <th style={{ textAlign: "left" }}>손익계산서</th>
+              <th style={{ whiteSpace: "nowrap" }}>금액</th>
+              <th style={{ whiteSpace: "nowrap" }}>건수</th>
+              <th style={{ whiteSpace: "nowrap" }}>매출 대비</th>
             </tr>
           </thead>
           <tbody>
-            {unclassified && (
-              <tr style={{ background: "var(--warn-soft)" }}>
-                <td style={{ fontWeight: 800, color: "var(--warn)" }}>
-                  미분류 <span style={{ fontWeight: 600, fontSize: 11 }}>아직 손익에 안 들어갑니다</span>
-                </td>
-                <td className="num" style={{ fontWeight: 800, color: "var(--warn)" }}>
-                  {won(unclassified.amount)}
-                </td>
-                <td className="num" style={{ color: "var(--warn)" }}>{unclassified.count}건</td>
-                <td className="num" style={{ color: "var(--warn)" }}>{pct(ratio(unclassified.amount))}</td>
-              </tr>
-            )}
+            {step("매출액", gross, true)}
 
-            {business.map((r) => (
-              <tr key={r.account}>
-                <td>{r.account}</td>
-                <td className="num">{won(r.amount)}</td>
-                <td className="num" style={{ color: "var(--muted)" }}>{r.count}건</td>
-                <td className="num" style={{ color: "var(--muted)" }}>{pct(ratio(r.amount))}</td>
-              </tr>
-            ))}
+            {cogsRows.map((r) => line(r))}
+            {step("매출총이익", summary.grossProfit, true, "매출 − 매출원가")}
 
-            {business.length > 0 && (
-              <tr style={{ borderTop: "1px solid var(--line-2)" }}>
-                <td style={{ fontWeight: 800 }}>사업 지출 계</td>
-                <td className="num" style={{ fontWeight: 800 }}>{won(bizTotal)}</td>
-                <td className="num" style={{ color: "var(--muted)" }}>{bizCount}건</td>
-                <td className="num" style={{ color: "var(--muted)" }}>{pct(ratio(bizTotal))}</td>
-              </tr>
-            )}
+            {sgaRows.map((r) => line(r))}
+            {step("영업이익", summary.operatingProfit, true, "매출총이익 − 판매관리비")}
+
+            {nonOpRows.length > 0 && nonOpRows.map((r) => line(r, true))}
+            {nonOpRows.length > 0 &&
+              step("당기순이익", summary.netProfit, true, "영업이익 − 영업외")}
 
             {personal.length > 0 && (
-              <tr>
+              <tr style={{ borderTop: "1px solid var(--line-2)" }}>
                 <td style={{ color: "var(--muted)" }}>
-                  개인지출 <span style={{ fontSize: 11 }}>손익 제외</span>
+                  개인지출 <span style={{ fontSize: 11 }}>손익에 안 들어갑니다</span>
                 </td>
                 <td className="num" style={{ color: "var(--muted)" }}>{won(perTotal)}</td>
                 <td className="num" style={{ color: "var(--muted)" }}>{perCount}건</td>
-                <td className="num" style={{ color: "var(--muted)" }}>{pct(ratio(perTotal))}</td>
+                <td className="num" style={{ color: "var(--muted)" }}>{pctOf(perTotal)}</td>
               </tr>
             )}
-
-            {income.map((r) => (
-              <tr key={r.account}>
-                <td style={{ color: "var(--muted)" }}>
-                  {r.account} <span style={{ fontSize: 11 }}>손익 제외</span>
-                </td>
-                <td className="num" style={{ color: "var(--muted)" }}>{won(r.amount)}</td>
-                <td className="num" style={{ color: "var(--muted)" }}>{r.count}건</td>
-                <td className="num" style={{ color: "var(--muted)" }}>{pct(ratio(r.amount))}</td>
-              </tr>
-            ))}
           </tbody>
-          <tfoot>
-            <tr>
-              <td>불러온 합계</td>
-              <td className="num">{won(loaded)}</td>
-              <td className="num">{state.transactions.length}건</td>
-              <td className="num" style={{ color: "var(--muted)" }}>
-                {gross > 0 ? pct(ratio(loaded)) : "100.0%"}
-              </td>
-            </tr>
-          </tfoot>
         </table>
       </div>
-      {gross === 0 && (
-        <p className="note-line" style={{ marginTop: 10 }}>
-          매출이 아직 없어 <b>구성비</b>(불러온 합계 대비)로 보여줍니다. 매출을 넣으면 매출 대비로 바뀝니다.
-        </p>
-      )}
+      <p className="note-line" style={{ marginTop: 10 }}>
+        <b>영업외</b>(대출이자·세금)는 장사를 잘했나와 상관없는 돈이라 영업이익 아래에서 뺍니다.
+        어느 계정이 어느 단에 들어가는지는 <b>설정</b>에서 바꿀 수 있습니다.
+      </p>
     </section>
   );
 }

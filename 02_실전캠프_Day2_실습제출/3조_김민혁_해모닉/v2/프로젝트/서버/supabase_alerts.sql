@@ -3,7 +3,7 @@
 -- 하는 일:
 --   1) events 표: 앱이 "알릴 일"을 한 줄 넣으면 서버가 텔레그램으로 보냅니다 (즉시).
 --   2) 1분마다 실패한 건을 다시 보냅니다 (최대 3회).
---   3) 매일 21:30(한국 시간)에 매장별 마감 리포트를 서버가 만들어 보냅니다 — 매장 PC가 꺼져 있어도.
+--   3) 매일 앱 설정의 리포트 시각(기본 21:50, 한국 시간)에 매장별 마감 리포트를 서버가 만들어 보냅니다 — 매장 PC가 꺼져 있어도.
 -- 봇 토큰·대화방 ID는 앱 설정(docs 표의 settings)에 있는 값을 그대로 씁니다. 여기에 적을 것은 없습니다.
 
 create extension if not exists pg_cron with schema pg_catalog;
@@ -85,6 +85,7 @@ begin
 end $$;
 
 -- 마감 리포트 문구 만들기 (앱의 buildReport 와 같은 규칙)
+-- ※ 평가·코칭 구간은 supabase_coach.sql 이 덧붙인다. 이 파일을 다시 실행했다면 그 파일도 다시 실행할 것.
 create or replace function public.daily_report(p_store text, p_key text default null) returns text
 language plpgsql security definer set search_path = public as $$
 declare
@@ -171,6 +172,25 @@ begin
 end $$;
 
 -- 매장별로 리포트를 events 에 넣는다 (넣으면 트리거가 보낸다). 텔레그램 설정 없는 매장은 건너뜀
+-- 전송 시각은 각 매장 문서의 settings.reportAt(기본 21:50, 한국 시간)을 따른다 → 앱 설정에서 바꾸면 서버도 따라간다. 하루 한 번만.
+create or replace function public.daily_report_tick() returns void
+language plpgsql security definer set search_path = public as $$
+declare s text; t text; v_token text; v_chat text; v_at text; v_now text; v_today text;
+begin
+  v_now := to_char(now() at time zone 'Asia/Seoul', 'HH24:MI');
+  v_today := to_char(now() at time zone 'Asia/Seoul', 'YYYY-MM-DD');
+  foreach s in array array['ansan', 'anyang'] loop
+    select token, chat into v_token, v_chat from public.tg_cfg(s);
+    if coalesce(v_token, '') = '' or coalesce(v_chat, '') = '' then continue; end if;
+    select coalesce(nullif(doc->'settings'->>'reportAt', ''), '21:50') into v_at from public.docs where key = 'state:' || s;
+    if v_at is null or v_at <> v_now then continue; end if;
+    -- 오늘 이미 보냈으면 건너뜀
+    if exists (select 1 from public.events where store = s and kind = 'report' and to_char(created_at at time zone 'Asia/Seoul', 'YYYY-MM-DD') = v_today) then continue; end if;
+    t := public.daily_report(s);
+    if t is not null then insert into public.events(store, kind, text) values (s, 'report', t); end if;
+  end loop;
+end $$;
+-- 예전 함수(고정 시각)도 남겨 둔다 — 수동 발송용
 create or replace function public.daily_report_all() returns void
 language plpgsql security definer set search_path = public as $$
 declare s text; t text; v_token text; v_chat text;
@@ -183,10 +203,10 @@ begin
   end loop;
 end $$;
 
--- 예약: 1분마다 재시도 확인, 매일 21:30 한국 시간(= 12:30 UTC) 리포트
-select cron.unschedule(jobid) from cron.job where jobname in ('haemonic-events-check', 'haemonic-daily-report');
+-- 예약: 1분마다 재시도 확인 · 매일 20:00~23:59(한국 시간 = 11~14시 UTC)에 1분마다 리포트 시각인지 확인해 보낸다
+select cron.unschedule(jobid) from cron.job where jobname in ('haemonic-events-check', 'haemonic-daily-report', 'haemonic-report-tick');
 select cron.schedule('haemonic-events-check', '* * * * *', $$select public.events_check()$$);
-select cron.schedule('haemonic-daily-report', '30 12 * * *', $$select public.daily_report_all()$$);
+select cron.schedule('haemonic-report-tick', '* 11-14 * * *', $$select public.daily_report_tick()$$);
 
 -- 확인용: 지금 안산점 리포트 문구 미리 보기 (보내지는 않음)
 select public.daily_report('ansan');

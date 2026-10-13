@@ -17,6 +17,8 @@ export interface Learned {
   subMemos: SubMemo[];
   /** 가맹점 표시 이름. 원문은 그대로 두고 화면에만 입힌다 */
   aliases: Alias[];
+  /** 메뉴 묶기. 상품명 원문 → 사장님이 정한 이름. 원문은 건드리지 않는다 */
+  menuNames?: Record<string, string>;
 }
 
 const KEY = "kimssi-learned";
@@ -112,6 +114,16 @@ export function forgetAlias(l: Learned, match: string): Learned {
 }
 
 export const aliasesOf = (l: Learned): Alias[] => l.aliases ?? [];
+
+export const menuNamesOf = (l: Learned): Record<string, string> => l.menuNames ?? {};
+
+/** 메뉴 원문 하나를 어떤 이름으로 볼지 정한다. 빈 값이면 자동 묶기로 되돌린다 */
+export function renameMenu(l: Learned, item: string, to: string): Learned {
+  const next = { ...(l.menuNames ?? {}) };
+  if (to.trim()) next[item] = to.trim();
+  else delete next[item];
+  return { ...l, menuNames: next };
+}
 
 export function rememberMemo(l: Learned, m: SubMemo): Learned {
   const rest = l.subMemos.filter((x) => !(x.account === m.account && x.sub === m.sub));

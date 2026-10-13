@@ -6,6 +6,7 @@ import { readPreviewRole } from "./preview/preview-role";
 import PreviewRoleSwitch from "./preview/preview-role-switch";
 import ChatPanel from "./recipes/chat-panel";
 import NoticeCount from "./notices/notice-count";
+import { demoScenes } from "./preview/demo-data";
 import styles from "./portal.module.css";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +58,17 @@ export default async function PortalHome() {
         <h2>물어보지 않아도 알고, 실행하고, 기록하는 매장.</h2>
         <p>필요한 영역을 고르세요. ‘준비 중’은 자리만 잡아 둔 곳이고, ‘잠김’은 매장 책임자가 열어 줄 때만 볼 수 있어요.</p>
       </section>
+
+      {demo && (
+        <section className={styles.demoGuide} aria-label="데모 안내">
+          <p><strong>데모입니다 · 가상 데이터.</strong> 가상의 직원 4명(김하늘·박도윤·이서준·최지우)이 6주 동안 써 온 가게처럼 채워 뒀어요. 위의 <strong>‘직원 눈으로 / 사장 눈으로’</strong>로 바꿔 보세요. 눌러서 바뀐 건 이 브라우저에만 남고, 각 화면의 ‘데모 데이터 다시 채우기’로 되돌립니다.</p>
+          <ol>
+            {demoScenes.map((scene) => (
+              <li key={scene.path}><Link href={scene.path}>{scene.title}</Link> <small>({scene.eye} 눈으로)</small> — {scene.story}</li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       {groups.map((group) => (
         <section key={group} className={styles.group} aria-labelledby={`group-${group}`}>

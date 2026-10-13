@@ -6,7 +6,7 @@ import { Notice } from "@/components/ui";
 import { useWeather } from "@/components/useWeather";
 import { todayStr } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
-import { STORE_LOCATION, expectedSales, KIND_ICON, missingWeatherDates, type WeatherKind } from "@/lib/weather";
+import { expectedSales, KIND_ICON, missingWeatherDates, type WeatherKind } from "@/lib/weather";
 
 const DOW = ["월", "화", "수", "목", "금", "토", "일"];
 const KINDS: WeatherKind[] = ["맑음", "흐림", "비", "눈"];
@@ -18,12 +18,12 @@ export default function WeatherPage() {
   const [help, setHelp] = useState(false);
   const missing = missingWeatherDates(w.sales, w.weather, todayStr());
 
-  // 열 때 빠진 날씨를 자동으로 채운다 (한 번)
+  // 열 때 빠진 날씨를 자동으로 채운다 (한 번). 지역을 안 정했으면 받지 않는다
   useEffect(() => {
-    if (w.loading || w.fetching || missing.length === 0) return;
-    w.fillMissing().then((n) => n && setNote(`${n}일 치 날씨를 받아 왔어요 (${STORE_LOCATION.name}, Open-Meteo)`)).catch((e) => setNote(`날씨를 못 받았어요: ${e instanceof Error ? e.message : e}`));
+    if (w.loading || w.fetching || missing.length === 0 || !w.location) return;
+    w.fillMissing().then((n) => n && setNote(`${n}일 치 날씨를 받아 왔어요 (${w.location?.name}, Open-Meteo)`)).catch((e) => setNote(`날씨를 못 받았어요: ${e instanceof Error ? e.message : e}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [w.loading, missing.length]);
+  }, [w.loading, missing.length, w.location]);
 
   if (w.loading) return <p className="py-10 text-center text-sm text-stone-500">불러오는 중…</p>;
   const a = w.analysis;
@@ -35,7 +35,7 @@ export default function WeatherPage() {
       <section className="card space-y-2">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-bold">날씨 × 매출</h2>
-          <span className="text-xs text-stone-500">{STORE_LOCATION.name} · 매출·날씨 둘 다 있는 날 {a.days}일</span>
+          <span className="text-xs text-stone-500">{w.location ? w.location.name : "지역 미설정"} · 매출·날씨 둘 다 있는 날 {a.days}일</span>
         </div>
         <button className="w-full text-left text-xs text-sky-800" onClick={() => setHelp((v) => !v)}>
           {help ? "▲" : "?"} 무엇을 보는 화면인가
@@ -48,6 +48,11 @@ export default function WeatherPage() {
               <li>이번 주 예보로 “예상 매출”을 참고값으로 보여 줘요. 준비량·알바 인원은 사장님이 정해요.</li>
             </ul>
           </div>
+        )}
+        {!w.location && (
+          <Notice tone="warn">
+            날씨 지역을 아직 안 정했어요. <Link href="/rules" className="font-bold underline">규칙 탭 → 내 가게</Link>에서 우리 동네를 고르면 그때부터 날씨가 붙어요.
+          </Notice>
         )}
         {note && <Notice tone={note.startsWith("날씨를 못") ? "warn" : "ok"}>{note}</Notice>}
         {w.error && <Notice tone="error">{w.error}</Notice>}

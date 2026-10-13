@@ -6,9 +6,20 @@ export type AccountGroup = "revenue" | "expense" | "personal" | "excluded" | "un
 export const UNCLASSIFIED = "미분류";
 export type Behavior = "fixed" | "variable";
 
+/**
+ * 손익계산서에서 이 계정이 들어가는 단.
+ *   원가   — 매출에서 바로 빼서 매출총이익을 만든다 (식자재비)
+ *   판관비 — 매출총이익에서 빼서 영업이익을 만든다
+ *   영업외 — 영업이익 아래에서 뺀다. 장사를 잘했나와 무관한 돈 (대출이자·세금)
+ * 코드에 박지 않고 설정에서 바꾼다.
+ */
+export type Tier = "원가" | "판관비" | "영업외";
+
 export interface AccountDef {
   name: string;
   group: AccountGroup;
+  /** 손익계산서 단. 비용 계정에만 뜻이 있다. 비우면 판관비로 본다 */
+  tier?: Tier;
   /** 기본 고정/변동 플래그. 인건비처럼 소분류별로 다르면 null. */
   behavior: Behavior | null;
   subs: string[];
@@ -42,7 +53,7 @@ export const LABOR_SUBS: { sub: string; behavior: Behavior }[] = [
 
 /** §4-2 사업 지출 13 */
 export const EXPENSE_ACCOUNTS: AccountDef[] = [
-  { name: "식자재비", group: "expense", behavior: "variable", subs: ["고기", "투웰브", "모노마트", "마트/또와", "김치", "식봄", "새우", "쌀", "음료/물", "올리브/튀김유", "고춧가루", "스리라차마요/마요", "육수재료", "기타"] },
+  { name: "식자재비", group: "expense", tier: "원가", behavior: "variable", subs: ["고기", "투웰브", "모노마트", "마트/또와", "김치", "식봄", "새우", "쌀", "음료/물", "올리브/튀김유", "고춧가루", "스리라차마요/마요", "육수재료", "기타"] },
   { name: "인건비", group: "expense", behavior: null, subs: LABOR_SUBS.map((s) => s.sub), note: "소분류별로 고정/변동이 다름" },
   { name: "임대료", group: "expense", behavior: "fixed", subs: ["월세"] },
   { name: "수수료", group: "expense", behavior: "variable", subs: ["홀", "배달의민족", "쿠팡이츠", "요기요"], note: "매출액−입금액 자동 계산" },
@@ -52,8 +63,8 @@ export const EXPENSE_ACCOUNTS: AccountDef[] = [
   { name: "일회용품", group: "expense", behavior: "variable", subs: ["면포장용기", "포장봉투", "포장/소스용기", "스탠드지퍼백", "수저", "종이컵", "기타비용"] },
   { name: "매장운영비", group: "expense", behavior: "variable", subs: ["소모품", "다이소"] },
   { name: "설비/비품비", group: "expense", behavior: "variable", subs: ["설비", "비품", "디자인/인테리어"], note: "비정기" },
-  { name: "대출이자", group: "expense", behavior: "fixed", subs: ["사업자대출", "마이너스통장"], note: "안분 대상" },
-  { name: "세금", group: "expense", behavior: "fixed", subs: ["부가세", "종소세", "지방세"], note: "안분 대상" },
+  { name: "대출이자", group: "expense", tier: "영업외", behavior: "fixed", subs: ["사업자대출", "마이너스통장"], note: "안분 대상" },
+  { name: "세금", group: "expense", tier: "영업외", behavior: "fixed", subs: ["부가세", "종소세", "지방세"], note: "안분 대상" },
   { name: "기부", group: "expense", behavior: "fixed", subs: ["월드비전"] },
 ];
 
@@ -117,6 +128,13 @@ export function configureAccounts(accounts: AccountDef[]) {
 export const accountsOf = (group: AccountGroup): AccountDef[] => registry.filter((a) => a.group === group);
 export const currentAccounts = (): AccountDef[] => [...registry];
 export const getAccount = (name: string): AccountDef | undefined => byName.get(name);
+
+/**
+ * 이 계정이 손익계산서 어느 단에 들어가나.
+ * 미분류는 판관비로 본다 — 어디로 갈지 아직 모를 뿐, 나간 돈은 사실이다.
+ * 빼면 분류를 안 할수록 영업이익이 좋아 보인다.
+ */
+export const tierOf = (name: string): Tier => getAccount(name)?.tier ?? "판관비";
 export const isKnownAccount = (name: string): boolean => byName.has(name);
 
 /**

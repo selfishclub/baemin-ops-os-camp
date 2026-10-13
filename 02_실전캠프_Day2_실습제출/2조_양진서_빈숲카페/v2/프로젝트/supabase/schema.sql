@@ -115,9 +115,10 @@ alter table public.recipe_workspaces enable row level security;
 alter table public.recipe_versions enable row level security;
 alter table public.recipe_audit_log enable row level security;
 
+-- (2026-10-10) 재직 직원은 동료 프로필(이름·역할·재직)도 읽는다 — 칭찬 대상 고르기, 인수인계 "안 읽은 사람", 확인한 사장 이름에 필요. 퇴사자는 자기 줄만
 drop policy if exists "profiles_select_self_or_owner" on public.profiles;
 create policy "profiles_select_self_or_owner" on public.profiles
-  for select to authenticated using (id = auth.uid() or public.is_owner());
+  for select to authenticated using (id = auth.uid() or public.is_owner() or public.is_active_user());
 
 drop policy if exists "profiles_update_owner" on public.profiles;
 create policy "profiles_update_owner" on public.profiles
@@ -336,6 +337,7 @@ drop policy if exists "daily_insert_self_or_owner" on public.daily_checks;
 create policy "daily_insert_self_or_owner" on public.daily_checks
   for insert to authenticated with check (
     checked_by = auth.uid() and public.is_active_user() and (item_key <> '__signoff__' or public.is_owner())
+    and (public.is_owner() or check_date = (now() at time zone 'Asia/Seoul')::date)
   );
 
 -- 체크 취소는 본인 것만, 사장은 모두
@@ -370,7 +372,7 @@ alter table public.view_logs enable row level security;
 
 drop policy if exists "views_select_owner" on public.view_logs;
 create policy "views_select_owner" on public.view_logs
-  for select to authenticated using (public.is_owner());
+  for select to authenticated using (user_id = auth.uid() or public.is_owner());
 
 drop policy if exists "views_insert_self" on public.view_logs;
 create policy "views_insert_self" on public.view_logs
@@ -543,7 +545,7 @@ as $$
     (select count(*) from public.training_checks t where t.user_id = p.id and t.recipe_id like 'manual:%' and t.practiced_at is not null and (since is null or t.practiced_at >= since))::integer,
     (select count(*) from public.training_checks t where t.user_id = p.id and t.recipe_id like 'manual:%' and t.confirmed_at is not null and (since is null or t.confirmed_at >= since))::integer,
     (select count(*) from public.training_checks t where t.user_id = p.id and t.recipe_id like 'exam:%' and t.confirmed_at is not null and (since is null or t.confirmed_at >= since))::integer,
-    (select count(*) from public.quiz_results q where q.user_id = p.id and jsonb_typeof(q.detail_json) = 'array' and q.score * 10 >= q.total * 7 and (since is null or q.created_at >= since))::integer,
+    (select count(distinct (q.created_at at time zone 'Asia/Seoul')::date) from public.quiz_results q where q.user_id = p.id and jsonb_typeof(q.detail_json) = 'array' and q.score * 10 >= q.total * 7 and (since is null or q.created_at >= since))::integer,
     (select count(*) from public.quiz_results q where q.user_id = p.id and jsonb_typeof(q.detail_json) = 'object' and q.score * 10 >= q.total * 8 and (since is null or q.created_at >= since))::integer,
     (select count(*) from public.recipe_acks a where a.user_id = p.id and (since is null or a.acked_at >= since))::integer,
     (select count(*) from public.view_logs v where v.user_id = p.id and v.kind in ('recipe', 'manual') and (since is null or v.viewed_at >= since))::integer,

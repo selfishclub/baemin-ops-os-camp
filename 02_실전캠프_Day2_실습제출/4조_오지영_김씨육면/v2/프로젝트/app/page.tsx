@@ -10,6 +10,7 @@ import { applySettings, loadSettings, type Settings } from "@/lib/settings";
 import { buildYear, storedYears } from "@/lib/year";
 import { MonthBar, type MonthBrief } from "@/components/MonthBar";
 import { SalesView } from "@/components/SalesView";
+import { HomeView } from "@/components/HomeView";
 import { buildRevenue } from "@/lib/dailySales";
 import { clearAllMonths, listStoredMonths, loadMonth, newMonthState, saveMonth, unconfirmAllOnce, type MonthState } from "@/lib/store";
 import { summarize } from "@/lib/summary";
@@ -20,7 +21,7 @@ import { updateLearned } from "@/lib/useLearned";
 const MONTHS = Array.from({ length: 12 }, (_, i) => `2026-${String(i + 1).padStart(2, "0")}`);
 const DEFAULT_MONTH = "2026-08";
 
-type View = "year" | "sales" | "month" | "work" | "settings";
+type View = "year" | "sales" | "month" | "work" | "home" | "settings";
 
 export default function Page() {
   const [month, setMonth] = useState(DEFAULT_MONTH);
@@ -197,6 +198,7 @@ export default function Page() {
           <button aria-current={view === "sales" ? "page" : undefined} onClick={() => go("sales")}>매출</button>
           <button aria-current={view === "month" ? "page" : undefined} onClick={() => go("month")}>월 요약</button>
           <button aria-current={view === "work" ? "page" : undefined} onClick={() => go("work")}>월 정산</button>
+          <button aria-current={view === "home" ? "page" : undefined} onClick={() => go("home")}>권빈이네</button>
           <button aria-current={view === "settings" ? "page" : undefined} onClick={() => go("settings")}>설정</button>
         </nav>
 
@@ -292,6 +294,10 @@ export default function Page() {
             update={update}
             months={stored}
             loadSales={(m) => (m === month ? (state.dailySales ?? []) : (loadMonth(m).dailySales ?? []))}
+            onOtherMonths={() => {
+              setStored(listStoredMonths());
+              setTick((n) => n + 1);
+            }}
           />
         ) : view === "settings" && settings ? (
           <SettingsView
@@ -301,6 +307,13 @@ export default function Page() {
               setState(loadMonth(month));
               setStored(listStoredMonths());
             }}
+          />
+        ) : view === "home" ? (
+          <HomeView
+            state={state}
+            update={update}
+            months={stored}
+            loadMonthState={(m) => (m === month ? state : loadMonth(m))}
           />
         ) : view === "work" ? (
           <Settlement state={state} update={update} summary={summary} openStep={openStep} refreshKey={tick} />
