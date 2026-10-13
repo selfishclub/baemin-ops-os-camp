@@ -1524,3 +1524,6 @@ body.minimal .demoBar{padding:6px 10px}
 .uiBtn{margin-left:6px;font-size:12px;padding:4px 9px;min-height:30px;color:var(--muted)}
 #who .uiBtn{margin-left:8px}
 .sfoot .uiBtn{width:auto;margin:0 0 6px}
+
+/* 돈 입력칸 — 콤마 표시, 오른쪽 정렬 */
+input.won{text-align:right;font-variant-numeric:tabular-nums}

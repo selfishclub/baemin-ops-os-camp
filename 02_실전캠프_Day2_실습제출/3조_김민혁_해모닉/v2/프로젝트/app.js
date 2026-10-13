@@ -24,6 +24,17 @@ const App = (() => {
 
   function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d; }
   function shift(key, n) { const d = new Date(key + 'T00:00:00'); d.setDate(d.getDate() + n); return dateKey(d); }
+  /* 돈 입력칸 — 2026-10-13 사장님 요청: 숫자는 3자리마다 콤마. 숫자형 input 은 콤마를 못 보여 줘서 글자형(data-won)으로 두고 치는 즉시 콤마를 넣는다.
+     읽을 때는 wonNum() 으로 콤마를 뺀다. */
+  const wonNum = (v) => { const t = String(v == null ? '' : v).replace(/,/g, '').trim(); if (t === '') return null; const n = Number(t); return isNaN(n) ? NaN : n; };
+  const wonStr = (v) => { const n = wonNum(v); return n == null || isNaN(n) ? '' : n.toLocaleString('ko-KR'); };
+  function wonInput(el) {
+    const raw = el.value, fromEnd = raw.length - (el.selectionStart == null ? raw.length : el.selectionStart);
+    const digits = raw.replace(/[^\d]/g, '');
+    const out = digits === '' ? '' : Number(digits).toLocaleString('ko-KR');
+    if (out !== raw) { el.value = out; try { const pos = Math.max(0, out.length - fromEnd); el.setSelectionRange(pos, pos); } catch (e) { /* 무시 */ } }
+  }
+  document.addEventListener('input', (e) => { const el = e.target; if (el && el.tagName === 'INPUT' && el.dataset && el.dataset.won != null) wonInput(el); }, true);
 
   /* 보고 있는 날짜. 마감 업무를 다음 날 아침에 채워 넣는 일이 잦아서 날짜 이동이 필요하다.
      알림은 이 값과 무관하게 항상 실제 오늘 기준으로 돈다. */
@@ -2581,13 +2592,13 @@ const App = (() => {
         <label>수량 <span class="opt">선택</span><input type="number" id="puQ" min="0" step="0.1" value="${x.qty ?? ''}" inputmode="decimal" placeholder="${mode === 'crab' ? '예: 12.5' : '예: 2 (파 두 단)'}"></label>
         <label>단위<select id="puU">${PURCHASE_UNITS.map((u) => `<option${u === x.unit ? ' selected' : ''}>${u}</option>`).join('')}</select></label>
       </div>
-      <label>금액 (원)<input type="number" id="puA" min="0" step="100" value="${x.amount ?? ''}" inputmode="numeric" placeholder="예: 480000"></label>
+      <label>금액 (원)<input type="text" class="won" id="puA" data-won value="${wonStr(x.amount)}" inputmode="numeric" placeholder="예: 480,000"></label>
       <label>거래처 <span class="opt">선택</span><input id="puV" value="${esc(x.vendor || '')}"></label>
       <label>메모 <span class="opt">선택</span><input id="puM" value="${esc(x.memo || '')}"></label>
       ${isNew ? '' : `<div class="rowbtns"><button class="btn danger sm" data-act="purchaseDel" data-id="${x.id}">이 내역 삭제</button></div>`}
     `, () => {
       const name = $('#puN').value.trim();
-      const amount = Number($('#puA').value);
+      const amount = Number(String($('#puA').value).replace(/,/g, ''));
       if (!name) { alert('품목을 입력하세요.'); return false; }
       if (!amount) { alert('금액을 입력하세요.'); return false; }
       const rec = {
@@ -3167,7 +3178,7 @@ const App = (() => {
 
     <section class="edCard"><h3><span class="edStep">4</span>임금·지급일·휴일</h3><div class="edGrid">
       ${fld('임금 형태', sel('edPayType', Object.entries(PAY_TYPES).map(([k, v]) => [k, v + '제']), f.payType))}
-      ${fld('기본 임금 (원)', `<input type="number" data-f="pay" inputmode="numeric" min="0" step="10" value="${f.pay}" required>`, false, '<span id="edWage"></span>')}
+      ${fld('기본 임금 (원)', `<input type="text" class="won" data-f="pay" data-won inputmode="numeric" value="${wonStr(f.pay)}" required>`, false, '<span id="edWage"></span>')}
       ${fld('임금 지급일', `<input data-f="payDayText" value="${esc(payDayText(f))}" placeholder="예: 매월 10일" required>`)}
       ${fld('지급 방법', sel('edPayHow', [['bank', '근로자 명의 계좌 지급'], ['cash', '직접 지급']], f.payHow))}
       ${fld('주휴일', `<input data-f="weeklyOffText" value="${esc(weeklyOffText(f))}" placeholder="예: 매주 일요일">`)}
@@ -3219,7 +3230,7 @@ const App = (() => {
     const saved = () => { save(); const d = new Date(); status(`자동 저장됨 ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`); };
     /* input 과 change 를 둘 다 받는다 — 아이패드·아이폰 사파리는 날짜·시간 칸에서 input 을 보내지 않는다 */
     box.querySelectorAll('[data-f]').forEach((el) => ['input', 'change'].forEach((ev) => el.addEventListener(ev, () => {
-      let v = el.value; if (el.type === 'number') v = Number(v) || 0;
+      let v = el.value; if (el.type === 'number' || el.dataset.won != null) v = Number(String(v).replace(/,/g, '')) || 0;
       setPath(el.dataset.f, typeof v === 'string' ? v.trim() : v);
       if (['from', 'to', 'breakFrom', 'breakTo', 'pay'].includes(el.dataset.f)) { hours(); wage(); }
       saved();
@@ -3792,7 +3803,7 @@ const App = (() => {
         <span class="v">${sealRef() ? `<img class="sealPrev" src="${blobUrl(sealRef())}" alt="도장">` : '미등록'}
           <button class="btn sm" data-act="sealUpload">${sealRef() ? '바꾸기' : '도장 등록'}</button>${sealRef() ? '<button class="btn sm ghost danger" data-act="sealDel">삭제</button>' : ''}</span></div>
       <div class="setrow"><span>최저시급 기준<div class="hint">계약서 임금이 이보다 낮으면 경고합니다. 해마다 바뀌면 여기서 고치세요.</div></span>
-        <input type="number" class="num wide" data-act="minWage" value="${minWage()}" min="0" step="10">
+        <input type="text" class="num wide won" data-act="minWage" data-won value="${wonStr(minWage())}" inputmode="numeric">
         <span class="hint" style="margin:0">원 · ${MIN_WAGE.year}년 고시 ${MIN_WAGE.hour.toLocaleString('ko-KR')}원</span></div>`;
 
     h += `<div class="hd sub2"><h3>인원 기준 — ${esc(storeName())}</h3></div>
@@ -3951,9 +3962,13 @@ const App = (() => {
 
   function salesFields(r) {
     r = r || {};
-    const inp = ([k, n, u, st]) => `<label>${n} <small class="opt">${u}</small><input type="number" class="sfIn" data-k="${k}" min="0" step="${st}" value="${r[k] ?? ''}" inputmode="decimal"></label>`;
+    const inp = ([k, n, u, st]) => (u === '원' || u === '원/kg')
+      ? `<label>${n} <small class="opt">${u}</small><input type="text" class="sfIn won" data-k="${k}" data-won value="${wonStr(r[k])}" inputmode="numeric" placeholder="0"></label>`
+      : `<label>${n} <small class="opt">${u}</small><input type="number" class="sfIn" data-k="${k}" min="0" step="${st}" value="${r[k] ?? ''}" inputmode="decimal"></label>`;
     const kgIn = (k, ph) => `<input type="number" class="sfIn" data-k="${k}" min="0" step="0.1" value="${r[k] ?? ''}" inputmode="decimal" placeholder="${ph || ''}">`;
-    const auto = ([k, n, u]) => `<label class="autoF">${n} <small class="opt">${u} · 자동 합계</small><input type="number" class="sfIn" data-k="${k}" min="0" step="1" value="${r[k] ?? ''}" inputmode="decimal" placeholder="자동"></label>`;
+    const auto = ([k, n, u]) => (u === '원')
+      ? `<label class="autoF">${n} <small class="opt">${u} · 자동 합계</small><input type="text" class="sfIn won" data-k="${k}" data-won value="${wonStr(r[k])}" inputmode="numeric" placeholder="자동"></label>`
+      : `<label class="autoF">${n} <small class="opt">${u} · 자동 합계</small><input type="number" class="sfIn" data-k="${k}" min="0" step="1" value="${r[k] ?? ''}" inputmode="decimal" placeholder="자동"></label>`;
     return `<div class="mlabel">주문 건 — 매장 · 배달 따로 넣으면 총주문은 자동</div>
       <div class="frow3">${inp(SALES_F[2])}${inp(SALES_F[3])}${auto(SALES_F[0])}</div>
       <div class="mlabel">매출 — 매장 · 배달 · 포장을 넣으면 총매출은 자동</div>
@@ -3966,14 +3981,14 @@ const App = (() => {
       </tbody></table>
       <div class="mlabel">결제 수단 · 시재 — 포스 정산 메시지에 있는 대로</div>
       <div class="frow3">${inp(SALES_F.find(([k]) => k === 'cash'))}${inp(SALES_F.find(([k]) => k === 'transfer'))}${inp(SALES_F.find(([k]) => k === 'voucher'))}</div>
-      <div class="frow3">${inp(SALES_F.find(([k]) => k === 'gifticon'))}${inp(SALES_F.find(([k]) => k === 'petty'))}<label class="autoF">카드·배달앱 등 나머지 <small class="opt">원 · 자동</small><input type="number" id="payRest" readonly placeholder="자동" inputmode="decimal"></label></div>
+      <div class="frow3">${inp(SALES_F.find(([k]) => k === 'gifticon'))}${inp(SALES_F.find(([k]) => k === 'petty'))}<label class="autoF">카드·배달앱 등 나머지 <small class="opt">원 · 자동</small><input type="text" class="won" id="payRest" readonly placeholder="자동"></label></div>
       <div class="mlabel">오늘의 단가 <span class="opt">원/kg · 선택</span></div>
       <div class="frow3">${inp(SALES_F.find(([k]) => k === 'priceCrab'))}${inp(SALES_F.find(([k]) => k === 'priceKing'))}${inp(SALES_F.find(([k]) => k === 'priceLob'))}</div>
       <label>비고 <span class="opt">선택</span><textarea id="sfNote" rows="2" placeholder="예: 잔돈이 없어 직원에게 1만원 빌림 · 상품권 손님 2팀">${esc(r.note || '')}</textarea></label>
       <p class="hint">빈칸은 0이 아니라 "미입력"으로 남습니다. 총주문·총매출은 나눠 넣은 값의 합으로 자동 계산되고, 나눠 넣지 않았을 때만 직접 적습니다. 결제 수단은 총매출에서 현금·이체·상품권·기프티콘을 뺀 나머지가 카드·배달앱으로 자동 표시됩니다(시제는 매출이 아니라 거스름돈용 시재금이라 빼지 않습니다). 주류 매출은 매장 매출 안에 포함된 금액을 따로 적는 칸입니다(총매출에 더해지지 않음). 합계 kg 만 알면 합계 칸에만 넣어도 됩니다.</p>`;
   }
   function syncKgTotals() {
-    const g = (k) => { const el = document.querySelector(`.sfIn[data-k="${k}"]`); if (!el) return null; const v = el.value.trim(); return v === '' ? null : Number(v); };
+    const g = (k) => { const el = document.querySelector(`.sfIn[data-k="${k}"]`); if (!el) return null; const v = el.value.replace(/,/g, '').trim(); return v === '' ? null : Number(v); };
     let sS = 0, sD = 0, sP = 0, sT = 0, anyS = false, anyD = false, anyP = false, anyT = false;
     KG_SP.forEach(([k]) => {
       const s = g(k + 'S'), d = g(k + 'D'), pv = g(k + 'P'), tEl = document.querySelector(`.sfIn[data-k="${k}"]`);
@@ -3986,17 +4001,17 @@ const App = (() => {
   }
   /* 총주문 = 매장 주문 + 배달 주문, 총매출 = 매장 + 배달 + 포장. 나눠 넣은 값이 하나라도 있으면 자동, 없으면 직접 입력 가능 */
   function syncSalesTotals() {
-    const g = (k) => { const el = document.querySelector(`.sfIn[data-k="${k}"]`); if (!el) return null; const v = el.value.trim(); return v === '' ? null : Number(v); };
+    const g = (k) => { const el = document.querySelector(`.sfIn[data-k="${k}"]`); if (!el) return null; const v = el.value.replace(/,/g, '').trim(); return v === '' ? null : Number(v); };
     const setAuto = (k, parts) => {
       const el = document.querySelector(`.sfIn[data-k="${k}"]`); if (!el) return;
       const vals = parts.map(g), any = vals.some((v) => v != null);
       el.readOnly = any; el.classList.toggle('autoOn', any);
-      if (any) el.value = vals.reduce((a, v) => a + (v || 0), 0);
+      if (any) { const sum = vals.reduce((a, v) => a + (v || 0), 0); el.value = el.dataset.won != null ? wonStr(sum) : sum; }
     };
     setAuto('orders', ['ordersS', 'ordersD']);
     setAuto('total', ['store', 'deliv', 'take']);
     const rest = document.getElementById('payRest');
-    if (rest) { const tot = g('total'); const paid = ['cash', 'transfer', 'voucher', 'gifticon'].map(g); rest.value = (tot != null && paid.some((v) => v != null)) ? Math.max(0, tot - paid.reduce((a, v) => a + (v || 0), 0)) : ''; }
+    if (rest) { const tot = g('total'); const paid = ['cash', 'transfer', 'voucher', 'gifticon'].map(g); rest.value = (tot != null && paid.some((v) => v != null)) ? wonStr(Math.max(0, tot - paid.reduce((a, v) => a + (v || 0), 0))) : ''; }
   }
   document.addEventListener('input', (e) => {
     if (!e.target.closest) return;
@@ -4010,7 +4025,7 @@ const App = (() => {
   function readSalesFields() {
     const out = {}; let bad = false;
     document.querySelectorAll('.sfIn').forEach((el) => {
-      const v = el.value.trim(); el.classList.remove('bad');
+      const v = el.value.replace(/,/g, '').trim(); el.classList.remove('bad');
       if (v === '') { out[el.dataset.k] = null; return; }
       const n = Number(v);
       if (isNaN(n) || n < 0) { el.classList.add('bad'); bad = true; return; }
@@ -4211,11 +4226,11 @@ const App = (() => {
     const isNew = !x; x = x || { name: '', amount: '', from: curMonth() };
     modal(isNew ? '고정비 추가' : '고정비 수정', `
       <label>항목<input id="fcN" value="${esc(x.name)}" placeholder="예: 임대료 · 공과금 · 보험 · 카드 수수료" list="fcList"><datalist id="fcList">${['임대료', '공과금', '보험', '통신비', '기타'].map((n) => `<option value="${n}">`).join('')}</datalist></label>
-      <div class="frow"><label>월 금액 (원)<input type="number" id="fcA" min="0" step="1000" value="${x.amount}" inputmode="numeric" placeholder="예: 2500000"></label>
+      <div class="frow"><label>월 금액 (원)<input type="text" class="won" id="fcA" data-won value="${wonStr(x.amount)}" inputmode="numeric" placeholder="예: 2,500,000"></label>
       <label>적용 시작 월<input type="month" id="fcF" value="${esc(x.from)}"></label></div>
       <p class="hint">같은 항목을 새 금액으로 다시 넣으면 그 달부터 새 값이 쓰이고, 이전 달은 옛 값 그대로입니다.</p>
       ${isNew ? '' : `<div class="rowbtns"><button class="btn danger sm" data-act="fixedDel" data-id="${x.id}">이 고정비 삭제</button></div>`}`, () => {
-      const name = $('#fcN').value.trim(), amount = Number($('#fcA').value), from = $('#fcF').value;
+      const name = $('#fcN').value.trim(), amount = Number(String($('#fcA').value).replace(/,/g, '')), from = $('#fcF').value;
       if (!name) { alert('항목 이름을 넣으세요.'); return false; }
       if (isNaN(amount) || amount < 0) { alert('금액은 0 이상 숫자여야 합니다.'); return false; }
       if (!/^\d{4}-\d{2}$/.test(from)) { alert('적용 시작 월을 고르세요.'); return false; }
@@ -4325,7 +4340,7 @@ const App = (() => {
       <div class="tkLogWrap"><table class="tkLog"><thead><tr><th>직원</th><th>급여 형태</th><th class="r">금액 (원)</th><th></th></tr></thead><tbody>
       ${S.staff.filter((s) => s.active).map((s2) => `<tr><td><b>${esc(s2.name)}</b></td>
         <td><select class="tkIn wide" data-act="staffPayType" data-store="${sid}" data-id="${s2.id}"><option value=""${!(s2.pay && s2.pay.type) ? ' selected' : ''}>없음</option><option value="hour"${s2.pay && s2.pay.type === 'hour' ? ' selected' : ''}>시급</option><option value="month"${s2.pay && s2.pay.type === 'month' ? ' selected' : ''}>월급</option></select></td>
-        <td class="r"><input type="number" class="tkIn wide" data-act="staffPayAmt" data-store="${sid}" data-id="${s2.id}" value="${s2.pay && s2.pay.amount ? s2.pay.amount : ''}" min="0" step="10" inputmode="numeric" placeholder="예: ${minWage()}"></td>
+        <td class="r"><input type="text" class="tkIn wide won" data-act="staffPayAmt" data-store="${sid}" data-id="${s2.id}" data-won value="${s2.pay && s2.pay.amount ? wonStr(s2.pay.amount) : ''}" inputmode="numeric" placeholder="예: ${wonStr(minWage())}"></td>
         <td>${s2.pay && s2.pay.type === 'hour' && Number(s2.pay.amount) > 0 && Number(s2.pay.amount) < minWage() ? '<span class="chip crit">최저임금 미만</span>' : ''}</td></tr>`).join('')}
       ${S.staff.filter((s) => s.active).length ? '' : '<tr><td colspan="4">재직 직원이 없습니다.</td></tr>'}</tbody></table></div></details>`;
     if (!L.anySched) return h + `<div class="notice warn"><b>${monthLabel(m)} 근무표가 없습니다.</b><div class="hint">근무표를 짜면 여기에 사람별 시간과 예상 급여가 나옵니다. 손익에는 0원이 아니라 "근무표 없음"으로 표시됩니다. <button class="btn sm" data-act="view" data-v="month">월간 근무표 열기</button></div></div>`;
@@ -4576,7 +4591,7 @@ const App = (() => {
     const rows = p.rows.filter((r) => r.payType);
     h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>직원</th><th class="r">지급 총액</th><th class="r">공제</th><th class="r">실지급</th><th class="r">소득세</th><th>이메일</th><th>발송</th><th></th></tr></thead><tbody>
       ${rows.map((r) => { const s = slipOf(m, r), last = s.sent[s.sent.length - 1]; return `<tr><td><b>${esc(r.name)}</b></td><td class="r">${fmtWon(s.gross)}</td><td class="r">${fmtWon(s.ded)}</td><td class="r"><b>${fmtWon(s.net)}</b></td>
-        <td class="r"><input type="number" class="tkIn" data-act="slipTax" data-n="${esc(r.name)}" value="${s.tax || ''}" min="0" step="10" placeholder="0"></td>
+        <td class="r"><input type="text" class="tkIn won" data-act="slipTax" data-n="${esc(r.name)}" data-won value="${s.tax ? wonStr(s.tax) : ''}" inputmode="numeric" placeholder="0"></td>
         <td>${s.email ? esc(s.email) : '<span class="chip missed">이메일 없음</span>'}</td>
         <td>${last ? `<span class="chip today">✓ ${esc(last.at.slice(5))}</span> <small class="mut">${esc(last.how)}</small>` : '<span class="chip missed">미발송</span>'}</td>
         <td class="nowrap"><button class="btn sm" data-act="slipView" data-n="${esc(r.name)}">보기 · 인쇄</button> ${s.email ? `<button class="btn sm primary" data-act="slipMail" data-n="${esc(r.name)}">이메일로 보내기</button>` : ''} <button class="btn sm ghost" data-act="slipSent" data-n="${esc(r.name)}">발송 완료 표시</button></td></tr>`; }).join('')}
@@ -6407,7 +6422,7 @@ const App = (() => {
         if (b.dataset.act === 'staffEmail') st.email = b.value.trim();
         else {
           st.pay = st.pay || { type: '', amount: 0 };
-          if (b.dataset.act === 'staffPayType') st.pay.type = b.value; else st.pay.amount = Math.max(0, Number(b.value) || 0);
+          if (b.dataset.act === 'staffPayType') st.pay.type = b.value; else st.pay.amount = Math.max(0, Number(String(b.value).replace(/,/g, '')) || 0);
         }
         if (c.cur) save(); else Store.saveStore(c.id, c.doc);
         if (b.dataset.act !== 'staffEmail') render();
@@ -6415,7 +6430,7 @@ const App = (() => {
       if (b.dataset.act === 'insRate') { S.settings.insRate = Math.max(0, Number(b.value) || 0); save(); render(); }
       if (b.dataset.act === 'dedRate') { dedRates()[b.dataset.k] = Math.max(0, Number(b.value) || 0); save(); }
       if (b.dataset.act === 'payDayText') { S.settings.payDayText = b.value.trim() || '매월 10일'; save(); }
-      if (b.dataset.act === 'slipTax') { const p = payrollOf(S.ui.lmonth || curMonth()); if (p) { p.slips = p.slips || {}; p.slips[b.dataset.n] = p.slips[b.dataset.n] || {}; p.slips[b.dataset.n].tax = Math.max(0, Number(b.value) || 0); save(); render(); } }
+      if (b.dataset.act === 'slipTax') { const p = payrollOf(S.ui.lmonth || curMonth()); if (p) { p.slips = p.slips || {}; p.slips[b.dataset.n] = p.slips[b.dataset.n] || {}; p.slips[b.dataset.n].tax = Math.max(0, Number(String(b.value).replace(/,/g, '')) || 0); save(); render(); } }
       if (b.dataset.act === 'tankMaxKg') { S.settings.tankMaxKg = Math.max(10, Number(b.value) || 700); save(); render(); }
       if (b.dataset.act === 'crabHold') { S.settings.crabHold = S.settings.crabHold || {}; S.settings.crabHold[b.dataset.sp] = Math.max(1, Number(b.value) || 28); save(); render(); }
       /* 날짜 칸은 한 자리씩 고칠 때마다 change 가 나는데, 그때마다 화면을 다시 그리면 입력 칸이 새로 만들어져 치던 날짜가 사라진다
@@ -6439,7 +6454,7 @@ const App = (() => {
         if (u.trim() && k.trim()) { Store.supaSetConfig(u, k); render(); }
       }
       if (b.dataset.act === 'biz') { bizOf()[b.dataset.f] = b.value.trim(); save(); }
-      if (b.dataset.act === 'minWage') { S.settings.minWage = Math.max(0, Number(b.value) || 0) || MIN_WAGE.hour; save(); render(); }
+      if (b.dataset.act === 'minWage') { S.settings.minWage = Math.max(0, Number(String(b.value).replace(/,/g, '')) || 0) || MIN_WAGE.hour; save(); render(); }
       if (b.dataset.act === 'reportAt') { S.settings.reportAt = b.value || '21:50'; save(); render(); }
       if (b.dataset.act === 'tgToken') { S.settings.tgToken = b.value.trim(); save(); }
       if (b.dataset.act === 'pmStart') { if (/^\d{2}:\d{2}$/.test(b.value)) { S.settings.pmStart = b.value; save(); render(); } }
