@@ -29,6 +29,7 @@
   #bar button:hover { background:#44403C }
   #notes { flex:1; color:#D6D3D1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
   #notes.hide { visibility:hidden }
+  body.clean #bar { display:none }
   @media print {
     @page { size:1920px 1080px; margin:0 }
     body,#stage { position:static; overflow:visible; background:#fff }
@@ -784,6 +785,7 @@
   <button id="prev">◀</button><button id="next">▶</button>
   <span id="pos"></span>
   <span id="notes"></span>
+  <button id="presenter">발표자 창</button>
   <button id="toggle">발표 노트 숨기기</button>
 </div>
 <script>
@@ -802,8 +804,59 @@
     document.getElementById('pos').textContent = (i + 1) + ' / ' + S.length;
     var a = S[i].querySelector('aside');
     document.getElementById('notes').textContent = a ? a.textContent.trim() : '';
+    pushPresenter();
   }
   function go(d) { i = Math.min(S.length - 1, Math.max(0, i + d)); draw(); }
+
+  // ── 발표자 창 ───────────────────────────────────────────────
+  //  본 화면은 빔프로젝터로, 이 창은 내 노트북에만 둔다
+  var PW = null, T0 = Date.now(), tick = null;
+  function titleOf(n) { var e = S[n] && S[n].querySelector('h2, h1'); return e ? (e.innerText || e.textContent).replace(/s+/g, ' ').trim() : ''; }
+  function noteOf(n) { var a = S[n] && S[n].querySelector('aside'); return a ? a.textContent.trim() : '(이 장은 노트가 없습니다)'; }
+  function two(v) { return (v < 10 ? '0' : '') + v; }
+  function clock() {
+    if (!PW || PW.closed) return;
+    var s2 = Math.floor((Date.now() - T0) / 1000);
+    var el = PW.document.getElementById('c');
+    if (el) el.textContent = '경과 ' + two(Math.floor(s2 / 60)) + ':' + two(s2 % 60);
+  }
+  function pushPresenter() {
+    if (!PW || PW.closed) return;
+    var d = PW.document;
+    d.getElementById('p').textContent = (i + 1) + ' / ' + S.length;
+    d.getElementById('t').textContent = titleOf(i);
+    d.getElementById('n').textContent = noteOf(i);
+    d.getElementById('x').textContent = i + 1 < S.length ? '다음 ' + (i + 2) + '장 — ' + titleOf(i + 1) : '마지막 장입니다';
+  }
+  function openPresenter() {
+    if (PW && !PW.closed) { PW.focus(); return; }
+    PW = window.open('', 'presenter', 'width=1000,height=780');
+    if (!PW) { alert('팝업이 막혀 있습니다. 주소창 오른쪽 팝업 아이콘을 눌러 허용해 주세요.'); return; }
+    var d = PW.document;
+    d.open();
+    d.write('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>발표자 노트</title>'
+      + '<style>*{box-sizing:border-box}body{margin:0;background:#0C0A09;color:#FBFAF7;'
+      + 'font-family:"Malgun Gothic",Arial,sans-serif;padding:26px 30px}'
+      + '#m{display:flex;gap:16px;align-items:center;color:#A8A29E;font-size:19px}'
+      + '#p{font-weight:700;color:#FB923C;font-size:22px}'
+      + '#t{font-size:32px;font-weight:700;margin:14px 0 20px;line-height:1.3}'
+      + '#n{font-size:31px;line-height:1.7;white-space:pre-wrap;color:#F5F5F4}'
+      + '#x{margin-top:26px;padding-top:18px;border-top:1px solid #292524;color:#A8A29E;font-size:23px;line-height:1.4}'
+      + 'button{background:#292524;color:#FBFAF7;border:0;border-radius:8px;padding:10px 18px;'
+      + 'font-size:18px;cursor:pointer;font-family:inherit}button:hover{background:#44403C}'
+      + '</style></head><body><div id="m"><span id="p"></span><span id="c"></span>'
+      + '<button id="b1">◀ 이전</button><button id="b2">다음 ▶</button><button id="b3">시간 다시</button></div>'
+      + '<div id="t"></div><div id="n"></div><div id="x"></div></body></html>');
+    d.close();
+    d.getElementById('b1').onclick = function () { go(-1); };
+    d.getElementById('b2').onclick = function () { go(1); };
+    d.getElementById('b3').onclick = function () { T0 = Date.now(); clock(); };
+    PW.addEventListener('keydown', keys);
+    // 발표자 창을 띄우면 본 화면 아래 띠는 지운다 — 빔프로젝터에 노트가 비치면 안 되니까
+    document.body.classList.add('clean');
+    if (!tick) tick = setInterval(clock, 1000);
+    pushPresenter(); clock();
+  }
   document.getElementById('prev').onclick = function () { go(-1); };
   document.getElementById('next').onclick = function () { go(1); };
   document.getElementById('toggle').onclick = function () {
@@ -811,12 +864,16 @@
     document.getElementById('notes').classList.toggle('hide', !showNotes);
     this.textContent = showNotes ? '발표 노트 숨기기' : '발표 노트 보기';
   };
-  addEventListener('keydown', function (e) {
+  document.getElementById('presenter').onclick = openPresenter;
+  function keys(e) {
     if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { go(1); e.preventDefault(); }
     if (e.key === 'ArrowLeft' || e.key === 'PageUp') { go(-1); e.preventDefault(); }
     if (e.key === 'Home') { i = 0; draw(); }
     if (e.key === 'End') { i = S.length - 1; draw(); }
-  });
+    if (e.key === 'n' || e.key === 'N') { openPresenter(); }
+    if (e.key === 'h' || e.key === 'H') { document.body.classList.toggle('clean'); }
+  }
+  addEventListener('keydown', keys);
   addEventListener('resize', fit);
   addEventListener('load', fit);
   addEventListener('pageshow', fit);
