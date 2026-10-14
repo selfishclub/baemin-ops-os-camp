@@ -1,3 +1,5 @@
+> **공개용으로 바꿈 (2026-10-14)**: 이 폴더의 코드는 실제 가게 서버에 연결된 원본 대신, 같은 기능을 가짜 가게(달빛베이커리)로 옮긴 **체험판**이에요. 서버 연결이 없어서 눌러도 어디에도 저장되지 않아요. 체험판 사이트: https://bakery-demo-kit.vercel.app/manual (관리자 비밀번호 0000)
+
 # bakery-manual-book
 
 베이커리 4개 매장 신입 직원용 매뉴얼북 웹사이트입니다.
@@ -16,7 +18,7 @@
 
 `index.html`은 기존 [bonnoel-manager-logbook](../bonnoel-manager-logbook) 로그북과 **같은 Supabase 계정**을 사용합니다(같은 프로젝트에 매뉴얼북 전용 테이블만 새로 추가). 어떤 기기·브라우저로 접속해도 같은 매뉴얼/확인 기록을 보고 저장할 수 있습니다.
 
-- **데이터베이스**: Supabase 프로젝트(`caetlljnyxsusswqhtci`)의 `manual_categories`, `manuals`, `manual_branches`, `manual_staff`, `manual_confirmations` 테이블
+- **데이터베이스**: Supabase 프로젝트(`(서버 이름 가림)`)의 `manual_categories`, `manuals`, `manual_branches`, `manual_staff`, `manual_confirmations` 테이블
 - **사진 저장**: Supabase Storage `manual-photos` 버킷 (public)
 - `index.html`에 박혀 있는 Supabase URL과 `anon`/`publishable` 키는 공개되어도 안전한 값입니다(Row Level Security 정책으로 접근을 제어). **서비스 롤(service role) 키는 절대 이 파일에 넣지 마세요.**
 

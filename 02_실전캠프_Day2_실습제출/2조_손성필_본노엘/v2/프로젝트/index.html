@@ -3,10 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>신입 직원 매뉴얼북</title>
+<title>신입 직원 매뉴얼북 (체험판)</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#c96b7b">
+<meta name="theme-color" content="#B9772B">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -24,8 +23,8 @@
     --ink-faint: oklch(62% .015 20);
     --line: oklch(92% .015 20);
     --line-strong: oklch(85% .02 20);
-    --accent: oklch(64% .12 10);
-    --accent-soft: oklch(94% .04 15);
+    --accent: oklch(58% .13 65);
+    --accent-soft: oklch(94% .045 80);
     --accent-ink: oklch(99% .005 20);
     --danger: oklch(55% .14 25);
     --danger-soft: oklch(95% .03 25);
@@ -334,25 +333,25 @@
 <body>
 <div id="app" class="wrap"><div class="loading">불러오는 중…</div></div>
 <div id="toast" class="toast"></div>
+<a class="demo-bar" href="index.html">빈 체험판 · 직접 넣어 보세요 · 저장되지 않아요 <b>소개로 ↩</b></a>
+<style>.demo-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--ink);color:var(--paper);border-radius:999px;padding:8px 16px;font-size:12.5px;text-decoration:none;box-shadow:var(--shadow);white-space:nowrap}.demo-bar b{color:var(--accent);margin-left:6px}</style>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="manual-data.js"></script>
+<script src="manual-fake.js"></script>
 <script>
 (function(){
   'use strict';
 
   // ===== 설정 =====
-  // 기존 매니저 로그북과 같은 Supabase 계정을 재사용합니다 (테이블만 새로 추가).
-  var SUPABASE_URL = 'https://caetlljnyxsusswqhtci.supabase.co';
-  var SUPABASE_KEY = 'sb_publishable_Oiqo2urdo-9s-HIso3rkmQ_7pP-I0nV';
+  // 체험판: 가짜 서버를 씁니다.
+  var SUPABASE_URL = '';   // 체험판: 서버 없음
+  var SUPABASE_KEY = '';
   var PHOTO_BUCKET = 'manual-photos';
 
   // 관리자 화면 비밀번호(4자리 숫자 등 원하는 값으로 바꾸세요)
-  var ADMIN_PIN = '0000'; // 제출용 복사본이라 실제 비밀번호를 가렸습니다
+  var ADMIN_PIN = '0000';   // 체험판 비밀번호
 
-  var sb = null;
-  if (window.supabase && typeof window.supabase.createClient === 'function'){
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  }
+  var sb = window.makeFakeSb();   // 체험판: 가짜 서버
 
   var app = document.getElementById('app');
   var toastEl = document.getElementById('toast');
@@ -441,7 +440,7 @@
   // ===== 데이터 로딩 =====
   function loadAll(){
     if (!sb){
-      app.innerHTML = '<div class="empty">Supabase 연결에 실패했습니다. 네트워크 상태를 확인해주세요.</div>';
+      app.innerHTML = '<div class="empty">체험판 데이터를 불러오지 못했어요.</div>';
       return;
     }
     Promise.all([
@@ -588,7 +587,7 @@
     return (
       backHtml +
       '<div class="head">' +
-        '<div class="brand" id="brandHome" title="홈으로"><img src="logo.png" alt="Bon Noël"><div><div class="kicker">Bon Noël</div><h1>신입 직원 매뉴얼북</h1><div class="sub">' + esc(subtitle || '검색하면 바로 찾아요') + '</div></div></div>' +
+        '<div class="brand" id="brandHome" title="홈으로"><img src="logo.svg" alt=""><div><div class="kicker">MOONLIGHT</div><h1>신입 직원 매뉴얼북</h1><div class="sub">' + esc(subtitle || '검색하면 바로 찾아요') + '</div></div></div>' +
         '<div style="display:flex; gap:6px; flex-shrink:0;">' + homeBtn + '<button class="head-link" id="btnAdminLink" style="position:relative;">' + esc(linkLabel) + lateBadgeHtml() + '</button></div>' +
       '</div>'
     );
@@ -637,10 +636,10 @@
     app.innerHTML =
       renderHeader() +
       '<div class="intro-banner" id="btnAbout">' +
-        '<div class="ib-text"><div class="ib-title">본노엘을 소개합니다</div><div class="ib-sub">일 시작 전에 먼저 읽어주세요</div></div>' +
+        '<div class="ib-text"><div class="ib-title">달빛베이커리를 소개합니다</div><div class="ib-sub">일 시작 전에 먼저 읽어주세요</div></div>' +
         '<span class="ib-arrow">&rarr;</span>' +
       '</div>' +
-      '<div class="search-box"><span class="icon">&#128269;</span><input id="searchInput" type="text" placeholder="예: 컵홀더, 단팥빵, 근로계약서" value=""></div>' +
+      '<div class="search-box"><span class="icon">&#128269;</span><input id="searchInput" type="text" placeholder="예: 봉투, 케이크, 마감" value=""></div>' +
 
       '<div class="cat-tile required" id="tileRequired">' +
         '<div class="ct-name">신입 필수 매뉴얼</div>' +
@@ -655,7 +654,7 @@
         '<div class="ct-count">' + state.manuals.length + '개 모두 보기</div>' +
       '</div>' +
 
-      '<div class="foot">BON NOËL · SINCE 2014</div>';
+      '<div class="foot">MOONLIGHT BAKERY · DEMO</div>';
 
     bindHeaderEvents();
 
@@ -695,10 +694,10 @@
     app.innerHTML =
       renderHeader() +
       '<button class="back-btn" id="btnBackOverview">&larr; 카테고리로</button>' +
-      '<div class="search-box"><span class="icon">&#128269;</span><input id="searchInput" type="text" placeholder="예: 컵홀더, 단팥빵, 근로계약서" value="' + esc(state.query) + '"></div>' +
+      '<div class="search-box"><span class="icon">&#128269;</span><input id="searchInput" type="text" placeholder="예: 봉투, 케이크, 마감" value="' + esc(state.query) + '"></div>' +
       '<div class="chips">' + chips.join('') + '</div>' +
       '<div class="manual-list">' + manualListHtml(visibleManuals()) + '</div>' +
-      '<div class="foot">BON NOËL · SINCE 2014</div>';
+      '<div class="foot">MOONLIGHT BAKERY · DEMO</div>';
 
     bindHeaderEvents();
 
@@ -771,44 +770,25 @@
       renderHeader(null, {back:true}) +
       '<div class="detail-card about-page">' +
         '<div class="about-hero">' +
-          '<img src="logo.png" alt="Bon Noël">' +
-          '<h2>본노엘을 소개합니다</h2>' +
-          '<div class="about-kicker">BON NOËL · SINCE 2014</div>' +
-          '<div class="about-frenchnote">"본노엘(Bon Noël)"은 프랑스어로 <b>"메리 크리스마스"</b>라는 뜻이에요.</div>' +
+          '<img src="logo.svg" alt="">' +
+          '<h2>달빛베이커리를 소개합니다</h2>' +
+          '<div class="about-kicker">MOONLIGHT BAKERY · DEMO</div>' +
+          '<div class="about-frenchnote">이 페이지는 체험판이라 가게 이야기도 예시예요.</div>' +
         '</div>' +
-
-        '<p class="about-lead">본노엘은 <b>2014년 12월 시작한 수제 베이커리</b>입니다. 매장이 늘어나도 우리가 가장 중요하게 생각하는 것은 같습니다. <b>좋은 재료로 직접 만들고, 당일 만든 빵을 좋은 상태로 고객에게 전달하는 것.</b> 우리는 단순히 빵을 많이 파는 가게보다 <b>오랫동안 고객에게 신뢰받는 빵집</b>이 되고 싶습니다.</p>' +
-
+        '<p class="about-lead">달빛베이커리는 동네에서 매장 4곳을 운영하는 <b>수제 베이커리</b>입니다. 매장이 늘어나도 지키고 싶은 건 같아요. <b>직접 만들고, 당일 만든 빵을 좋은 상태로 손님에게 드리는 것.</b></p>' +
         '<div class="about-section"><h3>우리가 지키는 기준</h3>' +
-          '<div class="about-principle"><b>1. 직접 만듭니다</b><p>본노엘은 각 매장에서 직접 빵을 생산합니다. 편리함보다 맛과 품질을 우선합니다.</p></div>' +
-          '<div class="about-principle"><b>2. 당일 생산 · 당일 판매</b><p>빵은 가장 맛있는 상태로 고객에게 전달되어야 합니다. 그래서 생산량과 소진율도 중요하게 관리합니다.</p></div>' +
-          '<div class="about-principle"><b>3. 기본을 중요하게 생각합니다</b><p>레시피, 중량, 포장, 청결, 시간, 고객응대. 작은 기본을 매일 지키는 것이 결국 본노엘의 실력이라고 생각합니다.</p></div>' +
+          '<div class="about-principle"><b>1. 직접 만듭니다</b><p>각 매장에서 반죽부터 직접 만들어요.</p></div>' +
+          '<div class="about-principle"><b>2. 당일 생산 · 당일 판매</b><p>빵은 가장 맛있는 상태로 드려야 해요. 그래서 남는 양도 매일 기록해요.</p></div>' +
+          '<div class="about-principle"><b>3. 기본을 지킵니다</b><p>레시피, 중량, 포장, 청결, 시간, 응대. 작은 기본을 매일 지키는 게 실력이라고 생각해요.</p></div>' +
         '</div>' +
-
         '<div class="about-section"><h3>왜 매뉴얼이 필요한가요?</h3>' +
-          '<p>사람마다 일하는 방법이 달라지면 매장마다 제품과 서비스의 기준도 달라집니다. 그래서 본노엘은 <b>"내가 배운 방식"보다 "회사가 정한 기준"을 먼저 지키는 것</b>을 중요하게 생각합니다. 매뉴얼은 사람을 통제하기 위한 것이 아니라 <b>누구나 같은 기준으로 편하게 일하기 위한 약속</b>입니다.</p>' +
+          '<p>사람마다 일하는 방법이 다르면 매장마다 기준도 달라져요. 그래서 "내가 배운 방식"보다 "가게가 정한 기준"을 먼저 지키는 걸 중요하게 생각해요. 매뉴얼은 사람을 통제하려는 게 아니라, 새로 온 사람이 빨리 익숙해지고 실수를 줄이게 돕는 도구예요.</p>' +
         '</div>' +
-
         '<div class="about-section"><h3>함께 일할 때 중요하게 생각하는 것</h3>' +
-          '<p>처음부터 일을 잘할 필요는 없습니다. 하지만 <b>약속을 지키고, 모르면 질문하고, 실수하면 빠르게 공유하고, 동료를 배려하고, 같은 실수를 반복하지 않는 태도</b>는 중요합니다. 베이커리 일은 혼자 할 수 없습니다. 내 일이 끝났는지만 보기보다 <b>다음 사람이 편하게 일할 수 있도록 마무리하는 것</b>도 우리의 중요한 기준입니다.</p>' +
+          '<p>처음부터 잘할 필요는 없어요. 하지만 <b>약속을 지키고, 모르면 묻고, 실수하면 빨리 알리고, 같은 실수를 반복하지 않는 태도</b>는 중요해요.</p>' +
         '</div>' +
-
-        '<div class="about-section"><h3>고객에게는 직원 한 명 한 명이 본노엘입니다</h3>' +
-          '<p>고객은 회사의 생각보다 매장에서 만나는 직원의 행동을 먼저 봅니다. 말투 하나, 포장 하나, 제품 하나가 본노엘의 이미지가 됩니다. 문제가 생겼을 때는 혼자 판단하거나 숨기지 말고 <b>빠르게 매니저나 책임자에게 공유해주세요.</b></p>' +
-        '</div>' +
-
-        '<div class="about-section"><h3>우리가 가장 중요하게 생각하는 말</h3>' +
-          '<div class="about-quote">힘들되, 지치지는 말자.</div>' +
-          '<p>베이커리 일은 힘들 수 있습니다. 하지만 불필요하게 힘든 일은 줄이고, 반복되는 일은 시스템으로 만들고, 서로 도우며 오래 일할 수 있는 회사를 만들고 싶습니다. <b>매뉴얼과 시스템으로 운영하고, 사람은 그 안에서 성장하는 것.</b> 이것이 본노엘이 가고 싶은 방향입니다.</p>' +
-        '</div>' +
-
-        '<div class="about-section">' +
-          '<p>여러분이 만드는 제품 하나, 정리하는 매대 하나, 고객에게 건네는 한마디가 본노엘이라는 브랜드를 만듭니다.</p>' +
-        '</div>' +
-
-        '<div class="about-welcome">본노엘에 함께하게 된 것을 환영합니다.</div>' +
+        '<div class="about-welcome">달빛베이커리에 함께하게 된 것을 환영합니다.</div>' +
       '</div>';
-
     bindHeaderEvents();
   }
 
@@ -1027,9 +1007,9 @@
   function renderAdminLogin(){
     app.innerHTML =
       '<div class="center-card">' +
-        '<img class="logo" src="logo.png" alt="Bon Noël">' +
+        '<img class="logo" src="logo.svg" alt="">' +
         '<h2>관리자 화면</h2>' +
-        '<p>비밀번호를 입력해주세요.</p>' +
+        '<p>체험판 비밀번호는 <b>0000</b> 이에요.</p>' +
         '<input id="pinInput" type="password" inputmode="numeric" maxlength="12" placeholder="••••">' +
         '<div class="error-text" id="pinError"></div>' +
         '<button class="btn" id="btnPinSubmit" style="width:100%">입장하기</button>' +
@@ -1073,7 +1053,7 @@
     }).join('');
 
     app.innerHTML =
-      '<div class="head"><div class="brand" id="brandHome" title="홈으로"><img src="logo.png" alt="Bon Noël"><div><div class="kicker">Bon Noël</div><h1>관리자 화면</h1><div class="sub">매뉴얼북 관리</div></div></div>' +
+      '<div class="head"><div class="brand" id="brandHome" title="홈으로"><img src="logo.svg" alt=""><div><div class="kicker">MOONLIGHT</div><h1>관리자 화면</h1><div class="sub">매뉴얼북 관리</div></div></div>' +
         '<button class="head-link" id="btnLogout">직원 화면으로</button></div>' +
       '<div class="admin-tabs">' + tabsHtml + '</div>' +
       '<div id="adminBody"></div>';
@@ -1767,7 +1747,7 @@
       '<div class="hint" style="margin-bottom:12px;">여기서 매장을 등록해두면 "직원 명단"에서 직원마다 소속 매장을 지정할 수 있어요.</div>' +
       '<div class="form-card">' +
         '<div class="field"><label>새 매장 이름</label>' +
-          '<div style="display:flex; gap:8px;"><input type="text" id="newBranchName" placeholder="예: 성수점" style="flex:1;"><button class="btn" id="btnAddBranch">추가</button></div>' +
+          '<div style="display:flex; gap:8px;"><input type="text" id="newBranchName" placeholder="예: 5호점" style="flex:1;"><button class="btn" id="btnAddBranch">추가</button></div>' +
         '</div>' +
       '</div>' +
       rows;
@@ -2068,12 +2048,7 @@
 
   loadAll();
 
-  if ('serviceWorker' in navigator){
-    window.addEventListener('load', function(){
-      navigator.serviceWorker.register('sw.js').catch(function(){});
-    });
-  }
-})();
+  })();
 </script>
 </body>
 </html>

@@ -3,34 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>신입 직원 매뉴얼북</title>
+<title>신입 직원 매뉴얼북 (체험판)</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#642e2c">
+<meta name="theme-color" content="#B9772B">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="매뉴얼북">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Gowun+Batang:wght@400;700&display=swap">
 <style>
   :root{
-    --paper:#faf7f2;
-    --surface:#ffffff;
-    --surface-sunken:#f1ece3;
-    --ink:#2b2420;
-    --ink-soft:#6b6259;
-    --ink-faint:#9a9086;
-    --line:#e5ddd0;
-    --line-strong:#d3c7b4;
-    --accent:#642e2c;
-    --accent-soft:#f0e2e0;
-    --accent-ink:#f7efe4;
-    --danger:#b5432c;
-    --danger-soft:#f6dfd8;
-    --ok:#2f7a4f;
-    --ok-soft:#dcefe1;
+    --paper: oklch(99.5% .002 20);
+    --surface: oklch(100% 0 0);
+    --surface-sunken: oklch(96.5% .012 20);
+    --ink: oklch(22% .02 20);
+    --ink-soft: oklch(50% .02 20);
+    --ink-faint: oklch(62% .015 20);
+    --line: oklch(92% .015 20);
+    --line-strong: oklch(85% .02 20);
+    --accent: oklch(58% .13 65);
+    --accent-soft: oklch(94% .045 80);
+    --accent-ink: oklch(99% .005 20);
+    --danger: oklch(55% .14 25);
+    --danger-soft: oklch(95% .03 25);
+    --ok: oklch(55% .1 150);
+    --ok-soft: oklch(95% .04 150);
+    --font-serif: 'Gowun Batang', ui-serif, Georgia, serif;
     --shadow: 0 1px 2px rgba(43,36,32,0.06), 0 6px 18px -10px rgba(43,36,32,0.22);
     --radius-s: 6px;
     --radius-m: 12px;
@@ -39,21 +39,21 @@
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --paper:#1c1713;
-      --surface:#252019;
-      --surface-sunken:#2c261e;
-      --ink:#f1ece3;
-      --ink-soft:#b7ada0;
-      --ink-faint:#847a6e;
-      --line:#3a3226;
-      --line-strong:#4a4030;
-      --accent:#d9a39e;
-      --accent-soft:#3b2523;
-      --accent-ink:#2a1412;
-      --danger:#e59078;
-      --danger-soft:#3a241d;
-      --ok:#7bc79a;
-      --ok-soft:#1e2f24;
+      --paper: oklch(18% .02 20);
+      --surface: oklch(23% .02 20);
+      --surface-sunken: oklch(27% .02 20);
+      --ink: oklch(94% .01 20);
+      --ink-soft: oklch(72% .015 20);
+      --ink-faint: oklch(58% .015 20);
+      --line: oklch(30% .02 20);
+      --line-strong: oklch(36% .02 20);
+      --accent: oklch(75% .1 10);
+      --accent-soft: oklch(28% .05 15);
+      --accent-ink: oklch(20% .04 15);
+      --danger: oklch(72% .12 25);
+      --danger-soft: oklch(28% .05 25);
+      --ok: oklch(70% .1 150);
+      --ok-soft: oklch(25% .05 150);
       color-scheme: dark;
     }
   }
@@ -75,11 +75,66 @@
   .head .sub{ font-size:12px; color:var(--ink-faint); margin-top:2px; }
   .head-link{ font-size:13px; color:var(--ink-soft); text-decoration:none; border:1px solid var(--line); padding:7px 12px; border-radius:999px; background:var(--surface); cursor:pointer; white-space:nowrap; }
   .head-link:hover{ border-color:var(--line-strong); }
-  .brand{ display:flex; align-items:center; gap:12px; min-width:0; }
+  .brand{ display:flex; align-items:center; gap:12px; min-width:0; cursor:pointer; }
   .brand img{ width:44px; height:44px; border-radius:12px; flex-shrink:0; box-shadow:var(--shadow); }
-  .brand .kicker{ font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; font-weight:600; color:var(--accent); margin-bottom:1px; }
+  .brand .kicker{ font-family:var(--font-serif); font-size:11px; letter-spacing:.18em; text-transform:uppercase; font-weight:600; color:var(--accent); margin-bottom:1px; }
   .center-card .logo{ width:76px; height:76px; border-radius:20px; display:block; margin:0 auto 16px; box-shadow:var(--shadow); }
-  .foot{ text-align:center; margin-top:44px; color:var(--ink-faint); font-size:11px; letter-spacing:.16em; }
+  .foot{ font-family:var(--font-serif); text-align:center; margin-top:44px; color:var(--ink-faint); font-size:12px; letter-spacing:.16em; }
+
+  /* 회사 소개 배너 (홈 화면 상단) */
+  .intro-banner{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--accent); color:var(--accent-ink); border-radius:var(--radius-l);
+    padding:16px 18px; margin-bottom:16px; cursor:pointer; box-shadow:var(--shadow);
+  }
+  .intro-banner .ib-title{ font-size:15px; font-weight:700; margin-bottom:2px; }
+  .intro-banner .ib-sub{ font-size:12px; opacity:.85; }
+  .intro-banner .ib-arrow{ font-size:20px; flex-shrink:0; }
+
+  /* 홈 - 카테고리 타일 화면 */
+  .section-label{ font-size:11.5px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.1em; font-weight:700; margin:4px 2px 10px; }
+  .cat-tile{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m);
+    padding:16px; cursor:pointer; box-shadow:var(--shadow);
+  }
+  .cat-tile:hover{ border-color:var(--line-strong); }
+  .cat-tile .ct-name{ font-size:15px; font-weight:700; margin-bottom:4px; }
+  .cat-tile .ct-count{ font-size:12px; color:var(--ink-faint); }
+  .cat-tile-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-bottom:14px; }
+  .cat-tile.required{
+    background:var(--accent); border-color:var(--accent); color:var(--accent-ink);
+    margin-bottom:22px; padding:18px 20px;
+  }
+  .cat-tile.required .ct-name{ font-size:16px; }
+  .cat-tile.required .ct-count{ color:var(--accent-ink); opacity:.85; }
+  .cat-tile.all{ background:var(--surface-sunken); border-style:dashed; border-color:var(--line-strong); margin-top:2px; margin-bottom:16px; }
+
+  /* 회사 소개 페이지 */
+  .about-page{ padding-top:28px; }
+  .about-hero{ text-align:center; margin-bottom:26px; }
+  .about-hero img{ width:64px; height:64px; border-radius:16px; box-shadow:var(--shadow); margin-bottom:14px; }
+  .about-hero h2{ margin:0 0 6px; font-size:22px; }
+  .about-kicker{ font-family:var(--font-serif); font-size:12px; letter-spacing:.18em; color:var(--ink-faint); }
+  .about-frenchnote{ font-size:12.5px; color:var(--accent); margin-top:10px; }
+  .about-lead{ font-size:14.5px; line-height:1.75; color:var(--ink-soft); margin-bottom:28px; padding-bottom:24px; border-bottom:1px dashed var(--line-strong); }
+  .about-section{ margin-bottom:26px; }
+  .about-section h3{ font-size:15.5px; margin:0 0 10px; }
+  .about-section p{ font-size:14px; line-height:1.75; color:var(--ink-soft); margin:0; }
+  .about-principle{ margin-bottom:16px; }
+  .about-principle b{ display:block; font-size:14.5px; margin-bottom:4px; }
+  .about-principle p{ font-size:13.5px; line-height:1.7; color:var(--ink-soft); margin:0; }
+  .about-list{ margin:0 0 12px; padding-left:20px; }
+  .about-list li{ font-size:14px; line-height:1.9; color:var(--ink-soft); }
+  .about-quote{
+    font-family:var(--font-serif);
+    text-align:center; font-size:19px; font-weight:700; line-height:1.6;
+    color:var(--accent); background:var(--accent-soft); border-radius:var(--radius-m);
+    padding:26px 18px; margin:0 0 28px;
+  }
+  .about-welcome{
+    text-align:center; font-size:15px; font-weight:700; color:var(--accent-ink);
+    background:var(--accent); border-radius:var(--radius-m); padding:20px; margin-top:8px;
+  }
 
   /* search */
   .search-box{ position:relative; margin-bottom:16px; }
@@ -117,16 +172,22 @@
   .detail-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-l); padding:20px; box-shadow:var(--shadow); }
   .detail-card .cat{ font-size:12px; color:var(--accent); font-weight:600; margin-bottom:6px; }
   .detail-card h2{ margin:0 0 14px; font-size:21px; }
-  .photo-strip{ display:flex; gap:10px; overflow-x:auto; margin-bottom:16px; padding-bottom:4px; }
+  .photo-strip{ display:flex; gap:10px; overflow-x:auto; margin-bottom:0; padding-bottom:4px; }
   .photo-strip img{ height:180px; width:auto; border-radius:var(--radius-m); flex-shrink:0; border:1px solid var(--line); object-fit:cover; }
   .video-wrap{ position:relative; padding-top:56.25%; border-radius:var(--radius-m); overflow:hidden; margin-bottom:18px; background:#000; }
   .video-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
   .steps{ list-style:none; margin:0 0 18px; padding:0; display:flex; flex-direction:column; gap:12px; }
   .steps li{ display:flex; gap:12px; }
-  .step-num{ flex-shrink:0; width:26px; height:26px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .step-num{ flex-shrink:0; width:26px; height:26px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-family:var(--font-serif); font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; }
   .step-text{ padding-top:3px; font-size:14.5px; white-space:pre-wrap; }
   .detail-card .tags{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px; }
 
+  .quiz-section{ background:var(--surface-sunken); border-radius:var(--radius-m); padding:16px 18px; margin-bottom:18px; }
+  .quiz-section h4{ margin:0 0 12px; font-size:14px; }
+  .quiz-take-q{ margin-bottom:14px; }
+  .quiz-take-q p{ margin:0 0 8px; font-size:14px; font-weight:600; }
+  .quiz-opt{ display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:14px; cursor:pointer; }
+  .quiz-wrong{ background:var(--danger-soft); color:var(--danger); padding:10px 14px; border-radius:var(--radius-s); font-size:13.5px; font-weight:600; margin-top:8px; }
   .confirm-box{ border-top:1px dashed var(--line-strong); padding-top:18px; margin-top:4px; }
   .confirm-box p{ font-size:13px; color:var(--ink-soft); margin:0 0 10px; }
   .confirm-row{ display:flex; gap:8px; }
@@ -179,6 +240,10 @@
   .step-edit-row textarea{ flex:1; }
   .step-edit-row .step-btns{ display:flex; flex-direction:column; gap:4px; }
   .mini-btn{ padding:4px 7px; font-size:11px; border-radius:4px; border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); cursor:pointer; }
+  .mini-btn.active{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  .quiz-q-edit{ background:var(--surface-sunken); border:1px solid var(--line); border-radius:var(--radius-m); padding:12px; margin-bottom:10px; }
+  .quiz-q-edit textarea, .quiz-q-edit select{ width:100%; padding:8px 10px; border-radius:6px; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); font-family:inherit; font-size:13px; }
+  .quiz-q-edit select{ width:auto; }
 
   .photo-grid{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; }
   .photo-item{ position:relative; width:96px; height:96px; }
@@ -187,6 +252,32 @@
   .upload-btn{ display:inline-block; padding:10px 16px; border-radius:var(--radius-s); border:1px dashed var(--line-strong); background:var(--surface-sunken); color:var(--ink-soft); font-size:13px; cursor:pointer; }
 
   .form-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+
+  /* 포장 비품 고르기 (매뉴얼 편집 화면) */
+  .supply-pick-grid{ display:flex; flex-wrap:wrap; gap:10px; }
+  .supply-pick-item{ position:relative; width:92px; cursor:pointer; border:2px solid transparent; border-radius:var(--radius-s); padding:3px; text-align:center; }
+  .supply-pick-item .rm{ position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; background:var(--danger); color:#fff; border:2px solid var(--surface); font-size:11px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:1; }
+  .supply-pick-item img{ width:100%; height:74px; object-fit:cover; border-radius:6px; border:1px solid var(--line); display:block; }
+  .supply-pick-item .n{ font-size:11px; color:var(--ink-soft); margin-top:4px; line-height:1.3; word-break:keep-all; }
+  .supply-pick-item.selected{ border-color:var(--accent); background:var(--accent-soft); }
+  .supply-pick-item.selected .n{ color:var(--accent); font-weight:600; }
+  .supply-pick-add{ border:1px dashed var(--line-strong) !important; background:var(--surface-sunken); display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .supply-pick-add .plus{ font-size:22px; color:var(--ink-faint); line-height:1; height:74px; display:flex; align-items:center; justify-content:center; }
+  .supply-pick-add .n{ color:var(--ink-faint); }
+
+  /* 포장 비품 (직원 상세 화면) */
+  .supply-section{ margin-bottom:18px; }
+  .supply-section h4{ font-size:12.5px; color:var(--ink-soft); margin:0 0 8px; font-weight:600; }
+  .supply-strip{ display:flex; flex-wrap:wrap; gap:10px; }
+  .supply-strip .sc{ width:88px; text-align:center; }
+  .supply-strip .sc img{ width:100%; height:70px; object-fit:cover; border-radius:var(--radius-s); border:1px solid var(--line); }
+  .supply-strip .sc span{ display:block; font-size:11px; color:var(--ink-soft); margin-top:4px; }
+
+  /* 포장 비품 관리 (관리자 화면) */
+  .supply-lib-grid{ display:flex; flex-wrap:wrap; gap:12px; }
+  .supply-lib-item{ width:104px; text-align:center; }
+  .supply-lib-item img{ width:100%; height:84px; object-fit:cover; border-radius:var(--radius-s); border:1px solid var(--line); }
+  .supply-lib-item .n{ font-size:12px; margin:5px 0 4px; word-break:keep-all; }
 
   .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--paper); padding:11px 18px; border-radius:999px; font-size:13.5px; box-shadow:var(--shadow); z-index:50; opacity:0; pointer-events:none; transition:opacity .2s; }
   .toast.show{ opacity:1; }
@@ -201,6 +292,12 @@
   .badge.no{ background:var(--danger-soft); color:var(--danger); }
   .badge.req{ background:var(--accent-soft); color:var(--accent); }
   .badge.late{ background:var(--danger-soft); color:var(--danger); }
+  .late-dot{
+    position:absolute; top:-6px; right:-6px; min-width:17px; height:17px; padding:0 3px;
+    border-radius:999px; background:var(--danger); color:#fff; font-size:10px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; line-height:1;
+  }
+  .admin-tab{ position:relative; }
   .manual-card .title .badge, .list-row .t .badge, .detail-card h2 .badge{ vertical-align:middle; margin-left:6px; }
 
   /* 확인 UI (매장 → 이름 고르기) */
@@ -236,25 +333,25 @@
 <body>
 <div id="app" class="wrap"><div class="loading">불러오는 중…</div></div>
 <div id="toast" class="toast"></div>
+<a class="demo-bar" href="index.html">빈 체험판 · 직접 넣어 보세요 · 저장되지 않아요 <b>소개로 ↩</b></a>
+<style>.demo-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--ink);color:var(--paper);border-radius:999px;padding:8px 16px;font-size:12.5px;text-decoration:none;box-shadow:var(--shadow);white-space:nowrap}.demo-bar b{color:var(--accent);margin-left:6px}</style>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="manual-data.js"></script>
+<script src="manual-fake.js"></script>
 <script>
 (function(){
   'use strict';
 
   // ===== 설정 =====
-  // 기존 매니저 로그북과 같은 Supabase 계정을 재사용합니다 (테이블만 새로 추가).
-  var SUPABASE_URL = 'https://caetlljnyxsusswqhtci.supabase.co';
-  var SUPABASE_KEY = 'sb_publishable_Oiqo2urdo-9s-HIso3rkmQ_7pP-I0nV';
+  // 체험판: 가짜 서버를 씁니다.
+  var SUPABASE_URL = '';   // 체험판: 서버 없음
+  var SUPABASE_KEY = '';
   var PHOTO_BUCKET = 'manual-photos';
 
   // 관리자 화면 비밀번호(4자리 숫자 등 원하는 값으로 바꾸세요)
-  var ADMIN_PIN = '1225';
+  var ADMIN_PIN = '0000';   // 체험판 비밀번호
 
-  var sb = null;
-  if (window.supabase && typeof window.supabase.createClient === 'function'){
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  }
+  var sb = window.makeFakeSb();   // 체험판: 가짜 서버
 
   var app = document.getElementById('app');
   var toastEl = document.getElementById('toast');
@@ -287,6 +384,11 @@
     return Math.max(1, Math.round((today - start) / 86400000) + 1);
   }
 
+  // 입사일(hire_on)이 있으면 그걸, 없으면 등록일(created_at)을 기준으로 삼음
+  function hireDate(s){
+    return s.hire_on || s.created_at;
+  }
+
   function extractYoutubeId(url){
     if (!url) return '';
     var m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{6,})/);
@@ -302,12 +404,14 @@
     loaded: false,
     categories: [],
     branches: [],
+    supplies: [],
     manuals: [],
     staff: [],
     confirmations: [],   // 현재 열어본 매뉴얼의 확인 기록만 필요할 때 불러옴
     view: 'home',         // home | detail | admin-login | admin
     activeCategory: null,
     onlyRequired: false,  // 홈에서 "신입 필수"만 보기
+    browsingAll: false,   // "전체 매뉴얼" 타일을 눌러 카테고리 없이 전체 목록을 보는 중
     query: '',
     detailManualId: null,
     isAdmin: false,
@@ -315,7 +419,8 @@
     editingManual: null,  // 편집 중인 매뉴얼 draft 객체 (신규 작성 포함)
     statusManualId: null,
     statusBranchId: null,  // 확인 현황 탭에서 고른 매장 (null = 전체)
-    progressBranchId: null // 진행률 탭에서 고른 매장 (null = 전체)
+    progressBranchId: null, // 진행률 탭에서 고른 매장 (null = 전체)
+    lateCount: 0           // 입사 7일 지났는데 필수 매뉴얼 남은 신입 수 (배지용)
   };
 
   // 매장 공용폰이라 마지막에 고른 매장을 기억해 두면 다음 사람은 이름만 고르면 됨
@@ -335,30 +440,57 @@
   // ===== 데이터 로딩 =====
   function loadAll(){
     if (!sb){
-      app.innerHTML = '<div class="empty">Supabase 연결에 실패했습니다. 네트워크 상태를 확인해주세요.</div>';
+      app.innerHTML = '<div class="empty">체험판 데이터를 불러오지 못했어요.</div>';
       return;
     }
     Promise.all([
       sb.from('manual_categories').select('*').order('sort_order', {ascending:true}),
       sb.from('manuals').select('*').order('created_at', {ascending:false}),
       sb.from('manual_staff').select('*').order('name', {ascending:true}),
-      sb.from('manual_branches').select('*').order('sort_order', {ascending:true})
+      sb.from('manual_branches').select('*').order('sort_order', {ascending:true}),
+      sb.from('manual_supplies').select('*').order('sort_order', {ascending:true})
     ]).then(function(results){
-      var catRes = results[0], manRes = results[1], staffRes = results[2], branchRes = results[3];
+      var catRes = results[0], manRes = results[1], staffRes = results[2], branchRes = results[3], supplyRes = results[4];
       if (catRes.error) throw catRes.error;
       if (manRes.error) throw manRes.error;
       if (staffRes.error) throw staffRes.error;
       if (branchRes.error) throw branchRes.error;
+      if (supplyRes.error) throw supplyRes.error;
       state.categories = catRes.data || [];
       state.manuals = manRes.data || [];
       state.staff = staffRes.data || [];
       state.branches = branchRes.data || [];
+      state.supplies = supplyRes.data || [];
       state.loaded = true;
       render();
+      refreshLateCount();
     }).catch(function(err){
       console.error(err);
       app.innerHTML = '<div class="empty">데이터를 불러오지 못했습니다.<br>' + esc(err.message || err) + '</div>';
     });
+  }
+
+  // 입사 7일 지났는데 필수 매뉴얼이 남은 신입 수를 세서 배지에 씀 (외부 발송 없이 화면 표시만)
+  function refreshLateCount(){
+    var required = requiredManuals();
+    if (!required.length){ state.lateCount = 0; return; }
+    var requiredIds = required.map(function(m){ return m.id; });
+    sb.from('manual_confirmations').select('manual_id, staff_id, staff_name').in('manual_id', requiredIds).then(function(res){
+      if (res.error) return;
+      var rows = res.data || [];
+      var doneById = {}, doneByName = {};
+      rows.forEach(function(c){
+        var bucket = c.staff_id ? (doneById[c.staff_id] = doneById[c.staff_id] || {}) : (c.staff_name ? (doneByName[c.staff_name] = doneByName[c.staff_name] || {}) : null);
+        if (bucket) bucket[c.manual_id] = true;
+      });
+      var late = 0;
+      state.staff.filter(function(s){ return s.active !== false; }).forEach(function(s){
+        var done = Object.assign({}, doneByName[s.name] || {}, doneById[s.id] || {});
+        var remaining = required.filter(function(m){ return !done[m.id]; });
+        if (remaining.length && daysSince(hireDate(s)) > 7) late++;
+      });
+      if (state.lateCount !== late){ state.lateCount = late; render(); }
+    }).catch(function(){});
   }
 
   function categoryName(id){
@@ -437,25 +569,119 @@
   function render(){
     if (!state.loaded){ app.innerHTML = '<div class="loading">불러오는 중…</div>'; return; }
     if (state.view === 'detail') return renderDetail();
+    if (state.view === 'about') return renderAbout();
     if (state.view === 'admin-login') return renderAdminLogin();
     if (state.view === 'admin') return renderAdmin();
     return renderHome();
+  }
+
+  function lateBadgeHtml(){
+    return state.lateCount ? '<span class="late-dot">' + (state.lateCount > 9 ? '9+' : state.lateCount) + '</span>' : '';
   }
 
   function renderHeader(subtitle, opts){
     opts = opts || {};
     var linkLabel = state.isAdmin ? '관리자 화면' : '관리자';
     var backHtml = opts.back ? '<button class="back-btn" id="btnBack">&larr; 목록으로</button>' : '';
+    var homeBtn = opts.back ? '<button class="head-link" id="btnHome">홈</button>' : '';
     return (
       backHtml +
       '<div class="head">' +
-        '<div class="brand"><img src="logo.png" alt="Bon Noël"><div><div class="kicker">Bon Noël</div><h1>신입 직원 매뉴얼북</h1><div class="sub">' + esc(subtitle || '검색하면 바로 찾아요') + '</div></div></div>' +
-        '<button class="head-link" id="btnAdminLink">' + esc(linkLabel) + '</button>' +
+        '<div class="brand" id="brandHome" title="홈으로"><img src="logo.svg" alt=""><div><div class="kicker">MOONLIGHT</div><h1>신입 직원 매뉴얼북</h1><div class="sub">' + esc(subtitle || '검색하면 바로 찾아요') + '</div></div></div>' +
+        '<div style="display:flex; gap:6px; flex-shrink:0;">' + homeBtn + '<button class="head-link" id="btnAdminLink" style="position:relative;">' + esc(linkLabel) + lateBadgeHtml() + '</button></div>' +
       '</div>'
     );
   }
 
+  // 로고나 "홈" 버튼 → 검색·필터 초기화하고 메인으로
+  function goHome(){
+    state.view = 'home';
+    state.activeCategory = null;
+    state.onlyRequired = false;
+    state.browsingAll = false;
+    state.query = '';
+    state.editingManual = null;
+    render();
+    window.scrollTo(0,0);
+  }
+
+  // 카테고리를 고르거나 검색을 하면 "둘러보기" 화면으로, 아무것도 안 골랐으면 카테고리 타일 화면으로
+  function isBrowsing(){
+    return state.browsingAll || !!state.activeCategory || state.onlyRequired || !!state.query.trim();
+  }
+
+  function categoryCount(id){
+    return state.manuals.filter(function(m){ return m.category_id === id; }).length;
+  }
+
   function renderHome(){
+    if (isBrowsing()) return renderHomeBrowse();
+    return renderHomeOverview();
+  }
+
+  // ===== 홈 - 카테고리 타일 화면 =====
+  function renderHomeOverview(){
+    var reqCount = requiredManuals().length;
+
+    var tilesHtml = state.categories.map(function(c){
+      var n = categoryCount(c.id);
+      return (
+        '<div class="cat-tile" data-cat="' + esc(c.id) + '">' +
+          '<div class="ct-name">' + esc(c.name) + '</div>' +
+          '<div class="ct-count">매뉴얼 ' + n + '개</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    app.innerHTML =
+      renderHeader() +
+      '<div class="intro-banner" id="btnAbout">' +
+        '<div class="ib-text"><div class="ib-title">달빛베이커리를 소개합니다</div><div class="ib-sub">일 시작 전에 먼저 읽어주세요</div></div>' +
+        '<span class="ib-arrow">&rarr;</span>' +
+      '</div>' +
+      '<div class="search-box"><span class="icon">&#128269;</span><input id="searchInput" type="text" placeholder="예: 봉투, 케이크, 마감" value=""></div>' +
+
+      '<div class="cat-tile required" id="tileRequired">' +
+        '<div class="ct-name">신입 필수 매뉴얼</div>' +
+        '<div class="ct-count">' + reqCount + '개 · 입사하면 가장 먼저 확인하세요</div>' +
+      '</div>' +
+
+      '<div class="section-label">카테고리별로 보기</div>' +
+      '<div class="cat-tile-grid">' + tilesHtml + '</div>' +
+
+      '<div class="cat-tile all" id="tileAll">' +
+        '<div class="ct-name">전체 매뉴얼 보기</div>' +
+        '<div class="ct-count">' + state.manuals.length + '개 모두 보기</div>' +
+      '</div>' +
+
+      '<div class="foot">MOONLIGHT BAKERY · DEMO</div>';
+
+    bindHeaderEvents();
+
+    var si = document.getElementById('searchInput');
+    si.addEventListener('input', function(){ state.query = si.value; render(); });
+
+    document.querySelectorAll('[data-cat]').forEach(function(el){
+      el.addEventListener('click', function(){
+        state.activeCategory = el.getAttribute('data-cat');
+        render();
+        window.scrollTo(0,0);
+      });
+    });
+    document.getElementById('tileRequired').addEventListener('click', function(){
+      state.onlyRequired = true;
+      render();
+      window.scrollTo(0,0);
+    });
+    document.getElementById('tileAll').addEventListener('click', function(){
+      state.browsingAll = true;
+      render();
+      window.scrollTo(0,0);
+    });
+  }
+
+  // ===== 홈 - 둘러보기(검색·카테고리·신입필수 필터) 화면 =====
+  function renderHomeBrowse(){
     var reqCount = requiredManuals().length;
     var chips = [
       '<button class="chip' + (!state.activeCategory && !state.onlyRequired ? ' active' : '') + '" data-cat="">전체</button>',
@@ -467,12 +693,22 @@
 
     app.innerHTML =
       renderHeader() +
-      '<div class="search-box"><span class="icon">&#128269;</span><input id="searchInput" type="text" placeholder="예: 컵홀더, 단팥빵, 근로계약서" value="' + esc(state.query) + '"></div>' +
+      '<button class="back-btn" id="btnBackOverview">&larr; 카테고리로</button>' +
+      '<div class="search-box"><span class="icon">&#128269;</span><input id="searchInput" type="text" placeholder="예: 봉투, 케이크, 마감" value="' + esc(state.query) + '"></div>' +
       '<div class="chips">' + chips.join('') + '</div>' +
       '<div class="manual-list">' + manualListHtml(visibleManuals()) + '</div>' +
-      '<div class="foot">BON NOËL · SINCE 2014</div>';
+      '<div class="foot">MOONLIGHT BAKERY · DEMO</div>';
 
     bindHeaderEvents();
+
+    document.getElementById('btnBackOverview').addEventListener('click', function(){
+      state.activeCategory = null;
+      state.onlyRequired = false;
+      state.browsingAll = false;
+      state.query = '';
+      render();
+      window.scrollTo(0,0);
+    });
 
     var si = document.getElementById('searchInput');
     si.addEventListener('input', function(){ state.query = si.value; renderListOnly(); });
@@ -487,6 +723,7 @@
         } else {
           state.activeCategory = el.getAttribute('data-cat') || null;
           state.onlyRequired = false;
+          state.browsingAll = !state.activeCategory; // "전체" 칩을 누르면 계속 둘러보기 화면에 머무름
         }
         render();
       });
@@ -515,6 +752,44 @@
       render();
       window.scrollTo(0,0);
     });
+    var brand = document.getElementById('brandHome');
+    if (brand) brand.addEventListener('click', goHome);
+    var aboutBtn = document.getElementById('btnAbout');
+    if (aboutBtn) aboutBtn.addEventListener('click', function(){
+      state.view = 'about';
+      render();
+      window.scrollTo(0,0);
+    });
+    var home = document.getElementById('btnHome');
+    if (home) home.addEventListener('click', goHome);
+  }
+
+  // ===== 회사 소개 =====
+  function renderAbout(){
+    app.innerHTML =
+      renderHeader(null, {back:true}) +
+      '<div class="detail-card about-page">' +
+        '<div class="about-hero">' +
+          '<img src="logo.svg" alt="">' +
+          '<h2>달빛베이커리를 소개합니다</h2>' +
+          '<div class="about-kicker">MOONLIGHT BAKERY · DEMO</div>' +
+          '<div class="about-frenchnote">이 페이지는 체험판이라 가게 이야기도 예시예요.</div>' +
+        '</div>' +
+        '<p class="about-lead">달빛베이커리는 동네에서 매장 4곳을 운영하는 <b>수제 베이커리</b>입니다. 매장이 늘어나도 지키고 싶은 건 같아요. <b>직접 만들고, 당일 만든 빵을 좋은 상태로 손님에게 드리는 것.</b></p>' +
+        '<div class="about-section"><h3>우리가 지키는 기준</h3>' +
+          '<div class="about-principle"><b>1. 직접 만듭니다</b><p>각 매장에서 반죽부터 직접 만들어요.</p></div>' +
+          '<div class="about-principle"><b>2. 당일 생산 · 당일 판매</b><p>빵은 가장 맛있는 상태로 드려야 해요. 그래서 남는 양도 매일 기록해요.</p></div>' +
+          '<div class="about-principle"><b>3. 기본을 지킵니다</b><p>레시피, 중량, 포장, 청결, 시간, 응대. 작은 기본을 매일 지키는 게 실력이라고 생각해요.</p></div>' +
+        '</div>' +
+        '<div class="about-section"><h3>왜 매뉴얼이 필요한가요?</h3>' +
+          '<p>사람마다 일하는 방법이 다르면 매장마다 기준도 달라져요. 그래서 "내가 배운 방식"보다 "가게가 정한 기준"을 먼저 지키는 걸 중요하게 생각해요. 매뉴얼은 사람을 통제하려는 게 아니라, 새로 온 사람이 빨리 익숙해지고 실수를 줄이게 돕는 도구예요.</p>' +
+        '</div>' +
+        '<div class="about-section"><h3>함께 일할 때 중요하게 생각하는 것</h3>' +
+          '<p>처음부터 잘할 필요는 없어요. 하지만 <b>약속을 지키고, 모르면 묻고, 실수하면 빨리 알리고, 같은 실수를 반복하지 않는 태도</b>는 중요해요.</p>' +
+        '</div>' +
+        '<div class="about-welcome">달빛베이커리에 함께하게 된 것을 환영합니다.</div>' +
+      '</div>';
+    bindHeaderEvents();
   }
 
   function renderDetail(){
@@ -525,6 +800,15 @@
 
     var photosHtml = photos.length ? (
       '<div class="photo-strip">' + photos.map(function(p){ return '<img src="' + esc(p.url) + '" alt="">'; }).join('') + '</div>'
+    ) : '';
+
+    var pickedSupplies = (m.supply_ids||[]).map(function(id){
+      return state.supplies.filter(function(s){ return s.id === id; })[0];
+    }).filter(Boolean);
+    var suppliesHtml = pickedSupplies.length ? (
+      '<div class="supply-section"><h4>포장 비품</h4><div class="supply-strip">' +
+        pickedSupplies.map(function(s){ return '<div class="sc"><img src="' + esc(s.photo_url) + '" alt=""><span>' + esc(s.name) + '</span></div>'; }).join('') +
+      '</div></div>'
     ) : '';
 
     var videoHtml = ytId ? (
@@ -549,8 +833,10 @@
         photosHtml +
         videoHtml +
         stepsHtml +
+        suppliesHtml +
         tagsHtml +
-        '<div class="confirm-box">' +
+        '<div id="quizBox"></div>' +
+        '<div class="confirm-box" id="confirmBox">' +
           '<p>다 확인하셨으면 매장과 본인 이름을 고르고 버튼을 눌러주세요.</p>' +
           '<div id="confirmArea"></div>' +
           '<div class="confirmed-list" id="confirmedList"><h4>확인한 사람</h4><div class="loading" style="padding:10px 0;">불러오는 중…</div></div>' +
@@ -561,6 +847,54 @@
 
     var confirmed = [];          // 이 매뉴얼의 확인 기록
     var confirmedStaffIds = {};  // staff_id → confirmed_at
+    var quizQuestions = [];
+    var quizAnswers = {};
+    var quizTries = 0;
+    var quizPassed = !m.quiz_required;
+    if (m.quiz_required) document.getElementById('confirmBox').style.display = 'none';
+
+    function renderQuizBox(){
+      var box = document.getElementById('quizBox');
+      if (!box || !quizQuestions.length) return;
+      var qHtml = quizQuestions.map(function(q, i){
+        var opts = q.type === 'mc' ? q.options : ['O', 'X'];
+        var optsHtml = opts.map(function(opt, j){
+          return (
+            '<label class="quiz-opt">' +
+              '<input type="radio" name="quiz-take-' + i + '" data-quiz-take="' + i + ':' + j + '"' + (quizAnswers[i] === j ? ' checked' : '') + '> ' + esc(opt) +
+            '</label>'
+          );
+        }).join('');
+        return '<div class="quiz-take-q"><p>' + (i+1) + '. ' + esc(q.question) + '</p>' + optsHtml + '</div>';
+      }).join('');
+      box.innerHTML =
+        '<div class="quiz-section">' +
+          '<h4>이해도 확인' + (m.quiz_required ? '' : ' (참고용)') + '</h4>' +
+          qHtml +
+          '<button class="btn secondary" id="btnQuizSubmit">제출</button>' +
+          '<div id="quizResult"></div>' +
+        '</div>';
+      box.querySelectorAll('[data-quiz-take]').forEach(function(el){
+        el.addEventListener('change', function(){
+          var parts = el.getAttribute('data-quiz-take').split(':');
+          quizAnswers[+parts[0]] = +parts[1];
+        });
+      });
+      document.getElementById('btnQuizSubmit').addEventListener('click', function(){
+        if (Object.keys(quizAnswers).length < quizQuestions.length){ toast('모든 문제에 답해주세요.'); return; }
+        quizTries++;
+        var wrong = quizQuestions.filter(function(q, i){ return quizAnswers[i] !== q.answer_index; }).length;
+        var resultEl = document.getElementById('quizResult');
+        if (!wrong){
+          quizPassed = true;
+          resultEl.innerHTML = '<div class="confirm-done">다 맞았어요! 아래에서 확인해주세요.</div>';
+          var cb = document.getElementById('confirmBox');
+          if (cb) cb.style.display = '';
+        } else {
+          resultEl.innerHTML = '<div class="quiz-wrong">' + wrong + '개 틀렸어요.' + (m.quiz_required ? ' 다시 도전해보세요.' : '') + '</div>';
+        }
+      });
+    }
 
     // 확인 기록 한 줄을 (이름, 매장)으로 풀어 줌. 옛 기록(staff_id 없음)은 이름 문자열로 표시
     function describe(c){
@@ -629,7 +963,7 @@
         }
         var btn = document.getElementById('btnConfirm');
         btn.disabled = true;
-        sb.from('manual_confirmations').insert({ manual_id: m.id, staff_id: staffId, staff_name: staff.name }).select().then(function(res){
+        sb.from('manual_confirmations').insert({ manual_id: m.id, staff_id: staffId, staff_name: staff.name, quiz_tries: quizQuestions.length ? quizTries : null }).select().then(function(res){
           if (res.error){
             btn.disabled = false;
             // 23505 = 이미 같은 사람의 기록이 있음 (DB unique 제약)
@@ -662,15 +996,20 @@
 
     renderConfirmArea();
     loadConfirmed();
+    sb.from('manual_quiz_questions').select('*').eq('manual_id', m.id).order('sort_order', {ascending:true}).then(function(res){
+      if (res.error) return;
+      quizQuestions = res.data || [];
+      renderQuizBox();
+    });
   }
 
   // ===== 관리자 로그인 =====
   function renderAdminLogin(){
     app.innerHTML =
       '<div class="center-card">' +
-        '<img class="logo" src="logo.png" alt="Bon Noël">' +
+        '<img class="logo" src="logo.svg" alt="">' +
         '<h2>관리자 화면</h2>' +
-        '<p>비밀번호를 입력해주세요.</p>' +
+        '<p>체험판 비밀번호는 <b>0000</b> 이에요.</p>' +
         '<input id="pinInput" type="password" inputmode="numeric" maxlength="12" placeholder="••••">' +
         '<div class="error-text" id="pinError"></div>' +
         '<button class="btn" id="btnPinSubmit" style="width:100%">입장하기</button>' +
@@ -702,25 +1041,26 @@
     var tabs = [
       ['manuals', '매뉴얼 관리'],
       ['categories', '카테고리 관리'],
+      ['supplies', '포장 비품'],
       ['branches', '매장 관리'],
       ['staff', '직원 명단'],
       ['progress', '신입 진행률'],
       ['status', '확인 현황']
     ];
     var tabsHtml = tabs.map(function(t){
-      return '<button class="admin-tab' + (state.adminTab === t[0] ? ' active' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>';
+      var badge = t[0] === 'progress' ? lateBadgeHtml() : '';
+      return '<button class="admin-tab' + (state.adminTab === t[0] ? ' active' : '') + '" data-tab="' + t[0] + '">' + t[1] + badge + '</button>';
     }).join('');
 
     app.innerHTML =
-      '<div class="head"><div class="brand"><img src="logo.png" alt="Bon Noël"><div><div class="kicker">Bon Noël</div><h1>관리자 화면</h1><div class="sub">매뉴얼북 관리</div></div></div>' +
+      '<div class="head"><div class="brand" id="brandHome" title="홈으로"><img src="logo.svg" alt=""><div><div class="kicker">MOONLIGHT</div><h1>관리자 화면</h1><div class="sub">매뉴얼북 관리</div></div></div>' +
         '<button class="head-link" id="btnLogout">직원 화면으로</button></div>' +
       '<div class="admin-tabs">' + tabsHtml + '</div>' +
       '<div id="adminBody"></div>';
 
-    document.getElementById('btnLogout').addEventListener('click', function(){
-      state.view = 'home';
-      render();
-    });
+    document.getElementById('btnLogout').addEventListener('click', goHome);
+    var adminBrand = document.getElementById('brandHome');
+    if (adminBrand) adminBrand.addEventListener('click', goHome);
     document.querySelectorAll('.admin-tab').forEach(function(el){
       el.addEventListener('click', function(){
         state.adminTab = el.getAttribute('data-tab');
@@ -732,6 +1072,7 @@
     var body = document.getElementById('adminBody');
     if (state.adminTab === 'manuals') renderAdminManuals(body);
     else if (state.adminTab === 'categories') renderAdminCategories(body);
+    else if (state.adminTab === 'supplies') renderAdminSupplies(body);
     else if (state.adminTab === 'branches') renderAdminBranches(body);
     else if (state.adminTab === 'staff') renderAdminStaff(body);
     else if (state.adminTab === 'progress') renderAdminProgress(body);
@@ -760,15 +1101,25 @@
       rows;
 
     document.getElementById('btnNewManual').addEventListener('click', function(){
-      state.editingManual = { id:null, title:'', category_id: state.categories[0] ? state.categories[0].id : null, tags:[], youtube_url:'', photos:[], steps:[''], is_required:false };
+      state.editingManual = { id:null, title:'', category_id: state.categories[0] ? state.categories[0].id : null, tags:[], youtube_url:'', photos:[], steps:[''], is_required:false, supply_ids:[], quiz_required:false, quiz_questions:[] };
       render();
     });
     body.querySelectorAll('[data-edit]').forEach(function(el){
       el.addEventListener('click', function(){
         var m = state.manuals.filter(function(x){ return x.id === el.getAttribute('data-edit'); })[0];
-        state.editingManual = JSON.parse(JSON.stringify(m));
-        if (!state.editingManual.steps || !state.editingManual.steps.length) state.editingManual.steps = [''];
+        var draft = JSON.parse(JSON.stringify(m));
+        if (!draft.steps || !draft.steps.length) draft.steps = [''];
+        if (!draft.supply_ids) draft.supply_ids = [];
+        draft.quiz_questions = [];
+        state.editingManual = draft;
         render();
+        sb.from('manual_quiz_questions').select('*').eq('manual_id', m.id).order('sort_order', {ascending:true}).then(function(res){
+          if (res.error || state.editingManual !== draft) return;
+          draft.quiz_questions = (res.data || []).map(function(q){
+            return { type: q.type, question: q.question, options: q.options || [], answer_index: q.answer_index };
+          });
+          render();
+        });
       });
     });
     body.querySelectorAll('[data-del]').forEach(function(el){
@@ -783,6 +1134,25 @@
         });
       });
     });
+  }
+
+  function supplyPickHtml(draft){
+    var itemsHtml = state.supplies.map(function(s){
+      var on = (draft.supply_ids||[]).indexOf(s.id) !== -1;
+      return (
+        '<div class="supply-pick-item' + (on ? ' selected' : '') + '" data-supply-pick="' + esc(s.id) + '">' +
+          '<span class="rm" data-supply-pick-del="' + esc(s.id) + '">&times;</span>' +
+          '<img src="' + esc(s.photo_url) + '" alt="">' +
+          '<div class="n">' + esc(s.name) + '</div>' +
+        '</div>'
+      );
+    }).join('');
+    var addHtml =
+      '<label class="supply-pick-item supply-pick-add">' +
+        '<div class="plus">+</div><div class="n">새 비품 추가</div>' +
+        '<input type="file" accept="image/*" id="fNewSupplyInline" style="display:none">' +
+      '</label>';
+    return itemsHtml + addHtml;
   }
 
   function renderManualForm(body, draft){
@@ -808,6 +1178,39 @@
       return '<div class="photo-item"><img src="' + esc(p.url) + '"><span class="rm" data-photo-del="' + i + '">&times;</span></div>';
     }).join('');
 
+    var quizHtml = (draft.quiz_questions||[]).map(function(q, i){
+      var body2;
+      if (q.type === 'mc'){
+        var optsHtml = (q.options||[]).map(function(opt, j){
+          return (
+            '<div style="display:flex; gap:6px; align-items:center; margin-bottom:5px;">' +
+              '<input type="radio" name="quiz-answer-' + i + '" data-quiz-mc-answer="' + i + ':' + j + '"' + (q.answer_index === j ? ' checked' : '') + '>' +
+              '<input type="text" data-quiz-mc-text="' + i + ':' + j + '" value="' + esc(opt) + '" placeholder="보기 ' + (j+1) + '" style="flex:1; padding:7px 9px; border-radius:6px; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink);">' +
+              '<button class="mini-btn" data-quiz-mc-del="' + i + ':' + j + '">삭제</button>' +
+            '</div>'
+          );
+        }).join('');
+        body2 = '<div>' + optsHtml + '<button class="mini-btn" data-quiz-mc-add="' + i + '">+ 보기 추가</button></div>';
+      } else {
+        body2 = (
+          '<div style="display:flex; gap:8px;">' +
+            '<button class="mini-btn' + (q.answer_index === 0 ? ' active' : '') + '" data-quiz-ox="' + i + ':0'+ '">정답: O</button>' +
+            '<button class="mini-btn' + (q.answer_index === 1 ? ' active' : '') + '" data-quiz-ox="' + i + ':1' + '">정답: X</button>' +
+          '</div>'
+        );
+      }
+      return (
+        '<div class="quiz-q-edit">' +
+          '<div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">' +
+            '<select data-quiz-type="' + i + '"><option value="ox"' + (q.type !== 'mc' ? ' selected' : '') + '>O/X</option><option value="mc"' + (q.type === 'mc' ? ' selected' : '') + '>객관식</option></select>' +
+            '<button class="mini-btn" data-quiz-del="' + i + '" style="margin-left:auto;">문제 삭제</button>' +
+          '</div>' +
+          '<textarea rows="2" data-quiz-question="' + i + '" placeholder="문제 내용" style="margin-bottom:8px;">' + esc(q.question) + '</textarea>' +
+          body2 +
+        '</div>'
+      );
+    }).join('');
+
     body.innerHTML =
       '<div class="form-card">' +
         '<div class="field"><label>제목</label><input type="text" id="fTitle" value="' + esc(draft.title) + '" placeholder="예: 컵홀더 접는 방법"></div>' +
@@ -818,11 +1221,28 @@
           '<div class="photo-grid" id="photoGrid">' + photosHtml + '</div>' +
           '<label class="upload-btn">사진 추가하기<input type="file" id="fPhotoInput" accept="image/*" multiple style="display:none"></label>' +
           '<div class="hint" id="uploadHint"></div>' +
+          (state.supplies.length ? (
+            '<div class="hint" style="margin-top:10px; margin-bottom:6px;">포장 비품에서 가져오기 (클릭하면 바로 추가돼요)</div>' +
+            '<div class="supply-pick-grid">' + state.supplies.map(function(s){
+              return '<div class="supply-pick-item" data-photo-from-supply="' + esc(s.id) + '"><img src="' + esc(s.photo_url) + '" alt=""><div class="n">' + esc(s.name) + '</div></div>';
+            }).join('') + '</div>'
+          ) : '') +
         '</div>' +
         '<div class="field"><label>유튜브 링크 (비공개 링크 가능)</label><input type="url" id="fYoutube" value="' + esc(draft.youtube_url||'') + '" placeholder="https://youtu.be/..."></div>' +
         '<div class="field"><label>단계별 설명</label>' +
           '<div id="stepsList">' + stepsHtml + '</div>' +
           '<button class="mini-btn" id="btnAddStep">+ 단계 추가</button>' +
+        '</div>' +
+        '<div class="field"><label>포장 비품 (완성 사진 + 필요한 포장재를 함께 보여줘요)</label>' +
+          '<div class="supply-pick-grid" id="supplyPickGrid">' + supplyPickHtml(draft) + '</div>' +
+          (state.supplies.length ? '' : '<div class="hint">등록된 비품 사진이 없어요. 관리자 화면 → 포장 비품에서 먼저 등록해주세요.</div>') +
+        '</div>' +
+        '<div class="field"><label>이해도 퀴즈 (선택)</label>' +
+          '<div id="quizList">' + quizHtml + '</div>' +
+          '<button class="mini-btn" id="btnAddQuiz">+ 문제 추가</button>' +
+          (draft.steps.filter(function(s){ return s.trim(); }).length ? '' : '<div class="hint">단계별 설명이 비어 있어요. 문제를 만들려면 먼저 단계 설명을 채워주세요.</div>') +
+          '<label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:12px;"><input type="checkbox" id="fQuizRequired"' + (draft.quiz_required ? ' checked' : '') + '> 통과해야 확인 인정</label>' +
+          '<div class="hint">켜면 퀴즈를 맞혀야 "확인했어요"가 눌려요. 끄면 참고용으로 풀고 확인은 그대로 됩니다.</div>' +
         '</div>' +
         '<div class="field"><label>태그 (쉼표로 구분)</label><input type="text" id="fTags" value="' + esc((draft.tags||[]).join(', ')) + '" placeholder="예: 포장, 컵홀더, 테이크아웃"></div>' +
         '<div class="form-actions">' +
@@ -837,6 +1257,126 @@
     document.getElementById('fYoutube').addEventListener('input', function(e){ draft.youtube_url = e.target.value; });
     document.getElementById('fRequired').addEventListener('change', function(e){ draft.is_required = e.target.checked; });
     document.getElementById('fTags').addEventListener('input', function(e){ draft.tags = e.target.value.split(',').map(function(t){ return t.trim(); }).filter(Boolean); });
+
+    body.querySelectorAll('[data-supply-pick]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-supply-pick');
+        if (!draft.supply_ids) draft.supply_ids = [];
+        var i = draft.supply_ids.indexOf(id);
+        if (i === -1) draft.supply_ids.push(id); else draft.supply_ids.splice(i, 1);
+        el.classList.toggle('selected');
+      });
+    });
+
+    body.querySelectorAll('[data-supply-pick-del]').forEach(function(el){
+      el.addEventListener('click', function(e){
+        e.stopPropagation();
+        var id = el.getAttribute('data-supply-pick-del');
+        var s = state.supplies.filter(function(x){ return x.id === id; })[0];
+        if (!confirm('"' + (s ? s.name : '') + '" 비품 사진을 완전히 삭제할까요?\n다른 매뉴얼에서 쓰고 있으면 거기서도 빠집니다.')) return;
+        sb.from('manual_supplies').delete().eq('id', id).then(function(res){
+          if (res.error){ toast('삭제 실패: ' + res.error.message); return; }
+          state.supplies = state.supplies.filter(function(x){ return x.id !== id; });
+          state.manuals.forEach(function(m){ m.supply_ids = (m.supply_ids||[]).filter(function(x){ return x !== id; }); });
+          if (draft.supply_ids) draft.supply_ids = draft.supply_ids.filter(function(x){ return x !== id; });
+          toast('삭제했어요.');
+          render();
+          if (s && s.photo_path) sb.storage.from(PHOTO_BUCKET).remove([s.photo_path]).catch(function(){});
+        });
+      });
+    });
+
+    var newSupplyInput = document.getElementById('fNewSupplyInline');
+    if (newSupplyInput) newSupplyInput.addEventListener('change', function(e){
+      var file = (e.target.files || [])[0];
+      if (!file) return;
+      var name = prompt('새 비품 이름을 입력하세요.', '');
+      if (name == null){ e.target.value = ''; return; }
+      name = name.trim();
+      if (!name){ e.target.value = ''; return; }
+      var path = 'supplies/' + uid() + '-' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+      sb.storage.from(PHOTO_BUCKET).upload(path, file).then(function(res){
+        if (res.error) throw res.error;
+        var pub = sb.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+        var sortOrder = state.supplies.length ? Math.max.apply(null, state.supplies.map(function(s){ return s.sort_order; })) + 1 : 0;
+        return sb.from('manual_supplies').insert({ name: name, photo_path: path, photo_url: pub.data.publicUrl, sort_order: sortOrder }).select();
+      }).then(function(res){
+        if (res.error) throw res.error;
+        var created = res.data[0];
+        state.supplies.push(created);
+        if (!draft.supply_ids) draft.supply_ids = [];
+        draft.supply_ids.push(created.id);
+        toast('비품을 추가하고 선택했어요.');
+        render();
+      }).catch(function(err){
+        toast('추가 실패: ' + (err.message || err));
+      });
+    });
+
+    var fQuizRequired = document.getElementById('fQuizRequired');
+    if (fQuizRequired) fQuizRequired.addEventListener('change', function(e){ draft.quiz_required = e.target.checked; });
+
+    var btnAddQuiz = document.getElementById('btnAddQuiz');
+    if (btnAddQuiz) btnAddQuiz.addEventListener('click', function(){
+      if (!draft.quiz_questions) draft.quiz_questions = [];
+      draft.quiz_questions.push({ type: 'ox', question: '', options: [], answer_index: 0 });
+      render();
+    });
+
+    body.querySelectorAll('[data-quiz-del]').forEach(function(el){
+      el.addEventListener('click', function(){
+        draft.quiz_questions.splice(+el.getAttribute('data-quiz-del'), 1);
+        render();
+      });
+    });
+    body.querySelectorAll('[data-quiz-type]').forEach(function(el){
+      el.addEventListener('change', function(){
+        var q = draft.quiz_questions[+el.getAttribute('data-quiz-type')];
+        q.type = el.value;
+        q.answer_index = 0;
+        if (q.type === 'mc' && !q.options.length) q.options = ['', ''];
+        render();
+      });
+    });
+    body.querySelectorAll('[data-quiz-question]').forEach(function(el){
+      el.addEventListener('input', function(){
+        draft.quiz_questions[+el.getAttribute('data-quiz-question')].question = el.value;
+      });
+    });
+    body.querySelectorAll('[data-quiz-ox]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var parts = el.getAttribute('data-quiz-ox').split(':');
+        draft.quiz_questions[+parts[0]].answer_index = +parts[1];
+        render();
+      });
+    });
+    body.querySelectorAll('[data-quiz-mc-answer]').forEach(function(el){
+      el.addEventListener('change', function(){
+        var parts = el.getAttribute('data-quiz-mc-answer').split(':');
+        draft.quiz_questions[+parts[0]].answer_index = +parts[1];
+      });
+    });
+    body.querySelectorAll('[data-quiz-mc-text]').forEach(function(el){
+      el.addEventListener('input', function(){
+        var parts = el.getAttribute('data-quiz-mc-text').split(':');
+        draft.quiz_questions[+parts[0]].options[+parts[1]] = el.value;
+      });
+    });
+    body.querySelectorAll('[data-quiz-mc-del]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var parts = el.getAttribute('data-quiz-mc-del').split(':');
+        var q = draft.quiz_questions[+parts[0]];
+        q.options.splice(+parts[1], 1);
+        if (q.answer_index >= q.options.length) q.answer_index = 0;
+        render();
+      });
+    });
+    body.querySelectorAll('[data-quiz-mc-add]').forEach(function(el){
+      el.addEventListener('click', function(){
+        draft.quiz_questions[+el.getAttribute('data-quiz-mc-add')].options.push('');
+        render();
+      });
+    });
 
     body.querySelectorAll('[data-step-input]').forEach(function(el){
       el.addEventListener('input', function(){
@@ -879,6 +1419,17 @@
       });
     });
 
+    body.querySelectorAll('[data-photo-from-supply]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-photo-from-supply');
+        var s = state.supplies.filter(function(x){ return x.id === id; })[0];
+        if (!s) return;
+        draft.photos.push({ path: null, url: s.photo_url });
+        toast('사진을 추가했어요.');
+        render();
+      });
+    });
+
     document.getElementById('fPhotoInput').addEventListener('change', function(e){
       var files = Array.prototype.slice.call(e.target.files || []);
       if (!files.length) return;
@@ -915,26 +1466,50 @@
         tags: draft.tags || [],
         youtube_url: (draft.youtube_url||'').trim(),
         is_required: !!draft.is_required,
+        supply_ids: draft.supply_ids || [],
         photos: draft.photos || [],
         steps: (draft.steps||[]).map(function(s){ return s.trim(); }).filter(Boolean),
+        quiz_required: !!draft.quiz_required,
         updated_at: new Date().toISOString()
       };
+      var cleanQuestions = (draft.quiz_questions||[])
+        .map(function(q){
+          return {
+            type: q.type === 'mc' ? 'mc' : 'ox',
+            question: (q.question||'').trim(),
+            options: q.type === 'mc' ? (q.options||[]).map(function(o){ return o.trim(); }).filter(Boolean) : [],
+            answer_index: q.answer_index || 0
+          };
+        })
+        .filter(function(q){ return q.question && (q.type === 'ox' || q.options.length >= 2); });
+
       var btn = document.getElementById('btnSaveManual');
       btn.disabled = true;
       var req = draft.id
         ? sb.from('manuals').update(payload).eq('id', draft.id).select()
         : sb.from('manuals').insert(payload).select();
       req.then(function(res){
-        if (res.error){ toast('저장 실패: ' + res.error.message); btn.disabled = false; return; }
+        if (res.error) throw res.error;
         var saved = res.data[0];
         if (draft.id){
           state.manuals = state.manuals.map(function(m){ return m.id === saved.id ? saved : m; });
         } else {
           state.manuals.unshift(saved);
         }
+        return sb.from('manual_quiz_questions').delete().eq('manual_id', saved.id).then(function(){
+          if (!cleanQuestions.length) return;
+          return sb.from('manual_quiz_questions').insert(cleanQuestions.map(function(q, i){
+            return Object.assign({}, q, { manual_id: saved.id, sort_order: i });
+          }));
+        });
+      }).then(function(){
         state.editingManual = null;
         toast('저장했어요.');
         render();
+        refreshLateCount();
+      }).catch(function(err){
+        toast('저장 실패: ' + (err.message || err));
+        btn.disabled = false;
       });
     });
   }
@@ -1007,6 +1582,152 @@
     });
   }
 
+  // --- 포장 비품 관리 (재사용 가능한 비품 사진 라이브러리) ---
+  function renderAdminSupplies(body){
+    var itemsHtml = state.supplies.map(function(s, i){
+      return (
+        '<div class="supply-lib-item">' +
+          '<img src="' + esc(s.photo_url) + '" alt="">' +
+          '<div class="n">' + esc(s.name) + '</div>' +
+          '<div style="display:flex; gap:4px; margin-bottom:4px;">' +
+            '<button class="mini-btn" data-supply-up="' + esc(s.id) + '"' + (i === 0 ? ' disabled' : '') + ' style="flex:1;">위로</button>' +
+            '<button class="mini-btn" data-supply-down="' + esc(s.id) + '"' + (i === state.supplies.length-1 ? ' disabled' : '') + ' style="flex:1;">아래로</button>' +
+          '</div>' +
+          '<label class="icon-btn" style="display:block; text-align:center; margin-bottom:4px; cursor:pointer;">사진 변경' +
+            '<input type="file" accept="image/*" data-supply-photo-change="' + esc(s.id) + '" style="display:none">' +
+          '</label>' +
+          '<div style="display:flex; gap:4px;">' +
+            '<button class="icon-btn" data-supply-rename="' + esc(s.id) + '" style="flex:1;">수정</button>' +
+            '<button class="icon-btn danger" data-supply-del="' + esc(s.id) + '" style="flex:1;">삭제</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join('') || '<div class="empty">등록된 비품 사진이 없어요.</div>';
+
+    body.innerHTML =
+      '<div class="section-head"><h3>포장 비품 (' + state.supplies.length + ')</h3></div>' +
+      '<div class="hint" style="margin-bottom:12px;">여기에 자주 쓰는 포장재·용기 사진을 등록해두면, 매뉴얼 편집 화면에서 골라서 붙일 수 있어요.</div>' +
+      '<div class="form-card">' +
+        '<div class="field"><label>비품 이름</label><input type="text" id="newSupplyName" placeholder="예: 크라프트 박스(대)"></div>' +
+        '<div class="field"><label>사진</label>' +
+          '<label class="upload-btn">사진 선택하기<input type="file" id="newSupplyPhoto" accept="image/*" style="display:none"></label>' +
+          '<div class="hint" id="supplyUploadHint"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="supply-lib-grid">' + itemsHtml + '</div>';
+
+    document.getElementById('newSupplyPhoto').addEventListener('change', function(e){
+      var file = (e.target.files || [])[0];
+      if (!file) return;
+      var nameInput = document.getElementById('newSupplyName');
+      var name = nameInput.value.trim();
+      if (!name){ toast('비품 이름을 먼저 입력해주세요.'); e.target.value = ''; return; }
+      var hint = document.getElementById('supplyUploadHint');
+      hint.textContent = '업로드 중…';
+      var path = 'supplies/' + uid() + '-' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+      sb.storage.from(PHOTO_BUCKET).upload(path, file).then(function(res){
+        if (res.error) throw res.error;
+        var pub = sb.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+        var sortOrder = state.supplies.length ? Math.max.apply(null, state.supplies.map(function(s){ return s.sort_order; })) + 1 : 0;
+        return sb.from('manual_supplies').insert({ name: name, photo_path: path, photo_url: pub.data.publicUrl, sort_order: sortOrder }).select();
+      }).then(function(res){
+        if (res.error) throw res.error;
+        state.supplies.push(res.data[0]);
+        toast('비품을 추가했어요.');
+        render();
+      }).catch(function(err){
+        toast('추가 실패: ' + (err.message || err));
+        hint.textContent = '';
+      });
+    });
+
+    body.querySelectorAll('[data-supply-photo-change]').forEach(function(el){
+      el.addEventListener('change', function(e){
+        var file = (e.target.files || [])[0];
+        if (!file) return;
+        var id = el.getAttribute('data-supply-photo-change');
+        var s = state.supplies.filter(function(x){ return x.id === id; })[0];
+        var oldPath = s.photo_path;
+        var path = 'supplies/' + uid() + '-' + file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+        sb.storage.from(PHOTO_BUCKET).upload(path, file).then(function(res){
+          if (res.error) throw res.error;
+          var pub = sb.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+          return sb.from('manual_supplies').update({ photo_path: path, photo_url: pub.data.publicUrl }).eq('id', id).select();
+        }).then(function(res){
+          if (res.error) throw res.error;
+          s.photo_path = res.data[0].photo_path;
+          s.photo_url = res.data[0].photo_url;
+          toast('사진을 바꿨어요.');
+          render();
+          if (oldPath) sb.storage.from(PHOTO_BUCKET).remove([oldPath]).catch(function(){});
+        }).catch(function(err){
+          toast('변경 실패: ' + (err.message || err));
+        });
+      });
+    });
+
+    function swapSupplyOrder(i, j){
+      var arr = state.supplies;
+      var tmp = arr[i].sort_order;
+      arr[i].sort_order = arr[j].sort_order;
+      arr[j].sort_order = tmp;
+      var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+      render();
+      Promise.all([
+        sb.from('manual_supplies').update({ sort_order: arr[i].sort_order }).eq('id', arr[i].id),
+        sb.from('manual_supplies').update({ sort_order: arr[j].sort_order }).eq('id', arr[j].id)
+      ]).catch(function(){ toast('순서 저장 실패'); });
+    }
+    body.querySelectorAll('[data-supply-up]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-supply-up');
+        var i = state.supplies.findIndex(function(s){ return s.id === id; });
+        if (i > 0) swapSupplyOrder(i, i-1);
+      });
+    });
+    body.querySelectorAll('[data-supply-down]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-supply-down');
+        var i = state.supplies.findIndex(function(s){ return s.id === id; });
+        if (i !== -1 && i < state.supplies.length-1) swapSupplyOrder(i, i+1);
+      });
+    });
+
+    body.querySelectorAll('[data-supply-rename]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-supply-rename');
+        var s = state.supplies.filter(function(x){ return x.id === id; })[0];
+        var name = prompt('새 이름을 입력하세요.', s.name);
+        if (name == null) return;
+        name = name.trim();
+        if (!name) return;
+        sb.from('manual_supplies').update({ name: name }).eq('id', id).then(function(res){
+          if (res.error){ toast('변경 실패: ' + res.error.message); return; }
+          s.name = name;
+          toast('이름을 변경했어요.');
+          render();
+        });
+      });
+    });
+
+    body.querySelectorAll('[data-supply-del]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-supply-del');
+        var used = state.manuals.some(function(m){ return (m.supply_ids||[]).indexOf(id) !== -1; });
+        if (used && !confirm('이 비품을 쓰는 매뉴얼이 있어요. 삭제하면 해당 매뉴얼에서도 빠집니다. 계속할까요?')) return;
+        var s = state.supplies.filter(function(x){ return x.id === id; })[0];
+        sb.from('manual_supplies').delete().eq('id', id).then(function(res){
+          if (res.error){ toast('삭제 실패: ' + res.error.message); return; }
+          state.supplies = state.supplies.filter(function(x){ return x.id !== id; });
+          state.manuals.forEach(function(m){ m.supply_ids = (m.supply_ids||[]).filter(function(x){ return x !== id; }); });
+          toast('삭제했어요.');
+          render();
+          if (s && s.photo_path) sb.storage.from(PHOTO_BUCKET).remove([s.photo_path]).catch(function(){});
+        });
+      });
+    });
+  }
+
   // --- 매장 관리 ---
   function renderAdminBranches(body){
     var rows = state.branches.map(function(b){
@@ -1026,7 +1747,7 @@
       '<div class="hint" style="margin-bottom:12px;">여기서 매장을 등록해두면 "직원 명단"에서 직원마다 소속 매장을 지정할 수 있어요.</div>' +
       '<div class="form-card">' +
         '<div class="field"><label>새 매장 이름</label>' +
-          '<div style="display:flex; gap:8px;"><input type="text" id="newBranchName" placeholder="예: 성수점" style="flex:1;"><button class="btn" id="btnAddBranch">추가</button></div>' +
+          '<div style="display:flex; gap:8px;"><input type="text" id="newBranchName" placeholder="예: 5호점" style="flex:1;"><button class="btn" id="btnAddBranch">추가</button></div>' +
         '</div>' +
       '</div>' +
       rows;
@@ -1102,7 +1823,7 @@
         }).join('');
         return (
           '<div class="list-row">' +
-            '<div class="info"><div class="t">' + esc(s.name) + '</div><div class="s">' + esc(fmtDate(s.created_at).slice(0, 10)) + ' 등록 · ' + daysSince(s.created_at) + '일째</div></div>' +
+            '<div class="info"><div class="t">' + esc(s.name) + '</div><div class="s">' + esc(fmtDate(hireDate(s)).slice(0, 10)) + ' 입사 · ' + daysSince(hireDate(s)) + '일째</div></div>' +
             '<div class="row-actions">' +
               '<select class="icon-btn" data-staff-branch="' + esc(s.id) + '">' + staffBranchOptions + '</select>' +
               '<button class="icon-btn danger" data-staff-del="' + esc(s.id) + '">삭제</button>' +
@@ -1194,7 +1915,7 @@
       result.innerHTML = '<div class="empty">아직 "신입 필수"로 지정된 매뉴얼이 없어요.<br>매뉴얼 관리 → 수정에서 "신입 필수 매뉴얼"을 체크해주세요.</div>';
       return;
     }
-    var staffList = state.staff.filter(function(s){ return !state.progressBranchId || s.branch_id === state.progressBranchId; });
+    var staffList = state.staff.filter(function(s){ return s.active !== false && (!state.progressBranchId || s.branch_id === state.progressBranchId); });
     if (!staffList.length){
       result.innerHTML = '<div class="empty">이 매장에 등록된 직원이 없어요.</div>';
       return;
@@ -1217,7 +1938,7 @@
         var doneCount = required.length - remaining.length;
         var last = null;
         Object.keys(done).forEach(function(k){ if (!last || done[k] > last) last = done[k]; });
-        var days = daysSince(s.created_at);
+        var days = daysSince(hireDate(s));
         return { staff: s, remaining: remaining, doneCount: doneCount, last: last, days: days, late: remaining.length > 0 && days > 7 };
       });
       cards.sort(function(a, b){
@@ -1327,12 +2048,7 @@
 
   loadAll();
 
-  if ('serviceWorker' in navigator){
-    window.addEventListener('load', function(){
-      navigator.serviceWorker.register('sw.js').catch(function(){});
-    });
-  }
-})();
+  })();
 </script>
 </body>
 </html>
