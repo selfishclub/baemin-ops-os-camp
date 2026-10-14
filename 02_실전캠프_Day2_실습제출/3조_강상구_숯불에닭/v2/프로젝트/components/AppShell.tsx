@@ -69,58 +69,82 @@ export default function AppShell({ children }: { children: ReactNode }) {
     setMonthState(m);
   };
 
+  const monthPicker = month && (
+    <div className="flex shrink-0 items-center gap-0.5 rounded-full border border-stone-200 bg-white px-1 py-0.5">
+      <button aria-label="이전 달" className="rounded-full px-2 py-1 text-xs hover:bg-stone-100" onClick={() => setMonth(prevMonth(month))}>
+        ◀
+      </button>
+      <span className="num min-w-[5.5rem] whitespace-nowrap text-center text-sm font-bold">{monthLabel(month)}</span>
+      <button aria-label="다음 달" className="rounded-full px-2 py-1 text-xs hover:bg-stone-100" onClick={() => setMonth(nextMonth(month))}>
+        ▶
+      </button>
+    </div>
+  );
+
   return (
-    <div className="mx-auto flex min-h-screen max-w-3xl flex-col">
-      <div
-        role="status"
-        className={`px-4 py-1.5 text-center text-xs font-semibold ${
-          mode === "local" ? "bg-emerald-600 text-white" : "bg-amber-400 text-amber-950"
-        }`}
-      >
-        {mode === "local"
-          ? "내 PC 모드 — 데이터가 이 컴퓨터에만 저장돼요"
-          : "시연 모드 — 가짜 데이터만 넣으세요. 누구나 볼 수 있어요"}
-      </div>
-
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-stone-100/95 px-4 py-3 backdrop-blur">
-        <h1 className="min-w-0 truncate text-sm font-bold sm:text-base">🔥 {title}</h1>
-        {month && (
-          <div className="flex shrink-0 items-center gap-1">
-            <button aria-label="이전 달" className="btn-ghost px-2.5 py-1.5" onClick={() => setMonth(prevMonth(month))}>
-              ◀
-            </button>
-            <span className="num min-w-[5.5rem] whitespace-nowrap text-center text-sm font-bold">{monthLabel(month)}</span>
-            <button aria-label="다음 달" className="btn-ghost px-2.5 py-1.5" onClick={() => setMonth(nextMonth(month))}>
-              ▶
-            </button>
-          </div>
-        )}
-      </header>
-
-      <main className="flex-1 space-y-4 px-4 pb-28">
-        {month ? <MonthContext.Provider value={{ month, setMonth }}>{children}</MonthContext.Provider> : null}
-      </main>
-
-      <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-stone-200 bg-white">
-        <ul className="mx-auto grid max-w-3xl grid-cols-6">
+    <div className="min-h-screen md:flex">
+      {/* PC: 왼쪽 사이드바 메뉴 (김씨육면 손익관리의 사이드 메뉴 구성을 가져옴) */}
+      <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:flex md:w-56 md:flex-col md:gap-5 md:bg-stone-900 md:px-3 md:py-5">
+        <h1 className="flex min-w-0 items-center gap-2 px-2 text-base font-bold text-white">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-600 text-lg">🔥</span>
+          <span className="truncate">{title}</span>
+        </h1>
+        <nav className="flex flex-col gap-1" aria-label="메뉴">
+          <div className="px-3 pb-1 text-[11px] font-bold tracking-wider text-stone-500">메뉴</div>
           {TABS.map((t) => {
             const active = pathname === t.href;
             return (
-              <li key={t.href}>
-                <Link
-                  href={t.href}
-                  className={`flex flex-col items-center gap-0.5 py-2 text-xs font-semibold ${
-                    active ? "text-orange-600" : "text-stone-500"
-                  }`}
-                >
-                  <span className="text-lg leading-none">{t.icon}</span>
-                  {t.label}
-                </Link>
-              </li>
+              <Link key={t.href} href={t.href} className={`side-nav ${active ? "side-nav-active" : ""}`} aria-current={active ? "page" : undefined}>
+                <span className="w-5 text-center text-base leading-none">{t.icon}</span>
+                {t.label}
+              </Link>
             );
           })}
-        </ul>
-      </nav>
+        </nav>
+        <div className="mt-auto px-2 text-[11px] leading-relaxed text-stone-500">
+          {mode === "local" ? "내 PC 모드 — 데이터가 이 컴퓨터에만 저장돼요" : "시연 모드 — 가짜 데이터만 넣으세요"}
+        </div>
+      </aside>
+
+      <div className="flex min-h-screen flex-1 flex-col md:pl-56">
+        <div
+          role="status"
+          className={`px-4 py-1.5 text-center text-xs font-semibold ${
+            mode === "local" ? "bg-emerald-600 text-white" : "bg-amber-400 text-amber-950"
+          }`}
+        >
+          {mode === "local"
+            ? "내 PC 모드 — 데이터가 이 컴퓨터에만 저장돼요"
+            : "시연 모드 — 가짜 데이터만 넣으세요. 누구나 볼 수 있어요"}
+        </div>
+
+        {/* 위 헤더: 폰에서는 로고·가게 이름 + 월 선택 + 가로 탭, PC에서는 지금 탭 이름 + 월 선택만 (메뉴는 왼쪽) */}
+        <header className="sticky top-0 z-10 border-b border-stone-200 bg-stone-100/85 px-4 pb-2 pt-3 backdrop-blur-md md:pb-3">
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="flex min-w-0 items-center gap-2 text-sm font-bold md:hidden">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-600 text-base">🔥</span>
+              <span className="truncate">{title}</span>
+            </h1>
+            <span className="hidden text-sm font-bold text-stone-700 md:block">{TABS.find((t) => t.href === pathname)?.label ?? ""}</span>
+            {monthPicker}
+          </div>
+          <nav className="tabs mt-2 md:hidden" aria-label="메뉴">
+            {TABS.map((t) => {
+              const active = pathname === t.href;
+              return (
+                <Link key={t.href} href={t.href} className={`tab ${active ? "tab-active" : ""}`} aria-current={active ? "page" : undefined}>
+                  <span className="mr-1">{t.icon}</span>
+                  {t.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </header>
+
+        <main className="mx-auto w-full max-w-3xl flex-1 space-y-4 px-4 pb-10 pt-4">
+          {month ? <MonthContext.Provider value={{ month, setMonth }}>{children}</MonthContext.Provider> : null}
+        </main>
+      </div>
     </div>
   );
 }

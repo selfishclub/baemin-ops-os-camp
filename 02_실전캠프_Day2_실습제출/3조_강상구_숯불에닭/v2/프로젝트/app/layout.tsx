@@ -16,6 +16,14 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1, them
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
+      <head>
+        {/* 글꼴: 본문 Pretendard, 숫자 IBM Plex Mono (김씨육면 손익관리와 같은 조합). 인터넷이 없으면 기본 글꼴로 보인다 */}
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+        />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" />
+      </head>
       <body>
         <AppShell>{children}</AppShell>
       </body>

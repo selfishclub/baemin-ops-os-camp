@@ -4,7 +4,8 @@
 
 body {
   @apply bg-stone-100 text-stone-900;
-  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  /* 본문 Pretendard, 숫자 IBM Plex Mono (김씨육면 손익관리와 같은 조합). 글꼴 파일은 app/layout.tsx 에서 불러온다 */
+  font-family: "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 }
 
 .card {
@@ -23,5 +24,30 @@ body {
   @apply w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200;
 }
 .num {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* 왼쪽 사이드바 메뉴 (PC). 김씨육면 손익관리의 사이드 메뉴 구성: 어두운 바탕, 아이콘 + 이름, 고른 메뉴는 포인트색 */
+.side-nav {
+  @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-stone-400 transition hover:bg-stone-800 hover:text-white;
+}
+.side-nav-active {
+  @apply bg-orange-600 text-white shadow-lg shadow-orange-900/40 hover:bg-orange-600;
+}
+
+/* 폰에서는 사이드바 대신 헤더 아래 가로 탭 (알약 모양, 옆으로 밀어서 본다) */
+.tabs {
+  @apply flex items-center gap-1 overflow-x-auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  @apply shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold text-stone-600 transition hover:bg-white;
+}
+.tab-active {
+  @apply bg-orange-100 text-orange-700;
 }
