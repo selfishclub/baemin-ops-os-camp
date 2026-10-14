@@ -5702,7 +5702,7 @@ const App = (() => {
   /* 기기 수첩 — 이 기기가 손댄 할 일 기록(완료·되돌림·건너뜀·메모)을 48시간 동안 이 기기에 적어 둔다.
      서버에서 받은 기록에서 그 체크가 풀려 있고, 그 뒤에 누가 일부러 바꾼 흔적(u 가 더 나중)이 없으면 되살려 다시 저장한다.
      "오전에 체크한 게 다 풀림"(안산점 신고 2026-10-10)이 어떤 경로로든 다시 생겨도 이 기기 체크는 살아남게 하는 안전장치. */
-  const JOURNAL_MAX = 300, JOURNAL_MS = 48 * 3600 * 1000;
+  const JOURNAL_MAX = 800, JOURNAL_MS = 7 * 24 * 3600 * 1000;   // 2026-10-13: 48시간 → 7일. 지난 날짜 체크가 뒤늦게 풀려도 이 기기에서 한 것은 되살린다
   const jKey = () => 'hm.journal:' + ((Store.meta && Store.meta.current) || 'x');
   const jRead = () => { try { return JSON.parse(localStorage.getItem(jKey()) || '[]'); } catch (_) { return []; } };
   const jWrite = (list) => { try { localStorage.setItem(jKey(), JSON.stringify(list.slice(-JOURNAL_MAX))); } catch (_) { /* 무시 */ } };
