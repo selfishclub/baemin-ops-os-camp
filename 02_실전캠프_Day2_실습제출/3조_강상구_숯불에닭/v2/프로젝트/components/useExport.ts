@@ -15,6 +15,27 @@ export interface ExportState {
   reload: () => Promise<void>;
 }
 
+export const EXPORT_UPDATED_EVENT = "ledger-export-updated";
+
+/** 내보내기 파일을 설정 칸에 저장한다. 올리기 카드와 도우미 자동 갱신이 같이 쓴다 */
+export async function applyExport(e: LedgerExport): Promise<ExportMeta> {
+  const store = getStore();
+  const meta: ExportMeta = {
+    exportedAt: e.exportedAt,
+    uploadedAt: new Date().toISOString(),
+    reviews: e.reviews.length,
+    rankPoints: e.rank?.history.length ?? 0,
+    settlements: e.baemin?.settlements.length ?? 0,
+  };
+  await store.saveSetting(EXPORT_REVIEWS_KEY, e.reviews);
+  // 순위·배민·상권은 파일에 없으면 전에 올린 것을 지우지 않는다 (리뷰만 다시 내보낸 경우)
+  if (e.rank) await store.saveSetting(EXPORT_RANK_KEY, e.rank);
+  if (e.baemin) await store.saveSetting(EXPORT_BAEMIN_KEY, e.baemin);
+  if (e.market) await store.saveSetting(EXPORT_MARKET_KEY, e.market);
+  await store.saveSetting(EXPORT_META_KEY, meta);
+  return meta;
+}
+
 // 리뷰 수집기 내보내기 파일(리뷰·순위·배민 정산)을 설정 칸에서 읽고 쓴다. 리뷰·상권·정산 탭이 같이 쓴다.
 export function useExport(): ExportState {
   const [state, setState] = useState<Pick<ExportState, "loaded" | "meta" | "reviews" | "rank" | "baemin" | "market">>({ loaded: false, meta: null, reviews: [], rank: null, baemin: null, market: null });
@@ -33,24 +54,14 @@ export function useExport(): ExportState {
 
   useEffect(() => {
     void reload();
+    // 도우미가 새 파일을 자동으로 넣으면 다시 읽는다
+    window.addEventListener(EXPORT_UPDATED_EVENT, reload);
+    return () => window.removeEventListener(EXPORT_UPDATED_EVENT, reload);
   }, [reload]);
 
   const save = useCallback(
     async (e: LedgerExport) => {
-      const store = getStore();
-      const meta: ExportMeta = {
-        exportedAt: e.exportedAt,
-        uploadedAt: new Date().toISOString(),
-        reviews: e.reviews.length,
-        rankPoints: e.rank?.history.length ?? 0,
-        settlements: e.baemin?.settlements.length ?? 0,
-      };
-      await store.saveSetting(EXPORT_REVIEWS_KEY, e.reviews);
-      // 순위·배민은 파일에 없으면 전에 올린 것을 지우지 않는다 (리뷰만 다시 내보낸 경우)
-      if (e.rank) await store.saveSetting(EXPORT_RANK_KEY, e.rank);
-      if (e.baemin) await store.saveSetting(EXPORT_BAEMIN_KEY, e.baemin);
-      if (e.market) await store.saveSetting(EXPORT_MARKET_KEY, e.market);
-      await store.saveSetting(EXPORT_META_KEY, meta);
+      const meta = await applyExport(e);
       await reload();
       return meta;
     },

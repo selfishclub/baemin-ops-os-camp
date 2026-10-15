@@ -76,6 +76,7 @@ export function ExportUploadCard({ exp, what }: { exp: ExportState; what: string
             <code>npm run export:ledger</code> → <code>data/ledger-export.json</code> 이 생깁니다
           </li>
           <li>그 파일을 위 버튼으로 올립니다. 닉네임은 가려져 있고, 파일은 어디에도 보내지 않아요.</li>
+          <li>리뷰 도우미(<code>npm run helper</code>)가 켜져 있으면 이 단계는 자동이에요 — 장부를 열 때 새 파일이 있으면 알아서 받아 넣고 위에 초록 띠로 알려요.</li>
         </ol>
       )}
     </section>
