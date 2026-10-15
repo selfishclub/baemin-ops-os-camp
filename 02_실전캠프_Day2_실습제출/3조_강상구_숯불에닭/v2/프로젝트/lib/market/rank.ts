@@ -93,3 +93,42 @@ export function nextSeasonKeyword(pk: PlaceKeywords, today: string): { month: nu
   const kw = (pk.season[String(next)] ?? "").trim();
   return kw ? { month: next, keyword: kw } : null;
 }
+
+// ── 키워드별 순위 변화 표 (날짜 × 키워드) ──────────────────────────────
+export interface RankGridCell {
+  rank: number | null; // null = 50위 밖
+  unread: boolean; // 그날 못 읽음
+  delta: number | null; // 직전에 읽은 날 대비 (양수 = 올라감)
+}
+export interface RankGrid {
+  dates: string[]; // 오래된 날부터
+  keywords: string[];
+  cells: Record<string, Record<string, RankGridCell>>; // cells[keyword][date]
+}
+
+/** 최근 days 일의 날짜 × 키워드 순위 표. 직전에 읽은 날과 비교해 오르내림을 붙인다 */
+export function rankGrid(history: RankPoint[], keywords: string[], days = 14, today?: string): RankGrid {
+  const allDates = [...new Set(history.map((h) => h.date))].sort();
+  const end = today ?? allDates[allDates.length - 1];
+  const dates = end ? Array.from({ length: days }, (_, i) => shiftDate(end, i - days + 1)) : [];
+  const cells: RankGrid["cells"] = {};
+  for (const k of keywords) {
+    cells[k] = {};
+    const mine = history.filter((h) => h.keyword === k).sort((a, b) => a.date.localeCompare(b.date));
+    let prevRank: number | null | undefined; // undefined = 아직 읽은 날 없음
+    for (const p of mine) {
+      if (!dates.includes(p.date)) {
+        if (!p.note) prevRank = p.rank; // 표 밖(더 오래된) 날도 비교 기준으로 쓴다
+        continue;
+      }
+      if (p.note) {
+        cells[k][p.date] = { rank: null, unread: true, delta: null };
+        continue;
+      }
+      const delta = prevRank === undefined || prevRank === null || p.rank === null ? null : prevRank - p.rank;
+      cells[k][p.date] = { rank: p.rank, unread: false, delta };
+      prevRank = p.rank;
+    }
+  }
+  return { dates, keywords, cells };
+}

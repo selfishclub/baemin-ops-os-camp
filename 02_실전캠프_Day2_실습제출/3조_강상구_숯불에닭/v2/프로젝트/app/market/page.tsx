@@ -9,7 +9,7 @@ import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
 import { todayStr } from "@/lib/daily";
 import { num } from "@/lib/format";
-import { CHANGE_TODO, EMPTY_PLACE_KEYWORDS, PLACE_KEYWORDS_KEY, SLOT_HINTS, SLOT_LABELS, keywordSummaries, nextSeasonKeyword, rankSeries, rankText, type PlaceKeywords } from "@/lib/market/rank";
+import { CHANGE_TODO, EMPTY_PLACE_KEYWORDS, PLACE_KEYWORDS_KEY, SLOT_HINTS, SLOT_LABELS, keywordSummaries, nextSeasonKeyword, rankGrid, rankSeries, rankText, type PlaceKeywords } from "@/lib/market/rank";
 import { areaSummary, competitorRows, trendSummary } from "@/lib/market/area";
 import { getStore } from "@/lib/storage";
 import type { DailySale } from "@/lib/types";
@@ -59,6 +59,8 @@ export default function MarketPage() {
   };
 
   const series = useMemo(() => (rank && keyword ? rankSeries(rank.history, keyword, 30) : []), [rank, keyword]);
+  const [gridDays, setGridDays] = useState<14 | 30>(14);
+  const grid = useMemo(() => (rank ? rankGrid(rank.history, rank.keywords.length ? rank.keywords : [...new Set(rank.history.map((h) => h.keyword))], gridDays, today) : null), [rank, gridDays, today]);
   const latestResult = rank?.latest?.results.find((r) => r.keyword === keyword) ?? null;
   const nextSeason = nextSeasonKeyword(pk, today);
   // 우리 동네 (npm run market 결과). 같은 종류 가게는 우리 가게 업종 글자로 고른다 — 닭·치킨·닭갈비
@@ -107,6 +109,59 @@ export default function MarketPage() {
           </div>
         )}
       </section>
+
+      {/* 키워드별 순위 변화 — 날짜 × 키워드 */}
+      {grid && grid.keywords.length > 0 && (
+        <section className="card space-y-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-base font-bold">
+              키워드별 순위 변화 <span className="text-xs font-normal text-stone-500">매일 09:00 기록 · 전날 대비</span>
+            </h2>
+            <div className="flex gap-1">
+              {([14, 30] as const).map((d) => (
+                <button key={d} className={`rounded-full px-2.5 py-1 text-xs font-semibold ${gridDays === d ? "bg-orange-600 text-white" : "bg-stone-100 text-stone-600"}`} onClick={() => setGridDays(d)}>
+                  최근 {d}일
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-stone-500">
+                <tr>
+                  <th className="sticky left-0 bg-white py-1 text-left">키워드</th>
+                  {grid.dates.map((d) => (
+                    <th key={d} className="px-1 text-center font-normal">
+                      {Number(d.slice(8))}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="num">
+                {grid.keywords.map((k) => (
+                  <tr key={k} className={k === keyword ? "bg-orange-50" : ""}>
+                    <td className="sticky left-0 cursor-pointer bg-white py-1 pr-2 text-left font-semibold" onClick={() => setKeyword(k)}>
+                      {k}
+                    </td>
+                    {grid.dates.map((d) => {
+                      const c = grid.cells[k][d];
+                      if (!c) return <td key={d} className="px-1 text-center text-stone-200">·</td>;
+                      if (c.unread) return <td key={d} className="px-1 text-center text-stone-300" title="못 읽음">×</td>;
+                      const tone = c.delta === null || c.delta === 0 ? "text-stone-700" : c.delta > 0 ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800";
+                      return (
+                        <td key={d} className={`px-1 text-center ${tone}`} title={c.delta ? `${c.delta > 0 ? "▲" : "▼"} ${Math.abs(c.delta)}` : ""}>
+                          {c.rank === null ? "밖" : c.rank}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-stone-500">숫자는 그날 순위(작을수록 좋음). 초록은 전에 읽은 날보다 올라간 날, 빨강은 내려간 날, ×는 못 읽은 날, "밖"은 50위 밖. 키워드를 누르면 아래 추이가 그 키워드로 바뀝니다. 추적 키워드는 "순위 바로 재기"에서 더할 수 있어요.</p>
+        </section>
+      )}
 
       <RankCheckCard tracked={rank?.keywords ?? []} />
 

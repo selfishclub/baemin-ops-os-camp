@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { keywordSummaries, nextSeasonKeyword, rankSeries, rankText, EMPTY_PLACE_KEYWORDS } from "./rank";
+import { keywordSummaries, nextSeasonKeyword, rankGrid, rankSeries, rankText, EMPTY_PLACE_KEYWORDS } from "./rank";
 import type { RankPoint } from "../export/types";
 
 const p = (date: string, keyword: string, rank: number | null, extra: Partial<RankPoint> = {}): RankPoint => ({ date, keyword, rank, blog: 10, visitor: 100, save: 5, total: 50, ...extra });
@@ -50,5 +50,24 @@ describe("대표 키워드 시즌 칸", () => {
     expect(nextSeasonKeyword(pk, "2026-10-15")).toEqual({ month: 11, keyword: "청주연말모임" });
     expect(nextSeasonKeyword(pk, "2026-12-15")).toEqual({ month: 1, keyword: "청주신년회" });
     expect(nextSeasonKeyword(pk, "2026-08-15")).toBeNull();
+  });
+});
+
+describe("키워드별 순위 변화 표", () => {
+  const history: RankPoint[] = [
+    p("2026-10-10", "A", 8),
+    p("2026-10-12", "A", 6),
+    p("2026-10-13", "A", null, { note: "못 읽음" }),
+    p("2026-10-14", "A", 5),
+    p("2026-10-14", "B", null),
+  ];
+  const g = rankGrid(history, ["A", "B"], 3, "2026-10-14");
+  it("최근 n일 날짜와 칸", () => {
+    expect(g.dates).toEqual(["2026-10-12", "2026-10-13", "2026-10-14"]);
+    expect(g.cells.A["2026-10-12"]).toEqual({ rank: 6, unread: false, delta: 2 }); // 표 밖 10/10 8위와 비교
+    expect(g.cells.A["2026-10-13"]).toEqual({ rank: null, unread: true, delta: null });
+    expect(g.cells.A["2026-10-14"]).toEqual({ rank: 5, unread: false, delta: 1 }); // 못 읽은 날은 건너뛰고 12일과 비교
+    expect(g.cells.B["2026-10-14"]).toEqual({ rank: null, unread: false, delta: null }); // 50위 밖
+    expect(g.cells.B["2026-10-12"]).toBeUndefined();
   });
 });
