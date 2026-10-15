@@ -220,9 +220,9 @@ window.HM_DEMO_SEED = async function (api) {
     /* 공지 · 교육 진도 · 퀴즈 · 미션 */
     const subDay = shift(today, -C.tasks.subAgo);
     S.notices = [
-      { id: 'n1', month: mon, title: '이번 달 목표 — 할 일 완료율 95%', body: '중요 표시 업무는 시간대 시작할 때 먼저 끝냅니다.', pin: true, by: mgr.name, createdAt: Date.now() - 864e5 * 6 },
-      { id: 'n2', month: mon, title: '주말 단체 예약 많음 — 룸 세팅 30분 일찍', body: '금·토 17:00 전까지 룸 세팅 완료', pin: false, by: mgr.name, createdAt: Date.now() - 864e5 * 2 },
-      ...(st === 'ansan' ? [{ id: 'n3', month: subDay.slice(0, 7), title: `${Number(subDay.slice(5, 7))}/${Number(subDay.slice(8))} 오후 대타 — 박서준 → 최유나`, body: '박서준 개인 사정. 오후 조 홀은 최유나가 대신 근무.', pin: false, by: mgr.name, createdAt: Date.now() - 864e5 * C.tasks.subAgo - 3600e3 * 5 }] : []),
+      { id: st + '-n1', store: st, month: mon, title: '이번 달 목표 — 할 일 완료율 95%', body: '중요 표시 업무는 시간대 시작할 때 먼저 끝냅니다.', pin: true, by: mgr.name, createdAt: Date.now() - 864e5 * 6 },
+      { id: st + '-n2', store: st, month: mon, title: '주말 단체 예약 많음 — 룸 세팅 30분 일찍', body: '금·토 17:00 전까지 룸 세팅 완료', pin: false, by: mgr.name, createdAt: Date.now() - 864e5 * 2 },
+      ...(st === 'ansan' ? [{ id: st + '-n3', store: st, month: subDay.slice(0, 7), title: `${Number(subDay.slice(5, 7))}/${Number(subDay.slice(8))} 오후 대타 — 박서준 → 최유나`, body: '박서준 개인 사정. 오후 조 홀은 최유나가 대신 근무.', pin: false, by: mgr.name, createdAt: Date.now() - 864e5 * C.tasks.subAgo - 3600e3 * 5 }] : []),
     ];
     api.seedTraining(true);
     const urls = (S.training || []).map((x) => x.url).filter(Boolean);
@@ -253,7 +253,11 @@ window.HM_DEMO_SEED = async function (api) {
 
   /* 두 매장 공용 — 사장님 비밀번호 · 게시판 (직원 신고와 처리 완료 이력, 컴플레인, 외국인 손님 질문) */
   const h = await api.hashPw(C.pw), t0 = Date.now();
-  const shared = { owner: { hash: h, at: t0 }, issues: [
+  const monS = today.slice(0, 7);
+  const shared = { owner: { hash: h, at: t0 }, notices: [
+    { id: 'all-n1', store: 'all', month: monS, title: '두 매장 공통 — 이번 달부터 완료 메모는 한 줄 이상', body: '체크만 하면 나중에 아무도 모릅니다. 무엇을 어떻게 했는지 한 줄씩.', pin: true, by: '사장님', createdAt: t0 - 864e5 * 8 },
+    { id: 'all-n2', store: 'all', month: monS, title: '킹크랩 시세 인상 — 안내 멘트 통일', body: '“이번 주 산지 시세가 올라 kg당 가격이 조정됐습니다.”로 안내', pin: false, by: '사장님', createdAt: t0 - 864e5 * 3 },
+  ], issues: [
     { id: 'i1', cat: '앱 오류', title: '할 일 체크가 가끔 풀림', body: '📍 어느 화면 : 업무 › 할 일 › 미들\n👆 무엇을 눌렀나 : 갑각류 중간체크 완료\n❗ 어떻게 됐나 : 체크됐다가 2초 뒤 풀림\n✅ 이렇게 되면 좋겠다 : 한 번 누르면 그대로\n📱 기기 : 매장 아이패드\n🔁 다시 해도 같은가 : 가끔', status: 'done', replies: [{ text: '다른 기기 저장이 올 때 화면이 초기화되던 문제 — 고쳤습니다', by: '사장님', at: t0 - 864e5, fix: true }], by: '박서준', anon: false, createdAt: t0 - 864e5 * 2, store: '안산점', updatedAt: t0 - 864e5 },
     { id: 'i2', cat: '앱 건의', title: '근무표에 내 이름 눌러서 넣기', body: '📍 어느 화면 : 인사관리 › 월간 근무표\n❗ 어떻게 됐나 : 이름을 매번 타자로 침\n✅ 이렇게 되면 좋겠다 : 직원 명단에서 눌러서 넣기', status: 'done', replies: [{ text: '직원 칩으로 바꿨습니다', by: '사장님', at: t0 - 864e5 * 3, fix: true }], by: '', anon: true, team: true, createdAt: t0 - 864e5 * 4, store: '안양점', updatedAt: t0 - 864e5 * 3 },
     { id: 'i3', cat: '앱 오류', title: '폐사 기록 후 3일 표시가 안 보임', body: '📍 어느 화면 : 업무 › 수조 관리표\n❗ 어떻게 됐나 : 폐사 적었는데 사용 기한 표시 없음\n📱 기기 : 매장 포스', status: 'open', replies: [], by: '오세린', anon: false, createdAt: t0 - 3600e3 * 5, store: '안양점', updatedAt: t0 - 3600e3 * 5 },

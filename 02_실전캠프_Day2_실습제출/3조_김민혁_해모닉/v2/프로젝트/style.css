@@ -1527,3 +1527,6 @@ body.minimal .demoBar{padding:6px 10px}
 
 /* 돈 입력칸 — 콤마 표시, 오른쪽 정렬 */
 input.won{text-align:right;font-variant-numeric:tabular-nums}
+
+/* 월간 공지 카드 — 매장 표시 바로 옆에 제목 (2026-10-15 통합 보기) */
+.ncard .rcTop{justify-content:flex-start;gap:8px;text-align:left}

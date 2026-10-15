@@ -1834,7 +1834,7 @@ const App = (() => {
 
     /* 백업 안내 배너는 서버(v2) 단계 전까지 두지 않는다 — 설정 › 백업에서 여전히 내보낼 수 있다 */
 
-    const pins = (S.notices || []).filter((n) => n.month === key.slice(0, 7) && n.pin);
+    const pins = noticesAll().filter((n) => n.month === key.slice(0, 7) && n.pin && (n.store === 'all' || n.store === (Store.meta && Store.meta.current)));
     if (pins.length && isToday) {
       h += pins.slice(0, 2).map((n) => `<button class="notice pin" data-act="view" data-v="notices">📌 <b>${esc(n.title)}</b>${n.body ? ` — ${esc(n.body.split('\n')[0].slice(0, 40))}` : ''}</button>`).join('');
     }
@@ -2618,25 +2618,27 @@ const App = (() => {
   function vNotices() {
     const m = S.ui.nmonth || dateKey().slice(0, 7);
     const [y, mo] = m.split('-').map(Number);
-    const list = (S.notices || []).filter((n) => n.month === m)
+    const stores = (Store.meta && Store.meta.stores) || [];
+    const list = noticesAll().filter((n) => n.month === m && (noticeStore === 'all' || n.store === 'all' || n.store === noticeStore))
       .sort((a, b) => (b.pin - a.pin) || (b.createdAt || 0) - (a.createdAt || 0));
 
     let h = `<div class="hd">
-      <div><h2>월간 공지</h2><div class="sub">이번 달 모두가 알아야 할 것 — 가격 변동, 행사, 주의사항. 📌 고정하면 할 일 화면 맨 위에도 보입니다.</div></div>
+      <div><h2>월간 공지</h2><div class="sub">안산점 · 안양점 공지를 한곳에서 봅니다. 📌 고정하면 해당 매장 할 일 화면 맨 위에도 보입니다.</div></div>
       <div class="mnav">
         <button class="dnav" data-act="nmonthNav" data-d="-1" aria-label="이전 달">‹</button>
         <span class="mtitle">${y}년 ${mo}월</span>
         <button class="dnav" data-act="nmonthNav" data-d="1" aria-label="다음 달">›</button>
         <button class="btn primary" data-act="noticeAdd">+ 공지 추가</button>
       </div>
-    </div>`;
+    </div>
+    <div class="filters">${[['all', '두 매장 전체'], ...stores.map((x) => [x.id, x.name])].map(([k, nm]) => `<button class="fl${noticeStore === k ? ' on' : ''}" data-act="noticeStore" data-k="${k}">${esc(nm)}</button>`).join('')}</div>`;
 
     if (!list.length) {
       h += `<div class="notice"><b>${mo}월 공지가 없습니다.</b>
         <div class="hint">예: "이번 주 킹크랩 시세 인상 — 안내 멘트 통일", "15일 단체 예약 30명" 처럼 한 달 동안 반복해서 말하게 되는 것을 올려두세요.</div></div>`;
     } else {
       h += list.map((n) => `<button class="ncard${n.pin ? ' pinned' : ''}" data-act="noticeOpen" data-id="${n.id}">
-        <div class="rcTop"><span class="rcName">${n.pin ? '📌 ' : ''}${esc(n.title)}</span></div>
+        <div class="rcTop"><span class="chip ${n.store === 'all' ? 'today' : 'cat'}">${esc(noticeStoreName(n.store))}</span><span class="rcName">${n.pin ? '📌 ' : ''}${esc(n.title)}</span></div>
         ${n.body ? `<div class="nbody">${esc(n.body.split('\n')[0])}</div>` : ''}
         <div class="rcMeta">${esc(n.by || '')}${n.createdAt ? ' · ' + new Date(n.createdAt).toLocaleDateString('ko-KR') : ''}</div>
       </button>`).join('');
@@ -2645,8 +2647,11 @@ const App = (() => {
   }
 
   function noticeForm(n) {
-    const isNew = !n; n = n || { month: S.ui.nmonth || dateKey().slice(0, 7) };
+    const isNew = !n; n = n || { month: S.ui.nmonth || dateKey().slice(0, 7), store: 'all' };
+    const stores = (Store.meta && Store.meta.stores) || [];
+    const tgt = n.store || (Store.meta && Store.meta.current) || 'all';
     modal(isNew ? '공지 추가' : '공지 수정', `
+      <label>어느 매장 공지인가요<select id="noS">${[['all', '두 매장 모두'], ...stores.map((x) => [x.id, x.name + '만'])].map(([k, nm]) => `<option value="${k}"${k === tgt ? ' selected' : ''}>${esc(nm)}</option>`).join('')}</select></label>
       <label>제목<input id="noT" value="${esc(n.title || '')}" placeholder="예: 킹크랩 시세 인상 안내"></label>
       <label>내용 <span class="opt">선택</span><textarea id="noB" rows="4">${esc(n.body || '')}</textarea></label>
       <label class="chk"><input type="checkbox" id="noP"${n.pin ? ' checked' : ''}> 📌 이번 달 내내 할 일 화면 위에 고정</label>
@@ -2655,26 +2660,24 @@ const App = (() => {
       const title = $('#noT').value.trim();
       if (!title) { alert('제목을 입력하세요.'); return false; }
       const rec = {
-        id: n.id || 'n' + Date.now(), month: n.month, title, body: $('#noB').value.trim(),
+        id: n.id || 'n' + Date.now(), month: n.month, store: $('#noS').value || 'all', title, body: $('#noB').value.trim(),
         pin: $('#noP').checked, by: (S.ui.whoDate === dateKey() ? S.ui.who : '') || n.by || '',
-        createdAt: n.createdAt || Date.now(),
+        createdAt: n.createdAt || Date.now(), updatedAt: Date.now(),
       };
-      if (n.id) S.notices = S.notices.map((x) => (x.id === n.id ? rec : x));
-      else S.notices.push(rec);
-      save(); render();
+      saveNotice(rec); render();
       const tg = $('#noTg');
       if (tg && tg.checked) {
-        sendTelegram(`\u{1F4E2} [${storeName()} 공지] ${rec.title}${rec.body ? '\n' + rec.body : ''}${rec.by ? '\n- ' + rec.by : ''}`)
+        sendTelegram(`\u{1F4E2} [${noticeStoreName(rec.store)} 공지] ${rec.title}${rec.body ? '\n' + rec.body : ''}${rec.by ? '\n- ' + rec.by : ''}`)
           .then((r) => banner(r.ok ? '공지를 텔레그램으로 보냈습니다' : '텔레그램 전송 실패', r.ok ? rec.title : r.err));
       }
     }, '저장');
   }
 
   function noticeShow(id) {
-    const n = (S.notices || []).find((x) => x.id === id); if (!n) return;
+    const n = noticesAll().find((x) => x.id === id); if (!n) return;
     modal(n.title, `
       ${n.body ? `<div class="rcBody">${esc(n.body)}</div>` : ''}
-      <p class="hint">${esc(n.by || '')}${n.createdAt ? ' · ' + new Date(n.createdAt).toLocaleDateString('ko-KR') : ''}${n.pin ? ' · 📌 고정됨' : ''}</p>
+      <p class="hint">${esc(noticeStoreName(n.store))} · ${esc(n.by || '')}${n.createdAt ? ' · ' + new Date(n.createdAt).toLocaleDateString('ko-KR') : ''}${n.pin ? ' · 📌 고정됨' : ''}</p>
       <div class="rowbtns">
         <button class="btn" data-act="noticeEdit" data-id="${n.id}">수정</button>
         <button class="btn" data-act="noticeSend" data-id="${n.id}">텔레그램 전송</button>
@@ -4427,8 +4430,40 @@ const App = (() => {
       if (st.id === mt.current) save(); else await Store.saveStore(st.id, doc2);
     }
     if (moved) saveShared();
+    let nMoved = moveNotices();
+    /* 다른 매장 문서에 남은 옛 공지도 읽어서 바로 합친다 (그 매장 문서는 건드리지 않음 — 그 매장 기기가 열 때 비운다) */
+    for (const st of (mt ? mt.stores : [])) {
+      if (st.id === mt.current) continue;
+      try { const d2 = await Store.loadStore(st.id); (d2 && d2.notices || []).forEach((x) => { if (x && !SH.notices.some((y) => y.id === x.id)) { SH.notices.push({ ...x, store: x.store || st.id }); nMoved++; } }); } catch (_) { /* 무시 */ }
+    }
+    if (nMoved) saveShared();
     Store.watchShared('issues');
-    if (view === 'issues') render();
+    if (view === 'issues' || view === 'notices') render();
+  }
+  /* 월간 공지 — 2026-10-15 사장님 요청: 안산점·안양점 통합으로 본다.
+     공지는 두 매장 공용 문서(SH.notices)에 둔다. n.store: 'all'(두 매장) | 매장 id. 지울 때는 del 표시(기기 간 합칠 때 되살아나지 않게).
+     예전에 매장 문서(S.notices)에 있던 공지는 그 매장 것으로 옮긴다 — 각 매장 기기가 열 때 자기 것을 옮긴다 */
+  function moveNotices() {
+    if (!Array.isArray(SH.notices)) SH.notices = [];
+    const cur = Store.meta && Store.meta.current; let n = 0;
+    (S.notices || []).forEach((x) => { if (x && !SH.notices.some((y) => y.id === x.id)) { SH.notices.push({ ...x, store: x.store || cur }); n++; } });
+    if ((S.notices || []).length) { S.notices = []; save(); }
+    return n;
+  }
+  const noticeStoreName = (sid) => (sid === 'all' || !sid ? '두 매장' : ((Store.meta && Store.meta.stores || []).find((x) => x.id === sid) || {}).name || sid);
+  function noticesAll() {
+    const sh = (SH.notices || []).filter((n) => !n.del);
+    const cur = Store.meta && Store.meta.current;
+    const legacy = (S.notices || []).filter((n) => !sh.some((y) => y.id === n.id)).map((n) => ({ ...n, store: n.store || cur }));   // 아직 안 옮긴 것
+    return sh.concat(legacy);
+  }
+  let noticeStore = 'all';   // 보기: all 두 매장 전체(기본) · 매장 id
+  function saveNotice(rec) {
+    if (!Array.isArray(SH.notices)) SH.notices = [];
+    const i = SH.notices.findIndex((x) => x.id === rec.id);
+    if (i >= 0) SH.notices[i] = rec; else SH.notices.push(rec);
+    S.notices = (S.notices || []).filter((x) => x.id !== rec.id);
+    saveShared(); save();
   }
 
   /* ── 보건증 · 위생교육 ────────────────────────────────────
@@ -5969,15 +6004,16 @@ const App = (() => {
         }
         case 'noticeAdd': noticeForm(null); break;
         case 'noticeOpen': noticeShow(id); break;
-        case 'noticeEdit': closeModal(); noticeForm((S.notices || []).find((x) => x.id === id)); break;
+        case 'noticeEdit': closeModal(); noticeForm(noticesAll().find((x) => x.id === id)); break;
+        case 'noticeStore': noticeStore = b.dataset.k || 'all'; render(); break;
         case 'noticeDel': {
           if (!confirm('이 공지를 삭제할까요?')) return;
-          S.notices = S.notices.filter((x) => x.id !== id); save(); closeModal(); render(); break;
+          { const n = noticesAll().find((x) => x.id === id); if (n) saveNotice({ ...n, del: true, updatedAt: Date.now() }); } closeModal(); render(); break;
         }
         case 'noticeSend': {
-          const n = (S.notices || []).find((x) => x.id === id); if (!n) return;
+          const n = noticesAll().find((x) => x.id === id); if (!n) return;
           b.disabled = true;
-          sendTelegram(`\u{1F4E2} [${storeName()} 공지] ${n.title}${n.body ? '\n' + n.body : ''}`).then((r) => {
+          sendTelegram(`\u{1F4E2} [${noticeStoreName(n.store)} 공지] ${n.title}${n.body ? '\n' + n.body : ''}`).then((r) => {
             b.disabled = false;
             alert(r.ok ? '보냈습니다.' : '실패: ' + r.err);
           });
@@ -6713,6 +6749,7 @@ const App = (() => {
     S = (await Store.switchTo(id)) || freshState(id);
     staffTab = null; otherDoc = null; otherDocId = null; cOpen = null; cMode = null; cFilter = 'all';
     hydrate();
+    if (moveNotices()) saveShared();   // 바꾼 매장 문서에 남은 옛 공지도 공용으로
     dashLiveOff(); dashAt = 0;
     if (!MENU.some((m) => m.items.some(([k]) => k === view))) view = 'dash';   // 보고 있던 화면은 그대로 둔다
     render();
@@ -6722,7 +6759,7 @@ const App = (() => {
   /* ── 데모판 (10/14 공유회용, 2026-10-09) ─────────────────────────
      demo.js 가 window.HM_DEMO 를 켜면: 서버 없음 · 저장소 따로 · 매일 처음 열 때 가짜 두 매장 자료를 오늘 날짜 기준으로 새로 만든다.
      실제 직원·매출과 무관한 숫자만 쓴다. 사장님 비밀번호 1234. */
-  const DEMO = !!window.HM_DEMO, DEMO_VER = 4, DEMO_PW = (window.HM_DEMO_CFG || {}).pw || '1234';   // DEMO_VER 4 (10/11): 자료 생성은 데모/demo.js 로 이동 · 6주 기록 · 일부러 넣은 일 · 시연 장면
+  const DEMO = !!window.HM_DEMO, DEMO_VER = 5, DEMO_PW = (window.HM_DEMO_CFG || {}).pw || '1234';   // DEMO_VER 4 (10/11): 자료 생성은 데모/demo.js 로 이동 · 6주 기록 · 일부러 넣은 일 · 시연 장면
   /* 데모 자료는 데모/demo.js(HM_DEMO_SEED) 가 만든다 — 숫자·이름·장면은 그 파일의 HM_DEMO_CFG 에 모아 둠 */
   async function demoSeed() {
     const api = { setS: (v) => { S = v; }, dateKey, nowMin, shift, minutesOf, pad, newId, monthNow, freshState, applyShiftDay, ensureDay, tpl, TANK_DEFAULT, deadEntries, seedTraining, quizOf, hashPw, schedOf, TRAIN_TRACKS, trackSteps, laborCalc, putBlob, newContract, ROUTINE_VER, ROLE_MGR, DEMO_VER };
@@ -6822,7 +6859,7 @@ const App = (() => {
        보류된 서버 변경은 다음 저장 때 합쳐지거나 60초 확인 때 다시 받는다. */
     const typing = () => { const a = document.activeElement; return !!(a && a.closest && a.closest('#main') && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !['checkbox', 'radio', 'button', 'submit'].includes(a.type)); };
     Store.onRemote((k, doc) => {   // false 를 돌려주면 "아직 받아들이지 않음" — 저장소가 서버 최신 표시를 앞당기지 않고, 다음 저장 때 합친다
-      if (k === 'shared:issues') { if (doc && Array.isArray(doc.issues)) { SH = doc; if (view === 'issues' && $('#modal').hidden) render(); } return true; }
+      if (k === 'shared:issues') { if (doc && Array.isArray(doc.issues)) { SH = doc; if ((view === 'issues' || view === 'notices' || view === 'today') && $('#modal').hidden && !typing()) render(); } return true; }
       if (k !== 'state:' + (Store.meta && Store.meta.current)) return true;
       if (!$('#modal').hidden) return false;      // 입력 중인 창을 날리지 않는다
       if (typing()) return false;                  // 설정 등에서 글자 치는 중
