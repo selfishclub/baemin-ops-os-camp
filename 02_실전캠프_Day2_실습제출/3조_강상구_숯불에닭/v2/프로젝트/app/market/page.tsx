@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ExportUploadCard } from "@/components/ExportUploadCard";
+import { MarketManualCard } from "@/components/MarketManualCard";
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
 import { todayStr } from "@/lib/daily";
@@ -213,6 +214,8 @@ export default function MarketPage() {
           </>
         )}
       </section>
+
+      <MarketManualCard today={today} />
 
       {/* 검색 흐름 */}
       {trends.length > 0 && market?.trend && (
