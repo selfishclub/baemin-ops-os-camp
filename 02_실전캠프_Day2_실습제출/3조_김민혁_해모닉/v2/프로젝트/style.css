@@ -1530,3 +1530,7 @@ input.won{text-align:right;font-variant-numeric:tabular-nums}
 
 /* 월간 공지 카드 — 매장 표시 바로 옆에 제목 (2026-10-15 통합 보기) */
 .ncard .rcTop{justify-content:flex-start;gap:8px;text-align:left}
+
+/* 카카오톡으로 보내기 버튼 — 카카오 노랑 */
+.btn.kakao{background:#FEE500;color:#191919;border-color:#FEE500}
+.btn.kakao:hover{filter:brightness(.96)}

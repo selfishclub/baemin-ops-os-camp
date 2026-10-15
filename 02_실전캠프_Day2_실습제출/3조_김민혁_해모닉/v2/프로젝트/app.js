@@ -854,14 +854,16 @@ const App = (() => {
     const rep = buildReport(key);
     if (!rep) { alert('그날 기록이 없습니다.'); return; }
     modal('마감 리포트', `
-      <p class="hint">아래 문구를 복사해 카카오톡 대화방에 붙여넣으세요.</p>
+      <p class="hint">「카톡으로 보내기」를 누르면 단톡방을 골라 보낼 수 있습니다.</p>
       <textarea id="repText" class="reptext" rows="14" readonly>${esc(rep.text)}</textarea>
       <div class="rowbtns">
         <button class="btn primary" data-act="sendReportNow">텔레그램으로 보내기</button>
+        <button class="btn kakao" data-act="reportKakao">💬 카톡으로 보내기</button>
         <button class="btn" data-act="copyReport">문구 복사</button>
       </div>
       <p class="hint" id="copyMsg"></p>`, null);
     $('#modal').dataset.repkey = key;
+    kakaoLoad();
   }
 
   /* ── 렌더 ────────────────────────────────────────────────── */
@@ -2622,6 +2624,7 @@ const App = (() => {
     const m = S.ui.nmonth || dateKey().slice(0, 7);
     const [y, mo] = m.split('-').map(Number);
     const stores = (Store.meta && Store.meta.stores) || [];
+    kakaoLoad();
     const list = noticesAll().filter((n) => n.month === m && (noticeStore === 'all' || n.store === 'all' || n.store === noticeStore))
       .sort((a, b) => (b.pin - a.pin) || (b.createdAt || 0) - (a.createdAt || 0));
 
@@ -2651,6 +2654,7 @@ const App = (() => {
 
   function noticeForm(n) {
     const isNew = !n; n = n || { month: S.ui.nmonth || dateKey().slice(0, 7), store: 'all' };
+    kakaoLoad();
     const stores = (Store.meta && Store.meta.stores) || [];
     const tgt = n.store || (Store.meta && Store.meta.current) || 'all';
     modal(isNew ? '공지 추가' : '공지 수정', `
@@ -2658,7 +2662,8 @@ const App = (() => {
       <label>제목<input id="noT" value="${esc(n.title || '')}" placeholder="예: 킹크랩 시세 인상 안내"></label>
       <label>내용 <span class="opt">선택</span><textarea id="noB" rows="4">${esc(n.body || '')}</textarea></label>
       <label class="chk"><input type="checkbox" id="noP"${n.pin ? ' checked' : ''}> 📌 이번 달 내내 할 일 화면 위에 고정</label>
-      ${isNew ? `<label class="chk"><input type="checkbox" id="noTg" checked> 텔레그램 방에도 바로 알리기</label>` : ''}
+      ${isNew ? `<label class="chk"><input type="checkbox" id="noTg" checked> 텔레그램 방에도 바로 알리기</label>
+      <label class="chk"><input type="checkbox" id="noKk"> 💬 저장하고 카카오톡 단톡방에도 보내기 <span class="opt">공유 창에서 방을 고릅니다</span></label>` : ''}
     `, () => {
       const title = $('#noT').value.trim();
       if (!title) { alert('제목을 입력하세요.'); return false; }
@@ -2667,7 +2672,9 @@ const App = (() => {
         pin: $('#noP').checked, by: (S.ui.whoDate === dateKey() ? S.ui.who : '') || n.by || '',
         createdAt: n.createdAt || Date.now(), updatedAt: Date.now(),
       };
+      const kk = $('#noKk') && $('#noKk').checked;
       saveNotice(rec); render();
+      if (kk) kakaoSend(noticeText(rec));
       const tg = $('#noTg');
       if (tg && tg.checked) {
         sendTelegram(`\u{1F4E2} [${noticeStoreName(rec.store)} 공지] ${rec.title}${rec.body ? '\n' + rec.body : ''}${rec.by ? '\n- ' + rec.by : ''}`)
@@ -2682,6 +2689,7 @@ const App = (() => {
       ${n.body ? `<div class="rcBody">${esc(n.body)}</div>` : ''}
       <p class="hint">${esc(noticeStoreName(n.store))} · ${esc(n.by || '')}${n.createdAt ? ' · ' + new Date(n.createdAt).toLocaleDateString('ko-KR') : ''}${n.pin ? ' · 📌 고정됨' : ''}</p>
       <div class="rowbtns">
+        <button class="btn kakao" data-act="noticeKakao" data-id="${n.id}">💬 카톡으로 보내기</button>
         <button class="btn" data-act="noticeEdit" data-id="${n.id}">수정</button>
         <button class="btn" data-act="noticeSend" data-id="${n.id}">텔레그램 전송</button>
         <button class="btn danger" data-act="noticeDel" data-id="${n.id}">삭제</button>
@@ -3858,6 +3866,21 @@ const App = (() => {
         <div class="hint">토큰은 이 PC에만 저장되고 어디에도 전송되지 않습니다 (텔레그램 서버 제외).</div>
       </details>
 
+      <div class="hd sub2"><h3>카카오톡으로 보내기</h3></div>
+      <div class="setrow"><span>카카오 JavaScript 키 <span class="hint" style="margin:0">두 매장 공통 · 공개용 키</span></span>
+        <input type="text" class="num wide2" value="${esc(kakaoKey())}" data-act="kakaoKey" placeholder="카카오 개발자 › 앱 키 › JavaScript 키" autocomplete="off"></div>
+      <div class="rowbtns"><button class="btn" data-act="kakaoTest">카카오 연결 확인</button></div>
+      <details class="notice"><summary><b>카카오 키 처음 받기 (약 5분, 한 번만)</b></summary>
+        <ol class="std">
+          <li>컴퓨터에서 <b>developers.kakao.com</b> 에 사장님 카카오 계정으로 로그인합니다.</li>
+          <li><b>내 애플리케이션 › 애플리케이션 추가하기</b> — 앱 이름 "해모닉 업무", 회사명 "해모닉"으로 만듭니다.</li>
+          <li>만든 앱의 <b>앱 키</b>에서 <b>JavaScript 키</b>를 복사해 위 칸에 붙여 넣습니다.</li>
+          <li><b>플랫폼 › Web</b>(또는 JavaScript SDK 도메인)에 <b>https://haemonic-ops.vercel.app</b> 을 등록합니다. 데모도 쓰려면 <b>https://haemonic-demo.vercel.app</b> 도 같이.</li>
+          <li>위 <b>카카오 연결 확인</b> → "카카오 연결됨"이 뜨면 끝입니다.</li>
+        </ol>
+        <div class="hint">카카오는 단톡방에 자동으로 올리는 기능을 주지 않습니다. 「카톡으로 보내기」를 누르면 공유 창이 뜨고, 단톡방을 골라 보내기를 누르면 됩니다. 키가 없어도 폰에서는 공유 창(카카오톡 선택), PC에서는 복사로 동작합니다.</div>
+      </details>
+
       <div class="setrow"><span>사장님 폰 즉시 알림 <span class="hint" style="margin:0">중요 업무 완료·지연 때 한 줄</span></span>
         <button class="btn sm${S.settings.tgInstant === false ? '' : ' on'}" data-act="toggleTgInstant">${S.settings.tgInstant === false ? '꺼짐' : '켜짐'}</button></div>
       <p class="hint">${serverSends()
@@ -4461,6 +4484,41 @@ const App = (() => {
     return sh.concat(legacy);
   }
   let noticeStore = 'all';   // 보기: all 두 매장 전체(기본) · 매장 id
+
+  /* ── 카카오톡으로 보내기 (2026-10-15 사장님 요청) ──────────────────
+     카카오는 단톡방에 자동으로 올리는 공식 기능이 없다. 그래서 "공유 창"을 띄우고 사람이 단톡방을 골라 보내기를 누른다.
+     카카오 개발자 JavaScript 키(공개용)가 설정에 있으면 카카오톡 공유 창, 없으면 폰은 기본 공유 창(카톡 선택), PC는 복사. */
+  const KAKAO_SDK = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js', KAKAO_SRI = 'sha384-DKYJZ8NLiK8MN4/C5P2dtSmLQ4KwPaoqAfyA/DfmEc1VDxu4yyC7wy6K1Hs90nka';
+  const kakaoKey = () => String((SH && SH.kakaoKey) || '').trim();
+  let kakaoLoading = null;
+  function kakaoLoad() {   // 버튼이 보이는 화면에서 미리 불러 둔다 — PC 는 누르는 순간 팝업이 떠야 막히지 않는다
+    const key = kakaoKey(); if (!key) return Promise.resolve(null);
+    if (window.Kakao && Kakao.isInitialized && Kakao.isInitialized()) return Promise.resolve(window.Kakao);
+    if (!kakaoLoading) kakaoLoading = new Promise((res) => {
+      const sc = document.createElement('script'); sc.src = KAKAO_SDK; sc.integrity = KAKAO_SRI; sc.crossOrigin = 'anonymous';
+      sc.onload = () => { try { if (!Kakao.isInitialized()) Kakao.init(key); res(Kakao); } catch (e) { console.warn('카카오 초기화 실패', e); kakaoLoading = null; res(null); } };
+      sc.onerror = () => { kakaoLoading = null; res(null); };
+      document.head.appendChild(sc);
+    });
+    return kakaoLoading;
+  }
+  function copyText(text, okTitle) {
+    const done = () => banner(okTitle || '복사했습니다', '카카오톡 단톡방에 붙여 넣으세요.');
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => prompt('아래 내용을 복사하세요', text));
+    else prompt('아래 내용을 복사하세요', text);
+  }
+  function kakaoSend(text) {
+    const K = (window.Kakao && Kakao.isInitialized && Kakao.isInitialized()) ? Kakao : null;
+    if (K) {
+      const url = location.origin + location.pathname;
+      const body = text.length > 200 ? text.slice(0, 196) + ' …' : text;   // 카카오 텍스트 메시지는 200자까지
+      try { K.Share.sendDefault({ objectType: 'text', text: body, link: { mobileWebUrl: url, webUrl: url }, buttonTitle: '앱에서 보기' }); if (text.length > 200) copyText(text, '200자가 넘어 앞부분만 보냅니다 — 전체는 복사해 두었습니다'); return; }
+      catch (e) { console.warn('카카오 공유 실패', e); }
+    }
+    if (navigator.share && /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)) { navigator.share({ text }).catch((e) => { if (!e || e.name !== 'AbortError') copyText(text); }); return; }
+    copyText(text, kakaoKey() ? '카카오 연결이 안 돼 복사했습니다' : '복사했습니다');
+  }
+  const noticeText = (n) => `📢 [${noticeStoreName(n.store)} 공지] ${n.title}${n.body ? '\n' + n.body : ''}${n.by ? '\n- ' + n.by : ''}`;
   function saveNotice(rec) {
     if (!Array.isArray(SH.notices)) SH.notices = [];
     const i = SH.notices.findIndex((x) => x.id === rec.id);
@@ -6010,6 +6068,9 @@ const App = (() => {
         case 'noticeOpen': noticeShow(id); break;
         case 'noticeEdit': closeModal(); noticeForm(noticesAll().find((x) => x.id === id)); break;
         case 'noticeStore': noticeStore = b.dataset.k || 'all'; render(); break;
+        case 'noticeKakao': { const n = noticesAll().find((x) => x.id === id); if (n) kakaoSend(noticeText(n)); break; }
+        case 'reportKakao': { const ta = $('#repText'); if (ta) kakaoSend(ta.value); break; }
+        case 'kakaoTest': kakaoLoad().then((K) => banner(K ? '카카오 연결됨' : '카카오 연결 실패', K ? '공지·리포트에서 「카톡으로 보내기」를 누르면 공유 창이 뜹니다.' : '키가 맞는지, 카카오 개발자 사이트에 이 주소를 등록했는지 확인하세요.')); break;
         case 'noticeDel': {
           if (!confirm('이 공지를 삭제할까요?')) return;
           { const n = noticesAll().find((x) => x.id === id); if (n) saveNotice({ ...n, del: true, updatedAt: Date.now() }); } closeModal(); render(); break;
@@ -6497,6 +6558,7 @@ const App = (() => {
       if (b.dataset.act === 'minWage') { S.settings.minWage = Math.max(0, Number(String(b.value).replace(/,/g, '')) || 0) || MIN_WAGE.hour; save(); render(); }
       if (b.dataset.act === 'reportAt') { S.settings.reportAt = b.value || '21:50'; save(); render(); }
       if (b.dataset.act === 'tgToken') { S.settings.tgToken = b.value.trim(); save(); }
+      if (b.dataset.act === 'kakaoKey') { const v = b.value.trim(); if (v !== kakaoKey()) { SH.kakaoKey = v; saveShared(); kakaoLoading = null; try { if (window.Kakao && Kakao.isInitialized && Kakao.isInitialized()) Kakao.cleanup(); } catch (_) { /* 무시 */ } } }
       if (b.dataset.act === 'pmStart') { if (/^\d{2}:\d{2}$/.test(b.value)) { S.settings.pmStart = b.value; save(); render(); } }
       if (b.dataset.act === 'tgChat') { S.settings.tgChat = b.value.trim(); save(); }
       if (b.dataset.act === 'budget') { S.settings.budget = Math.max(1, Number(b.value) || 6); save(); render(); }
