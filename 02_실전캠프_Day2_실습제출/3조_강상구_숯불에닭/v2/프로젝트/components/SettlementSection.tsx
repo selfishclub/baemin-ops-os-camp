@@ -19,11 +19,13 @@ export default function SettlementSection({
   ledger,
   daily,
   settlement,
+  show = "all",
 }: {
   month: string;
   ledger: ReturnType<typeof useLedger>;
   daily: ReturnType<typeof useDaily>;
   settlement: SettlementState;
+  show?: "all" | "rules" | "results"; // 정산 탭은 결과를 위에, 규칙은 맨 아래에 따로 그린다
 }) {
   const { rules, results, loaded, saveRules, saveAdjustment } = settlement;
   // "차이" 줄에 환급 등 다른 돈이 섞였을 때: 얼마인지 물어 표시로 저장 (0이면 지움)
@@ -97,6 +99,7 @@ export default function SettlementSection({
 
   return (
     <>
+      {show !== "results" && (
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-bold">정산 규칙 — 언제 입금되나</h2>
@@ -215,7 +218,10 @@ export default function SettlementSection({
           </div>
         )}
       </section>
+      )}
 
+      {show !== "rules" && (
+        <>
       {rules.length > 0 && (
         <section className="card space-y-3">
           <div className="flex items-baseline justify-between">
@@ -443,6 +449,8 @@ export default function SettlementSection({
             </>
           )}
         </section>
+      )}
+        </>
       )}
     </>
   );
