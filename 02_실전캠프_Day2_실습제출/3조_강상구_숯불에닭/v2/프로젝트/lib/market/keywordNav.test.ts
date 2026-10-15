@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { brandWordOf, buildCombos, compareSlots, draftSlots, menuCoverage, nicknameCountsAsDistrict, opportunities, parseWorkbook, regionGrade, volumeOf, type KeywordNavData } from "./keywordNav";
+import { brandWordOf, buildCombos, compareSlots, draftSlots, mainRegions, menuCoverage, nicknameCountsAsDistrict, opportunities, parseWorkbook, regionGrade, volumeOf, type KeywordNavData } from "./keywordNav";
 
 const data: KeywordNavData = {
   fileName: "t.xlsx",
@@ -40,6 +40,13 @@ describe("지역 등급", () => {
   it("닉네임 주소가 구+맛집의 절반 이상이면 구처럼 쓴다", () => {
     expect(nicknameCountsAsDistrict(28190, 260)).toBe(true);
     expect(nicknameCountsAsDistrict(100, 260)).toBe(false);
+  });
+});
+
+describe("메인 권역", () => {
+  it("1등 주소 가운데 도 단위·겹치는 이름은 빼고 검색수 순", () => {
+    const regs = [...data.regions, { keyword: "충청도", kind: "주소" as const, volume: 20150, foodVolume: 1720 }, { keyword: "청주율량동", kind: "주소" as const, volume: 2310, foodVolume: 6690 }];
+    expect(mainRegions(regs).map((r) => r.keyword)).toEqual(["청주", "율량동"]);
   });
 });
 

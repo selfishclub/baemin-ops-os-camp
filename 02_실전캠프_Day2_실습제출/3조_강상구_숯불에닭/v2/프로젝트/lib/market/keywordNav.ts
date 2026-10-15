@@ -69,9 +69,14 @@ export function regionGrade(foodVolume: number | null): RegionGrade {
 /** 닉네임 주소(율량동·왕십리 같은 생활 지명)+맛집이 구+맛집의 절반 이상이면 구와 같이 쓴다 */
 export const nicknameCountsAsDistrict = (nickFood: number, districtFood: number) => districtFood > 0 && nickFood >= districtFood * 0.5;
 
-/** 메인 권역 — 1등 주소 가운데 검색수 가장 큰 것들. 동(면)+맛집이 구+맛집보다 크면 동이 메인(승격) */
+/** 도 단위처럼 생활권이 아닌 넓은 주소 (충청도·충북·경기) — 메인 권역에서 뺀다 */
+export const isProvinceWord = (k: string) => /^(충청|충북|충남|전라|전북|전남|경상|경북|경남|경기|강원|제주)$|도$/.test(normalizeKeyword(k));
+
+/** 메인 권역 — 1등 주소 가운데 검색수 가장 큰 것들(도 단위 제외). 동(면)+맛집이 구+맛집보다 크면 동이 메인(승격) */
 export function mainRegions(regions: RegionRow[], limit = 3): RegionRow[] {
-  const sorted = regions.filter((r) => r.kind === "주소" && regionGrade(r.foodVolume) === "1등").sort((a, b) => (b.foodVolume ?? 0) - (a.foodVolume ?? 0));
+  const firsts = regions.filter((r) => r.kind === "주소" && regionGrade(r.foodVolume) === "1등");
+  const local = firsts.filter((r) => !isProvinceWord(r.keyword));
+  const sorted = (local.length ? local : firsts).sort((a, b) => (b.foodVolume ?? 0) - (a.foodVolume ?? 0));
   const out: RegionRow[] = [];
   for (const r of sorted) {
     // 이미 고른 권역을 품은 긴 이름(청주 + 율량동 → 청주율량동)은 같은 곳이라 뺀다
