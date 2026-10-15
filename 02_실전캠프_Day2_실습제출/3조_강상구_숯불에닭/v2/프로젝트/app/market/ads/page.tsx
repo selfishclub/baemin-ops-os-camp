@@ -16,6 +16,9 @@ const HELPER = process.env.NEXT_PUBLIC_HELPER_URL || "http://127.0.0.1:4599";
 const AD_BIDS_KEY = "ad_bids_v1";
 type BidMap = Record<string, BidInfo & { at: string }>;
 
+/** 시작 입찰가 — 최소 노출가와 1위 예상가 중 큰 쪽 (네이버가 둘을 다른 기간으로 어림해 뒤집혀 나올 때가 있다) */
+const startBid = (c: AdCandidate) => (c.bid.minShow === null && c.bid.top1 === null ? null : Math.max(c.bid.minShow ?? 0, c.bid.top1 ?? 0));
+
 const VERDICT_CLS = { 추천: "bg-emerald-100 text-emerald-800", 보류: "bg-stone-200 text-stone-700", 나중: "bg-amber-100 text-amber-800" } as const;
 
 // 광고 노트 — 시작안. 파워링크를 아직 안 켠 상태에서 "어느 키워드부터, 얼마로" 를 묶음별로 고르고 기록한다.
@@ -75,7 +78,8 @@ export default function AdPlanPage() {
     setBusy(true);
     setMsg({ tone: "info", text: `네이버에 후보 ${cands.length}개의 광고 통계·예상 입찰가를 묻는 중… (20~40초)` });
     try {
-      const keys = cands.slice(0, 60).map((c) => c.keyword);
+      // 아직 입찰가가 없는 키워드부터, 한 번에 60개
+      const keys = [...needBids, ...cands.map((c) => c.keyword).filter((k) => !needBids.includes(k))].slice(0, 60);
       if (needStats.length) {
         const r1 = await fetch(`${HELPER}/keyword-volume`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keywords: keys.filter((k) => needStats.includes(k)).slice(0, 100) }) });
         const j1 = (await r1.json()) as { ok: boolean; message?: string; exact?: { keyword: string; pc: number; mobile: number; total: number; under10: boolean; comp?: string | null; adClicks?: number | null; adDepth?: number | null }[] };
@@ -102,11 +106,11 @@ export default function AdPlanPage() {
 
   const toggle = (c: AdCandidate) => {
     if (inPlan(c.keyword)) savePlan({ ...plan, items: plan.items.filter((i) => normalizeKeyword(i.keyword) !== c.keyword) });
-    else savePlan({ ...plan, items: [...plan.items, { keyword: c.keyword, group: c.group, bid: c.bid.minShow ?? c.bid.top1 ?? null, status: "예정" }] });
+    else savePlan({ ...plan, items: [...plan.items, { keyword: c.keyword, group: c.group, bid: startBid(c), status: "예정" }] });
   };
   const addRecommended = () => {
     const picks = cands.filter((c) => c.verdict === "추천" && !inPlan(c.keyword)).slice(0, 12);
-    savePlan({ ...plan, items: [...plan.items, ...picks.map((c) => ({ keyword: c.keyword, group: c.group, bid: c.bid.minShow ?? c.bid.top1 ?? null, status: "예정" as const }))] });
+    savePlan({ ...plan, items: [...plan.items, ...picks.map((c) => ({ keyword: c.keyword, group: c.group, bid: startBid(c), status: "예정" as const }))] });
   };
   const addLog = (text: string) => {
     if (!text.trim()) return;
@@ -227,7 +231,7 @@ export default function AdPlanPage() {
               );
             })}
             <p className="text-xs text-stone-500">
-              경쟁은 광고 기준(낮음·중간·높음), 광고 수는 그 검색 결과에 보통 뜨는 광고 개수예요. "최소 입찰가"는 모바일에서 광고가 보이기 시작하는 금액, "1위 입찰가"는 맨 위에 뜨는 금액. 판단에 마우스를 올리면 이유가 보여요. 자연 순위가 3위 안이면 공짜 노출이 있어 보류로 둬요.
+              경쟁은 광고 기준(낮음·중간·높음), 광고 수는 그 검색 결과에 보통 뜨는 광고 개수예요. "최소 입찰가"는 모바일에서 광고가 보이기 시작하는 금액, "1위 입찰가"는 맨 위에 뜨는 금액. 판단에 마우스를 올리면 이유가 보여요. 자연 순위가 3위 안이면 공짜 노출이 있어 보류로 둬요. 1위 입찰가가 최소 입찰가보다 낮게 나올 때가 있는데(네이버가 다른 기간으로 어림해요) 시작안에 넣으면 둘 중 큰 쪽을 넣어요. "?"는 아직 안 받아온 것 — 받아오기를 한 번 더 누르면 채워져요.
             </p>
           </section>
 
