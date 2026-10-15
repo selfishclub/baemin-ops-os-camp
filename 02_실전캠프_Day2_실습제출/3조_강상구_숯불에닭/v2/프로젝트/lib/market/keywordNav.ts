@@ -170,11 +170,16 @@ const normalizeRanks = (ranks: Record<string, number | null>) => {
   return out;
 };
 
-/** 우리 지역 말이 들어간 키워드인가 — 네이버가 덧붙여 준 연관 키워드(항공권 등)에서 우리 것만 고를 때 */
+/** 식당 손님이 치는 꼬리말 — 지역 말과 함께 들어 있어야 "우리 키워드"로 본다 */
+export const FOOD_TAILS = ["맛집", "식당", "밥집", "음식", "먹거리", "카페", "술집", "고기", "닭", "회식", "데이트", "점심", "저녁", "모임", "가족", "부모님", "포장", "배달", "단체", "현지인", "가성비", "핫플", "분위기", "야장", "룸"];
+
+/** 우리 키워드인가 — 우리 지역 말 + 식당 꼬리말(또는 엑셀의 메뉴·TPO)이 같이 들어 있어야. 네이버 연관 키워드(항공권·주차장·가볼만한곳)를 걸러 낸다 */
 export function isOurs(keyword: string, data: KeywordNavData | null): boolean {
   if (!data) return true;
   const k = normalizeKeyword(keyword);
-  return data.regions.some((r) => k.includes(normalizeKeyword(r.keyword)));
+  if (!data.regions.some((r) => k.includes(normalizeKeyword(r.keyword)))) return false;
+  const tails = [...FOOD_TAILS, ...data.menus.map((m) => normalizeKeyword(m.keyword)), ...data.tpo.map(normalizeKeyword)];
+  return tails.some((t) => t && k.includes(t));
 }
 
 /**
