@@ -157,6 +157,13 @@ describe("5. 중복·잘못된 참조", () => {
       expect(ins.summary.dailySales).toBe(4); // 그대로 보존 — 지우지 않는다
     }
   });
+  it("같은 날·같은 카드사라도 포스 간편결제(pos_easy) 줄은 중복이 아니다 (앱 설계, G단계 실제 장부로 확인)", () => {
+    const d = fakeData();
+    d.dailySales.push({ date: "2026-09-05", channel: "hall_card", amount: 12000, source: "pos_easy" });
+    const ins = inspectBackup(wrap(d));
+    expect(ins.ok).toBe(true);
+    if (ins.ok) expect(ins.warnings.filter((w) => w.includes("두 번"))).toEqual([]);
+  });
   it("중복 경고는 종류별 3개까지만 보여 준다 (수백 개면 화면이 넘친다)", () => {
     const many = fakeData();
     for (let i = 0; i < 10; i++) many.dailySales.push(sale("2026-09-05"));
