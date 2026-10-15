@@ -53,9 +53,10 @@ export interface PerOrder {
   payment: number;
   delivery: number;
   vat: number;
+  ad: number; // 주문당 광고비 (쿠팡이츠)
   unclassified: number;
   net: number; // 주문금액 + 가게배달팁 − 할인 − 공제 = 정산으로 받는 돈
-  per: { gross: number; discount: number; brokerage: number; payment: number; delivery: number; vat: number; unclassified: number; net: number } | null; // 주문 1건당
+  per: { gross: number; discount: number; brokerage: number; payment: number; delivery: number; vat: number; ad: number; unclassified: number; net: number } | null; // 주문 1건당
   netRate: number | null; // net ÷ gross %
 }
 
@@ -71,8 +72,9 @@ export function perOrderBreakdown(days: BaeminOrderDay[], month: string): PerOrd
   const payment = sum((d) => d.deductions.payment);
   const delivery = sum((d) => d.deductions.delivery);
   const vat = sum((d) => d.deductions.vat);
+  const ad = sum((d) => d.deductions.ad ?? 0);
   const unclassified = sum((d) => d.deductions.unclassified);
-  const net = gross + otherRevenue - discount - brokerage - payment - delivery - vat - unclassified;
+  const net = gross + otherRevenue - discount - brokerage - payment - delivery - vat - ad - unclassified;
   const r = (n: number) => Math.round(n / orders);
   return {
     month,
@@ -85,9 +87,10 @@ export function perOrderBreakdown(days: BaeminOrderDay[], month: string): PerOrd
     payment,
     delivery,
     vat,
+    ad,
     unclassified,
     net,
-    per: orders > 0 ? { gross: r(gross), discount: r(discount), brokerage: r(brokerage), payment: r(payment), delivery: r(delivery), vat: r(vat), unclassified: r(unclassified), net: r(net) } : null,
+    per: orders > 0 ? { gross: r(gross), discount: r(discount), brokerage: r(brokerage), payment: r(payment), delivery: r(delivery), vat: r(vat), ad: r(ad), unclassified: r(unclassified), net: r(net) } : null,
     netRate: gross > 0 ? Math.round((net / gross) * 1000) / 10 : null,
   };
 }

@@ -16,18 +16,24 @@ const STATE_TONE: Record<DepositState, string> = { "입금 확인": "bg-emerald-
 
 // 정산 탭 — 배민 정산 명세(자동 수집): 정산 건별 입금 확인 · 주문 1건당 쪼개기 · 광고 효율.
 // 유승균 사장님 배달이익노트 방식. 자료는 리뷰 수집기의 npm run collect:baemin-settle → export:ledger 로 온다.
-export function BaeminSettleSection({ month, txs, nextTxs, sales, onSaved }: { month: Month; txs: Transaction[]; nextTxs: Transaction[]; sales: ChannelSale[]; onSaved: () => Promise<void> }) {
+const PLATFORM_META = {
+  baemin: { channel: "baemin", name: "배달의민족", short: "배민", collect: "npm run collect:baemin-settle", adLabel: "광고 효율 (우리가게클릭)", adSource: "가게통계" },
+  coupang: { channel: "coupang", name: "쿠팡이츠", short: "쿠팡이츠", collect: "npm run collect:coupang-settle", adLabel: "광고비 (매입세금계산서)", adSource: "세금계산서" },
+} as const;
+
+export function BaeminSettleSection({ platform = "baemin", month, txs, nextTxs, sales, onSaved }: { platform?: "baemin" | "coupang"; month: Month; txs: Transaction[]; nextTxs: Transaction[]; sales: ChannelSale[]; onSaved: () => Promise<void> }) {
   const exp = useExport();
+  const P = PLATFORM_META[platform];
   const today = todayStr();
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const b = exp.baemin;
+  const b = platform === "baemin" ? exp.baemin : exp.coupang;
 
-  const rows = useMemo(() => (b ? matchSettlements(b.settlements, [...txs, ...nextTxs], today).filter((r) => r.depositDueDate.startsWith(month)) : []), [b, txs, nextTxs, month, today]);
+  const rows = useMemo(() => (b ? matchSettlements(b.settlements, [...txs, ...nextTxs], today, P.channel).filter((r) => r.depositDueDate.startsWith(month)) : []), [b, txs, nextTxs, month, today]);
   const per = useMemo(() => (b ? perOrderBreakdown(b.orders, month) : null), [b, month]);
   const ad = useMemo(() => adEfficiency(b, month), [b, month]);
   const suggested = b ? channelSaleFromOrders(b.orders, month) : null;
-  const current = sales.find((s) => s.channel === "baemin") ?? null;
+  const current = sales.find((s) => s.channel === P.channel) ?? null;
 
   if (!exp.loaded) return null;
 
@@ -35,10 +41,10 @@ export function BaeminSettleSection({ month, txs, nextTxs, sales, onSaved }: { m
     if (!suggested) return;
     setSaving(true);
     try {
-      const row: ChannelSale = { month, channel: "baemin", name: current?.name ?? "배달의민족", orders: suggested.orders, deposit: suggested.deposit, count: suggested.count, unsettled: current?.unsettled ?? null };
+      const row: ChannelSale = { month, channel: P.channel, name: current?.name ?? P.name, orders: suggested.orders, deposit: suggested.deposit, count: suggested.count, unsettled: current?.unsettled ?? null };
       await getStore().saveChannelSales([row]);
       await onSaved();
-      setMsg(`${monthLabel(month)} 배민 주문금액 ${won(suggested.orders)} · 정산금액 ${won(suggested.deposit)} · ${num(suggested.count)}건을 위 표에 넣었어요.`);
+      setMsg(`${monthLabel(month)} ${P.short} 주문금액 ${won(suggested.orders)} · 정산금액 ${won(suggested.deposit)} · ${num(suggested.count)}건을 위 표에 넣었어요.`);
     } finally {
       setSaving(false);
     }
@@ -49,17 +55,23 @@ export function BaeminSettleSection({ month, txs, nextTxs, sales, onSaved }: { m
       <section className="card space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-base font-bold">
-            배민 정산 명세 — 자동 수집
+            {P.short} 정산 명세 — 자동 수집
             <SourceTag from="유승균" />
           </h2>
           <span className="text-xs text-stone-500">{b ? `수집 ${b.collectedAt.slice(0, 10)} · 정산 ${num(b.settlements.length)}건` : "아직 자료 없음"}</span>
         </div>
         {!b ? (
           <Notice tone="info">
-            배민 사장님 사이트의 정산 내역·주문·가게통계를 읽기만 해서 가져오면, 정산 건마다 통장에 들어왔는지와 주문 1건당 수수료가 보여요. 리뷰 수집기에서 <code>npm run collect:baemin-settle</code> → <code>npm run export:ledger</code> 뒤 올리기 탭에서 파일을 올리세요.
+            {P.name} 사장님 사이트의 주문·정산을 읽기만 해서 가져오면, 정산 건마다 통장에 들어왔는지와 주문 1건당 수수료가 보여요. 리뷰 수집기에서 <code>{P.collect}</code> → <code>npm run export:ledger</code> 뒤 올리기 탭에서 파일을 올리세요(도우미가 켜져 있으면 자동).
           </Notice>
         ) : (
           <>
+            {platform === "coupang" && (b.balance || (b.expected ?? []).length > 0) && (
+              <p className="num rounded-lg bg-stone-50 px-3 py-2 text-sm">
+                {b.balance && <>정산 예정 금액 <b>{won(b.balance.expected)}</b> · 출금 가능 <b>{won(b.balance.withdrawable)}</b></>}
+                {(b.expected ?? []).length > 0 && <span className="text-xs text-stone-500"> · 다음 입금 {b.expected!.map((e) => `${e.date.slice(5)} ${num(e.amount)}`).join(", ")}</span>}
+              </p>
+            )}
             {/* 정산 건별 입금 */}
             <div>
               <p className="text-sm font-semibold">
@@ -101,7 +113,7 @@ export function BaeminSettleSection({ month, txs, nextTxs, sales, onSaved }: { m
                 </div>
               )}
               <p className="mt-1 text-xs text-stone-500">
-                <b className="text-red-700">입금 대기</b>는 예정일이 지났는데 같은 금액의 배민 입금이 통장(이 달·다음 달 초)에 없는 것. 올리기 탭에서 그 기간 통장 내역을 올렸는지 먼저 보고, 그래도 없으면 배민 정산 화면에서 확인하세요.
+                <b className="text-red-700">입금 대기</b>는 예정일이 지났는데 같은 금액의 {P.short} 입금이 통장(이 달·다음 달 초)에 없는 것. 올리기 탭에서 그 기간 통장 내역을 올렸는지 먼저 보고, 그래도 없으면 {P.short} 정산 화면에서 확인하세요.{platform === "coupang" && " 쿠팡이츠는 주문별 정산 예정일로 묶은 것이라, 실제 입금은 며칠치가 합쳐질 수 있어요 (직접 출금 신청 뒤 입금)."}
               </p>
             </div>
 
@@ -109,7 +121,7 @@ export function BaeminSettleSection({ month, txs, nextTxs, sales, onSaved }: { m
             {per && per.per && (
               <div className="rounded-xl bg-stone-50 p-3">
                 <p className="text-sm font-semibold">
-                  주문 1건 {won(per.per.gross)} 중, 배민에 내는 돈 <span className="num text-xs font-normal text-stone-500">{monthLabel(month)} 주문 {num(per.orders)}건 (정산된 것)</span>
+                  주문 1건 {won(per.per.gross)} 중, {P.short}에 내는 돈 <span className="num text-xs font-normal text-stone-500">{monthLabel(month)} 주문 {num(per.orders)}건 (정산된 것)</span>
                 </p>
                 <ul className="mt-2 space-y-1 text-sm">
                   {[
@@ -117,6 +129,7 @@ export function BaeminSettleSection({ month, txs, nextTxs, sales, onSaved }: { m
                     ["결제수수료", per.per.payment, per.payment],
                     ["배달비", per.per.delivery, per.delivery],
                     ["부가세", per.per.vat, per.vat],
+                    ...(per.ad ? [["광고비(주문당)", per.per.ad, per.ad] as const] : []),
                     ["점주 할인", per.per.discount, per.discount],
                     ...(per.unclassified ? [["미분류", per.per.unclassified, per.unclassified] as const] : []),
                   ].map(([label, perOrder, total]) => (
@@ -136,7 +149,7 @@ export function BaeminSettleSection({ month, txs, nextTxs, sales, onSaved }: { m
                 {per.unsettledOrders > 0 && <p className="mt-1 text-xs text-stone-500">아직 정산 전이라 뺀 주문 {num(per.unsettledOrders)}건 — 며칠 뒤 다시 수집하면 들어와요.</p>}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <button className="btn-primary" disabled={saving || !suggested} onClick={applyToChannel}>
-                    이 숫자를 위 정산 표의 배민 칸에 넣기
+                    이 숫자를 위 정산 표의 {P.short} 칸에 넣기
                   </button>
                   {current && suggested && (
                     <span className="num text-xs text-stone-500">
@@ -153,10 +166,10 @@ export function BaeminSettleSection({ month, txs, nextTxs, sales, onSaved }: { m
             {ad && (
               <div className="rounded-xl bg-stone-50 p-3">
                 <p className="text-sm font-semibold">
-                  광고 효율 (우리가게클릭) <span className="text-xs font-normal text-stone-500">가게통계 {monthLabel(month)}</span>
+                  {P.adLabel} <span className="text-xs font-normal text-stone-500">{P.adSource} {monthLabel(month)}</span>
                 </p>
                 {ad.cost === null ? (
-                  <p className="mt-1 text-sm text-stone-500">이 달 우리가게클릭 광고비 자료가 없어요.</p>
+                  <p className="mt-1 text-sm text-stone-500">이 달 광고비 자료가 없어요.</p>
                 ) : (
                   <dl className="num mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm sm:grid-cols-3">
                     <dt className="text-stone-500">광고비</dt>

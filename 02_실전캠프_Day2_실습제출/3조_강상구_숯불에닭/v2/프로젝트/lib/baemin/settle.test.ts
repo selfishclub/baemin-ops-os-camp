@@ -45,6 +45,14 @@ describe("주문 1건당 쪼개기", () => {
     expect(p.netRate).toBe(Math.round((p.net / 400_000) * 1000) / 10);
   });
 
+  it("쿠팡이츠처럼 주문당 광고비가 있으면 빼고 센다", () => {
+    const d: BaeminOrderDay[] = [{ date: "2026-10-01", orders: 2, settledOrders: 2, unsettledOrders: 0, gross: 60_000, discount: 0, otherRevenue: 0, deductions: { brokerage: 4_680, payment: 1_800, delivery: 6_000, vat: 1_548, ad: 3_000, unclassified: 0 } }];
+    const q = perOrderBreakdown(d, "2026-10");
+    expect(q.ad).toBe(3_000);
+    expect(q.per!.ad).toBe(1_500);
+    expect(q.net).toBe(60_000 - 4_680 - 1_800 - 6_000 - 1_548 - 3_000);
+  });
+
   it("정산 탭 채널 숫자로 바꾸기 · 주문 없으면 null", () => {
     expect(channelSaleFromOrders(days, "2026-09")).toEqual({ orders: 400_000, deposit: p.net, count: 20 });
     expect(channelSaleFromOrders(days, "2026-08")).toBeNull();

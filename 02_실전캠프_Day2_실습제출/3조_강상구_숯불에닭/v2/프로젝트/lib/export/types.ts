@@ -75,7 +75,7 @@ export interface BaeminOrderDay {
   gross: number; // 주문금액
   discount: number; // 점주 부담 할인
   otherRevenue: number; // 가게배달팁 등
-  deductions: { brokerage: number; payment: number; delivery: number; vat: number; unclassified: number };
+  deductions: { brokerage: number; payment: number; delivery: number; vat: number; unclassified: number; ad?: number }; // ad = 주문당 광고비 (쿠팡이츠)
 }
 
 export interface BaeminStatsMonth {
@@ -91,6 +91,10 @@ export interface BaeminExport {
   orders: BaeminOrderDay[];
   stats: Record<string, BaeminStatsMonth>; // "2026-09" →
   unknownCodes: { code: string; count: number }[];
+  // 쿠팡이츠만: 정산 예정 잔액 · 예정 입금 · 매입세금계산서(달별 수수료·광고비)
+  balance?: { expected: number; withdrawable: number } | null;
+  expected?: { date: string; amount: number }[];
+  taxInvoices?: { seq: string; issueDate: string; month: string; note: string; supply: number; vat: number; total: number }[];
 }
 
 // ── 상권 조사 (npm run market) ──────────────────────────────────────────
@@ -157,6 +161,7 @@ export interface LedgerExport {
   reviews: ExportReview[];
   rank: RankExport | null;
   baemin: BaeminExport | null;
+  coupang?: BaeminExport | null; // 쿠팡이츠 — 같은 모양 (주문별 정산 항목으로 만듦)
   market?: MarketExport | null;
 }
 
@@ -166,6 +171,7 @@ export const EXPORT_RANK_KEY = "export_rank_v1";
 export const EXPORT_BAEMIN_KEY = "export_baemin_v1";
 export const EXPORT_META_KEY = "export_meta_v1";
 export const EXPORT_MARKET_KEY = "export_market_v1";
+export const EXPORT_COUPANG_KEY = "export_coupang_v1";
 
 export interface ExportMeta {
   exportedAt: string;

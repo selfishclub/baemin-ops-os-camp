@@ -261,7 +261,8 @@ export default function ChannelsPage() {
         </section>
       )}
 
-      <BaeminSettleSection month={month} txs={ledger.txs} nextTxs={ledger.nextTxs} sales={ledger.sales} onSaved={ledger.reload} />
+      <BaeminSettleSection platform="baemin" month={month} txs={ledger.txs} nextTxs={ledger.nextTxs} sales={ledger.sales} onSaved={ledger.reload} />
+      <BaeminSettleSection platform="coupang" month={month} txs={ledger.txs} nextTxs={ledger.nextTxs} sales={ledger.sales} onSaved={ledger.reload} />
 
       {asking && (
         <ConfirmDialog title="숫자를 한 번 더 확인해 주세요" confirmLabel="맞아요, 저장" onConfirm={save} onCancel={() => setAsking(false)}>
