@@ -83,6 +83,12 @@ describe("기회 키워드", () => {
     expect(ops[0].tracked).toBe(true);
     expect(ops.find((o) => o.keyword === "청주포장맛집")?.reason).toContain("안 재 봤어요");
   });
+  it("조회해 둔 검색수 가운데 우리 지역 말이 없는 것(항공권)은 빼고, 있는 것(율량동회식)은 넣는다", () => {
+    const v = { 항공권: { total: 1136500, pc: 1, mobile: 1, under10: false, at: "2026-10-15" }, 율량동회식: { total: 250, pc: 1, mobile: 1, under10: false, at: "2026-10-15" } };
+    const keys = opportunities(data, v, {}, []).map((o) => o.keyword);
+    expect(keys).not.toContain("항공권");
+    expect(keys).toContain("율량동회식");
+  });
 });
 
 describe("5칸 초안", () => {

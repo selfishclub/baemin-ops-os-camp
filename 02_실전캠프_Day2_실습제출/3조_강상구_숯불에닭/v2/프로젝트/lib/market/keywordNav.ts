@@ -170,6 +170,13 @@ const normalizeRanks = (ranks: Record<string, number | null>) => {
   return out;
 };
 
+/** 우리 지역 말이 들어간 키워드인가 — 네이버가 덧붙여 준 연관 키워드(항공권 등)에서 우리 것만 고를 때 */
+export function isOurs(keyword: string, data: KeywordNavData | null): boolean {
+  if (!data) return true;
+  const k = normalizeKeyword(keyword);
+  return data.regions.some((r) => k.includes(normalizeKeyword(r.keyword)));
+}
+
 /**
  * 검색수가 있는데(≥ minVolume) 아직 상위(≤ goodRank)가 아닌 키워드. 검색수 큰 순.
  * ranks: 추적 기록의 최근 순위 (키워드 → 순위, null = 50위 밖). 기록이 없으면 "아직 안 재 봤다"로 둔다.
@@ -181,7 +188,7 @@ export function opportunities(data: KeywordNavData, volumes: VolumeMap, ranks: R
   const nr = normalizeRanks(ranks);
   const out: Opportunity[] = [];
   const seen = new Set<string>();
-  const keys = [...data.nav.filter((n) => n.axis === "조합").map((n) => n.keyword), ...Object.keys(volumes)];
+  const keys = [...data.nav.filter((n) => n.axis === "조합").map((n) => n.keyword), ...Object.keys(volumes).filter((k) => isOurs(k, data))];
   for (const raw of keys) {
     const k = normalizeKeyword(raw);
     if (seen.has(k)) continue;

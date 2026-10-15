@@ -7,7 +7,7 @@ import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
 import { todayStr } from "@/lib/daily";
 import { num } from "@/lib/format";
-import { CORE_TAILS, KEYWORD_NAV_KEY, KEYWORD_VOLUMES_KEY, SLOT_MAX, TYPE_ACTION, buildCombos, compareSlots, draftSlots, mainRegions, menuCoverage, normalizeKeyword, opportunities, parseWorkbook, regionGrade, volumeOf, type KeywordNavData, type PlaceType, type RegionGrade, type VolumeMap } from "@/lib/market/keywordNav";
+import { CORE_TAILS, KEYWORD_NAV_KEY, KEYWORD_VOLUMES_KEY, SLOT_MAX, TYPE_ACTION, buildCombos, compareSlots, draftSlots, mainRegions, menuCoverage, isOurs, normalizeKeyword, opportunities, parseWorkbook, regionGrade, volumeOf, type KeywordNavData, type PlaceType, type RegionGrade, type VolumeMap } from "@/lib/market/keywordNav";
 import { EMPTY_PLACE_KEYWORDS, PLACE_KEYWORDS_KEY, keywordSummaries, type PlaceKeywords } from "@/lib/market/rank";
 import { getStore } from "@/lib/storage";
 
@@ -114,11 +114,13 @@ export default function KeywordNavPage() {
         setMsg({ tone: "warn", text: j.message ?? "검색수를 읽지 못했어요." });
         return;
       }
+      // 연관 키워드는 우리 지역 말이 든 것만 남긴다 (청주공항을 물으면 항공권 같은 게 섞여 온다)
+      const ours = (j.related ?? []).filter((r) => isOurs(r.keyword, data));
       const next: VolumeMap = { ...volumes };
-      for (const v of [...(j.exact ?? []), ...(j.related ?? [])]) next[v.keyword] = { total: v.total, pc: v.pc, mobile: v.mobile, under10: v.under10, at: today };
+      for (const v of [...(j.exact ?? []), ...ours]) next[v.keyword] = { total: v.total, pc: v.pc, mobile: v.mobile, under10: v.under10, at: today };
       saveVolumes(next);
-      setRelated((j.related ?? []).slice(0, 20).map((r) => ({ keyword: r.keyword, total: r.total })));
-      setMsg({ tone: "ok", text: `${j.exact?.length ?? 0}개 검색수를 받았어요${j.related?.length ? ` · 네이버가 함께 알려준 연관 키워드 ${j.related.length}개도 저장` : ""}` });
+      setRelated(ours.slice(0, 20).map((r) => ({ keyword: r.keyword, total: r.total })));
+      setMsg({ tone: "ok", text: `${j.exact?.length ?? 0}개 검색수를 받았어요${ours.length ? ` · 네이버가 함께 알려준 우리 지역 연관 키워드 ${ours.length}개도 저장` : ""}` });
     } catch {
       setHelperReady(null);
       setMsg({ tone: "error", text: "도우미에 연결하지 못했어요. 리뷰 수집기 폴더에서 npm run helper 를 켜 주세요." });
