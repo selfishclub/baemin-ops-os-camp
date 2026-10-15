@@ -47,9 +47,9 @@ export default function KeywordNavPage() {
     const store = getStore();
     void Promise.all([store.getSetting<KeywordNavData>(KEYWORD_NAV_KEY), store.getSetting<VolumeMap>(KEYWORD_VOLUMES_KEY), store.getSetting<PlaceKeywords>(PLACE_KEYWORDS_KEY)]).then(([d, v, p]) => {
       setData(d ?? null);
-      // 전에 저장된 연관 키워드 가운데 우리 지역 말이 없는 것(항공권 등)은 한 번 걸러 낸다
+      // 네이버가 덧붙여 준 연관 키워드 가운데 우리 것이 아닌 것(항공권 등)은 걸러 낸다. 내가 직접 물은 것은 그대로 둔다
       const vols = v ?? {};
-      const cleaned = d ? Object.fromEntries(Object.entries(vols).filter(([k]) => isOurs(k, d))) : vols;
+      const cleaned = d ? Object.fromEntries(Object.entries(vols).filter(([k, e]) => !e.related || isOurs(k, d))) : vols;
       setVolumes(cleaned);
       if (Object.keys(cleaned).length !== Object.keys(vols).length) void store.saveSetting(KEYWORD_VOLUMES_KEY, cleaned).catch(() => {});
       if (p) setPk({ ...EMPTY_PLACE_KEYWORDS, ...p, slots: [...EMPTY_PLACE_KEYWORDS.slots].map((s, i) => p.slots?.[i] ?? s) as PlaceKeywords["slots"] });
@@ -121,7 +121,8 @@ export default function KeywordNavPage() {
       // 연관 키워드는 우리 지역 말이 든 것만 남긴다 (청주공항을 물으면 항공권 같은 게 섞여 온다)
       const ours = (j.related ?? []).filter((r) => isOurs(r.keyword, data));
       const next: VolumeMap = { ...volumes };
-      for (const v of [...(j.exact ?? []), ...ours]) next[v.keyword] = { total: v.total, pc: v.pc, mobile: v.mobile, under10: v.under10, at: today };
+      for (const v of j.exact ?? []) next[v.keyword] = { total: v.total, pc: v.pc, mobile: v.mobile, under10: v.under10, at: today };
+      for (const v of ours) if (!next[v.keyword]) next[v.keyword] = { total: v.total, pc: v.pc, mobile: v.mobile, under10: v.under10, at: today, related: true };
       saveVolumes(next);
       setRelated(ours.slice(0, 20).map((r) => ({ keyword: r.keyword, total: r.total })));
       setMsg({ tone: "ok", text: `${j.exact?.length ?? 0}개 검색수를 받았어요${ours.length ? ` · 네이버가 함께 알려준 우리 지역 연관 키워드 ${ours.length}개도 저장` : ""}` });

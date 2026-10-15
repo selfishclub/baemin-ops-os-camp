@@ -41,6 +41,7 @@ export interface VolumeEntry {
   mobile: number;
   under10: boolean;
   at: string; // 조회한 날짜
+  related?: boolean; // 내가 물은 게 아니라 네이버가 덧붙여 준 연관 키워드
 }
 export type VolumeMap = Record<string, VolumeEntry>;
 
