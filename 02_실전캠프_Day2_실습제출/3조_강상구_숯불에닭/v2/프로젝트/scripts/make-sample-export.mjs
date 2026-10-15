@@ -80,9 +80,21 @@ const stats = {
   "2026-10": { orderAmount: 3_010_000, orderCount: 136, groups: { CPC: { cost: 77_000, orderCount: 24, orderAmount: 520_000 } } },
 };
 
+// 상권 조사 (가짜) — 반경 500m 점포 · 동 인구 · 검색 흐름 · 경쟁 가게 변화
+const KINDS = [["음식", "한식", "닭/오리요리"], ["음식", "한식", "국밥"], ["음식", "카페", "커피전문점"], ["음식", "분식", "분식"], ["음식", "한식", "고기구이"], ["소매", "종합소매", "편의점"], ["서비스", "미용", "미용실"], ["음식", "치킨", "치킨"], ["음식", "중식", "중식당"]];
+const mkStores = (n, offset) => Array.from({ length: n }, (_, i) => { const k = KINDS[(i + offset) % KINDS.length]; return { id: `S${i + offset}`, name: `가짜 ${k[2]} ${i + offset}호`, large: k[0], mid: k[1], small: k[2], addr: "충북 청주시 청원구 율량동 (가짜)" }; });
+const areaNow = { surveyedAt: TODAY, center: { lat: 36.66, lng: 127.49 }, radius: 500, total: 180, stores: mkStores(180, 0) };
+const areaPrev = { surveyedAt: "2026-09-12", center: { lat: 36.66, lng: 127.49 }, radius: 500, total: 176, stores: [...mkStores(170, 0), ...mkStores(6, 400)] };
+const months12 = Array.from({ length: 12 }, (_, i) => new Date(Date.UTC(2025, 10 + i, 1)).toISOString().slice(0, 7));
+const trendGroups = KEYWORDS.map((k, gi) => ({ name: k, keywords: [k], data: months12.map((period, i) => ({ period, ratio: Math.round(40 + 30 * Math.sin(((i + gi * 2) / 12) * Math.PI * 2) + (i === 1 + gi ? 25 : 0) + rnd() * 8) })) }));
+const compRows = (bump) => Array.from({ length: 10 }, (_, i) => ({ id: `C${i}`, rank: i + 1, name: i === 5 ? "숯불에닭 청주율량점 (가짜)" : `가짜 닭갈비 ${i + 1}호`, visitor: 900 - i * 60 + bump * (i % 3), blog: 100 - i * 5 }));
+const competitors = KEYWORDS.map((k) => ({ keyword: k, first: { date: day(20), rows: compRows(0), mine: { id: "C5", rank: 6, name: "숯불에닭 청주율량점 (가짜)", visitor: 600, blog: 75 } }, latest: { date: day(44), rows: compRows(15), mine: { id: "C5", rank: 4, name: "숯불에닭 청주율량점 (가짜)", visitor: 648, blog: 78 } } }));
+const market = { area: { ...areaNow, prev: areaPrev }, population: { admName: "충청북도 청주시 청원구 율량동 (가짜)", admCd: "3304000", year: 2025, total: 38_412, avgAge: 41.3, households: 15_820, fetchedAt: TODAY }, trend: { fetchedAt: TODAY, start: months12[0], end: months12[11], groups: trendGroups }, competitors };
+
 const out = {
   kind: "sootdak-ledger-export", version: 1, exportedAt: `${TODAY}T08:30:00.000Z`, shop: { name: "숯불에닭 청주율량점 (가짜)" },
   reviews, rank: { shop: "숯불에닭 청주율량점 (가짜)", shopId: "0000000000", keywords: KEYWORDS, history, latest },
+  market,
   baemin: { collectedAt: `${TODAY}T08:00:00.000Z`, orderRange: { start: day(0), end: day(44) }, settlements, orders, stats, unknownCodes: [] },
 };
 const file = path.join("public", "sample", "가짜_리뷰수집기_내보내기.json");

@@ -7,8 +7,12 @@ import { Notice } from "@/components/ui";
 import { todayStr } from "@/lib/daily";
 import { num } from "@/lib/format";
 import { CHANGE_TODO, EMPTY_PLACE_KEYWORDS, PLACE_KEYWORDS_KEY, SLOT_HINTS, SLOT_LABELS, keywordSummaries, nextSeasonKeyword, rankSeries, rankText, type PlaceKeywords } from "@/lib/market/rank";
+import { areaSummary, competitorRows, trendSummary } from "@/lib/market/area";
 import { getStore } from "@/lib/storage";
 import type { DailySale } from "@/lib/types";
+
+const SAME_WORDS = ["닭", "치킨", "닭갈비"];
+const MONTH = (p: string) => `${Number(p.slice(5, 7))}월`;
 
 const LINKS = [
   { name: "네이버 검색광고 키워드 도구", url: "https://searchad.naver.com/", why: "한 달 검색량·경쟁 정도 (카페스이가 시즌 키워드 고를 때 보던 곳)" },
@@ -54,6 +58,14 @@ export default function MarketPage() {
   const series = useMemo(() => (rank && keyword ? rankSeries(rank.history, keyword, 30) : []), [rank, keyword]);
   const latestResult = rank?.latest?.results.find((r) => r.keyword === keyword) ?? null;
   const nextSeason = nextSeasonKeyword(pk, today);
+  // 우리 동네 (npm run market 결과). 같은 종류 가게는 우리 가게 업종 글자로 고른다 — 닭·치킨·닭갈비
+  const market = exp.market;
+  const area = useMemo(() => (market?.area ? areaSummary(market.area, SAME_WORDS) : null), [market]);
+  const trends = useMemo(() => (market?.trend ? market.trend.groups.map(trendSummary) : []), [market]);
+  const competitor = useMemo(() => {
+    const c = market?.competitors.find((x) => x.keyword === keyword) ?? market?.competitors[0];
+    return c ? competitorRows(c) : null;
+  }, [market, keyword]);
 
   if (!exp.loaded) return <p className="py-10 text-center text-sm text-stone-500">불러오는 중…</p>;
 
@@ -150,6 +162,140 @@ export default function MarketPage() {
             })}
           </ol>
           {latestResult.adNames.length > 0 && <p className="text-xs text-stone-500">광고로 위에 뜬 가게: {latestResult.adNames.join(", ")}</p>}
+        </section>
+      )}
+
+      {/* 우리 동네 — 점포 · 인구 */}
+      <section className="card space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-base font-bold">우리 동네는 어떤가</h2>
+          <span className="text-xs text-stone-500">공공데이터 상가정보 · 통계청 · 한 달에 한 번 <code>npm run market</code></span>
+        </div>
+        {!market || (!area && !market.population) ? (
+          <Notice tone="info">
+            아직 동네 조사 자료가 없어요. 리뷰 수집기 .env.local 에 공공데이터포털·통계청 키(무료)를 넣고 <code>npm run market</code> → <code>npm run export:ledger</code> 뒤 파일을 올리면, 반경 500m 안 점포 수·같은 업종 가게·동 인구가 보여요.
+          </Notice>
+        ) : (
+          <>
+            {area && (
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div className="rounded-xl bg-stone-50 px-3 py-2">
+                  <p className="text-xs font-semibold text-stone-500">반경 {area.radius}m 안 점포</p>
+                  <p className="num mt-0.5 text-lg font-bold">{num(area.total)}곳</p>
+                  <p className="num text-[11px] text-stone-500">{area.byLarge.slice(0, 3).map((b) => `${b.name} ${b.count}`).join(" · ")}</p>
+                </div>
+                <div className="rounded-xl bg-stone-50 px-3 py-2">
+                  <p className="text-xs font-semibold text-stone-500">음식점 종류</p>
+                  <p className="num mt-0.5 text-sm">{area.food.slice(0, 5).map((f) => `${f.name} ${f.count}`).join(" · ") || "–"}</p>
+                </div>
+                <div className={`rounded-xl px-3 py-2 ${area.same.length ? "bg-orange-50" : "bg-stone-50"}`}>
+                  <p className="text-xs font-semibold text-stone-500">같은 종류 가게 (닭·치킨)</p>
+                  <p className="num mt-0.5 text-lg font-bold">{num(area.same.length)}곳</p>
+                  <p className="truncate text-[11px] text-stone-500">{area.same.slice(0, 4).map((x) => x.name).join(", ")}</p>
+                </div>
+              </div>
+            )}
+            {area?.prev && (
+              <p className="text-sm">
+                <b>{area.prev.surveyedAt}</b> 조사와 비교: 새로 생긴 가게 <b className="num text-emerald-700">{area.prev.opened.length}</b>
+                {area.prev.opened.length > 0 && <span className="text-xs text-stone-500"> ({area.prev.opened.slice(0, 5).map((x) => x.name).join(", ")})</span>} · 사라진 가게 <b className="num text-red-700">{area.prev.closed.length}</b>
+                {area.prev.closed.length > 0 && <span className="text-xs text-stone-500"> ({area.prev.closed.slice(0, 5).map((x) => x.name).join(", ")})</span>}
+              </p>
+            )}
+            {market.population && (
+              <p className="num text-sm text-stone-700">
+                {market.population.admName} 인구 <b>{num(market.population.total)}명</b> ({market.population.year}년)
+                {market.population.avgAge !== null && <> · 평균 {market.population.avgAge}세</>}
+                {market.population.households !== null && <> · {num(market.population.households)}가구</>}
+              </p>
+            )}
+            {area && <p className="num text-xs text-stone-400">조사일 {area.surveyedAt} · 공공데이터 상가정보는 등록 기준이라 실제와 몇 곳 다를 수 있어요</p>}
+          </>
+        )}
+      </section>
+
+      {/* 검색 흐름 */}
+      {trends.length > 0 && market?.trend && (
+        <section className="card space-y-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-base font-bold">
+              키워드 검색 흐름 <span className="text-xs font-normal text-stone-500">네이버 데이터랩 · 최근 12개월</span>
+            </h2>
+            <span className="num text-xs text-stone-500">
+              {MONTH(market.trend.start)} ~ {MONTH(market.trend.end)}
+            </span>
+          </div>
+          <ul className="space-y-2">
+            {market.trend.groups.map((g, gi) => {
+              const t = trends[gi];
+              const max = Math.max(1, ...g.data.map((d) => d.ratio));
+              return (
+                <li key={g.name} className="rounded-xl bg-stone-50 px-3 py-2">
+                  <p className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                    <b>{g.name}</b>
+                    <span className="num text-xs text-stone-600">
+                      {t.bestMonth !== null && (
+                        <>
+                          가장 많이 찾는 달 <b>{t.bestMonth}월</b> → ⑤칸은 <b>{t.prepareMonth}월</b>에 바꾸기
+                        </>
+                      )}
+                      {t.latestVsAvg !== null && <> · 지금은 평소의 {Math.round(t.latestVsAvg * 100)}%</>}
+                    </span>
+                  </p>
+                  <div className="mt-1 flex h-12 items-end gap-0.5">
+                    {g.data.map((d) => (
+                      <div key={d.period} className="flex flex-1 flex-col items-center" title={`${d.period} ${d.ratio}`}>
+                        <div className={`w-full rounded-t ${t.peakMonths.includes(Number(d.period.slice(5, 7))) ? "bg-orange-500" : "bg-orange-200"}`} style={{ height: `${Math.max(2, (d.ratio / max) * 36)}px` }} />
+                        <span className="text-[9px] text-stone-400">{Number(d.period.slice(5, 7))}</span>
+                      </div>
+                    ))}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-xs text-stone-500">진한 막대가 평소보다 20% 넘게 많이 찾은 달이에요. 검색량은 그 기간 최대를 100으로 둔 비율이라 키워드끼리 크기 비교는 안 돼요.</p>
+        </section>
+      )}
+
+      {/* 경쟁 가게 변화 */}
+      {competitor && competitor.rows.length > 0 && (
+        <section className="card space-y-2">
+          <h2 className="text-base font-bold">
+            경쟁 가게 변화{" "}
+            <span className="num text-xs font-normal text-stone-500">
+              "{keyword}" · {competitor.from} → {competitor.to} ({competitor.days}일)
+            </span>
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[26rem] text-sm">
+              <thead className="text-left text-xs text-stone-500">
+                <tr>
+                  <th className="py-1">가게</th>
+                  <th className="text-right">순위</th>
+                  <th className="text-right">방문자 리뷰</th>
+                  <th className="text-right">그동안 늘어난 리뷰</th>
+                </tr>
+              </thead>
+              <tbody className="num divide-y divide-stone-100">
+                {competitor.rows.slice(0, 12).map((r) => (
+                  <tr key={r.id} className={r.mine ? "bg-orange-50 font-bold" : ""}>
+                    <td className="py-1">
+                      {r.name}
+                      {r.mine && " ← 우리"}
+                    </td>
+                    <td className="text-right">
+                      {r.rankNow ?? "밖"}
+                      {r.rankFirst !== null && r.rankNow !== null && r.rankFirst !== r.rankNow && <span className={`ml-1 text-xs ${r.rankNow < r.rankFirst ? "text-emerald-700" : "text-red-700"}`}>({r.rankFirst}→)</span>}
+                    </td>
+                    <td className="text-right">{r.visitorNow === null ? "–" : num(r.visitorNow)}</td>
+                    <td className={`text-right ${(r.visitorGain ?? 0) > 0 ? "text-emerald-700" : ""}`}>{r.visitorGain === null ? <span className="text-stone-300">새로 올라옴</span> : `+${num(r.visitorGain)}`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-stone-500">리뷰가 빨리 느는 가게가 손님을 끌어가는 가게예요. 우리보다 빠르면 그 가게 리뷰에서 손님이 뭘 좋아하는지 보세요.</p>
         </section>
       )}
 

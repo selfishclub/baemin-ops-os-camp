@@ -93,6 +93,62 @@ export interface BaeminExport {
   unknownCodes: { code: string; count: number }[];
 }
 
+// ── 상권 조사 (npm run market) ──────────────────────────────────────────
+export interface MarketStore {
+  id: string;
+  name: string;
+  large: string | null; // 업종 대분류 (음식·소매·…)
+  mid: string | null; // 중분류 (한식·카페·…)
+  small: string | null; // 소분류 (닭/오리요리·커피전문점·…)
+  addr: string | null;
+}
+export interface MarketArea {
+  surveyedAt: string;
+  center: { lat: number; lng: number };
+  radius: number; // m
+  total: number;
+  stores: MarketStore[];
+  prev?: MarketArea | null; // 지난 조사 (다른 달)
+}
+export interface MarketPopulation {
+  admName: string; // 충청북도 청주시 청원구 율량동
+  admCd: string;
+  year: number;
+  total: number;
+  avgAge: number | null;
+  households: number | null;
+  fetchedAt: string;
+}
+export interface MarketTrendGroup {
+  name: string;
+  keywords: string[];
+  data: { period: string; ratio: number }[]; // "2026-10", 상대 검색량 (최대 100)
+}
+export interface MarketTrend {
+  fetchedAt: string;
+  start: string;
+  end: string;
+  groups: MarketTrendGroup[];
+}
+export interface MarketCompetitorRow {
+  id: string;
+  rank: number | null;
+  name: string;
+  visitor: number | null;
+  blog: number | null;
+}
+export interface MarketCompetitor {
+  keyword: string;
+  first: { date: string; rows: MarketCompetitorRow[]; mine: MarketCompetitorRow | null };
+  latest: { date: string; rows: MarketCompetitorRow[]; mine: MarketCompetitorRow | null };
+}
+export interface MarketExport {
+  area: MarketArea | null;
+  population: MarketPopulation | null;
+  trend: MarketTrend | null;
+  competitors: MarketCompetitor[];
+}
+
 export interface LedgerExport {
   kind: "sootdak-ledger-export";
   version: 1;
@@ -101,6 +157,7 @@ export interface LedgerExport {
   reviews: ExportReview[];
   rank: RankExport | null;
   baemin: BaeminExport | null;
+  market?: MarketExport | null;
 }
 
 // 저장 키 (설정 칸에 통째로 둔다)
@@ -108,6 +165,7 @@ export const EXPORT_REVIEWS_KEY = "export_reviews_v1";
 export const EXPORT_RANK_KEY = "export_rank_v1";
 export const EXPORT_BAEMIN_KEY = "export_baemin_v1";
 export const EXPORT_META_KEY = "export_meta_v1";
+export const EXPORT_MARKET_KEY = "export_market_v1";
 
 export interface ExportMeta {
   exportedAt: string;
@@ -116,3 +174,5 @@ export interface ExportMeta {
   rankPoints: number;
   settlements: number;
 }
+
+// 상권 조사 저장 키는 위 EXPORT_MARKET_KEY (2026-10-15)

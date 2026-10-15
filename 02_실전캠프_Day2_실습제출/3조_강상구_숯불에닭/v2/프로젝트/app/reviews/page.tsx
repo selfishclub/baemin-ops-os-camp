@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ExportUploadCard } from "@/components/ExportUploadCard";
+import { MarketingIdeasCard, MonthlyReportCard } from "@/components/ReviewMonthlyCards";
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
 import type { ExportReview } from "@/lib/export/types";
@@ -133,6 +134,10 @@ export default function ReviewsPage() {
             <h2 className="text-base font-bold">달마다 들어온 리뷰 <span className="text-xs font-normal text-stone-500">최근 12개월</span></h2>
             <Bars rows={stats.monthly.map((m) => ({ label: `${Number(m.month.slice(5))}월`, value: m.count, sub: m.avgRating === null ? "" : `★${m.avgRating.toFixed(1)}` }))} horizontal={false} />
           </section>
+
+          {/* 한달 분석 · 마케팅 자료 (카페스이 틀) */}
+          <MonthlyReportCard reviews={exp.reviews} today={today} />
+          <MarketingIdeasCard reviews={exp.reviews} today={today} />
 
           {/* 주제 */}
           {stats.topics.length > 0 && (
