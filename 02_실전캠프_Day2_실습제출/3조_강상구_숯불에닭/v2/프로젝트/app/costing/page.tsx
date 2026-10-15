@@ -7,9 +7,11 @@ import { useLedger } from "@/components/useLedger";
 import { useDaily } from "@/components/useDaily";
 import PurchaseSection from "@/components/PurchaseSection";
 import { PriceTrendCard } from "@/components/PriceTrendCard";
+import { PriceSimCard } from "@/components/PriceSimCard";
 import { newId } from "@/lib/classify";
 import { buildCostRateReport, recipeUnitCost } from "@/lib/costing/costRate";
 import { PURCHASES_KEY_PREFIX, costFromPurchases, type Purchase } from "@/lib/costing/purchases";
+import { defaultFeeRatePct } from "@/lib/costing/priceSim";
 import { mergePosReports, parsePosAbcGrid, PosParseError } from "@/lib/costing/okpos";
 import sample from "@/lib/costing/sample.json";
 import { ITEMS_KEY, MENUS_KEY, POS_KEY_PREFIX, RECIPES_KEY, type BaseUnit, type Item, type Menu, type PosSalesReport, type Recipe } from "@/lib/costing/types";
@@ -107,6 +109,8 @@ export default function CostingPage() {
 
   // 서비스·할인이 많이 나간 메뉴 (레시피 있는 것·없는 것 다 본다).
   // 위에 조건부 return이 있어서 훅(useMemo)을 쓰면 안 된다 — 그냥 계산한다.
+  // 가격 실험의 수수료 가정 기본값 — 이 달 정산·통장에서 어림
+  const feePct = defaultFeeRatePct(ledger.sales, ledger.txs);
   const giveawayRows = report ? [...report.rows, ...report.unmapped].filter((r) => (r.giveaway ?? 0) > 0).sort((a, b) => b.giveaway! - a.giveaway!) : [];
 
   return (
@@ -270,6 +274,8 @@ export default function CostingPage() {
               </table>
             </div>
           </section>
+
+          <PriceSimCard report={report} defaultFeePct={feePct} />
 
           <section className="card space-y-2">
             <h2 className="text-base font-bold">품목별 이론 사용량 <span className="text-xs font-normal text-stone-500">이만큼 나갔어야 해요</span></h2>
