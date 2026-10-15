@@ -132,10 +132,16 @@ export function inspectBackup(text: string): BackupInspection {
   const data: LocalData = { ...emptyData(), ...(raw as Partial<LocalData>) };
 
   // 2) 줄 단위 검사 — 날짜·금액·필수 칸·중복·참조
+  // 중복은 "경고"다, 거절이 아니다. 앱 자체가 품고 있는 데이터(예: 다른 도구가 넣은 같은 날·같은 카드사 두 줄)를
+  // 백업조차 못 하게 되면 더 위험하다 (G단계 실제 장부에서 발견). 복원하면 그대로 복원되고, 화면에서 고치면 된다.
+  const dupCount = new Map<string, number>();
   const seen = (label: string) => {
     const s = new Set<string>();
     return (key: string, where: string) => {
-      if (s.has(key)) err(`${label}에 같은 ${where}이(가) 두 번 있어요: ${key}`);
+      if (s.has(key)) {
+        dupCount.set(label, (dupCount.get(label) ?? 0) + 1);
+        if ((dupCount.get(label) ?? 0) <= 3) warnings.push(`${label}에 같은 ${where}이(가) 두 번 있어요: ${key} — 그날 숫자가 두 번 더해질 수 있어요. 화면에서 그날을 다시 저장하면 한 줄로 정리돼요.`);
+      }
       s.add(key);
     };
   };

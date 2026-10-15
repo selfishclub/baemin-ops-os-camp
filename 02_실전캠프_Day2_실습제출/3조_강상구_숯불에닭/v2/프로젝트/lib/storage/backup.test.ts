@@ -140,17 +140,29 @@ describe("4. 필수 데이터 누락", () => {
 });
 
 describe("5. 중복·잘못된 참조", () => {
-  it("같은 거래 id 두 번 → 거절", () => {
+  it("같은 거래 id 두 번 → 경고만, 백업·복원은 된다 (거절하면 앱이 품은 데이터를 백업조차 못 한다)", () => {
     const bad = fakeData();
     bad.transactions.push(tx("t1"));
     const ins = inspectBackup(wrap(bad));
-    expect(ins.ok).toBe(false);
-    if (!ins.ok) expect(ins.errors[0]).toContain("두 번");
+    expect(ins.ok).toBe(true);
+    if (ins.ok) expect(ins.warnings.join(" ")).toContain("두 번");
   });
-  it("같은 날·같은 채널 일별 매출 두 번 → 거절", () => {
+  it("같은 날·같은 채널 일별 매출 두 번 → 경고만 (G단계 실제 장부에서 발견된 경우)", () => {
     const bad = fakeData();
     bad.dailySales.push(sale("2026-09-05"));
-    expect(inspectBackup(wrap(bad)).ok).toBe(false);
+    const ins = inspectBackup(wrap(bad));
+    expect(ins.ok).toBe(true);
+    if (ins.ok) {
+      expect(ins.warnings.some((w) => w.includes("2026-09-05/hall_card"))).toBe(true);
+      expect(ins.summary.dailySales).toBe(4); // 그대로 보존 — 지우지 않는다
+    }
+  });
+  it("중복 경고는 종류별 3개까지만 보여 준다 (수백 개면 화면이 넘친다)", () => {
+    const many = fakeData();
+    for (let i = 0; i < 10; i++) many.dailySales.push(sale("2026-09-05"));
+    const ins = inspectBackup(wrap(many));
+    expect(ins.ok).toBe(true);
+    if (ins.ok) expect(ins.warnings.filter((w) => w.includes("일별 매출")).length).toBe(3);
   });
   it("없는 직원을 가리키는 근무 → 경고만 (복원은 됨)", () => {
     const d = fakeData();
