@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ExportStatusLine } from "@/components/ExportUploadCard";
 import { SourceTag } from "@/components/SourceTag";
+import { ReplyEditor } from "@/components/ReplyEditor";
 import { MarketingIdeasCard, MonthlyReportCard } from "@/components/ReviewMonthlyCards";
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
@@ -181,7 +182,7 @@ export default function ReviewsPage() {
                   <ReviewRow key={`${r.platform}-${r.id}`} r={r} today={today} />
                 ))}
             </ul>
-            <p className="text-xs text-stone-500">초안은 복사해서 플랫폼 사장님 화면에 붙여 넣으세요. 등록 버튼은 사장님이 누릅니다.</p>
+            <p className="text-xs text-stone-500">초안을 고쳐 “확정”하면 “답글칸 채우기”로 도우미가 플랫폼 답글칸까지 넣어 줘요. 등록 버튼은 사장님이 직접 누릅니다.</p>
           </section>
         </>
       )}
@@ -245,16 +246,8 @@ function Bars({ rows, horizontal = true }: { rows: { label: string; value: numbe
 }
 
 function ReviewRow({ r, today }: { r: ExportReview; today: string }) {
-  const [copied, setCopied] = useState(false);
   const left = replyDaysLeft(r, today);
-  async function copy() {
-    if (!r.draft) return;
-    try {
-      await navigator.clipboard.writeText(r.draft.text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
-  }
+  const isUnansweredRow = !r.reply; // 초안이 없어도 미답변이면 직접 쓸 수 있게
   return (
     <li className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-stone-200">
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -266,17 +259,8 @@ function ReviewRow({ r, today }: { r: ExportReview; today: string }) {
         {left !== null && left >= 0 && <span className={`num ml-auto rounded px-1.5 py-0.5 ${left <= 5 ? "bg-red-50 text-red-700" : "bg-stone-100 text-stone-600"}`}>답글 {left}일 남음</span>}
       </div>
       <p className="mt-1 whitespace-pre-wrap text-stone-800">{r.content}</p>
-      {r.draft && (
-        <div className="mt-2 rounded-lg bg-stone-50 px-2 py-1.5">
-          <p className="flex items-center justify-between text-[11px] font-semibold text-stone-500">
-            답글 초안{r.draft.needsOwnerInput && <span className="text-amber-700">사장님이 채울 자리 있음</span>}
-            <button className="rounded bg-stone-800 px-2 py-0.5 text-[11px] font-bold text-white" onClick={copy}>
-              {copied ? "복사됨" : "복사"}
-            </button>
-          </p>
-          <p className="mt-1 whitespace-pre-wrap text-xs text-stone-700">{r.draft.text}</p>
-        </div>
-      )}
+      {/* 답글 쓰기·확정·답글칸 채우기 — 등록은 사장님이 플랫폼에서 */}
+      {(r.draft || isUnansweredRow) && <ReplyEditor key={`${r.platform}-${r.id}-${r.draft?.status ?? ""}`} review={r} />}
     </li>
   );
 }
