@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ExportStatusLine } from "@/components/ExportUploadCard";
 import { SourceTag } from "@/components/SourceTag";
 import { MarketManualCard } from "@/components/MarketManualCard";
+import { RankCheckCard } from "@/components/RankCheckCard";
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
 import { todayStr } from "@/lib/daily";
@@ -106,6 +107,8 @@ export default function MarketPage() {
           </div>
         )}
       </section>
+
+      <RankCheckCard tracked={rank?.keywords ?? []} />
 
       {/* 추이 + 매출 */}
       {series.length > 0 && (
