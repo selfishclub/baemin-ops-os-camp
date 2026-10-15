@@ -162,7 +162,8 @@ export function inspectBackup(text: string): BackupInspection {
     if (!DATE.test(String(s?.date))) return err(`${at}: 날짜 형식이 틀려요 (${String(s?.date)}).`);
     if (!isStr(s.channel)) return err(`${at}: 채널이 비어 있어요.`);
     if (!isNum(s.amount)) err(`${at}: 금액이 숫자가 아니에요.`);
-    saleSeen(`${s.date}/${s.channel}`, "날짜·채널");
+    // 같은 날·같은 카드사라도 "포스 간편결제 승인(pos_easy)" 줄은 일반 승인 줄과 따로 한 줄 더 두는 게 앱 설계다 → 출처까지 같을 때만 중복
+    saleSeen(`${s.date}/${s.channel}${s.source ? `(${s.source})` : ""}`, "날짜·채널·출처");
   });
   const staffSeen = seen("직원");
   const staffIds = new Set<string>();
