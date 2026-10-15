@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ExportUploadCard } from "@/components/ExportUploadCard";
+import { ExportStatusLine } from "@/components/ExportUploadCard";
+import { SourceTag } from "@/components/SourceTag";
 import { MarketManualCard } from "@/components/MarketManualCard";
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
@@ -72,7 +73,7 @@ export default function MarketPage() {
 
   return (
     <>
-      <ExportUploadCard exp={exp} what="상권 탭의 순위" />
+      <ExportStatusLine exp={exp} need="순위 · 동네 조사" />
 
       {/* 순위 요약 */}
       <section className="card space-y-2">
@@ -81,7 +82,7 @@ export default function MarketPage() {
           {rank?.latest && <span className="num text-xs text-stone-500">마지막으로 읽은 날 {rank.latest.date}</span>}
         </div>
         {!rank || summaries.length === 0 ? (
-          <Notice tone="info">순위 기록이 아직 없어요. 리뷰 수집기에서 <code>npm run rank</code> 를 돌린 뒤 내보내기 파일을 올리면 키워드별 순위가 보여요.</Notice>
+          <Notice tone="info">순위 기록이 아직 없어요. 리뷰 수집기에서 <code>npm run rank</code> 를 돌린 뒤 올리기 탭에서 내보내기 파일을 올리면 키워드별 순위가 보여요.</Notice>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2">
             {summaries.map((s) => (
@@ -169,7 +170,10 @@ export default function MarketPage() {
       {/* 우리 동네 — 점포 · 인구 */}
       <section className="card space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-bold">우리 동네는 어떤가</h2>
+          <h2 className="text-base font-bold">
+            우리 동네는 어떤가
+            <SourceTag from="ReTi" />
+          </h2>
           <span className="text-xs text-stone-500">공공데이터 상가정보 · 통계청 · 한 달에 한 번 <code>npm run market</code></span>
         </div>
         {!market || (!area && !market.population) ? (
@@ -305,7 +309,10 @@ export default function MarketPage() {
       {/* 대표 키워드 5칸 */}
       <section className="card space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-bold">스마트플레이스 대표 키워드 5칸</h2>
+          <h2 className="text-base font-bold">
+            스마트플레이스 대표 키워드 5칸
+            <SourceTag from="카페스이" />
+          </h2>
           <span className="text-xs text-stone-500">카페스이 방식 — 네 칸은 고정, ⑤칸만 시즌마다</span>
         </div>
         <p className="text-sm text-stone-600">

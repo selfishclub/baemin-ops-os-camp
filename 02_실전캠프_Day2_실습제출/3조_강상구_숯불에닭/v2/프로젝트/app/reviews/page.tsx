@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ExportUploadCard } from "@/components/ExportUploadCard";
+import { ExportStatusLine } from "@/components/ExportUploadCard";
+import { SourceTag } from "@/components/SourceTag";
 import { MarketingIdeasCard, MonthlyReportCard } from "@/components/ReviewMonthlyCards";
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
@@ -26,16 +27,19 @@ export default function ReviewsPage() {
 
   return (
     <>
-      <ExportUploadCard exp={exp} what="리뷰 탭" />
+      <ExportStatusLine exp={exp} need="리뷰 탭" />
 
       {!stats ? (
-        <Notice tone="info">아직 리뷰 자료가 없어요. 위에서 내보내기 파일을 올리면 이번 주 리뷰 · 먼저 답할 리뷰 · 플랫폼별 답변률이 보여요.</Notice>
+        <Notice tone="info">아직 리뷰 자료가 없어요. 올리기 탭에서 리뷰 수집기 파일을 올리면 이번 주 리뷰 · 먼저 답할 리뷰 · 플랫폼별 답변률 · 한달 분석 · 마케팅 자료가 보여요.</Notice>
       ) : (
         <>
           {/* 이번 주 vs 지난주 */}
           <section className="card space-y-2">
             <div className="flex items-baseline justify-between">
-              <h2 className="text-base font-bold">이번 주 vs 지난주</h2>
+              <h2 className="text-base font-bold">
+                이번 주 vs 지난주
+                <SourceTag from="카페스이" />
+              </h2>
               <span className="num text-xs text-stone-500">
                 {stats.thisWeek.from.slice(5)} ~ {stats.thisWeek.to.slice(5)} · 전체 {num(stats.total)}건
               </span>
@@ -51,7 +55,10 @@ export default function ReviewsPage() {
           {/* 오늘 먼저 볼 것 */}
           <section className="card space-y-2">
             <div className="flex items-baseline justify-between">
-              <h2 className="text-base font-bold">오늘 먼저 볼 것</h2>
+              <h2 className="text-base font-bold">
+                오늘 먼저 볼 것
+                <SourceTag from="카페스이" />
+              </h2>
               <span className="text-xs text-stone-500">답글을 달 수 있는 리뷰만</span>
             </div>
             {stats.first.length === 0 ? (

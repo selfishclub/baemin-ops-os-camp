@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { ExportReview } from "@/lib/export/types";
 import { marketingIdeas, meetingText, monthlyReport, prevMonthOf, type Channel } from "@/lib/reviews/monthly";
 import { PLATFORM_NAME, dayOf } from "@/lib/reviews/stats";
+import { SourceTag } from "@/components/SourceTag";
 import { num, pctText } from "@/lib/format";
 
 const CH_TONE: Record<Channel, string> = { 캐러셀: "bg-orange-100 text-orange-800", 릴스: "bg-violet-100 text-violet-800", "플레이스 소식": "bg-emerald-100 text-emerald-800" };
@@ -35,7 +36,10 @@ export function MonthlyReportCard({ reviews, today }: { reviews: ExportReview[];
   return (
     <section className="card space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-base font-bold">한달 분석 — 손님 리포트</h2>
+        <h2 className="text-base font-bold">
+          한달 분석 — 손님 리포트
+          <SourceTag from="카페스이" />
+        </h2>
         <div className="flex items-center gap-2">
           <select className="field w-auto py-1 text-xs" value={month} onChange={(e) => setMonth(e.target.value)}>
             {(months.length ? months : [month]).map((ym) => (
@@ -161,7 +165,10 @@ export function MarketingIdeasCard({ reviews, today }: { reviews: ExportReview[]
   return (
     <section className="card space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-base font-bold">마케팅 자료 — 손님 문장으로 게시물 주제</h2>
+        <h2 className="text-base font-bold">
+          마케팅 자료 — 손님 문장으로 게시물 주제
+          <SourceTag from="카페스이" />
+        </h2>
         <span className="text-xs text-stone-500">최근 리뷰에서 · 어디에 올릴지</span>
       </div>
       {ideas.length === 0 ? (

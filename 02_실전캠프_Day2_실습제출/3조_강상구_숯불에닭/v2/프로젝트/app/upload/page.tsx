@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { CategorySelect, MoneyInput, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
+import { ExportUploadSection } from "@/components/ExportUploadCard";
 import ExpenseSection from "@/components/ExpenseSection";
 import { BankParseError, parseBankSheet } from "@/lib/bank/parse";
 import { DEFAULT_CHANNELS, type ChannelId, type Major } from "@/lib/categories";
@@ -310,6 +311,8 @@ export default function UploadPage() {
           )}
         </section>
       )}
+      <div id="export" />
+      <ExportUploadSection />
     </>
   );
 }

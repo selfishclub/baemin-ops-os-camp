@@ -5,6 +5,7 @@ import { MoneyInput } from "@/components/ui";
 import type { CostRateReport } from "@/lib/costing/costRate";
 import { simulatePrice, type PriceSimMenu } from "@/lib/costing/priceSim";
 import { num, pctText, won } from "@/lib/format";
+import { SourceTag } from "@/components/SourceTag";
 
 const DELTAS = [300, 500, 1_000, 2_000];
 const DECLINES = [0, 5, 10, 20];
@@ -30,7 +31,10 @@ export function PriceSimCard({ report, defaultFeePct }: { report: CostRateReport
   return (
     <section className="card space-y-3">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-base font-bold">가격 실험</h2>
+        <h2 className="text-base font-bold">
+          가격 실험
+          <SourceTag from="유승균" />
+        </h2>
         <span className="text-xs text-stone-500">이 메뉴 값을 올리면?</span>
       </div>
 

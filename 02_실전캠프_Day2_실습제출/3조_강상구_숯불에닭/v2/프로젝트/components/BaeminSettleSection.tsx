@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ExportUploadCard } from "@/components/ExportUploadCard";
+import { ExportStatusLine } from "@/components/ExportUploadCard";
+import { SourceTag } from "@/components/SourceTag";
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
 import { adEfficiency, channelSaleFromOrders, matchSettlements, perOrderBreakdown, type DepositState } from "@/lib/baemin/settle";
@@ -47,12 +48,15 @@ export function BaeminSettleSection({ month, txs, nextTxs, sales, onSaved }: { m
     <>
       <section className="card space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-bold">배민 정산 명세 — 자동 수집</h2>
+          <h2 className="text-base font-bold">
+            배민 정산 명세 — 자동 수집
+            <SourceTag from="유승균" />
+          </h2>
           <span className="text-xs text-stone-500">{b ? `수집 ${b.collectedAt.slice(0, 10)} · 정산 ${num(b.settlements.length)}건` : "아직 자료 없음"}</span>
         </div>
         {!b ? (
           <Notice tone="info">
-            배민 사장님 사이트의 정산 내역·주문·가게통계를 읽기만 해서 가져오면, 정산 건마다 통장에 들어왔는지와 주문 1건당 수수료가 보여요. 리뷰 수집기에서 <code>npm run collect:baemin-settle</code> → <code>npm run export:ledger</code> 뒤 아래 카드에 파일을 올리세요.
+            배민 사장님 사이트의 정산 내역·주문·가게통계를 읽기만 해서 가져오면, 정산 건마다 통장에 들어왔는지와 주문 1건당 수수료가 보여요. 리뷰 수집기에서 <code>npm run collect:baemin-settle</code> → <code>npm run export:ledger</code> 뒤 올리기 탭에서 파일을 올리세요.
           </Notice>
         ) : (
           <>
@@ -176,7 +180,7 @@ export function BaeminSettleSection({ month, txs, nextTxs, sales, onSaved }: { m
           </>
         )}
       </section>
-      <ExportUploadCard exp={exp} what="배민 정산 명세" />
+      <ExportStatusLine exp={exp} need="배민 정산 명세" />
     </>
   );
 }

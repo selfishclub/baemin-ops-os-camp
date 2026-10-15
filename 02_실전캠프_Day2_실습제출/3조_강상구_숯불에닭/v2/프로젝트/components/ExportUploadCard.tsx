@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { Notice } from "@/components/ui";
-import type { ExportState } from "@/components/useExport";
+import { useExport, type ExportState } from "@/components/useExport";
 import { ExportParseError, parseLedgerExport } from "@/lib/export/parse";
 
 const SAMPLE = "/sample/가짜_리뷰수집기_내보내기.json";
@@ -78,5 +79,33 @@ export function ExportUploadCard({ exp, what }: { exp: ExportState; what: string
         </ol>
       )}
     </section>
+  );
+}
+
+/** 올리기 탭에 두는 묶음 — 파일은 여기 한 곳에서만 올린다 */
+export function ExportUploadSection() {
+  const exp = useExport();
+  if (!exp.loaded) return null;
+  return <ExportUploadCard exp={exp} what="리뷰 · 상권 · 정산(배민 정산 명세) 탭" />;
+}
+
+/** 리뷰·상권·정산 탭 위에 두는 한 줄 — 어느 시점 자료인지와 올리기 탭 가는 길 */
+export function ExportStatusLine({ exp, need }: { exp: ExportState; need: string }) {
+  const m = exp.meta;
+  return (
+    <p className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-stone-50 px-3 py-1.5 text-xs text-stone-600 ring-1 ring-stone-200">
+      <span>
+        {m ? (
+          <>
+            자료 기준 <b className="num">{fmt(m.exportedAt)}</b> (올린 때 {fmt(m.uploadedAt)}) · 리뷰 {m.reviews}건 · 순위 {m.rankPoints}줄 · 배민 정산 {m.settlements}건
+          </>
+        ) : (
+          <>아직 리뷰 수집기 파일을 안 올렸어요 — {need}은 그 파일로 채워져요.</>
+        )}
+      </span>
+      <Link href="/upload#export" className="whitespace-nowrap font-bold text-orange-700 underline">
+        {m ? "새 파일 올리기 →" : "올리기 탭에서 올리기 →"}
+      </Link>
+    </p>
   );
 }

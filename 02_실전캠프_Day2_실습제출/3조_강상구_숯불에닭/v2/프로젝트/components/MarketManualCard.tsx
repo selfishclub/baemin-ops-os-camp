@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { MoneyInput } from "@/components/ui";
 import { num } from "@/lib/format";
 import { getStore } from "@/lib/storage";
+import { SourceTag } from "@/components/SourceTag";
 
 // 동네 유동인구 — 소상공인365(bigdata.sbiz.or.kr) 상권분석 화면에서 달마다 옮겨 적는 칸.
 // API가 없는 자료라 손으로 적는다 (카페스이 월말회의 표 방식: 작년 같은 달 vs 이번 달). 통신사 유료 API는 안 쓴다.
@@ -63,7 +64,10 @@ export function MarketManualCard({ today }: { today: string }) {
   return (
     <section className="card space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-base font-bold">동네 유동인구 · 상권 매출 — 옮겨 적기</h2>
+        <h2 className="text-base font-bold">
+          동네 유동인구 · 상권 매출 — 옮겨 적기
+          <SourceTag from="카페스이" />
+        </h2>
         <select className="field w-auto py-1 text-xs" value={month} onChange={(e) => setMonth(e.target.value)}>
           {months.map((m) => (
             <option key={m} value={m}>
