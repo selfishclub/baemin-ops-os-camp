@@ -85,7 +85,7 @@ export default function ChannelsPage() {
 
   return (
     <>
-      {/* 짝 맞추기 결과는 위에, 정산 규칙은 맨 아래 (사장님 요청 10/15) */}
+      {/* 정산 규칙 카드는 규칙 탭 맨 아래로 옮김 (사장님 요청 10/15). 여기는 짝 맞추기 결과만 */}
       <SettlementSection month={month} ledger={ledger} daily={daily} settlement={settlement} show="results" />
 
       <section className="card space-y-3">
@@ -96,7 +96,7 @@ export default function ChannelsPage() {
 
         <Notice tone="warn">
           <b>통장에 들어온 돈을 넣는 곳이 아니에요.</b> 통장 입금은 올리기 탭에서 은행 엑셀을 올리면 자동으로 읽어요. 여기는 정산 규칙이 없는 채널만, 각 앱 사장님 사이트의 <b>월 합계</b>(주문금액·정산금액)를 손으로 넣는 예비 칸이에요.
-          {autoChannels.length === 0 && " 아래 “정산 규칙”에서 기본 규칙을 넣으면 이 칸은 거의 사라져요."}
+          {autoChannels.length === 0 && " 규칙 탭의 “정산 규칙”에서 기본 규칙을 넣으면 이 칸은 거의 사라져요."}
         </Notice>
 
         <div className="space-y-1 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-950 ring-1 ring-sky-200">
@@ -262,8 +262,6 @@ export default function ChannelsPage() {
       )}
 
       <BaeminSettleSection month={month} txs={ledger.txs} nextTxs={ledger.nextTxs} sales={ledger.sales} onSaved={ledger.reload} />
-
-      <SettlementSection month={month} ledger={ledger} daily={daily} settlement={settlement} show="rules" />
 
       {asking && (
         <ConfirmDialog title="숫자를 한 번 더 확인해 주세요" confirmLabel="맞아요, 저장" onConfirm={save} onCancel={() => setAsking(false)}>

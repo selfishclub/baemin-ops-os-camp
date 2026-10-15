@@ -5,6 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { CategorySelect, ConfirmDialog, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
+import { useDaily } from "@/components/useDaily";
+import { useSettlement } from "@/components/useSettlement";
+import SettlementSection from "@/components/SettlementSection";
 import { DEFAULT_CHANNELS, type Major } from "@/lib/categories";
 import { monthLabel } from "@/lib/month";
 import { getStore, storageMode } from "@/lib/storage";
@@ -25,6 +28,9 @@ import { EMPTY_PROFILE, loadStoreProfile, saveStoreProfile, searchLocations, typ
 export default function RulesPage() {
   const { month } = useMonth();
   const ledger = useLedger(month);
+  // 정산 규칙(언제 입금되나)은 규칙 탭 맨 아래에 (사장님 요청 10/15 — 규칙은 규칙 탭에 모아 두기)
+  const daily = useDaily(month);
+  const settlement = useSettlement(month, ledger, daily);
   const [editing, setEditing] = useState<Rule | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [note, setNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
@@ -422,6 +428,8 @@ export default function RulesPage() {
           {monthLabel(month)} 데이터 지우기
         </button>
       </section>
+
+      <SettlementSection month={month} ledger={ledger} daily={daily} settlement={settlement} show="rules" />
 
       {confirmDelete && (
         <ConfirmDialog title={`${monthLabel(month)} 데이터를 지울까요?`} confirmLabel="지우기" cancelLabel="취소" danger onConfirm={deleteMonth} onCancel={() => setConfirmDelete(false)}>
