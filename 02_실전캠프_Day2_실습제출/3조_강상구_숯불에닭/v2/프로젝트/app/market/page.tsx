@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ExportStatusLine } from "@/components/ExportUploadCard";
 import { SourceTag } from "@/components/SourceTag";
@@ -164,6 +165,19 @@ export default function MarketPage() {
       )}
 
       <RankCheckCard tracked={rank?.keywords ?? []} />
+
+      <section className="card flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-base font-bold">
+            키워드 네비게이션
+            <SourceTag from="배민아카데미" />
+          </h2>
+          <p className="text-xs text-stone-500">교육 엑셀을 올리면 지역 1등·2등 판정 → 지역×메뉴·TPO 조합 → 월간 검색수·순위 → 대표 키워드 5칸 초안. 마피아넷에서 하던 조합·검색수 조회를 여기서.</p>
+        </div>
+        <Link href="/market/keywords" className="btn-primary shrink-0">
+          열기 →
+        </Link>
+      </section>
 
       {/* 추이 + 매출 */}
       {series.length > 0 && (

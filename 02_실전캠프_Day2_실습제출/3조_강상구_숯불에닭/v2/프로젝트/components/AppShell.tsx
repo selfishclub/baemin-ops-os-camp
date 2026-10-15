@@ -45,6 +45,9 @@ const TABS = [
   { href: "/rules", label: "규칙", icon: "⚙️" },
 ];
 
+/** 하위 주소(/market/keywords)도 그 탭으로 본다 */
+const isActive = (pathname: string | null, href: string) => pathname === href || (href !== "/" && !!pathname?.startsWith(href + "/"));
+
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [month, setMonthState] = useState<Month | null>(null);
@@ -116,7 +119,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <nav className="flex flex-col gap-1" aria-label="메뉴">
           <div className="px-3 pb-1 text-[11px] font-bold tracking-wider text-stone-500">메뉴</div>
           {TABS.map((t) => {
-            const active = pathname === t.href;
+            const active = isActive(pathname, t.href);
             return (
               <Link key={t.href} href={t.href} className={`side-nav ${active ? "side-nav-active" : ""}`} aria-current={active ? "page" : undefined}>
                 <span className="w-5 text-center text-base leading-none">{t.icon}</span>
@@ -151,12 +154,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-600 text-base">🔥</span>
               <span className="truncate">{title}</span>
             </h1>
-            <span className="hidden text-sm font-bold text-stone-700 md:block">{TABS.find((t) => t.href === pathname)?.label ?? ""}</span>
+            <span className="hidden text-sm font-bold text-stone-700 md:block">{TABS.find((t) => isActive(pathname, t.href))?.label ?? ""}</span>
             {monthPicker}
           </div>
           <nav className="tabs mt-2 md:hidden" aria-label="메뉴">
             {TABS.map((t) => {
-              const active = pathname === t.href;
+              const active = isActive(pathname, t.href);
               return (
                 <Link key={t.href} href={t.href} className={`tab ${active ? "tab-active" : ""}`} aria-current={active ? "page" : undefined}>
                   <span className="mr-1">{t.icon}</span>
