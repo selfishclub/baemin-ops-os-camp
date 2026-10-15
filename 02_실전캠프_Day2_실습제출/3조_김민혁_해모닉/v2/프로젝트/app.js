@@ -1407,7 +1407,8 @@ const App = (() => {
 
   /* ── 폐사 기록 · 3일 안에 사용 (사장님 요청 2026-10-08) ──
      폐사는 두 곳에서 들어온다: ① 할 일(갑각류 상태 확인 등)에서 입력한 폐사 마릿수 ② 수조 관리표에서 직접 적은 기록(S.deaths[]).
-     폐사한 날 + 3일이 사용 기한. 사용 처리는 S.deadUse[key] = { at, by, how } 로 남긴다. */
+     폐사한 날 + 3일이 사용 기한. 사용 처리는 S.deadUse[key] = { uses: [{ id, n, at, by, how }] } — 2마리 중 1마리만 쓰면 남은 1마리는 계속 사용 대기
+     (2026-10-15 사장님 요청). 예전 기록 { at, by, how } 는 "전부 사용"으로 읽는다. */
   const DEAD_DAYS = 3;
   function deadEntries(days) {
     const tk = dateKey(), from = shift(tk, -(days || 30)), out = [];
@@ -1421,31 +1422,41 @@ const App = (() => {
       });
     });
     (S.deaths || []).forEach((x) => { if (x.date >= from) out.push({ key: `m|${x.id}`, id: x.id, date: x.date, sp: x.sp, n: Number(x.n) || 0, by: x.by || '', tank: x.tank, note: x.note, src: '직접 기록' }); });
-    out.forEach((e) => { e.use = (S.deadUse || {})[e.key] || null; e.due = addDays(e.date, DEAD_DAYS); e.left = diffDays(tk, e.due); });
-    // 미사용이 위(기한 급한 순), 사용 완료는 아래(최근 순)
+    out.forEach((e) => {
+      e.uses = deadUsesOf(e); e.usedN = Math.min(e.n, e.uses.reduce((a, u) => a + (Number(u.n) || 0), 0)); e.rest = Math.max(0, e.n - e.usedN);
+      e.use = e.rest <= 0 ? (e.uses[e.uses.length - 1] || { at: '', by: '' }) : null;   // 다 썼을 때만 "사용 완료"
+      e.due = addDays(e.date, DEAD_DAYS); e.left = diffDays(tk, e.due);
+    });
+    // 미사용(남은 것 있음)이 위(기한 급한 순), 다 쓴 것은 아래(최근 순)
     return out.sort((a, b) => (!!a.use - !!b.use) || (a.use ? b.date.localeCompare(a.date) : a.left - b.left || a.date.localeCompare(b.date)));
   }
+  function deadUsesOf(e) {
+    const r = (S.deadUse || {})[e.key]; if (!r) return [];
+    if (Array.isArray(r.uses)) return r.uses;
+    return [{ id: 'legacy', n: e.n, at: r.at || '', by: r.by || '', how: r.how }];   // 예전 기록 — 통째로 사용
+  }
+  const deadUseLine = (u) => `${esc(u.by || '')} ${esc(u.at || '')} · <b>${Number(u.n) || 0}마리</b>${u.how ? ' · ' + esc(u.how) : ''}`;
   const deadLeftLabel = (e) => e.left > 1 ? `${md(e.due)}까지 · ${e.left}일 남음` : e.left === 1 ? `내일(${md(e.due)})까지` : e.left === 0 ? '오늘까지 사용' : `기한 ${-e.left}일 지남`;
   const deadLeftCls = (e) => e.left >= 2 ? 'ok' : e.left === 1 ? 'warn' : 'bad';
   function deadSection() {
-    const all = deadEntries(30), open = all.filter((e) => !e.use), used = all.filter((e) => e.use);
-    const sum = (arr) => arr.reduce((a, e) => a + e.n, 0);
+    const all = deadEntries(30), open = all.filter((e) => !e.use), used = all.filter((e) => e.usedN > 0);
+    const sum = (arr) => arr.reduce((a, e) => a + e.n, 0), sumRest = (arr) => arr.reduce((a, e) => a + e.rest, 0), sumUsed = (arr) => arr.reduce((a, e) => a + e.usedN, 0);
     const today = open.filter((e) => e.left === 0), over = open.filter((e) => e.left < 0);
     const rowOf = (e) => `<tr class="${e.use ? 'used' : deadLeftCls(e)}">
       <td>${md(e.date)} (${WD[new Date(e.date + 'T00:00:00').getDay()]})</td>
-      <td><b>${esc(e.sp)}</b></td><td class="r"><b>${e.n}</b>마리</td>
+      <td><b>${esc(e.sp)}</b></td><td class="r"><b>${e.n}</b>마리${e.usedN > 0 && e.rest > 0 ? `<br><small class="crit">남은 ${e.rest}마리</small>` : ''}</td>
       <td>${e.tank ? `수조 ${esc(String(e.tank))}` : '<span class="dim">—</span>'}</td>
-      <td>${e.use ? `<span class="tkAgo used">사용 완료</span> <small class="mut">${esc(e.use.by || '')} ${esc(e.use.at || '')}${e.use.how ? ' · ' + esc(e.use.how) : ''}</small>` : `<span class="tkAgo ${deadLeftCls(e)}">${deadLeftLabel(e)}</span>`}</td>
+      <td>${e.use ? '<span class="tkAgo used">사용 완료</span>' : `<span class="tkAgo ${deadLeftCls(e)}">${deadLeftLabel(e)}</span>`}${e.uses.map((u) => `<br><small class="mut">사용 ${deadUseLine(u)}</small>`).join('')}</td>
       <td class="mut">${esc(e.by || '')}<br><small>${esc(e.src)}</small>${e.note ? `<br><small>${esc(e.note)}</small>` : ''}</td>
-      <td>${e.use ? `<button class="btn sm ghost" data-act="deadUnuse" data-key="${esc(e.key)}">되돌리기</button>` : `<button class="btn sm primary" data-act="deadUse" data-key="${esc(e.key)}">사용 완료</button>`}${e.id ? ` <button class="more" data-act="deadDel" data-id="${e.id}" aria-label="삭제">✕</button>` : ''}</td></tr>`;
+      <td>${e.rest > 0 ? `<button class="btn sm primary" data-act="deadUse" data-key="${esc(e.key)}">${e.usedN > 0 ? `남은 ${e.rest}마리 사용` : '사용 처리'}</button>` : ''}${e.usedN > 0 ? ` <button class="btn sm ghost" data-act="deadUnuse" data-key="${esc(e.key)}" title="마지막 사용 기록을 지웁니다">되돌리기</button>` : ''}${e.id ? ` <button class="more" data-act="deadDel" data-id="${e.id}" aria-label="삭제">✕</button>` : ''}</td></tr>`;
     return `<div class="hd sub2"><h3>🦀 폐사 기록 — 3일 안에 사용</h3>
       <button class="btn sm primary" data-act="deadAdd" style="margin-left:auto">+ 폐사 기록</button></div>
-    <p class="hint" style="margin:0 0 8px">폐사한 갑각류는 <b>폐사한 날부터 3일 안에</b> 사용해야 합니다. 할 일에서 입력한 폐사 마릿수는 여기에 자동으로 들어오고, 사용했으면 <b>사용 완료</b>를 눌러 누가 어떻게 썼는지 남깁니다.</p>
-    ${open.length ? `<div class="notice ${over.length || today.length ? 'warn' : ''}"><b>사용 대기 ${sum(open)}마리</b>${today.length ? ` · <b class="crit">오늘까지 ${sum(today)}마리</b>` : ''}${over.length ? ` · <b class="crit">기한 지남 ${sum(over)}마리</b>` : ''}${!today.length && !over.length ? ' · 아직 여유 있음' : ''}</div>` : ''}
+    <p class="hint" style="margin:0 0 8px">폐사한 갑각류는 <b>폐사한 날부터 3일 안에</b> 사용해야 합니다. 할 일에서 입력한 폐사 마릿수는 여기에 자동으로 들어오고, 사용했으면 <b>사용 처리</b>를 눌러 몇 마리를 누가 어떻게 썼는지 남깁니다. 일부만 쓰면 남은 마릿수는 계속 사용 대기로 남습니다.</p>
+    ${open.length ? `<div class="notice ${over.length || today.length ? 'warn' : ''}"><b>사용 대기 ${sumRest(open)}마리</b>${today.length ? ` · <b class="crit">오늘까지 ${sumRest(today)}마리</b>` : ''}${over.length ? ` · <b class="crit">기한 지남 ${sumRest(over)}마리</b>` : ''}${!today.length && !over.length ? ' · 아직 여유 있음' : ''}</div>` : ''}
     ${all.length ? `<div class="tkLogWrap"><table class="tkLog deadTbl">
       <thead><tr><th>폐사일</th><th>품종</th><th class="r">마릿수</th><th>수조</th><th>사용 기한 · 상태</th><th>기록</th><th></th></tr></thead>
       <tbody>${all.map(rowOf).join('')}</tbody>
-      <tfoot><tr><td colspan="2">최근 30일</td><td class="r">${sum(all)}마리</td><td colspan="4">사용 대기 ${sum(open)} · 사용 완료 ${sum(used)}</td></tr></tfoot></table></div>`
+      <tfoot><tr><td colspan="2">최근 30일</td><td class="r">${sum(all)}마리</td><td colspan="4">사용 대기 ${sumRest(open)} · 사용 완료 ${sumUsed(used)}</td></tr></tfoot></table></div>`
       : '<div class="tkEmptyLog">최근 30일 폐사 기록이 없습니다. 할 일에서 폐사를 입력하거나 위 "+ 폐사 기록"으로 남기세요.</div>'}`;
   }
   function deadAddModal() {
@@ -1468,8 +1479,11 @@ const App = (() => {
     bindWhoChips();
   }
   function deadUseModal(key) {
-    const e = deadEntries(60).find((x) => x.key === key); if (!e) return;
-    modal(`사용 완료 — ${e.sp} ${e.n}마리 (${md(e.date)} 폐사)`, `
+    const e = deadEntries(60).find((x) => x.key === key); if (!e || e.rest <= 0) return;
+    modal(`사용 처리 — ${e.sp} ${e.n}마리 중 남은 ${e.rest}마리 (${md(e.date)} 폐사)`, `
+      ${e.rest > 1 ? `<div class="mlabel">몇 마리 썼나요</div>
+      <div class="roles wrap" id="duN">${Array.from({ length: e.rest }, (_, i) => i + 1).map((k) => `<button type="button" class="rl${k === e.rest ? ' on' : ''}" data-n="${k}">${k}마리${k === e.rest ? ' (전부)' : ''}</button>`).join('')}</div>` : ''}
+      ${e.uses.length ? `<p class="hint" style="margin:6px 0 0">이미 사용: ${e.uses.map((u) => deadUseLine(u)).join(' / ')}</p>` : ''}
       <div class="mlabel">어떻게 사용했나요</div>
       <div class="roles wrap" id="duHow">${['찜 서비스', '직원 식사', '육수·요리용', '폐기'].map((h) => `<button type="button" class="rl" data-how="${h}">${h}</button>`).join('')}</div>
       <input id="duHowIn" placeholder="직접 입력 (예: 단골 서비스로 제공)" style="margin-top:6px">
@@ -1477,15 +1491,20 @@ const App = (() => {
       const by = whoValue(); if (!by) { alert('누가 처리했는지 적어 주세요.'); return false; }
       const sel = document.querySelector('#duHow .rl.on');
       const how = $('#duHowIn').value.trim() || (sel ? sel.dataset.how : '');
-      S.deadUse = S.deadUse || {}; S.deadUse[key] = { at: stamp(), by, how: how || undefined };
+      const nSel = document.querySelector('#duN .rl.on'); const n = Math.min(e.rest, Math.max(1, nSel ? Number(nSel.dataset.n) : e.rest));
+      S.deadUse = S.deadUse || {};
+      const uses = deadUsesOf(e).slice(); uses.push({ id: 'u' + Date.now().toString(36), n, at: stamp(), by, how: how || undefined });
+      S.deadUse[key] = { uses, u: Date.now() };
       save(); render();
+      if (n < e.rest) banner(`${e.sp} ${n}마리 사용 처리`, `남은 ${e.rest - n}마리는 계속 사용 대기로 남습니다.`);
     }, '저장');
+    const nBox = $('#duN'); if (nBox) nBox.addEventListener('click', (ev) => { const b = ev.target.closest('.rl'); if (!b) return; nBox.querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); });
     $('#duHow').addEventListener('click', (ev) => { const b = ev.target.closest('.rl'); if (!b) return; $('#duHow').querySelectorAll('.rl').forEach((el) => el.classList.remove('on')); b.classList.add('on'); $('#duHowIn').value = ''; });
     bindWhoChips();
   }
   /* 사용 기한이 오늘이거나 지난 폐사 — 수조 관리표 상단·대시보드 "수조 처리"에 같이 뜬다 */
   function deadAlerts() {
-    return deadEntries(30).filter((e) => !e.use && e.left <= 0).map((e) => `폐사 ${e.sp} ${e.n}마리 ${e.left === 0 ? '오늘까지 사용' : '사용 기한 지남'}`);
+    return deadEntries(30).filter((e) => !e.use && e.left <= 0).map((e) => `폐사 ${e.sp} ${e.rest}마리 ${e.left === 0 ? '오늘까지 사용' : '사용 기한 지남'}`);
   }
   function tankAlerts() {
     const T = S.tanks, tk = dateKey(), out = [];
@@ -6178,7 +6197,12 @@ const App = (() => {
         case 'tankStock': tankStockModal(Number(b.dataset.n), b.dataset.pos); break;
         case 'deadAdd': deadAddModal(); break;
         case 'deadUse': deadUseModal(b.dataset.key); break;
-        case 'deadUnuse': { if (S.deadUse) delete S.deadUse[b.dataset.key]; save(); render(); break; }
+        case 'deadUnuse': {   // 마지막 사용 기록 하나만 지운다
+          const k2 = b.dataset.key, r = (S.deadUse || {})[k2]; if (!r) break;
+          if (Array.isArray(r.uses) && r.uses.length > 1) { if (!confirm('마지막 사용 기록을 지울까요?')) break; S.deadUse[k2] = { uses: r.uses.slice(0, -1), u: Date.now() }; }
+          else { if (!confirm('사용 기록을 지울까요?')) break; S.deadUse[k2] = { uses: [], u: Date.now() }; }   // 지우지 않고 빈 기록 — 기기 간 합칠 때 옛 사용 기록이 되살아나지 않게
+          save(); render(); break;
+        }
         case 'deadDel': { if (!confirm('이 폐사 기록을 지울까요?')) return; S.deaths = (S.deaths || []).filter((x) => x.id !== b.dataset.id); if (S.deadUse) delete S.deadUse['m|' + b.dataset.id]; save(); render(); break; }
         case 'tankCareDel': {
           if (!confirm('이 기록 한 줄을 지웁니다. 위 표의 칸은 그대로 둡니다.')) break;
