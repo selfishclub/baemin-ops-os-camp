@@ -169,7 +169,7 @@ const App = (() => {
     if (window.crypto && crypto.subtle) { const b = await crypto.subtle.digest('SHA-256', data); return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join(''); }
     let h = 2166136261; data.forEach((c) => { h ^= c; h = Math.imul(h, 16777619) >>> 0; }); return 'f' + h.toString(16);   // 보안 문맥이 아닐 때(file://) 임시 해시
   }
-  function ownerLoginModal() {
+  function ownerLoginModal(then) {   // then: 비밀번호가 맞으면 이어서 할 일 (예: 공지 쓰기 창 열기)
     if (LIMITED) { banner('등록된 기기에서만 됩니다', '사장님 모드는 기기 등록 뒤에 쓸 수 있습니다.'); return; }
     if (!ownerPwSet()) { ownerPwModal(); return; }
     modal('사장님 모드 열기', `<label>사장님 비밀번호<input id="owP" type="password" autocomplete="current-password"></label>
@@ -177,7 +177,9 @@ const App = (() => {
       const v = $('#owP').value; if (!v) return false;
       hashPw(v).then((h) => {
         if (h !== SH.owner.hash) { alert('비밀번호가 다릅니다.'); const i = $('#owP'); if (i) { i.value = ''; i.focus(); } return; }
-        ownerExtend(); closeModal(); render(); window.scrollTo(0, 0);
+        ownerExtend(); closeModal(); render();
+        if (typeof then === 'function') { then(); return; }
+        window.scrollTo(0, 0);
         banner('사장님 모드', '5분 동안 사용이 없으면 자동으로 잠깁니다. 왼쪽 아래에서 바로 잠글 수도 있습니다.');
       });
       return false;
@@ -216,6 +218,7 @@ const App = (() => {
     'reset', 'import', 'sampleLoad', 'sampleClear', 'fixedAdd', 'fixedEdit', 'fixedDel', 'weeklyPay', 'sper', 'toggleAskWho', 'toggleReport', 'toggleSound', 'toggleTgInstant', 'tgFind', 'tgTest', 'supaClear', 'laborConfirm', 'laborUnconfirm', 'sealUpload', 'sealDel', 'guideEdit', 'doneMemo', 'staffLockToggle',
     'cAdd', 'cDel', 'cVoid', 'cEdit', 'cSign', 'cStamp', 'cDeliver', 'cAttach', 'cFileDel', 'cSaveBack', 'sendReportNow', 'testAlarm',
   ]);
+  const STAFF_ASK = new Set(['noticeAdd']);   // 잠겨 있어도 버튼은 보여 주고, 누르면 비밀번호를 묻는 것
   const staffLocked = () => S.settings && S.settings.staffLock !== false && !ownerOn();
   const blockedBanner = () => banner('테스트 기간에는 사장님만 바꿀 수 있습니다', '직원은 할 일 체크·메모·숫자 입력·게시판만 씁니다. 바꾸고 싶은 게 있으면 게시판에 건의로 올려 주세요.');
   /* 사용 중이면 5분 연장, 안 쓰면 자동 잠김 */
@@ -1120,7 +1123,7 @@ const App = (() => {
     window.scrollTo(0, y);   // 체크할 때마다 화면이 위로 튀지 않게
     if (view === 'contracts') bindEditor();
     if (staffLocked()) {
-      document.querySelectorAll('#main [data-act]').forEach((el) => { if (STAFF_BLOCK.has(el.dataset.act)) el.hidden = true; });
+      document.querySelectorAll('#main [data-act]').forEach((el) => { if (STAFF_BLOCK.has(el.dataset.act) && !STAFF_ASK.has(el.dataset.act)) el.hidden = true; });
       const sf = $('#side .sfoot'); if (sf && !sf.querySelector('.staffLockTag')) sf.insertAdjacentHTML('afterbegin', '<div class="staffLockTag">🔒 테스트 기간 — 체크·메모만</div>');
     }
   }
@@ -2628,7 +2631,7 @@ const App = (() => {
         <button class="dnav" data-act="nmonthNav" data-d="-1" aria-label="이전 달">‹</button>
         <span class="mtitle">${y}년 ${mo}월</span>
         <button class="dnav" data-act="nmonthNav" data-d="1" aria-label="다음 달">›</button>
-        <button class="btn primary" data-act="noticeAdd">+ 공지 추가</button>
+        <button class="btn primary" data-act="noticeAdd">+ 공지 쓰기</button>
       </div>
     </div>
     <div class="filters">${[['all', '두 매장 전체'], ...stores.map((x) => [x.id, x.name])].map(([k, nm]) => `<button class="fl${noticeStore === k ? ' on' : ''}" data-act="noticeStore" data-k="${k}">${esc(nm)}</button>`).join('')}</div>`;
@@ -5917,6 +5920,7 @@ const App = (() => {
       if (!b) { if (e.target === m) closeModal(); return; }
       const a = b.dataset.act, id = b.dataset.id;
       const key = view === 'month' ? mdateKey() : viewKey();   // 편성 동작은 근무표에서 선택한 날짜 기준
+      if (STAFF_ASK.has(a) && staffLocked()) { ownerLoginModal(() => { if (a === 'noticeAdd') noticeForm(null); }); return; }   // 버튼은 보이고, 누르면 사장님 비밀번호 → 바로 이어서
       if (STAFF_BLOCK.has(a) && staffLocked()) { blockedBanner(); return; }
       if (b.closest('#side') && (a === 'view' || a === 'storeSwitch')) sideClose();   // 메뉴를 고르면 서랍은 바로 닫힌다 (대카테고리 접기·펼치기는 열어 둔다)
 
