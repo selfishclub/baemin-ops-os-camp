@@ -99,7 +99,7 @@ export default function MarketPage() {
                   {s.total !== null && <span>검색 결과 {num(s.total)}곳</span>}
                   {s.visitor !== null && <span>방문자 리뷰 {num(s.visitor)}</span>}
                   {s.blog !== null && <span>블로그 {num(s.blog)}</span>}
-                  {s.save !== null && <span>저장 {num(s.save)}</span>}
+                  {s.save !== null && <span>저장 {typeof s.save === "number" ? num(s.save) : String(s.save)}</span>}
                   {s.unreadDays > 0 && <span className="text-stone-400">못 읽은 날 {s.unreadDays}</span>}
                 </p>
               </button>

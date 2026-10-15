@@ -87,8 +87,8 @@ export function RankCheckCard({ tracked }: { tracked: string[] }) {
                     · 방문자 리뷰 {r.mine.visitor ?? "–"} · 블로그 {r.mine.blog ?? "–"}
                   </span>
                 )}
-                <span className="num ml-1 text-[11px] text-stone-400">
-                  {result!.date} {result!.time}
+                <span className="num ml-2 text-[11px] text-stone-400">
+                  · {result!.date} {result!.time} 기준
                 </span>
               </p>
               <ol className="mt-2 divide-y divide-stone-100 text-sm">

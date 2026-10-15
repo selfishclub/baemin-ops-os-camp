@@ -11,7 +11,7 @@ export interface KeywordSummary {
   best: number | null; // 기록 중 가장 좋은 순위
   blog: number | null;
   visitor: number | null;
-  save: number | null;
+  save: number | string | null;
   total: number | null; // 검색 결과 가게 수
   days: number; // 읽은 날 수
   unreadDays: number; // 못 읽은 날 수 (note 있음)

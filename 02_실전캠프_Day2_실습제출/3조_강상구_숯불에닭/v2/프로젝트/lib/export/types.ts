@@ -29,7 +29,7 @@ export interface RankPoint {
   rank: number | null; // null = 50위 밖 또는 못 읽음
   blog: number | null;
   visitor: number | null;
-  save: number | null;
+  save: number | string | null; // 네이버는 "25,000+" 같은 글자로 줄 때가 있다
   total: number | null;
   note?: string | null;
 }
@@ -39,7 +39,7 @@ export interface RankTop {
   name: string;
   blog: number | null;
   visitor: number | null;
-  save: number | null;
+  save: number | string | null;
 }
 
 export interface RankDay {
