@@ -96,6 +96,10 @@ export default function AdPlanPage() {
       for (const b of j2.bids ?? []) nb[b.keyword] = { top1: b.top1, minShow: b.minShow, at: today };
       setBids(nb);
       void getStore().saveSetting(AD_BIDS_KEY, nb).catch(() => {});
+      // 시작안에 먼저 담겨 입찰가가 비어 있던 키워드는 새로 받은 값으로 채운다
+      if (plan.items.some((i) => i.bid === null && nb[normalizeKeyword(i.keyword)])) {
+        savePlan({ ...plan, items: plan.items.map((i) => (i.bid === null && nb[normalizeKeyword(i.keyword)] ? { ...i, bid: Math.max(nb[normalizeKeyword(i.keyword)].minShow ?? 0, nb[normalizeKeyword(i.keyword)].top1 ?? 0) || null } : i)) });
+      }
       setMsg({ tone: "ok", text: `${j2.bids?.length ?? 0}개 키워드의 예상 입찰가를 받았어요. 아래 표가 새 숫자로 정렬됐어요.` });
     } catch (e) {
       setMsg({ tone: "error", text: e instanceof Error ? e.message : "도우미에 연결하지 못했어요. 리뷰 수집기 폴더에서 npm run helper 를 켜 주세요." });
