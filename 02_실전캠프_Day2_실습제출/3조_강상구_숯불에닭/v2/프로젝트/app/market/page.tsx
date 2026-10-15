@@ -179,6 +179,19 @@ export default function MarketPage() {
         </Link>
       </section>
 
+      <section className="card flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-base font-bold">
+            광고 노트 — 시작안
+            <SourceTag from="카페스이" />
+          </h2>
+          <p className="text-xs text-stone-500">파워링크를 켜기 전에: 검색수·경쟁·예상 입찰가로 어느 키워드부터 얼마로 시작할지 묶음별로 고르고, 켠 뒤엔 여기에 성적이 붙어요.</p>
+        </div>
+        <Link href="/market/ads" className="btn-primary shrink-0">
+          열기 →
+        </Link>
+      </section>
+
       {/* 추이 + 매출 */}
       {series.length > 0 && (
         <section className="card space-y-2">

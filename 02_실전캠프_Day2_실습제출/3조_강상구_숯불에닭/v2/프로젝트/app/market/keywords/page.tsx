@@ -112,7 +112,8 @@ export default function KeywordNavPage() {
     setMsg({ tone: "info", text: `네이버에 ${want.length}개 검색수를 묻는 중… (5개씩, 10초 안팎)` });
     try {
       const res = await fetch(`${HELPER}/keyword-volume`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keywords: want }) });
-      const j = (await res.json()) as { ok: boolean; message?: string; ready?: boolean; exact?: { keyword: string; pc: number; mobile: number; total: number; under10: boolean }[]; related?: { keyword: string; total: number; pc: number; mobile: number; under10: boolean }[] };
+      type V = { keyword: string; pc: number; mobile: number; total: number; under10: boolean; comp?: string | null; adClicks?: number | null; adDepth?: number | null };
+      const j = (await res.json()) as { ok: boolean; message?: string; ready?: boolean; exact?: V[]; related?: V[] };
       if (!j.ok) {
         if (j.ready === false) setHelperReady(false);
         setMsg({ tone: "warn", text: j.message ?? "검색수를 읽지 못했어요." });
@@ -121,8 +122,9 @@ export default function KeywordNavPage() {
       // 연관 키워드는 우리 지역 말이 든 것만 남긴다 (청주공항을 물으면 항공권 같은 게 섞여 온다)
       const ours = (j.related ?? []).filter((r) => isOurs(r.keyword, data));
       const next: VolumeMap = { ...volumes };
-      for (const v of j.exact ?? []) next[v.keyword] = { total: v.total, pc: v.pc, mobile: v.mobile, under10: v.under10, at: today };
-      for (const v of ours) if (!next[v.keyword]) next[v.keyword] = { total: v.total, pc: v.pc, mobile: v.mobile, under10: v.under10, at: today, related: true };
+      const entry = (v: V) => ({ total: v.total, pc: v.pc, mobile: v.mobile, under10: v.under10, at: today, comp: v.comp ?? null, adClicks: v.adClicks ?? null, adDepth: v.adDepth ?? null });
+      for (const v of j.exact ?? []) next[v.keyword] = entry(v);
+      for (const v of ours) if (!next[v.keyword]) next[v.keyword] = { ...entry(v), related: true };
       saveVolumes(next);
       setRelated(ours.slice(0, 20).map((r) => ({ keyword: r.keyword, total: r.total })));
       setMsg({ tone: "ok", text: `${j.exact?.length ?? 0}개 검색수를 받았어요${ours.length ? ` · 네이버가 함께 알려준 우리 지역 연관 키워드 ${ours.length}개도 저장` : ""}` });
@@ -224,9 +226,14 @@ export default function KeywordNavPage() {
             키워드 네비게이션
             <SourceTag from="배민아카데미" />
           </h2>
-          <Link href="/market" className="text-xs font-semibold text-orange-700 underline">
-            ← 상권 탭
-          </Link>
+          <span className="flex gap-3 text-xs font-semibold">
+            <Link href="/market/ads" className="text-orange-700 underline">
+              광고 시작안 →
+            </Link>
+            <Link href="/market" className="text-stone-600 underline">
+              ← 상권 탭
+            </Link>
+          </span>
         </div>
         <p className="text-sm text-stone-600">
           교육에서 만든 키워드 엑셀을 올리면 <b>지역 등급(1등·2등)</b> → <b>지역 × 메뉴·TPO 조합</b> → <b>검색수·순위</b> → <b>유형별 할 일</b> → <b>대표 키워드 5칸 초안</b>이 나와요. 검색수는 네이버 검색광고 키워드 도구(무료)로 도우미가 읽어 옵니다 — 마피아넷이 보여 주는 숫자와 같은 출처예요.
