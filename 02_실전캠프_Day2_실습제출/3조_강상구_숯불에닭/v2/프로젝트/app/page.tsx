@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, Notice } from "@/components/ui";
 import { BreakevenCard } from "@/components/BreakevenCard";
+import { ReviewSummaryCard } from "@/components/ReviewSummaryCard";
 import { WeekdayCard } from "@/components/WeekdayCard";
 import { FindingsCard } from "@/components/FindingsCard";
 import { RatioCard } from "@/components/RatioCard";
@@ -183,6 +184,8 @@ export default function PnlPage() {
       </section>
 
       <FindingsCard sources={monthSources(findingsInput)} findings={monthFindings(findingsInput)} />
+
+      <ReviewSummaryCard month={month} />
 
       <section className="card">
         <div className="mb-2 flex items-baseline justify-between">

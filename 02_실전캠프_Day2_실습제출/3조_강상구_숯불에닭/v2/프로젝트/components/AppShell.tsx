@@ -39,6 +39,8 @@ const TABS = [
   { href: "/upload", label: "올리기", icon: "📥" },
   { href: "/channels", label: "정산", icon: "🛵" },
   { href: "/costing", label: "원가율", icon: "🍗" },
+  { href: "/reviews", label: "리뷰", icon: "⭐" },
+  { href: "/market", label: "상권", icon: "📍" },
   { href: "/rules", label: "규칙", icon: "⚙️" },
 ];
 
