@@ -112,6 +112,12 @@ export default function AdPlanPage() {
     const picks = cands.filter((c) => c.verdict === "추천" && !inPlan(c.keyword)).slice(0, 12);
     savePlan({ ...plan, items: [...plan.items, ...picks.map((c) => ({ keyword: c.keyword, group: c.group, bid: startBid(c), status: "예정" as const }))] });
   };
+  // 한 묶음의 "추천" 키워드를 한 번에 시작안으로 (예: 랜드마크 묶음부터)
+  const addGroup = (group: AdCandidate["group"]) => {
+    const picks = cands.filter((c) => c.group === group && c.verdict === "추천" && !inPlan(c.keyword));
+    if (!picks.length) return;
+    savePlan({ ...plan, items: [...plan.items, ...picks.map((c) => ({ keyword: c.keyword, group: c.group, bid: startBid(c), status: "예정" as const }))], log: [...plan.log, { date: today, text: `${group} 묶음 ${picks.length}개를 시작안에 넣음` }] });
+  };
   const addLog = (text: string) => {
     if (!text.trim()) return;
     savePlan({ ...plan, log: [...plan.log, { date: today, text: text.trim() }] });
@@ -182,8 +188,15 @@ export default function AdPlanPage() {
               if (!items.length) return null;
               return (
                 <div key={g.group}>
-                  <p className="text-sm font-semibold">
-                    {g.group} <span className="text-xs font-normal text-stone-500">— {AD_GROUP_NOTE[g.group]}</span>
+                  <p className="flex flex-wrap items-center justify-between gap-2 text-sm font-semibold">
+                    <span>
+                      {g.group} <span className="text-xs font-normal text-stone-500">— {AD_GROUP_NOTE[g.group]}</span>
+                    </span>
+                    {g.items.some((c) => c.verdict === "추천" && !inPlan(c.keyword)) && (
+                      <button className="btn-ghost px-2 py-0.5 text-[11px]" onClick={() => addGroup(g.group)}>
+                        이 묶음 추천 전부 시작안에
+                      </button>
+                    )}
                   </p>
                   <div className="mt-1 overflow-x-auto">
                     <table className="w-full text-sm">
