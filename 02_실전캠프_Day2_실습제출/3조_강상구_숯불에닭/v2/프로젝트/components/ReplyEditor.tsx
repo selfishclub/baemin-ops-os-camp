@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { EXPORT_UPDATED_EVENT } from "@/components/useExport";
 import { EXPORT_REVIEWS_KEY, type ExportReview } from "@/lib/export/types";
 import { getStore } from "@/lib/storage";
+import { markKey, REPLY_MARKS_KEY, type ReplyMark } from "@/lib/reviews/marks";
 
 // 답글 쓰기 — 장부 안에서 초안을 고쳐 "확정"하고, 리뷰 도우미(npm run helper)가 Aside 창에서 그 플랫폼의 답글칸에 글을 넣어 준다.
 // 넘지 않는 선: 등록 버튼은 사장님이 플랫폼에서 직접 누른다. 도우미는 채우고 멈춘다. 모든 통신은 내 컴퓨터 안(127.0.0.1).
@@ -21,7 +22,7 @@ async function checkHelper(): Promise<boolean> {
   return helperAlive;
 }
 
-const STATUS_LABEL: Record<string, string> = { approved: "확정됨 — 채울 수 있어요", edited: "고쳐 둠 (아직 확정 전)", draft: "자동 초안" };
+const STATUS_LABEL: Record<string, string> = { approved: "확정됨 — 채울 수 있어요", edited: "고쳐 둠 (아직 확정 전)", draft: "자동 초안", posted: "등록했다고 표시함" };
 
 export function ReplyEditor({ review }: { review: ExportReview }) {
   const [text, setText] = useState(review.draft?.text ?? "");
@@ -80,6 +81,21 @@ export function ReplyEditor({ review }: { review: ExportReview }) {
     }
   }
 
+  /** 플랫폼에서 등록 버튼을 누른 뒤 — 수집기가 다시 읽어 올 때까지 미답변에서 빼 둔다 */
+  async function markPosted() {
+    setBusy("fill");
+    try {
+      const store = getStore();
+      const marks = (await store.getSetting<ReplyMark[]>(REPLY_MARKS_KEY)) ?? [];
+      const next = [...marks.filter((m) => markKey(m.platform, m.id) !== id), { platform: review.platform, id: review.id, at: new Date().toISOString(), text }];
+      await store.saveSetting(REPLY_MARKS_KEY, next);
+      window.dispatchEvent(new Event(EXPORT_UPDATED_EVENT));
+      setMsg({ ok: true, text: "답글 단 것으로 표시했어요. 다음 수집에서 진짜 답글을 확인하면 자동으로 정리돼요." });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const changed = text !== (review.draft?.text ?? "");
   const canFill = status === "approved" && !changed && !text.includes("【");
 
@@ -113,6 +129,9 @@ export function ReplyEditor({ review }: { review: ExportReview }) {
         </button>
         <button className="rounded-xl bg-emerald-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40" disabled={busy !== null || alive === false || !canFill} title={canFill ? "Aside 창에서 답글칸에 이 글을 넣고 멈춰요" : "먼저 확정해야 채울 수 있어요"} onClick={fill}>
           {busy === "fill" ? "채우는 중…" : "답글칸 채우기"}
+        </button>
+        <button className="rounded-xl bg-stone-200 px-3 py-1 text-xs font-semibold text-stone-700 disabled:opacity-40" disabled={busy !== null} title="플랫폼에서 등록을 눌렀으면 여기서 답한 것으로 표시해요" onClick={markPosted}>
+          등록했어요
         </button>
         {alive === false && <span className="text-[11px] text-amber-700">도우미가 꺼져 있어요 — 리뷰 수집기 폴더에서 npm run helper</span>}
       </div>

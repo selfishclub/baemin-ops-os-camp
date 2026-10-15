@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { EXPORT_BAEMIN_KEY, EXPORT_MARKET_KEY, EXPORT_META_KEY, EXPORT_RANK_KEY, EXPORT_REVIEWS_KEY, type BaeminExport, type ExportMeta, type ExportReview, type LedgerExport, type MarketExport, type RankExport } from "@/lib/export/types";
+import { applyMarks, pruneMarks, REPLY_MARKS_KEY, type ReplyMark } from "@/lib/reviews/marks";
 import { getStore } from "@/lib/storage";
 
 export interface ExportState {
@@ -42,14 +43,19 @@ export function useExport(): ExportState {
 
   const reload = useCallback(async () => {
     const store = getStore();
-    const [meta, reviews, rank, baemin, market] = await Promise.all([
+    const [meta, reviews, rank, baemin, market, marks] = await Promise.all([
       store.getSetting<ExportMeta>(EXPORT_META_KEY),
       store.getSetting<ExportReview[]>(EXPORT_REVIEWS_KEY),
       store.getSetting<RankExport>(EXPORT_RANK_KEY),
       store.getSetting<BaeminExport>(EXPORT_BAEMIN_KEY),
       store.getSetting<MarketExport>(EXPORT_MARKET_KEY),
+      store.getSetting<ReplyMark[]>(REPLY_MARKS_KEY),
     ]);
-    setState({ loaded: true, meta, reviews: reviews ?? [], rank, baemin, market });
+    // 사장님이 "답글 달았어요"로 표시한 리뷰는 수집기가 답글을 가져올 때까지 답한 것으로 본다. 가져왔으면 표시를 정리한다
+    const list = reviews ?? [];
+    const kept = pruneMarks(list, marks ?? []);
+    if (kept.length !== (marks ?? []).length) await store.saveSetting(REPLY_MARKS_KEY, kept);
+    setState({ loaded: true, meta, reviews: applyMarks(list, kept), rank, baemin, market });
   }, []);
 
   useEffect(() => {
