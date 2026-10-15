@@ -47,7 +47,11 @@ export default function KeywordNavPage() {
     const store = getStore();
     void Promise.all([store.getSetting<KeywordNavData>(KEYWORD_NAV_KEY), store.getSetting<VolumeMap>(KEYWORD_VOLUMES_KEY), store.getSetting<PlaceKeywords>(PLACE_KEYWORDS_KEY)]).then(([d, v, p]) => {
       setData(d ?? null);
-      setVolumes(v ?? {});
+      // 전에 저장된 연관 키워드 가운데 우리 지역 말이 없는 것(항공권 등)은 한 번 걸러 낸다
+      const vols = v ?? {};
+      const cleaned = d ? Object.fromEntries(Object.entries(vols).filter(([k]) => isOurs(k, d))) : vols;
+      setVolumes(cleaned);
+      if (Object.keys(cleaned).length !== Object.keys(vols).length) void store.saveSetting(KEYWORD_VOLUMES_KEY, cleaned).catch(() => {});
       if (p) setPk({ ...EMPTY_PLACE_KEYWORDS, ...p, slots: [...EMPTY_PLACE_KEYWORDS.slots].map((s, i) => p.slots?.[i] ?? s) as PlaceKeywords["slots"] });
       setLoaded(true);
     });

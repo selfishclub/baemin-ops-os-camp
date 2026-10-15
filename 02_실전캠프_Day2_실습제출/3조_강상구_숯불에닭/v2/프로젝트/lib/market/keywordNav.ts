@@ -188,7 +188,8 @@ export function opportunities(data: KeywordNavData, volumes: VolumeMap, ranks: R
   const nr = normalizeRanks(ranks);
   const out: Opportunity[] = [];
   const seen = new Set<string>();
-  const keys = [...data.nav.filter((n) => n.axis === "조합").map((n) => n.keyword), ...Object.keys(volumes).filter((k) => isOurs(k, data))];
+  const bare = new Set(data.regions.map((r) => normalizeKeyword(r.keyword))); // 지역 이름 그 자체(청주공항)는 조합이 아니다
+  const keys = [...data.nav.filter((n) => n.axis === "조합").map((n) => n.keyword), ...Object.keys(volumes).filter((k) => isOurs(k, data) && !bare.has(normalizeKeyword(k)))];
   for (const raw of keys) {
     const k = normalizeKeyword(raw);
     if (seen.has(k)) continue;
