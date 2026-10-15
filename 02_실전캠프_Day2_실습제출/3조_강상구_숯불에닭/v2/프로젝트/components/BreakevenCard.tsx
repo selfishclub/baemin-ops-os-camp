@@ -35,8 +35,12 @@ export function BreakevenCard({ month, pnl, openDays }: { month: Month; pnl: Pnl
   }, []);
 
   const update = (next: BreakevenSetting) => {
+    const prev = setting;
     setSetting(next);
-    void getStore().saveSetting(BREAKEVEN_KEY, next).catch(() => {});
+    // 저장 실패를 삼키지 않는다 — 화면을 되돌리고, 알림은 AppShell 이 띄운다
+    void getStore()
+      .saveSetting(BREAKEVEN_KEY, next)
+      .catch(() => setSetting(prev));
   };
   const flip = (item: CostItem) => update({ ...setting, variable: { ...setting.variable, [item.key]: !item.variable } });
 

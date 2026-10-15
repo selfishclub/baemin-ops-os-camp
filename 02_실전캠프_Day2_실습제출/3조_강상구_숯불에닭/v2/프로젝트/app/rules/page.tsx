@@ -8,7 +8,12 @@ import { useLedger } from "@/components/useLedger";
 import { DEFAULT_CHANNELS, type Major } from "@/lib/categories";
 import { monthLabel } from "@/lib/month";
 import { getStore, storageMode } from "@/lib/storage";
-import { exportBackup, importBackup } from "@/lib/storage/backup";
+import { exportBackup } from "@/lib/storage/backup";
+import { inspectLocal, markBackupConfirmed, markBackupStarted } from "@/lib/storage/local";
+import StorageUsageCard from "@/components/StorageUsageCard";
+import RestoreDialog from "@/components/RestoreDialog";
+import PhotoBackupCard from "@/components/PhotoBackupCard";
+import AutoBackupCard from "@/components/AutoBackupCard";
 import type { Rule } from "@/lib/types";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, parsePayDays } from "@/lib/paydays";
 import { amountFor, emptyFixedCost, fixedCostGaps, FIXED_COSTS_KEY, setAmountFor, type FixedCost } from "@/lib/fixedCosts";
@@ -85,8 +90,14 @@ export default function RulesPage() {
       .catch(() => {});
   }, []);
   async function saveFixedCosts(next: FixedCost[]) {
+    const prev = fixedCosts;
     setFixedCosts(next);
-    await getStore().saveSetting(FIXED_COSTS_KEY, next);
+    try {
+      await getStore().saveSetting(FIXED_COSTS_KEY, next);
+    } catch (e) {
+      setFixedCosts(prev); // 저장 실패 — 화면도 되돌린다
+      throw e;
+    }
   }
   async function savePayDays() {
     const days = parsePayDays(payDaysText);
@@ -110,26 +121,37 @@ export default function RulesPage() {
     await ledger.reload();
   }
 
+  const [usageTick, setUsageTick] = useState(0);
   function downloadBackup() {
-    const blob = new Blob([exportBackup()], { type: "application/json" });
+    let text: string;
+    try {
+      text = exportBackup();
+    } catch (e) {
+      setNote({ tone: "error", text: e instanceof Error ? e.message : String(e) });
+      return;
+    }
+    const blob = new Blob([text], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `sootdak-ledger-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
-    setNote({ tone: "ok", text: "백업 파일을 저장했어요. 실제 숫자가 들어 있으니 GitHub나 단톡방에 올리지 마세요." });
+    // 브라우저는 파일이 실제로 저장됐는지 알려 주지 않는다. "시작했다"고만 기록하고 확인은 사장님께 맡긴다.
+    markBackupStarted();
+    setUsageTick((t) => t + 1);
+    setNote({ tone: "ok", text: "백업 파일 내려받기를 시작했어요. 다운로드 폴더에 파일이 있는지 확인해 주세요. 실제 숫자가 들어 있으니 GitHub나 단톡방에 올리지 마세요." });
   }
 
-  async function restore(file: File) {
-    try {
-      importBackup(await file.text());
-      setNote({ tone: "ok", text: "백업을 불러왔어요." });
-      await ledger.reload();
-    } catch (e) {
-      setNote({ tone: "error", text: e instanceof Error ? e.message : String(e) });
-    } finally {
-      if (fileRef.current) fileRef.current.value = "";
-    }
+  // 파일을 골라도 바로 덮어쓰지 않는다 — RestoreDialog 가 검사·미리보기·확인을 거친 뒤에만 쓴다
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  function restore(file: File) {
+    setRestoreFile(file);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+  function confirmBackupSaved() {
+    markBackupConfirmed();
+    setUsageTick((t) => t + 1);
+    setNote({ tone: "ok", text: "백업 파일이 저장된 것을 확인했다고 기록했어요." });
   }
 
   async function deleteMonth() {
@@ -362,8 +384,11 @@ export default function RulesPage() {
         {local ? (
           <>
             <p className="text-sm text-stone-600">
-              내 PC 모드의 데이터는 <b>이 컴퓨터의 이 브라우저</b>에만 있어요. 브라우저 기록을 지우면 사라지니, 정산을 마칠 때마다 백업 파일을 저장해 두세요.
+              내 PC 모드의 데이터는 <b>이 컴퓨터의 이 브라우저</b>에만 있어요. 브라우저 기록을 지우면 사라지니, 정산을 마칠 때마다 백업 파일을 저장해 두세요. (영수증 사진은 백업 파일에 들어가지 않아요)
             </p>
+            <StorageUsageCard refreshKey={usageTick} />
+            <PhotoBackupCard onLedgerBackup={() => setUsageTick((t) => t + 1)} />
+            <AutoBackupCard />
             <div className="flex flex-wrap gap-2">
               <button className="btn-primary" onClick={downloadBackup}>
                 백업 파일 저장
@@ -371,8 +396,24 @@ export default function RulesPage() {
               <button className="btn-ghost" onClick={() => fileRef.current?.click()}>
                 백업 불러오기
               </button>
+              <button className="btn-ghost text-xs" onClick={confirmBackupSaved}>
+                받은 파일 확인했어요
+              </button>
               <input ref={fileRef} type="file" accept=".json" aria-label="백업 파일" className="hidden" onChange={(e) => e.target.files?.[0] && restore(e.target.files[0])} />
             </div>
+            {restoreFile && (
+              <RestoreDialog
+                file={restoreFile}
+                current={inspectLocal()}
+                onClose={() => setRestoreFile(null)}
+                onRestored={async () => {
+                  setRestoreFile(null);
+                  setUsageTick((t) => t + 1);
+                  setNote({ tone: "ok", text: "백업을 불러왔어요." });
+                  await ledger.reload();
+                }}
+              />
+            )}
           </>
         ) : (
           <p className="text-sm text-stone-600">시연 모드예요. 데이터는 인터넷 데이터 창고(Supabase)에 저장되고 누구나 볼 수 있으니 가짜 데이터만 넣으세요.</p>

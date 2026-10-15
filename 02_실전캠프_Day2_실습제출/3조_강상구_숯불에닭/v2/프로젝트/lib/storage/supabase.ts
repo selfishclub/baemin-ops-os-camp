@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { ChannelId, Major } from "../categories";
 import { seedRules } from "../seed";
 import type { ChannelSale, DailySale, DailyWeather, Month, MonthClosing, Rule, Shift, Staff, Transaction, UploadRecord } from "../types";
+import type { BatchOp } from "./batch";
 import type { Store } from "./index";
 import { nextMonth } from "../month";
 
@@ -44,6 +45,9 @@ const rowToTx = (r: Row): Transaction => ({
 
 export class SupabaseStore implements Store {
   mode = "supabase" as const;
+  // 시연 모드는 원자적이지 않다. 표마다 따로 요청하므로 중간에 실패하면 앞의 것만 남는다.
+  // 진짜 원자성을 내려면 Postgres 함수(RPC) 한 번으로 전부 쓰도록 schema.sql 에 함수를 만들어야 한다 — 시연 DB 에서 시험할 수 없어 이번엔 넣지 않았다.
+  readonly batchAtomic = false;
   private db: SupabaseClient;
 
   constructor() {
@@ -54,6 +58,22 @@ export class SupabaseStore implements Store {
     const { data, error } = await q;
     if (error) throw new Error(`데이터 창고 오류: ${error.message}`);
     return data as T;
+  }
+
+  // 순차 실행 — 원자적이지 않음 (batchAtomic = false). 실패하면 어디까지 됐는지 오류 메시지에 적는다.
+  async batch(ops: BatchOp[]) {
+    for (let i = 0; i < ops.length; i++) {
+      const op = ops[i];
+      try {
+        if (op.kind === "transactions") await this.saveTransactions(op.txs);
+        else if (op.kind === "upload") await this.saveUpload(op.record);
+        else if (op.kind === "dailySales") await this.saveDailySales(op.date, op.sales);
+        else if (op.kind === "shifts") await this.saveShifts(op.date, op.shifts);
+        else await this.saveSetting(op.key, op.value);
+      } catch (e) {
+        throw new Error(`${e instanceof Error ? e.message : String(e)} (시연 모드: ${ops.length}개 중 ${i}개는 이미 저장됐고 ${ops.length - i}개는 안 됐어요)`);
+      }
+    }
   }
 
   async listTransactions(month: Month) {

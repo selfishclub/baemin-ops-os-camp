@@ -7,6 +7,9 @@ import { monthLabel, nextMonth, prevMonth } from "@/lib/month";
 import { storageMode } from "@/lib/storage";
 import { appTitle, loadStoreProfile, STORE_PROFILE_EVENT } from "@/lib/storeProfile";
 import type { Month } from "@/lib/types";
+import { DamagedRecovery, StorageFailureToast, useLocalHealth, useStorageFailure } from "@/components/StorageGuard";
+import { isStorageError } from "@/lib/storage/errors";
+import AutoBackupAgent from "@/components/AutoBackupAgent";
 
 const MONTH_KEY = "sootdak-ledger-month";
 
@@ -44,9 +47,23 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [month, setMonthState] = useState<Month | null>(null);
   const [title, setTitle] = useState(appTitle(null));
   const mode = storageMode();
+  // 내 PC 모드에서만: 저장된 장부를 읽을 수 있는지 확인하고, 저장 실패 알림을 받는다
+  const { health, recheck } = useLocalHealth(mode === "local");
+  const { failure, dismiss } = useStorageFailure(recheck);
+  const damaged = health !== null && !health.ok;
 
   useEffect(() => {
     setMonthState(readMonth() ?? defaultMonth());
+  }, []);
+
+  // 저장 실패는 이미 빨간 알림으로 보여 줬으므로, catch 가 없는 화면에서 올라온 같은 오류가 콘솔에 "Uncaught" 로 찍히지 않게 한다.
+  // 저장소 오류만 조용히 하고, 다른 오류는 그대로 둔다.
+  useEffect(() => {
+    const quiet = (e: PromiseRejectionEvent) => {
+      if (isStorageError(e.reason)) e.preventDefault();
+    };
+    window.addEventListener("unhandledrejection", quiet);
+    return () => window.removeEventListener("unhandledrejection", quiet);
   }, []);
 
   // 가게 이름은 설정에 있다. 서버에서 그려지는 <title>은 못 바꾸니 여기서 다시 적어 준다
@@ -83,6 +100,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen md:flex">
+      {/* 저장 실패 알림 — 어느 화면이든 위에 뜬다 */}
+      <StorageFailureToast failure={failure} onDismiss={dismiss} />
+      {/* 내 PC 모드이고 장부를 읽을 수 있을 때만 자동 백업 일꾼을 띄운다 */}
+      {mode === "local" && health?.ok && <AutoBackupAgent />}
       {/* PC: 왼쪽 사이드바 메뉴 (김씨육면 손익관리의 사이드 메뉴 구성을 가져옴) */}
       <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:flex md:w-56 md:flex-col md:gap-5 md:bg-stone-900 md:px-3 md:py-5">
         <h1 className="flex min-w-0 items-center gap-2 px-2 text-base font-bold text-white">
@@ -110,12 +131,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <div
           role="status"
           className={`px-4 py-1.5 text-center text-xs font-semibold ${
-            mode === "local" ? "bg-emerald-600 text-white" : "bg-amber-400 text-amber-950"
+            damaged ? "bg-red-600 text-white" : mode === "local" ? "bg-emerald-600 text-white" : "bg-amber-400 text-amber-950"
           }`}
         >
-          {mode === "local"
-            ? "내 PC 모드 — 데이터가 이 컴퓨터에만 저장돼요"
-            : "시연 모드 — 가짜 데이터만 넣으세요. 누구나 볼 수 있어요"}
+          {damaged
+            ? "저장된 장부를 읽을 수 없어요 — 입력이 잠겼어요. 아래 안내대로 복구해 주세요"
+            : mode === "local"
+              ? "내 PC 모드 — 데이터가 이 컴퓨터에만 저장돼요"
+              : "시연 모드 — 가짜 데이터만 넣으세요. 누구나 볼 수 있어요"}
         </div>
 
         {/* 위 헤더: 폰에서는 로고·가게 이름 + 월 선택 + 가로 탭, PC에서는 지금 탭 이름 + 월 선택만 (메뉴는 왼쪽) */}
@@ -142,7 +165,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="mx-auto w-full max-w-3xl flex-1 space-y-4 px-4 pb-10 pt-4">
-          {month ? <MonthContext.Provider value={{ month, setMonth }}>{children}</MonthContext.Provider> : null}
+          {/* 장부를 읽을 수 없으면 화면을 띄우지 않는다 — 어떤 화면도 빈 장부를 보고 저장하지 못하게 */}
+          {health && !health.ok ? (
+            <DamagedRecovery read={health} onRecovered={recheck} />
+          ) : month ? (
+            <MonthContext.Provider value={{ month, setMonth }}>{children}</MonthContext.Provider>
+          ) : null}
         </main>
       </div>
     </div>

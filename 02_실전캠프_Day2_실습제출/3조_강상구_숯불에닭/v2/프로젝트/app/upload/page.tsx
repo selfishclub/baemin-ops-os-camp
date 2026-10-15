@@ -86,7 +86,8 @@ export default function UploadPage() {
     let duplicates = 0;
     const overlap = findOverlap(await store.listUploads(), from, to);
     if (overlap) {
-      const existing = (await Promise.all(monthsBetween(from, to).map((m) => store.listTransactions(m)))).flat().filter((t) => t.source === "bank" && t.date >= from && t.date <= to);
+      // "지난달 비용으로" 규칙(급여·거래처 대금)에 걸린 줄은 month 가 한 달 앞이라, 지난달까지 함께 읽어야 같은 줄을 또 넣지 않는다 (F-보완에서 발견)
+      const existing = (await Promise.all(monthsBetween(prevMonth(from.slice(0, 7)), to).map((m) => store.listTransactions(m)))).flat().filter((t) => t.source === "bank" && t.date >= from && t.date <= to);
       ({ fresh: rows, duplicates } = newBankRowsOnly(all, existing));
       if (rows.length === 0) {
         setMessage({ tone: "info", text: `이미 다 들어 있는 거래예요 (${from} ~ ${to}, ${duplicates}줄). 새로 넣은 줄은 없어요.` });
@@ -95,9 +96,12 @@ export default function UploadPage() {
     }
     const rules = await store.listRules();
     const txs = classifyRows(rows, rules, usualAmounts(ledger.txs.concat(ledger.prevTxs), rules));
-    await store.saveTransactions(txs);
     const fileMonth = from.slice(0, 7);
-    await store.saveUpload({ id: newId(), month: fileMonth, from, to, rowCount: txs.length, uploadedAt: new Date().toISOString() });
+    // 거래와 "올린 기록"을 한 번에 — 거래만 남고 기록이 빠지면 같은 파일을 또 올려도 중복 경고가 안 뜬다
+    await store.batch([
+      { kind: "transactions", txs },
+      { kind: "upload", record: { id: newId(), month: fileMonth, from, to, rowCount: txs.length, uploadedAt: new Date().toISOString() } },
+    ]);
     await ledger.recordEdit(`${label}, ${txs.length}줄)`);
     const auto = txs.filter((t) => t.major).length;
     setMessage({

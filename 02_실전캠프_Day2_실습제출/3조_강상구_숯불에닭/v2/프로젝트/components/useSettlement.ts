@@ -45,20 +45,45 @@ export function useSettlement(month: string, ledger: ReturnType<typeof useLedger
     })();
   }, []);
 
-  const saveRules = useCallback(async (next: SettlementRule[]) => {
-    setRules(next);
-    await getStore().saveSetting(SETTLEMENT_RULES_KEY, next);
-  }, []);
-  const saveHolidays = useCallback(async (next: string[]) => {
-    setHolidays(next);
-    await getStore().saveSetting(HOLIDAYS_KEY, next);
-  }, []);
+  // 화면을 먼저 바꾸고 저장한다. 저장에 실패하면 되돌려서 "저장된 것처럼" 보이지 않게 한다.
+  const saveRules = useCallback(
+    async (next: SettlementRule[]) => {
+      const prev = rules;
+      setRules(next);
+      try {
+        await getStore().saveSetting(SETTLEMENT_RULES_KEY, next);
+      } catch (e) {
+        setRules(prev);
+        throw e;
+      }
+    },
+    [rules],
+  );
+  const saveHolidays = useCallback(
+    async (next: string[]) => {
+      const prev = holidays;
+      setHolidays(next);
+      try {
+        await getStore().saveSetting(HOLIDAYS_KEY, next);
+      } catch (e) {
+        setHolidays(prev);
+        throw e;
+      }
+    },
+    [holidays],
+  );
   const saveAdjustment = useCallback(
     async (a: SettlementAdjustment) => {
+      const prev = adjustments;
       const next = adjustments.filter((x) => !(x.channel === a.channel && x.date === a.date));
       if (a.amount > 0) next.push(a);
       setAdjustments(next);
-      await getStore().saveSetting(SETTLEMENT_ADJUSTMENTS_KEY, next);
+      try {
+        await getStore().saveSetting(SETTLEMENT_ADJUSTMENTS_KEY, next);
+      } catch (e) {
+        setAdjustments(prev);
+        throw e;
+      }
     },
     [adjustments],
   );
