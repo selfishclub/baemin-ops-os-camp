@@ -113,14 +113,57 @@ export default function UploadPage() {
     else await ledger.reload();
   }
 
+  // 엑셀의 시트를 차례로 읽어 거래내역 표가 있는 시트를 찾는다.
+  // 농협 "엑셀저장" 파일은 HTML 표 네 개(제목·조회일시·계좌정보·거래내역)라 첫 시트에는 표가 없다.
+  async function parseBankBytes(buf: ArrayBuffer) {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.read(buf, { type: "array" });
+    let lastErr: unknown = null;
+    for (const name of wb.SheetNames) {
+      const grid = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true }) as never[][];
+      if (grid.length < 2) continue;
+      try {
+        return parseBankSheet(grid);
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw lastErr ?? new BankParseError("은행 거래내역 파일이 아닌 것 같아요. 날짜·내용·금액(출금/입금) 열을 찾지 못했어요.");
+  }
+
+  // 농협에서 바로 가져오기 — 리뷰 도우미가 Aside(사장님이 로그인해 둔 창)에서 입출금거래내역 엑셀을 받아 건네준다.
+  // 받은 뒤는 파일 올리기와 똑같이 처리한다(겹치는 줄은 뺀다). 로그인·이체는 프로그램이 절대 하지 않는다.
+  const [bankFetching, setBankFetching] = useState(false);
+  async function fetchFromBank() {
+    setMessage(null);
+    setBankFetching(true);
+    try {
+      const helper = process.env.NEXT_PUBLIC_HELPER_URL || "http://127.0.0.1:4599";
+      const local = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const to = local(new Date(Date.now() - 86_400_000));
+      const from = local(new Date(Date.now() - 7 * 86_400_000));
+      const res = await fetch(`${helper}/nh/fetch`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ from, to }) });
+      const j = (await res.json()) as { ok: boolean; message?: string; needLogin?: boolean; fileName?: string; base64?: string };
+      if (!j.ok || !j.base64) {
+        setMessage({ tone: "error", text: j.needLogin ? "농협 로그인이 필요해요. 리뷰 수집기 폴더에서 npm run login:source -- nh 를 돌리고 Aside 창에서 로그인한 뒤 다시 눌러 주세요 (로그인은 10분 안에 써야 해요)." : (j.message ?? "받지 못했어요.") });
+        return;
+      }
+      const bin = atob(j.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      await handleFile(new Blob([bytes]), j.fileName ?? "농협_입출금거래내역.xls");
+    } catch {
+      setMessage({ tone: "error", text: "도우미에 연결하지 못했어요. 리뷰 수집기 폴더에서 npm run helper 를 켜 주세요." });
+    } finally {
+      setBankFetching(false);
+    }
+  }
+
   async function handleFile(file: File | Blob, name: string) {
     setBusy(true);
     setMessage(null);
     try {
-      const XLSX = await import("xlsx");
-      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-      const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true }) as never[][];
-      const parsed = parseBankSheet(grid);
+      const parsed = await parseBankBytes(await file.arrayBuffer());
       await ingest(parsed.rows, parsed.from, parsed.to, `거래내역 파일 올림 (${name}`);
     } catch (e) {
       setMessage({
@@ -183,6 +226,9 @@ export default function UploadPage() {
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0], e.target.files[0].name)}
         />
         <div className="flex flex-wrap gap-2">
+          <button className="btn-primary" disabled={busy || bankFetching} onClick={() => void fetchFromBank()}>
+            {bankFetching ? "농협에서 받는 중… (20초쯤)" : "농협에서 바로 가져오기 (어제까지 7일)"}
+          </button>
           {SAMPLES.map((s) => (
             <button key={s.file} className="btn-ghost" disabled={busy} onClick={() => loadSample(s.file)}>
               가짜 {s.label} 파일로 해 보기
