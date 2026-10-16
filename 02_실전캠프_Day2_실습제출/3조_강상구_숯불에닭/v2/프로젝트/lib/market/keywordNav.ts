@@ -188,7 +188,7 @@ export function isOurs(keyword: string, data: KeywordNavData | null): boolean {
 
 /**
  * 검색수가 있는데(≥ minVolume) 아직 상위(≤ goodRank)가 아닌 키워드. 검색수 큰 순.
- * ranks: 추적 기록의 최근 순위 (키워드 → 순위, null = 50위 밖). 기록이 없으면 "아직 안 재 봤다"로 둔다.
+ * ranks: 추적 기록의 최근 순위 (키워드 → 순위, null = 50위 밖). 기록이 없으면 "아직 측정 안 함"으로 둔다.
  */
 export function opportunities(data: KeywordNavData, volumes: VolumeMap, ranks: Record<string, number | null>, tracked: string[], opts: { minVolume?: number; goodRank?: number; limit?: number } = {}): Opportunity[] {
   const minVolume = opts.minVolume ?? 100;
@@ -209,7 +209,7 @@ export function opportunities(data: KeywordNavData, volumes: VolumeMap, ranks: R
     const measured = k in nr;
     const rank = measured ? nr[k] : null;
     if (measured && rank !== null && rank <= goodRank) continue; // 이미 잡은 키워드
-    const reason = !measured ? "아직 순위를 안 재 봤어요" : rank === null ? "50위 밖" : `${rank}위 — 더 올릴 수 있어요`;
+    const reason = !measured ? "아직 측정 안 했어요" : rank === null ? "50위 밖" : `${rank}위 — 더 올릴 수 있어요`;
     out.push({ keyword: k, volume: vol, type: navRow?.type ?? null, rank, measured, tracked: trackedSet.has(k), reason, guide: navRow?.guide ?? null });
   }
   return out.sort((a, b) => b.volume - a.volume).slice(0, opts.limit ?? 40);

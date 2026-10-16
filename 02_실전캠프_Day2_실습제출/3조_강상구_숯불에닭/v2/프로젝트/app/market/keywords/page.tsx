@@ -22,7 +22,7 @@ const TYPE_CLS: Record<PlaceType, string> = { 대표상호: "bg-orange-100 text-
 function TypeBadge({ type }: { type: PlaceType | null }) {
   if (!type) return <span className="text-[11px] text-stone-400">?</span>;
   return (
-    <span title={TYPE_ACTION[type]} className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${TYPE_CLS[type]}`}>
+    <span title={TYPE_ACTION[type]} className={`inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold ${TYPE_CLS[type]}`}>
       {type}
     </span>
   );
@@ -211,7 +211,7 @@ export default function KeywordNavPage() {
     const next = { ...pk, slots: draft.slots.slice(0, 5) as PlaceKeywords["slots"] };
     setPk(next);
     void getStore().saveSetting(PLACE_KEYWORDS_KEY, next).catch(() => {});
-    setMsg({ tone: "ok", text: "상권 탭 5칸 메모에 넣었어요. 스마트플레이스에서 바꾼 뒤 1~2주 뒤 순위를 다시 재 보세요." });
+    setMsg({ tone: "ok", text: "상권 탭 5칸 메모에 넣었어요. 스마트플레이스에서 바꾼 뒤 1~2주 뒤 순위를 다시 측정해 보세요." });
   };
 
   if (!loaded || !exp.loaded) return <p className="py-10 text-center text-sm text-stone-500">불러오는 중…</p>;
@@ -427,11 +427,11 @@ export default function KeywordNavPage() {
                         <TypeBadge type={c.type} />
                       </td>
                       <td className="num text-right">{c.measured ? (c.rank === null ? "밖" : `${c.rank}위`) : <span className="text-stone-300">–</span>}</td>
-                      <td className="text-right">
+                      <td className="whitespace-nowrap text-right">
                         {(c.volume ?? 0) >= 10 && (
-                          <span className="inline-flex gap-1">
+                          <span className="inline-flex gap-1 whitespace-nowrap">
                             <button className="btn-ghost px-2 py-0.5 text-[11px]" disabled={busy !== null} onClick={() => void measure(c.keyword)}>
-                              {busy === `rank:${c.keyword}` ? "재는 중" : "순위 재기"}
+                              {busy === `rank:${c.keyword}` ? "측정 중" : "순위 측정"}
                             </button>
                             {isTracked(c.keyword) ? <span className="text-[11px] text-emerald-700">추적 중</span> : <button className="btn-ghost px-2 py-0.5 text-[11px]" onClick={() => void track(c.keyword)}>추적</button>}
                           </span>
@@ -453,7 +453,7 @@ export default function KeywordNavPage() {
         {landmarkKeys.length > 0 && (
           <div className="rounded-xl bg-stone-50 p-3">
             <p className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-stone-500">
-              랜드마크 10종 — "{mains[0].keyword}" 뒤에 붙여 검색수를 재 보면 동네 사람들이 부르는 큰 장소가 나와요
+              랜드마크 10종 — "{mains[0].keyword}" 뒤에 붙여 검색수를 조회해 보면 동네 사람들이 부르는 큰 장소가 나와요
               <button className="btn-ghost px-2 py-0.5 text-[11px]" disabled={busy !== null} onClick={() => void lookup(landmarkKeys, "landmark")}>
                 {busy === "landmark" ? "묻는 중…" : "검색수 조회"}
               </button>
@@ -484,11 +484,11 @@ export default function KeywordNavPage() {
                       <span>
                         <b>{c.keyword}</b> <span className="num text-xs text-stone-500">{num(c.volume)}</span>
                       </span>
-                      <span className="num flex items-center gap-2 text-xs">
-                        {c.measured ? <b>{c.rank === null ? "50위 밖" : `${c.rank}위`}</b> : <span className="text-stone-400">안 재 봄</span>}
+                      <span className="num flex shrink-0 items-center gap-2 whitespace-nowrap text-xs">
+                        {c.measured ? <b>{c.rank === null ? "50위 밖" : `${c.rank}위`}</b> : <span className="text-stone-400">미측정</span>}
                         {!good && (
                           <button className="btn-ghost px-2 py-0.5 text-[11px]" disabled={busy !== null} onClick={() => void measure(c.keyword)}>
-                            {busy === `rank:${c.keyword}` ? "재는 중" : "재기"}
+                            {busy === `rank:${c.keyword}` ? "측정 중" : "측정"}
                           </button>
                         )}
                         {!isTracked(c.keyword) && (
@@ -525,13 +525,13 @@ export default function KeywordNavPage() {
                       <td className="text-center">
                         <TypeBadge type={o.type} />
                       </td>
-                      <td className="num text-xs text-stone-600">{o.reason}</td>
-                      <td className="text-xs text-stone-600">{o.guide ?? (o.type ? TYPE_ACTION[o.type] : "상위 가게 5칸·상호를 보고 유형부터 정하기")}</td>
-                      <td className="text-right">
-                        <span className="inline-flex gap-1">
+                      <td className="num whitespace-nowrap text-xs text-stone-600">{o.reason}</td>
+                      <td className="min-w-[14rem] text-xs text-stone-600">{o.guide ?? (o.type ? TYPE_ACTION[o.type] : "상위 가게 5칸·상호를 보고 유형부터 정하기")}</td>
+                      <td className="whitespace-nowrap text-right">
+                        <span className="inline-flex gap-1 whitespace-nowrap">
                           {!o.measured && (
                             <button className="btn-ghost px-2 py-0.5 text-[11px]" disabled={busy !== null} onClick={() => void measure(o.keyword)}>
-                              {busy === `rank:${o.keyword}` ? "재는 중" : "재기"}
+                              {busy === `rank:${o.keyword}` ? "측정 중" : "측정"}
                             </button>
                           )}
                           {o.tracked ? <span className="text-[11px] text-emerald-700">추적 중</span> : <button className="btn-ghost px-2 py-0.5 text-[11px]" onClick={() => void track(o.keyword)}>추적</button>}
@@ -580,7 +580,7 @@ export default function KeywordNavPage() {
               </p>
               <p className="mt-1">
                 지금 5칸에 있지만 검색수 근거가 안 보이는 말: {diff.unknown.length ? diff.unknown.join(" · ") : <span className="text-stone-500">없음</span>}
-                <span className="block text-xs text-stone-500">근거가 없다고 틀린 건 아니에요 — 조합기에서 그 말을 꼬리로 넣어 검색수를 재 보세요.</span>
+                <span className="block text-xs text-stone-500">근거가 없다고 틀린 건 아니에요 — 조합기에서 그 말을 꼬리로 넣어 검색수를 조회해 보세요.</span>
               </p>
             </div>
           )}
@@ -588,7 +588,7 @@ export default function KeywordNavPage() {
             <button className="btn-primary" onClick={applyDraft}>
               이 초안을 상권 탭 5칸 메모에 넣기
             </button>
-            <span className="text-xs text-stone-500">네이버는 안 바뀌어요. 스마트플레이스에서 2~3개씩 바꿔 보고(검수에 걸리면 줄여서) 1~2주 뒤 순위를 재 보세요.</span>
+            <span className="text-xs text-stone-500">네이버는 안 바뀌어요. 스마트플레이스에서 2~3개씩 바꿔 보고(검수에 걸리면 줄여서) 1~2주 뒤 순위를 측정해 보세요.</span>
           </div>
           {draft.skipped.length > 0 && (
             <details className="text-xs text-stone-500">

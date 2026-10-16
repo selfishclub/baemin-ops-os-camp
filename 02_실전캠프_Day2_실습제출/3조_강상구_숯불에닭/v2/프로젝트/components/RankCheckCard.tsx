@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { num } from "@/lib/format";
 
-// 순위 바로 재기 — 키워드를 넣으면 리뷰 도우미(npm run helper)가 네이버 플레이스 검색 결과를 읽어 우리 가게가 몇 위인지 알려 준다.
+// 순위 바로 측정 — 키워드를 넣으면 리뷰 도우미(npm run helper)가 네이버 플레이스 검색 결과를 읽어 우리 가게가 몇 위인지 알려 준다.
 // 공개 검색 페이지를 읽기만 한다. 한 번에 하나, 1분 안팎. 기록은 남기지 않고, "매일 추적에 더하기"를 누르면 아침 순위 기록 대상이 된다.
 const HELPER = process.env.NEXT_PUBLIC_HELPER_URL || "http://127.0.0.1:4599";
 
@@ -56,7 +56,7 @@ export function RankCheckCard({ tracked }: { tracked: string[] }) {
   return (
     <section className="card space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-base font-bold">순위 바로 재기</h2>
+        <h2 className="text-base font-bold">순위 바로 측정</h2>
         <span className="text-xs text-stone-500">궁금한 키워드로 우리 가게가 몇 위인지 · 네이버 플레이스 검색 결과</span>
       </div>
       <form
@@ -68,7 +68,7 @@ export function RankCheckCard({ tracked }: { tracked: string[] }) {
       >
         <input className="field" placeholder="예: 청주 숯불닭갈비, 율량동 회식" value={keyword} onChange={(e) => setKeyword(e.target.value)} disabled={busy} maxLength={30} />
         <button className="btn-primary shrink-0" type="submit" disabled={busy || !keyword.trim()}>
-          {busy ? "찾는 중…" : "순위 재기"}
+          {busy ? "측정 중…" : "순위 측정"}
         </button>
       </form>
       {msg && <p className="text-xs text-stone-600">{msg}</p>}
@@ -121,7 +121,7 @@ export function RankCheckCard({ tracked }: { tracked: string[] }) {
           )}
         </div>
       )}
-      <p className="text-xs text-stone-500">한 번에 한 키워드만, 간격을 두고 재 주세요. 네이버가 제한 문구를 보이면 그날은 멈춰요.</p>
+      <p className="text-xs text-stone-500">한 번에 한 키워드만, 간격을 두고 측정해 주세요. 네이버가 제한 문구를 보이면 그날은 멈춰요.</p>
     </section>
   );
 }

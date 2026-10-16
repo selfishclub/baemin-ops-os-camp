@@ -160,7 +160,7 @@ export default function MarketPage() {
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-stone-500">숫자는 그날 순위(작을수록 좋음). 초록은 전에 읽은 날보다 올라간 날, 빨강은 내려간 날, ×는 못 읽은 날, "밖"은 50위 밖. 키워드를 누르면 아래 추이가 그 키워드로 바뀝니다. 추적 키워드는 "순위 바로 재기"에서 더할 수 있어요.</p>
+          <p className="text-xs text-stone-500">숫자는 그날 순위(작을수록 좋음). 초록은 전에 읽은 날보다 올라간 날, 빨강은 내려간 날, ×는 못 읽은 날, "밖"은 50위 밖. 키워드를 누르면 아래 추이가 그 키워드로 바뀝니다. 추적 키워드는 "순위 바로 측정"에서 더할 수 있어요.</p>
         </section>
       )}
 
@@ -446,7 +446,7 @@ export default function MarketPage() {
                   </li>
                 ))}
               </ul>
-              {pk.changedAt && <p className="num mt-1.5 text-xs text-stone-500">마지막으로 바꾼 날 {pk.changedAt} → {daysSince(pk.changedAt, today) >= 7 ? "순위를 다시 재 볼 때예요 (위 순위 카드)" : `${7 - daysSince(pk.changedAt, today)}일 뒤에 순위를 다시 재 보세요`}</p>}
+              {pk.changedAt && <p className="num mt-1.5 text-xs text-stone-500">마지막으로 바꾼 날 {pk.changedAt} → {daysSince(pk.changedAt, today) >= 7 ? "순위를 다시 측정할 때예요 (위 순위 카드)" : `${7 - daysSince(pk.changedAt, today)}일 뒤에 순위를 다시 측정해 보세요`}</p>}
             </div>
           </>
         )}

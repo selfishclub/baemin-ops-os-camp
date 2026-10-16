@@ -70,7 +70,7 @@ export const PLACE_KEYWORDS_KEY = "place_keywords_v1";
 export interface PlaceKeywords {
   slots: [string, string, string, string, string]; // ①지역+업종 ②대표 상품 ③동네·랜드마크 ④용도·선물 ⑤시즌(교체)
   season: Record<string, string>; // "1".."12" 월 → 그 달에 ⑤칸에 넣을 말
-  changedAt: string | null; // ⑤칸을 마지막으로 바꾼 날 (1~2주 뒤 순위 재기용)
+  changedAt: string | null; // ⑤칸을 마지막으로 바꾼 날 (1~2주 뒤 순위 측정용)
   todo: boolean[]; // 바꾸는 날 할 일 5개 체크
 }
 
@@ -81,7 +81,7 @@ export const CHANGE_TODO = [
   "상세설명 소개글에 새 시즌 말을 문장으로 1~2번 (단어만 나열하지 않기)",
   "대표 사진 첫 장을 시즌 메뉴로",
   "같은 시즌 광고그룹이 있으면 켜기",
-  "1~2주 뒤 순위 다시 재기 — 바꾸기 전 순위와 비교",
+  "1~2주 뒤 순위 다시 측정 — 바꾸기 전 순위와 비교",
 ] as const;
 
 export const EMPTY_PLACE_KEYWORDS: PlaceKeywords = { slots: ["", "", "", "", ""], season: {}, changedAt: null, todo: [false, false, false, false, false] };
