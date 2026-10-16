@@ -302,3 +302,51 @@ export function applyBackup(inspection: Extract<BackupInspection, { ok: true }>)
   writeLocal(inspection.data);
   return inspection.data;
 }
+
+// ── 설정만 골라 되살리기 ─────────────────────────────────────────
+// 백업 전체를 덮어쓰면 그 뒤에 넣은 매출·거래가 사라진다. 리뷰 수집 자료·키워드 엑셀·광고 시작안처럼
+// "설정" 칸에 든 것만 백업에서 꺼내 지금 장부에 끼워 넣는다. 거래·일별 매출·직원은 건드리지 않는다.
+export const SETTING_LABEL: Record<string, string> = {
+  export_reviews_v1: "리뷰 수집 자료 (리뷰 탭)",
+  export_rank_v1: "네이버 플레이스 순위 기록 (상권 탭)",
+  export_baemin_v1: "배민 정산 수집 자료 (정산 탭)",
+  export_coupang_v1: "쿠팡이츠 정산 수집 자료 (정산 탭)",
+  export_market_v1: "동네 조사 자료 (상권 탭)",
+  export_meta_v1: "수집 자료 받은 시각",
+  review_reply_marks_v1: "답글 등록했어요 표시",
+  keyword_nav_v1: "키워드 네비게이션 엑셀 자료",
+  keyword_volumes_v1: "키워드 월간 검색수",
+  ad_plan_v1: "광고 시작안 (고른 키워드·입찰가·기록)",
+  ad_bids_v1: "키워드 예상 입찰가",
+  place_keywords_v1: "대표 키워드 5칸 메모",
+  market_manual_v1: "유동인구 옮겨 적기",
+};
+export const settingLabel = (key: string) => SETTING_LABEL[key] ?? key;
+
+export interface SettingChoice {
+  key: string;
+  label: string;
+  inCurrent: boolean; // 지금 장부에도 있는 키 (넣으면 덮어쓴다)
+  chars: number; // 크기 어림 (글자 수)
+}
+
+/** 백업의 설정 목록 — 지금 장부에 없는 것이 먼저, 그다음 있는 것 */
+export function settingChoices(backup: LocalData, current: LocalData | null): SettingChoice[] {
+  const now = new Set((current?.settings ?? []).map((s) => s.key));
+  return backup.settings
+    .map((s) => ({ key: s.key, label: settingLabel(s.key), inCurrent: now.has(s.key), chars: JSON.stringify(s.value ?? null).length }))
+    .sort((a, b) => Number(a.inCurrent) - Number(b.inCurrent) || a.label.localeCompare(b.label, "ko"));
+}
+
+/** 고른 설정 키만 백업에서 꺼내 지금 장부에 넣는다 (한 번의 쓰기). 거래·매출 등 다른 칸은 그대로 */
+export function mergeSettings(backup: LocalData, keys: string[]): { added: string[]; replaced: string[] } {
+  const current = readLocal();
+  const want = new Set(keys);
+  const fromBackup = backup.settings.filter((s) => want.has(s.key));
+  const existing = new Set(current.settings.map((s) => s.key));
+  const added = fromBackup.filter((s) => !existing.has(s.key)).map((s) => s.key);
+  const replaced = fromBackup.filter((s) => existing.has(s.key)).map((s) => s.key);
+  const settings = [...current.settings.filter((s) => !want.has(s.key)), ...fromBackup];
+  writeLocal({ ...current, settings });
+  return { added, replaced };
+}

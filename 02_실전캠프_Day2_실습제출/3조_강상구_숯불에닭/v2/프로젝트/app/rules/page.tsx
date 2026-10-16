@@ -15,6 +15,7 @@ import { exportBackup } from "@/lib/storage/backup";
 import { inspectLocal, markBackupConfirmed, markBackupStarted } from "@/lib/storage/local";
 import StorageUsageCard from "@/components/StorageUsageCard";
 import RestoreDialog from "@/components/RestoreDialog";
+import { SettingsRestoreCard } from "@/components/SettingsRestoreCard";
 import PhotoBackupCard from "@/components/PhotoBackupCard";
 import AutoBackupCard from "@/components/AutoBackupCard";
 import type { Rule } from "@/lib/types";
@@ -407,6 +408,12 @@ export default function RulesPage() {
               </button>
               <input ref={fileRef} type="file" accept=".json" aria-label="백업 파일" className="hidden" onChange={(e) => e.target.files?.[0] && restore(e.target.files[0])} />
             </div>
+            <SettingsRestoreCard
+              onDone={() => {
+                setUsageTick((t) => t + 1);
+                void ledger.reload();
+              }}
+            />
             {restoreFile && (
               <RestoreDialog
                 file={restoreFile}

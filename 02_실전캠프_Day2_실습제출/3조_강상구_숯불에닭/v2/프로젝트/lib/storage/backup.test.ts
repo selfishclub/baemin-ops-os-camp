@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { applyBackup, canRestore, diffBackup, exportBackup, inspectBackup, photoLinkRisk, photoOwnerIds, summarize } from "./backup";
+import { applyBackup, canRestore, diffBackup, exportBackup, inspectBackup, mergeSettings, photoLinkRisk, photoOwnerIds, settingChoices, summarize } from "./backup";
 import { StorageFullError } from "./errors";
 import { emptyData, inspectLocal, LOCAL_KEY, LocalStore, type LocalData } from "./local";
 
@@ -276,5 +276,27 @@ describe("12. JSON 복원 후 사진 연결 위험", () => {
     const r = photoLinkRisk(null, fakeData(), { p1: 1, old: 2 });
     expect(r).toMatchObject({ photos: 3, linkedNow: 0, linkedAfter: 1, orphanedAfter: 0 });
     expect(r.message).toContain("무관");
+  });
+});
+
+describe("13. 설정만 골라 되살리기", () => {
+  it("백업에만 있는 설정이 먼저 오고, 고른 키만 들어가며 거래·매출은 그대로", () => {
+    const current: LocalData = { ...emptyData(), transactions: [tx("new1", "2026-10", "2026-10-16")], dailySales: [sale("2026-10-16")], settings: [{ key: "channels", value: [1] }] };
+    fake.setItem(LOCAL_KEY, JSON.stringify(current));
+    const backup: LocalData = { ...emptyData(), transactions: [tx("old1")], settings: [{ key: "channels", value: [] }, { key: "ad_plan_v1", value: { items: [1, 2] } }, { key: "keyword_nav_v1", value: { regions: [] } }] };
+    const choices = settingChoices(backup, current);
+    expect(choices.map((c) => c.key)).toEqual(["ad_plan_v1", "keyword_nav_v1", "channels"]); // 없는 것 먼저, 이름 순
+    expect(choices[0].inCurrent).toBe(false);
+    expect(choices[2].inCurrent).toBe(true);
+    expect(choices[0].label).toContain("광고 시작안");
+    const r = mergeSettings(backup, ["ad_plan_v1", "keyword_nav_v1"]);
+    expect(r.added.sort()).toEqual(["ad_plan_v1", "keyword_nav_v1"]);
+    expect(r.replaced).toEqual([]);
+    const after = inspectLocal();
+    if (!after.ok) throw new Error("읽기 실패");
+    expect(after.data.transactions.map((t) => t.id)).toEqual(["new1"]); // 거래는 지금 것 그대로
+    expect(after.data.dailySales).toHaveLength(1);
+    expect(after.data.settings.find((s) => s.key === "channels")?.value).toEqual([1]); // 안 고른 설정은 그대로
+    expect(after.data.settings.find((s) => s.key === "ad_plan_v1")?.value).toEqual({ items: [1, 2] });
   });
 });
