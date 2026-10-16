@@ -29,23 +29,23 @@ body {
   letter-spacing: -0.02em;
 }
 
-/* 왼쪽 사이드바 메뉴 (PC). 카페스이 색감 — 짙은 세이지 바탕(#4F6449), 크림 글자, 지금 탭은 밝은 칸 + 겨자색 점. 그림 없이 글자만, 18px */
+/* 왼쪽 사이드바 메뉴 (PC). 카페스이 브라운 크림 — 진한 브라운 바탕(#3B302A), 크림 글자, 지금 탭은 밝은 칸 + 골드 점. 그림 없이 글자만, 18px */
 .side {
-  background: #4f6449;
-  color: #f4f1e8;
+  background: #3b302a;
+  color: #f4ede1;
 }
 .side-group {
   @apply px-3 pb-1 pt-4 text-[11.5px] font-extrabold tracking-[0.08em] text-stone-200/60;
 }
 .side-nav {
-  @apply flex w-full items-center justify-between rounded-[10px] px-3.5 py-2.5 text-[18px] font-medium text-[#d8e0d2] transition hover:bg-white/10 hover:text-white;
+  @apply flex w-full items-center justify-between rounded-[10px] px-3.5 py-2.5 text-[18px] font-medium text-[#d9ccbe] transition hover:bg-white/10 hover:text-white;
 }
 .side-nav-active {
   @apply bg-white/[0.14] font-bold text-white hover:bg-white/[0.14];
 }
 .side-nav-active::after {
   content: "";
-  @apply h-2 w-2 rounded-full bg-[#e6b94a];
+  @apply h-2 w-2 rounded-full bg-[#e0b04a];
 }
 
 /* 폰에서는 사이드바 대신 헤더 아래 가로 탭 (알약 모양, 옆으로 밀어서 본다) */
