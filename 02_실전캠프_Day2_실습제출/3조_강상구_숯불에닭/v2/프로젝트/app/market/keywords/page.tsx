@@ -520,7 +520,7 @@ export default function KeywordNavPage() {
                 <tbody className="divide-y divide-stone-100">
                   {opps.map((o) => (
                     <tr key={o.keyword}>
-                      <td className="py-1 font-semibold">{o.keyword}</td>
+                      <td className="whitespace-nowrap py-1 font-semibold">{o.keyword}</td>
                       <td className="num text-right">{num(o.volume)}</td>
                       <td className="text-center">
                         <TypeBadge type={o.type} />
