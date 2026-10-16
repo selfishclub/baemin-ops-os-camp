@@ -217,8 +217,9 @@ const App = (() => {
     'tankCount', 'tankCareDel', 'tankLogDel', 'deadDel', 'purchaseDel', 'purchaseCsv', 'salesDel', 'salesCsv',
     'reset', 'import', 'sampleLoad', 'sampleClear', 'fixedAdd', 'fixedEdit', 'fixedDel', 'weeklyPay', 'sper', 'toggleAskWho', 'toggleReport', 'toggleSound', 'toggleTgInstant', 'tgFind', 'tgTest', 'supaClear', 'laborConfirm', 'laborUnconfirm', 'sealUpload', 'sealDel', 'guideEdit', 'doneMemo', 'staffLockToggle',
     'cAdd', 'cDel', 'cVoid', 'cEdit', 'cSign', 'cStamp', 'cDeliver', 'cAttach', 'cFileDel', 'cSaveBack', 'sendReportNow', 'testAlarm',
+    'msApprove', 'issueDel', 'healthMonths',   // 10/15 점검: 직원이 자기 미션 승인 · 남의 글 삭제 · 보건증 유효기간 변경이 되던 구멍
   ]);
-  const STAFF_ASK = new Set(['noticeAdd']);   // 잠겨 있어도 버튼은 보여 주고, 누르면 비밀번호를 묻는 것
+  const STAFF_ASK = new Set(['noticeAdd', 'msApprove']);   // 잠겨 있어도 버튼은 보여 주고, 누르면 비밀번호를 묻는 것
   const staffLocked = () => S.settings && S.settings.staffLock !== false && !ownerOn();
   const blockedBanner = () => banner('테스트 기간에는 사장님만 바꿀 수 있습니다', '직원은 할 일 체크·메모·숫자 입력·게시판만 씁니다. 바꾸고 싶은 게 있으면 게시판에 건의로 올려 주세요.');
   /* 사용 중이면 5분 연장, 안 쓰면 자동 잠김 */
@@ -533,14 +534,14 @@ const App = (() => {
     const key = dateKey(), day = ensureDay(key), n = nowMin();
     const groups = alarmGroups();
     Object.entries(groups).forEach(([due, list]) => {
-      const mine = list.filter((t) => day.inst[t.id]);
+      const mine = list.filter((t) => day.inst[t.id] && !day.inst[t.id].auto);   // 오늘 하지 않는 요일(자동 완료)은 울리지 않는다
       if (!mine.length) return;
       const dm = minutesOf(due);
       const names = mine.map((t) => t.title).join(' · ');
 
       if (n >= dm && !day.notified[due + ':pre']) {
         day.notified[due + ':pre'] = Date.now();
-        fire(`[중요] ${due} · ${mine.length}건`, names);
+        if (n < dm + 30) fire(`[중요] ${due} · ${mine.length}건`, names);   // 30분 넘게 지나 앱을 열었으면 시작 알림은 건너뛴다 (안 된 것은 아래 "아직 안 됐습니다"가 알린다)
         save();
       }
       const grace = Math.max(...mine.map((t) => t.grace || 30));
@@ -1125,7 +1126,7 @@ const App = (() => {
     window.scrollTo(0, y);   // 체크할 때마다 화면이 위로 튀지 않게
     if (view === 'contracts') bindEditor();
     if (staffLocked()) {
-      document.querySelectorAll('#main [data-act]').forEach((el) => { if (STAFF_BLOCK.has(el.dataset.act) && !STAFF_ASK.has(el.dataset.act)) el.hidden = true; });
+      hideBlocked($('#main'));
       const sf = $('#side .sfoot'); if (sf && !sf.querySelector('.staffLockTag')) sf.insertAdjacentHTML('afterbegin', '<div class="staffLockTag">🔒 테스트 기간 — 체크·메모만</div>');
     }
   }
@@ -1610,12 +1611,12 @@ const App = (() => {
     modal(`수조 ${n} — ${label}`, `
       <label>날짜<input type="date" id="tkD" value="${r.date || dateKey()}" max="${dateKey()}"></label>
       ${whoInput(who)}
-      ${r.date ? `<button type="button" class="btn danger sm" id="tkClear" style="margin-top:12px">기록 지우기</button>` : ''}
+      ${r.date && !staffLocked() ? `<button type="button" class="btn danger sm" id="tkClear" style="margin-top:12px">기록 지우기</button>` : ''}
     `, () => {
       const d = $('#tkD').value; if (!d) { alert('날짜를 골라 주세요.'); return false; }
       const by = whoValue();
       if (!by) { alert('누가 했는지 적어 주세요.'); return false; }
-      it[kind] = { date: d, by };
+      if (!(it[kind] && it[kind].date > d)) it[kind] = { date: d, by };   // 빠뜨린 지난 날짜를 채워도 "마지막으로 한 날"이 뒤로 가지 않게
       const now = new Date(), at = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
       const dup = T.care.find((x) => x.n === n && x.kind === kind && x.date === d);
       if (dup) { dup.by = by; dup.at = at; }
@@ -1678,6 +1679,7 @@ const App = (() => {
         lots.push(l);
         logIt('in', l, { by: who });
       }
+      it[pos].u = Date.now();   // 칸을 마지막으로 손댄 시각 — 기기 간 합칠 때 나중 것이 이긴다
       save(); render();
     }, '기록');
     const box = $('#modal');
@@ -1703,7 +1705,7 @@ const App = (() => {
       } else if (b.dataset.lot === 'out') {
         if (!confirm(`${lotName(l)} ${l.qty}미를 꺼낼까요? (다 나갔음)\n기록은 "출고"로 남습니다.`)) return;
         const who = whoValue() || l.by || '';
-        it[pos].lots = lots.filter((x) => x.id !== l.id);
+        it[pos].lots = lots.filter((x) => x.id !== l.id); it[pos].u = Date.now();
         logIt('out', l, { by: who, date: dateKey() });
         save(); closeModal(); render();
       }
@@ -1713,7 +1715,7 @@ const App = (() => {
       const l = lots.find((x) => x.id === moveId); if (!l) return;
       const [tn, tp] = box.querySelector('#tkMoveTo').value.split('|'); const tgt = T.items[Number(tn) - 1]; if (!tgt) return;
       if (!tgt[tp] || !Array.isArray(tgt[tp].lots)) tgt[tp] = { lots: [] };
-      it[pos].lots = lots.filter((x) => x.id !== l.id); tgt[tp].lots.push(l);
+      it[pos].lots = lots.filter((x) => x.id !== l.id); tgt[tp].lots.push(l); it[pos].u = tgt[tp].u = Date.now();
       const who = whoValue() || l.by || '';
       logIt('move', l, { by: who, date: dateKey(), n: Number(tn), pos: tp, note: `수조 ${n} ${posLabel(pos)} → 수조 ${tn} ${posLabel(tp)}` });
       save(); closeModal(); render();
@@ -1881,7 +1883,7 @@ const App = (() => {
     const allReal = real(ids), allDone = doneN(ids), allLeft = allReal.length - allDone;
     const allPct = allReal.length ? Math.round(allDone / allReal.length * 100) : 0;
     h += `<div class="progCard dayTotal${allLeft === 0 && allReal.length ? ' done' : ''}">
-      <div class="pcTop"><div><b>오늘 진행률</b><div class="pcSub">완료 <b>${allDone}</b> / ${allReal.length}건 · 남은 업무 <b class="left">${allLeft}건</b>${allLeft === 0 && allReal.length ? ' — 전부 마쳤습니다 🎉' : ''}</div></div>
+      <div class="pcTop"><div><b>${isToday ? '오늘' : '이날'} 진행률</b><div class="pcSub">완료 <b>${allDone}</b> / ${allReal.length}건 · 남은 업무 <b class="left">${allLeft}건</b>${allLeft === 0 && allReal.length ? ' — 전부 마쳤습니다 🎉' : ''}</div></div>
         <div class="pcNum">${allPct}<small>%</small></div></div>
       <div class="bar"><i style="width:${allPct}%"></i></div></div>`;
 
@@ -2399,10 +2401,11 @@ const App = (() => {
         <label class="chk"><input type="checkbox" id="seAll" checked> 오늘 모든 구간에 함께 배치</label>
         <button type="button" class="btn primary" style="width:100%" data-act="seAdd" data-k="${date}" data-seg="${seg.key}">+ 배치 추가</button>
       </div>`;
-    modal(`${mdLabel(date)} ${WD[d.getDay()]}요일 근무 배치`, body, null, '완료');
+    modal(`${mdLabel(date)} ${WD[d.getDay()]}요일 근무 배치${staffLocked() ? ' (보기)' : ''}`, body, null, '완료');
+    if (staffLocked()) { const aw = $('#modal .addWorker'); if (aw) { aw.hidden = true; if (aw.previousElementSibling) aw.previousElementSibling.hidden = true; } }   // 직원은 배치를 보기만 한다
     const sel = $('#seStaff');
     const syncType = () => { const st = S.staff.find((x) => x.id === sel.value); $('#seNameWrap').hidden = sel.value !== '__new'; if (st && st.type) $('#seType').value = st.type; };
-    sel.addEventListener('change', syncType); syncType();
+    if (sel) { sel.addEventListener('change', syncType); syncType(); }
     $('#modal').dataset.sched = date;
   }
 
@@ -2626,10 +2629,11 @@ const App = (() => {
       if (!name) { alert('품목을 입력하세요.'); return false; }
       if (!amount) { alert('금액을 입력하세요.'); return false; }
       const rec = {
+        ...(x.id ? x : {}),   // 고칠 때 화면에 없는 값(src 등)을 잃지 않게
         id: x.id || 'p' + Date.now(), date: $('#puD').value || dateKey(), cat: $('#puC').value,
         name, qty: $('#puQ').value ? Number($('#puQ').value) : null, unit: $('#puU').value,
         amount, vendor: $('#puV').value.trim(), memo: $('#puM').value.trim(),
-        by: (S.ui.whoDate === dateKey() ? S.ui.who : '') || x.by || '', createdAt: x.createdAt || Date.now(),
+        by: (S.ui.whoDate === dateKey() ? S.ui.who : '') || x.by || '', createdAt: x.createdAt || Date.now(), u: Date.now(),
       };
       if (x.id) S.purchases = S.purchases.map((p2) => (p2.id === x.id ? rec : p2));
       else S.purchases.push(rec);
@@ -2768,7 +2772,7 @@ const App = (() => {
     const curBy = x.by || (S.ui.whoDate === dateKey() ? S.ui.who : '') || '';
     modal(isNew ? '글 쓰기' : '글 수정', `
       <div class="mlabel">종류</div>
-      <div class="roles wrap" id="isCats">${[...FB_CATS, ...ISSUE_CATS].map((c) => `<button type="button" class="rl${c === x.cat ? ' on' : ''}${FB_CATS.includes(c) ? ' fb' : ''}" data-cat="${esc(c)}">${FB_CATS.includes(c) ? (c === '앱 오류' ? '🐛 ' : '🙋 ') : ''}${esc(c)}</button>`).join('')}</div>
+      <div class="roles wrap" id="isCats">${[...FB_CATS, ...ISSUE_CATS].map((c) => `<button type="button" class="rl${c === x.cat || (c === '기타' && x.cat && ![...FB_CATS, ...ISSUE_CATS].includes(x.cat)) ? ' on' : ''}${FB_CATS.includes(c) ? ' fb' : ''}" data-cat="${esc(c)}">${FB_CATS.includes(c) ? (c === '앱 오류' ? '🐛 ' : '🙋 ') : ''}${esc(c)}</button>`).join('')}</div>
       <input id="isCOther" placeholder="기타 — 종류를 짧게 적어 주세요 (선택)" value="${x.cat && !ISSUE_CATS.includes(x.cat) && !FB_CATS.includes(x.cat) ? esc(x.cat) : ''}" style="margin-top:6px"${(x.cat === '기타' || (x.cat && !ISSUE_CATS.includes(x.cat) && !FB_CATS.includes(x.cat))) ? '' : ' hidden'}>
       <label>제목<input id="isT" value="${esc(x.title || '')}" placeholder="${FB_CATS.includes(x.cat) ? '예: 할 일 체크가 풀림 (어디 + 무엇)' : '예: 룸2 에어컨 소음 — 손님 컴플레인'}"></label>
       <label>무슨 일이 있었나요<textarea id="isB" rows="${FB_CATS.includes(x.cat) ? 8 : 4}" placeholder="상황을 그대로 적으세요. 잘잘못보다 다음에 어떻게 할지가 중요합니다.">${esc(x.body || (FB_CATS.includes(x.cat) ? FB_TEMPLATE : ''))}</textarea></label>
@@ -2788,9 +2792,10 @@ const App = (() => {
       if (cat === '앱 건의' && !team) { alert('건의는 팀원들과 먼저 상의한 뒤 올립니다. 상의했다면 체크해 주세요.'); return false; }
       const by = anon ? '' : $('#isBy').value.trim();
       if (!anon && !by) { alert('작성자를 적거나 익명을 켜 주세요.'); return false; }
+      const cur = (x.id && issuesAll().find((i2) => i2.id === x.id)) || x;   // 창을 연 사이 다른 기기에서 달린 덧글·상태를 잃지 않게
       const rec = {
         id: x.id || 'i' + Date.now(), cat, title, body: $('#isB').value.trim(),
-        status: x.status || 'open', replies: x.replies || [],
+        status: cur.status || 'open', replies: cur.replies || [],
         by, anon, team: team || undefined, createdAt: x.createdAt || Date.now(), store: x.store || storeName(), updatedAt: Date.now(),
       };
       if (x.id) SH.issues = issuesAll().map((i2) => (i2.id === x.id ? rec : i2));
@@ -3726,7 +3731,7 @@ const App = (() => {
     function stat(ks) {
       let tot = 0, dn = 0, ct = 0, cd = 0;
       ks.forEach((k) => Object.entries(S.days[k].inst).forEach(([tid, r]) => {
-        if (r.s === 'skip') return;
+        if (r.s === 'skip' || tpl(tid)?.rest) return;   // 휴식은 할 일 화면처럼 완료율에 넣지 않는다
         tot++; if (r.s === 'done') dn++;
         if (tpl(tid)?.crit) { ct++; if (r.s === 'done') cd++; }
       }));
@@ -3747,7 +3752,7 @@ const App = (() => {
     /* 자주 놓치는 항목 — 개선 지점을 짚어준다 */
     const miss = {};
     span(30).forEach((k) => Object.entries(S.days[k].inst).forEach(([tid, r]) => {
-      if (r.s === 'todo' && k < dateKey()) miss[tid] = (miss[tid] || 0) + 1;
+      if (r.s === 'todo' && k < dateKey() && !tpl(tid)?.rest) miss[tid] = (miss[tid] || 0) + 1;
     }));
     const top = Object.entries(miss).sort((a, b) => b[1] - a[1]).slice(0, 5);
     h += `<div class="hd sub2"><h3>자주 놓치는 항목</h3></div>`;
@@ -4053,6 +4058,7 @@ const App = (() => {
     const setAuto = (k, parts) => {
       const el = document.querySelector(`.sfIn[data-k="${k}"]`); if (!el) return;
       const vals = parts.map(g), any = vals.some((v) => v != null);
+      if (!any && el.classList.contains('autoOn')) el.value = '';   // 자동으로 채웠던 옛 합계가 남아 저장되지 않게
       el.readOnly = any; el.classList.toggle('autoOn', any);
       if (any) { const sum = vals.reduce((a, v) => a + (v || 0), 0); el.value = el.dataset.won != null ? wonStr(sum) : sum; }
     };
@@ -5561,7 +5567,7 @@ const App = (() => {
     const wrong = watch.quiz.map((q, k) => k).filter((k) => watch.answers[k] !== watch.quiz[k].a);
     document.querySelectorAll('.qzItem').forEach((el) => { const k = Number(el.dataset.i); const why = el.querySelector('.qzWhy'); const bad = wrong.includes(k); el.classList.toggle('bad', bad); el.classList.toggle('good', !bad); why.hidden = false; why.textContent = (bad ? '✗ 아니에요 — ' : '✓ 맞아요 — ') + watch.quiz[k].why; });
     const msg = $('#qzMsg');
-    if (wrong.length) { msg.textContent = `${wrong.length}문제가 틀렸어요. 이유를 읽고 다시 골라 주세요 (${watch.quizTries}번째 시도)`; watch.answers = {}; setTimeout(() => document.querySelectorAll('.qzItem.bad .qzA').forEach((b) => b.classList.remove('on')), 300); return; }
+    if (wrong.length) { msg.textContent = `${wrong.length}문제가 틀렸어요. 이유를 읽고 다시 골라 주세요 (${watch.quizTries}번째 시도)`; wrong.forEach((k) => { delete watch.answers[k]; }); setTimeout(() => document.querySelectorAll('.qzItem.bad .qzA').forEach((b) => b.classList.remove('on')), 300); return; }
     watch.quizPassed = true;
     if (!S.trainQuiz) S.trainQuiz = {}; if (!S.trainQuiz[watch.who]) S.trainQuiz[watch.who] = {};
     S.trainQuiz[watch.who][watch.url] = { tries: watch.quizTries, at: dateKey() }; save();
@@ -5686,7 +5692,7 @@ const App = (() => {
       <label>확인하며 한마디 <span class="opt">선택</span><input id="msNote" value="${esc(x.note || '')}" placeholder="예: 어제 룸 손님 배웅 잘 봤어요" autocomplete="off"></label>
       <p class="hint">확인하면 완료로 바뀌고, 텔레그램이 연결돼 있으면 방에 공유됩니다.</p>`, () => {
       const before = (gamify(S, Store.meta.current).find((s) => s.name === x.who) || { points: 0, badges: [] });
-      x.status = 'done'; x.doneAt = Date.now(); x.note = $('#msNote').value.trim() || undefined;
+      x.status = 'done'; x.doneAt = x.u = Date.now(); x.note = $('#msNote').value.trim() || undefined;
       save(); render();
       const after = (gamify(S, Store.meta.current).find((s) => s.name === x.who) || { points: 0, badges: [] });
       const newB = after.badges.filter((b) => !before.badges.some((q) => q.id === b.id));
@@ -5712,7 +5718,15 @@ const App = (() => {
       <button class="btn primary" data-act="mOk">${esc(okLabel)}</button></div></div>`;
     m.hidden = false;
     m._ok = onOk;
+    if (staffLocked()) hideBlocked(m);
     const f = m.querySelector('input,textarea,select'); if (f) setTimeout(() => f.focus(), 30);
+  }
+  /* 직원 잠금 중 — 막힌 동작의 버튼은 숨기고, 체크칸은 눌리지 않게 (팝업 안에서 눌러도 아무 일 없던 문제 10/15) */
+  function hideBlocked(root) {
+    root.querySelectorAll('[data-act]').forEach((el) => {
+      if (!STAFF_BLOCK.has(el.dataset.act) || STAFF_ASK.has(el.dataset.act)) return;
+      if (el.type === 'checkbox') el.disabled = true; else el.hidden = true;
+    });
   }
   function closeModal() { const m = $('#modal'); m.hidden = true; m._ok = null; m.innerHTML = ''; }
 
@@ -5739,11 +5753,12 @@ const App = (() => {
       <div class="whosel" data-tid="${tid}" data-instant="${instant ? 1 : 0}">
         ${whoNames(false).map((n) =>
           `<button type="button" class="btn who${!instant && n === cur ? ' on' : ''}" data-whosel="${esc(n)}">${esc(n)}</button>`).join('')}
+        ${whoNames(false).length < whoNames(true).length ? '<button type="button" class="btn who more" data-whoall="1">다른 사람 ▾</button>' : ''}
       </div>`;
   }
 
   function completeTask(tid) {
-    const t = tpl(tid), key = viewKey();
+    const t = tpl(tid), key = viewKey(), pre = esc((S.days[key].inst[tid] || {}).note || '');   // 미리 남긴 메모는 완료 창에 채워 둔다
     /* 담당자는 '지금 앱을 쓰는 사람'이다. 보고 있는 날짜가 아니라 실제 오늘에 묶는다.
        여기를 날짜에 묶으면 지난 날짜를 채워 넣을 때 이름 선택 창만 반복해서 뜬다. */
     const who = S.ui.whoDate === dateKey() ? S.ui.who : null;
@@ -5768,9 +5783,9 @@ const App = (() => {
     if (t.ev === 'money') b += `<div class="mlabel">오늘 매출 — 포스 마감 화면을 보고 적으세요 (회계 › 매출 입력에 그대로 쌓입니다)</div>` + salesFields(salesOf(key));
     if (t.ev === 'kakao') b += `<label class="chk"><input type="checkbox" id="evKakao"> 카톡방에 사진을 보냈습니다</label>
       <p class="hint">사진은 앱이 아니라 카톡방에 남습니다. 이상이 있던 날은 아래에 한 줄 적어두면 나중에 앱에서 바로 찾을 수 있습니다.</p>`;
-    if (memoMode !== 'off') b += `<label>어떻게 했나요 <span class="opt">${memoMode === 'req' ? '필수' : '선택'}</span><textarea id="evNote" rows="3" placeholder="${esc(t.notePh || (t.ev === 'deaths' || t.ev === 'kakao' || /수조|갑각류|염도/.test(t.title) ? '예: 수조 3번 온도 1도 내림 · 이끼 닦음 · 특이사항 없음' : '예: 룸 3번 벽 얼룩 세제로 닦음 · 부족한 것 채움 · 특이사항 없음'))}"></textarea></label>
+    if (memoMode !== 'off') b += `<label>어떻게 했나요 <span class="opt">${memoMode === 'req' ? '필수' : '선택'}</span><textarea id="evNote" rows="3" placeholder="${esc(t.notePh || (t.ev === 'deaths' || t.ev === 'kakao' || /수조|갑각류|염도/.test(t.title) ? '예: 수조 3번 온도 1도 내림 · 이끼 닦음 · 특이사항 없음' : '예: 룸 3번 벽 얼룩 세제로 닦음 · 부족한 것 채움 · 특이사항 없음'))}">${pre}</textarea></label>
       <p class="hint" style="margin-top:4px">한 줄이면 됩니다. 무엇을 어떻게 했는지, 평소와 다른 점이 있었는지. 체크만 하면 나중에 아무도 모릅니다.</p>`;
-    else if (t.note || t.ev === 'kakao') b += `<label>메모 <span class="opt">선택</span><textarea id="evNote" rows="2" placeholder="이상 있을 때만 적으세요"></textarea></label>`;
+    else if (t.note || t.ev === 'kakao') b += `<label>메모 <span class="opt">선택</span><textarea id="evNote" rows="2" placeholder="이상 있을 때만 적으세요">${pre}</textarea></label>`;
 
     setTimeout(() => { if (t.ev === 'money') { syncKgTotals(); syncSalesTotals(); } }, 0);
     modal(t.title, b, () => {
@@ -5804,9 +5819,11 @@ const App = (() => {
   const doneMemoMode = () => (['req', 'opt', 'off'].includes(S.settings.doneMemo) ? S.settings.doneMemo : 'req');
   /* 완료 뒤에도 메모를 남기거나 고친다 (담당자 누구나) */
   function taskNoteModal(tid) {
-    const key = viewKey(), rec = S.days[key].inst[tid], t = tpl(tid); if (!rec) return;
+    const key = viewKey(), rec0 = S.days[key].inst[tid], t = tpl(tid); if (!rec0) return;
+    const rec = rec0;
     modal(`메모 — ${t.title}`, `<label>어떻게 했나요<textarea id="tnNote" rows="4" placeholder="예: 수조 3번 온도 1도 내림 · 이끼 닦음 · 특이사항 없음">${esc(rec.note || '')}</textarea></label>
       <p class="hint">${rec.s === 'done' ? `${esc(rec.by || '')} ${rec.at || ''} 완료` : '아직 완료 전입니다. 메모만 먼저 남겨 둘 수 있습니다.'}</p>`, () => {
+      const rec = S.days[key] && S.days[key].inst[tid]; if (!rec) return;   // 창이 열린 사이 다른 기기 기록과 합쳐졌을 수 있다 — 지금 기록에 적는다
       const v = $('#tnNote').value.trim(); if (v) rec.note = v; else delete rec.note; rec.u = Date.now();
       rec.noteBy = (S.ui.whoDate === dateKey() ? S.ui.who : '') || rec.noteBy || '';
       journal(key, tid);
@@ -5866,13 +5883,15 @@ const App = (() => {
     sendTelegram(`[${storeName()}] ✅ ${t.title} — ${rec.by || '이름 없음'} ${rec.at || ''}${ev}`, 'done').catch(() => {});
   }
 
+  /* 되돌릴 때 완료 정보는 지우되 메모는 남긴다 — 다시 완료할 때 창에 채워진다 */
+  const undoRec = (rec) => ({ s: 'todo', role: rec.role, ...(rec.note ? { note: rec.note, noteBy: rec.noteBy || rec.by || '' } : {}), u: Date.now() });
   function taskMenu(tid) {
     const key = viewKey(), rec = S.days[key].inst[tid], t = tpl(tid);
     modal(t.title, `<div class="pick">
       ${rec.s === 'done' ? `<div class="mlabel">완료자 바꾸기</div>
         <div class="roles big">${S.staff.filter((x) => x.active).map((x) =>
           `<button class="rl${rec.by === x.name ? ' on' : ''}" data-menu="by:${esc(x.name)}">${esc(x.name)}</button>`).join('')}</div>` : ''}
-      ${rec.s !== 'todo' ? `<button class="btn big" data-menu="undo">되돌리기 (미완료로)</button>` : ''}
+      ${rec.s !== 'todo' && !rec.auto ? `<button class="btn big" data-menu="undo">되돌리기 (미완료로)</button>` : ''}
       ${rec.s === 'todo' ? `<button class="btn big" data-menu="skip">오늘만 건너뛰기</button>` : ''}
       ${staffLocked() ? '' : `<div class="mlabel">오늘만 담당 바꾸기</div>
       <div class="roles big">${ROLE_OPTS.map((x) => `<button class="rl${roleOf(key, tid) === x ? ' on' : ''}" data-menu="role:${x}">${x}</button>`).join('')}</div>
@@ -5966,6 +5985,12 @@ const App = (() => {
       const tg = e.target.closest('[data-tgchat]');
       if (tg) { S.settings.tgChat = tg.dataset.tgchat; save(); closeModal(); render(); return; }
 
+      const wa = e.target.closest('[data-whoall]');   // 근무표에 없는 사람(대타 등)도 고를 수 있게 전체 이름을 펼친다
+      if (wa) {
+        const box = wa.closest('.whosel'), have = new Set([...box.querySelectorAll('[data-whosel]')].map((x) => x.dataset.whosel));
+        wa.insertAdjacentHTML('beforebegin', whoNames(true).filter((n) => !have.has(n)).map((n) => `<button type="button" class="btn who" data-whosel="${esc(n)}">${esc(n)}</button>`).join(''));
+        wa.remove(); return;
+      }
       const ws = e.target.closest('[data-whosel]');
       if (ws) {
         const box = ws.closest('.whosel');
@@ -5979,11 +6004,11 @@ const App = (() => {
       if (mm) {
         const tid = m.dataset.tid, key = viewKey(), rec = S.days[key].inst[tid], v = mm.dataset.menu;
         if (staffLocked() && (v === 'title' || v === 'memo' || v.startsWith('role:'))) { blockedBanner(); return; }
-        if (v === 'undo') { S.days[key].inst[tid] = { s: 'todo', role: rec.role, u: Date.now() }; }
+        if (v === 'undo') { S.days[key].inst[tid] = undoRec(rec); }
         else if (v === 'skip') {
           const why = prompt('건너뛰는 이유를 적어주세요.\n(예: 재료 미입고)');
           if (why === null) return;
-          Object.assign(rec, { s: 'skip', reason: why.trim() || '사유 없음', by: S.ui.who, u: Date.now() });
+          Object.assign(rec, { s: 'skip', reason: why.trim() || '사유 없음', by: whoNow(), u: Date.now() });
         } else if (v === 'memo') { closeModal(); editMemo(tid); return; }
         else if (v === 'note') { closeModal(); taskNoteModal(tid); return; }
         else if (v === 'title') { closeModal(); editTitle(tid); return; }
@@ -5997,8 +6022,8 @@ const App = (() => {
       if (!b) { if (e.target === m) closeModal(); return; }
       const a = b.dataset.act, id = b.dataset.id;
       const key = view === 'month' ? mdateKey() : viewKey();   // 편성 동작은 근무표에서 선택한 날짜 기준
-      if (STAFF_ASK.has(a) && staffLocked()) { ownerLoginModal(() => { if (a === 'noticeAdd') noticeForm(null); }); return; }   // 버튼은 보이고, 누르면 사장님 비밀번호 → 바로 이어서
-      if (STAFF_BLOCK.has(a) && staffLocked()) { blockedBanner(); return; }
+      if (STAFF_ASK.has(a) && staffLocked()) { ownerLoginModal(() => { if (a === 'noticeAdd') noticeForm(null); if (a === 'msApprove') missionApprove(id); }); return; }   // 버튼은 보이고, 누르면 사장님 비밀번호 → 바로 이어서
+      if (STAFF_BLOCK.has(a) && staffLocked()) { e.preventDefault(); blockedBanner(); return; }
       if (b.closest('#side') && (a === 'view' || a === 'storeSwitch')) sideClose();   // 메뉴를 고르면 서랍은 바로 닫힌다 (대카테고리 접기·펼치기는 열어 둔다)
 
       switch (a) {
@@ -6118,6 +6143,7 @@ const App = (() => {
         case 'issueDel': {
           if (pinOk(S.settings.orderPin) && !orderUnlocked()) { closeModal(); orderUnlockModal('글을 지우려면 사장님 PIN 을 넣으세요.'); return; }
           if (!confirm('이 기록을 삭제할까요? 덧글도 함께 사라집니다. 두 매장 모두에서 사라집니다.')) return;
+          SH.issuesDel = [...new Set([...(SH.issuesDel || []), id])];   // 지운 표시 — 다른 기기와 합칠 때 되살아나지 않게
           SH.issues = issuesAll().filter((x) => x.id !== id); saveShared(); closeModal(); render(); break;
         }
         case 'issueReply': {
@@ -6168,8 +6194,8 @@ const App = (() => {
         case 'msAdd': missionForm(null); break;
         case 'msEdit': closeModal(); missionForm((S.missions || []).find((q) => q.id === id)); break;
         case 'msDel': { if (!confirm('이 미션을 삭제할까요?')) return; S.missions = (S.missions || []).filter((q) => q.id !== id); save(); closeModal(); render(); break; }
-        case 'msClaim': { const x = (S.missions || []).find((q) => q.id === id); if (x) { x.status = 'claimed'; x.claimedAt = Date.now(); save(); render(); banner('사장님 확인을 기다립니다', x.text); } break; }
-        case 'msUnclaim': { const x = (S.missions || []).find((q) => q.id === id); if (x) { if (x.status === 'done' && pinOk(S.settings.orderPin) && !orderUnlocked()) { orderUnlockModal(); return; } x.status = 'open'; delete x.doneAt; save(); render(); } break; }
+        case 'msClaim': { const x = (S.missions || []).find((q) => q.id === id); if (x) { x.status = 'claimed'; x.claimedAt = x.u = Date.now(); save(); render(); banner('사장님 확인을 기다립니다', x.text); } break; }
+        case 'msUnclaim': { const x = (S.missions || []).find((q) => q.id === id); if (x) { if (x.status === 'done' && staffLocked()) { blockedBanner(); return; } if (x.status === 'done' && pinOk(S.settings.orderPin) && !orderUnlocked()) { orderUnlockModal(); return; } x.status = 'open'; delete x.doneAt; x.u = Date.now(); save(); render(); } break; }
         case 'msApprove': missionApprove(id); break;
         case 'trainReward': { const v = prompt('코스 완주 보상 문구 (직원에게 보입니다)', S.settings.trainReward || TRAIN_REWARD_DEFAULT); if (v === null) return; S.settings.trainReward = v.trim() || undefined; save(); render(); break; }
         case 'trainDel': { if (!confirm('이 교육 자료를 삭제할까요?')) return; S.training = trainList().filter((t) => t.id !== id); save(); closeModal(); render(); break; }
@@ -6220,7 +6246,12 @@ const App = (() => {
         case 'toggle': {
           const rec = S.days[key].inst[id];
           if (rec.s === 'todo') completeTask(id);
-          else { S.days[key].inst[id] = { s: 'todo', role: rec.role, u: Date.now() }; journal(key, id); save(); render(); }
+          else if (rec.auto) banner('오늘은 하지 않는 날입니다', `${(tpl(id) || {}).title || ''} — ${rec.reason || '정해진 요일이 아니라 자동 완료'}`);
+          else {   // 손이 스쳐 완료가 풀리는 일이 없게 한 번 묻는다 (안산점 "체크 풀림" 신고 10/15)
+            const what = rec.auto ? '자동 완료된' : rec.s === 'skip' ? `${rec.by ? rec.by + ' 님이 ' : ''}건너뛴` : `${rec.by ? rec.by + ' 님이 ' : ''}${rec.at ? rec.at + '에 ' : ''}완료한`;
+            if (!confirm(`「${(tpl(id) || {}).title || ''}」\n${what} 항목입니다. 미완료로 되돌릴까요?`)) break;
+            S.days[key].inst[id] = undoRec(rec); journal(key, id); save(); render();
+          }
           break;
         }
         case 'menu': taskMenu(id); break;
@@ -6238,8 +6269,9 @@ const App = (() => {
         }
         case 'ckExtra': {
           const x = S.days[key].extras.find((y) => y.id === id);
-          if (x.s === 'done') { x.s = 'todo'; delete x.by; delete x.at; }
-          else { const d = new Date(); Object.assign(x, { s: 'done', by: S.ui.who || '', at: `${pad(d.getHours())}:${pad(d.getMinutes())}` }); }
+          if (x.s === 'done') { if (!confirm(`「${x.title}」 완료를 취소할까요?`)) break; x.s = 'todo'; delete x.by; delete x.at; }
+          else { const d = new Date(); Object.assign(x, { s: 'done', by: whoNow(), at: `${pad(d.getHours())}:${pad(d.getMinutes())}` }); }
+          x.u = Date.now();
           save(); render(); break;
         }
         case 'delExtra': S.days[key].extras = S.days[key].extras.filter((y) => y.id !== id); save(); render(); break;
@@ -6525,6 +6557,7 @@ const App = (() => {
 
     document.addEventListener('change', (e) => {
       const b = e.target.closest('[data-act]'); if (!b) return;
+      if (STAFF_BLOCK.has(b.dataset.act) && staffLocked()) { blockedBanner(); render(); return; }
       const key = viewKey();
       if (b.dataset.act === 'staffType') {
         const c = staffCtx(b.dataset.store); if (!c.doc) return;

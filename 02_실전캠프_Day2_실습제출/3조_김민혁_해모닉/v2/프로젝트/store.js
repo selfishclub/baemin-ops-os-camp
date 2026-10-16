@@ -167,6 +167,7 @@ const Store = (() => {
       staleLocal.delete(k);
       const merged = mergeDocs(v, srv);
       merged.savedAt = Date.now();
+      if (v.ui) merged.ui = v.ui;          // 날짜·필터·이름 선택은 이 기기 것 (서버본이 더 새것이면 다른 기기 화면 상태가 따라오던 문제 10/15)
       Object.keys(v).forEach((f) => { if (!(f in merged)) delete v[f]; });
       Object.assign(v, merged);           // 앱이 들고 있는 상태(S) 자체를 합친 결과로 바꾼다
       document.dispatchEvent(new CustomEvent('doc-merged', { detail: { key: k } }));
@@ -177,6 +178,7 @@ const Store = (() => {
   /* 2026-10-14 저장 폭주 사고: 두 기기가 내용이 똑같은 문서를 몇 초마다 번갈아 올려 하루 3만 번 저장 → 서버 디스크가 차서 읽기 전용이 됨.
      본문(savedAt·ui 제외)이 마지막으로 올렸거나 받은 것과 같으면 서버에는 올리지 않는다. 화면 상태(ui)는 이 기기 것이라 서버에 보낼 이유가 없다 */
   const lastSig = {};
+  const noUi = (v) => { if (!v || !v.ui) return v; const c = { ...v }; delete c.ui; return c; };   // 화면 상태는 서버에 보내지 않는다
   function docSig(v) {
     try { const c = { ...v }; delete c.savedAt; delete c.ui; const t = JSON.stringify(c); let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return t.length + ':' + h.toString(16); }
     catch (_) { return null; }
@@ -189,7 +191,7 @@ const Store = (() => {
         if (sig0 && sig0 === lastSig[k] && !staleLocal.has(k)) return true;   // 내용이 그대로 — 서버에 다시 올리지 않는다
         v = await mergeBeforePut(k, v);
         lastUp[k] = v.savedAt;
-        const { error } = await supa.client.from('docs').upsert({ key: k, doc: v, saved_at: v.savedAt || Date.now(), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+        const { error } = await supa.client.from('docs').upsert({ key: k, doc: noUi(v), saved_at: v.savedAt || Date.now(), updated_at: new Date().toISOString() }, { onConflict: 'key' });
         if (error) throw error;
         cloudRetry = null; lastSig[k] = docSig(v);
         if (cloudErr) { cloudErr = null; document.dispatchEvent(new Event('cloud-status')); }
@@ -261,12 +263,14 @@ const Store = (() => {
     if (remote && local && !isSynced(k) && !isEmpty(remote) && !isEmpty(local) && (remote.savedAt || 0) !== (local.savedAt || 0)) {
       const merged = mergeDocs(remote, local);
       merged.savedAt = Date.now();
+      merged.ui = local.ui;
       await localPut(k, merged);
       await cloudPut(k, merged);
       markSynced(k);
       return merged;
     }
     if (remote && (!local || (remote.savedAt || 0) >= (local.savedAt || 0))) {
+      if (local && local.ui) remote.ui = local.ui; else delete remote.ui;   // 이 기기 화면 상태를 지킨다 — 예전에 올라간 다른 기기 ui 는 버린다
       await localPut(k, remote);          // 로컬은 캐시 — 오프라인에 대비해 최신본을 남겨둔다
       lastUp[k] = remote.savedAt; lastSig[k] = docSig(remote);
       markSynced(k);
@@ -293,22 +297,53 @@ const Store = (() => {
       (o || []).forEach((x) => { const id = idOf(x, by); if (!seen.has(id)) { seen.add(id); res.push(x); } });
       return res;
     };
+    /* 같은 id 가 양쪽에 있으면 ts(x) 가 큰 쪽(나중에 손댄 쪽), 같으면 newer 쪽 */
+    const unionNewest = (n, o, by, ts) => {
+      const res = unionBy(n, o, by); if (!res) return res;
+      const om = new Map((o || []).map((x) => [idOf(x, by), x]));
+      return res.map((x) => { const y = om.get(idOf(x, by)); return y && y !== x && ts(y) > ts(x) ? y : x; });
+    };
     const unionObj = (n, o, each) => {
       if (!n && !o) return undefined;
       const res = { ...(o || {}), ...(n || {}) };
       if (each) Object.keys(res).forEach((key) => { if (n && o && n[key] && o[key]) res[key] = each(n[key], o[key]); });
       return res;
     };
-    [['purchases', 'id'], ['contracts', 'id'], ['recipes', 'id'], ['notices', 'id'], ['issues', 'id'], ['training', 'id'], ['deaths', 'id'],
-      ['health', 'id'], ['staff', 'name'], ['trainSeen', null]].forEach(([f, by]) => {
-      const v = unionBy(newer[f], older[f], by); if (v !== undefined) out[f] = v;
+    /* 목록은 합집합. 같은 항목이 양쪽에 있으면 나중에 손댄 쪽(u · updatedAt …) — 통째로 최신 문서 쪽을 쓰면
+       다른 기기에서 바꾼 상태(해결 완료 · 미션 승인 · 매입 수정 등)가 되돌아간다 (10/15 점검). 손댄 시각이 없으면 예전처럼 최신 문서 쪽 */
+    const tsOf = (x) => Number(x && (x.u || x.updatedAt || Math.max(x.doneAt || 0, x.claimedAt || 0)))
+      || 0;
+    [['purchases', 'id'], ['contracts', 'id'], ['recipes', 'id'], ['training', 'id'], ['deaths', 'id'],
+      ['health', 'id'], ['staff', 'name'], ['trainSeen', null], ['notices', 'id'], ['issues', 'id'], ['missions', 'id']].forEach(([f, by]) => {
+      const v = by ? unionNewest(newer[f], older[f], by, tsOf) : unionBy(newer[f], older[f], by); if (v !== undefined) out[f] = v;
     });
+    /* 교육 진도·퀴즈 — 사람별로 본 영상을 합친다 */
+    ['trainDone', 'trainQuiz'].forEach((f) => { const v = unionObj(newer[f], older[f], (a2, b2) => ({ ...b2, ...a2 })); if (v !== undefined) out[f] = v; });
+    /* 수조 — 관리 기록·입출고 기록은 합치고, 칸(묶음)은 나중에 손댄 쪽, 해수 교체·청소일은 더 늦은 날짜 */
+    if (newer.tanks && older.tanks) {
+      const nt = newer.tanks, ot = older.tanks, T = { ...ot, ...nt };
+      T.care = unionBy(nt.care, ot.care, 'id') || [];
+      T.log = unionBy(nt.log, ot.log, 'id') || [];
+      T.items = (nt.items || []).map((it, i) => {
+        const o = (ot.items || [])[i]; if (!o || o.n !== it.n) return it;
+        const r = { ...o, ...it };
+        ['top', 'bottom'].forEach((p) => { const a2 = it[p], b2 = o[p]; if (a2 && b2 && (b2.u || 0) > (a2.u || 0)) r[p] = b2; });
+        ['water', 'clean'].forEach((kd) => { const a2 = it[kd], b2 = o[kd]; if (b2 && b2.date && (!a2 || !a2.date || b2.date > a2.date)) r[kd] = b2; });
+        return r;
+      });
+      out.tanks = T;
+    }
     /* 기본값으로 깔리는 자리표시 직원(사장님 · 홀 1 · 주방 1 · 매니저 · 점장, id s1~s3)은 한쪽에만 있으면 버린다.
        새 기기가 처음 연결될 때 빈 기본 상태의 이름이 서버 명단에 다시 섞여 들어오던 문제 (사장님 지적 2026-10-08) */
     if (Array.isArray(out.staff)) {
       const ph = (s) => s && /^s[1-3]$/.test(String(s.id)) && ['사장님', '홀 1', '주방 1', '매니저', '점장'].includes(s.name);
       const has = (list, s) => (list || []).some((x) => x && x.name === s.name);
       out.staff = out.staff.filter((s) => !ph(s) || (has(newer.staff, s) && has(older.staff, s)));
+    }
+    if (newer.issuesDel || older.issuesDel) {   // 게시판에서 지운 글은 다른 기기 사본에 남아 있어도 되살리지 않는다
+      out.issuesDel = unionBy(newer.issuesDel, older.issuesDel, null) || [];
+      const del = new Set(out.issuesDel);
+      if (Array.isArray(out.issues)) out.issues = out.issues.filter((i) => !del.has(i.id));
     }
     if (Array.isArray(out.issues)) out.issues = out.issues.map((i) => {
       const n = (newer.issues || []).find((x) => x.id === i.id), o = (older.issues || []).find((x) => x.id === i.id);
@@ -317,11 +352,11 @@ const Store = (() => {
     const mergeDay = (n, o) => ({
       ...o, ...n,
       inst: unionObj(n.inst, o.inst, (ni, oi) => (ni.u || oi.u) ? ((ni.u || 0) >= (oi.u || 0) ? ni : oi) : (((ni.s && ni.s !== 'todo') || !(oi.s && oi.s !== 'todo')) ? ni : oi)),   // 손댄 시각이 있는 쪽(더 늦은 쪽)이 이기고, 둘 다 없으면 완료 우선
-      extras: unionBy(n.extras, o.extras, 'id') || [],
+      extras: unionNewest(n.extras, o.extras, 'id', (x) => x.u || 0) || [],
       notified: { ...(o.notified || {}), ...(n.notified || {}) },
     });
     ['days', 'sales', 'roster', 'sched', 'payroll', 'hygiene', 'blobs', 'deadUse'].forEach((f) => {
-      const v = unionObj(newer[f], older[f], f === 'days' ? mergeDay : null); if (v !== undefined) out[f] = v;
+      const v = unionObj(newer[f], older[f], f === 'days' ? mergeDay : f === 'deadUse' ? (a2, b2) => ((b2.u || 0) > (a2.u || 0) ? b2 : a2) : null); if (v !== undefined) out[f] = v;
     });
     /* 설정은 최신 쪽이 이기되, 최신 쪽에 비어 있는 값(봇 토큰·대화방·PIN 등)은 예전 값을 지우지 않는다.
        (2026-10-07 안산점 토큰이 새 기기 연결 때 빈 값으로 덮인 사고 뒤 추가) */
@@ -556,6 +591,15 @@ const Store = (() => {
   }
   async function trainingSave(store, patch) {
     if (!supa) return false;
+    /* training_save 는 통째로 바꿔 넣는다 — 아침에 연 폰이 저장하면 그사이 사장님이 준 미션·승인, 다른 직원 진도가 사라졌다 (10/15 점검).
+       올리기 직전에 서버본을 읽어 사람별·항목별로 합친다 */
+    try {
+      const srv = await trainingDoc(store);
+      if (srv) {
+        const m = mergeDocs({ ...patch, savedAt: 2 }, { trainDone: srv.trainDone, trainQuiz: srv.trainQuiz, missions: srv.missions, trainSeen: srv.trainSeen, savedAt: 1 });
+        ['trainDone', 'trainQuiz', 'missions', 'trainSeen'].forEach((f) => { if (m[f] !== undefined) patch[f] = m[f]; });
+      }
+    } catch (_) { /* 읽기 실패면 그대로 올린다 */ }
     const { error } = await supa.client.rpc('training_save', { p_store: store, p_patch: patch });
     if (error) throw new Error(error.message); return true;
   }
