@@ -206,9 +206,10 @@ export default function TodayPage() {
     setPosBusy(true);
     try {
       const helper = process.env.NEXT_PUBLIC_HELPER_URL || "http://127.0.0.1:4599";
-      // 기본: 어제까지 7일. 이번 달 1일이 더 늦으면(월초) 1일부터
-      const to = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-      const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+      // 기본: 어제까지 7일 (우리 시간 기준 — toISOString 은 세계시라 밤에는 하루가 밀린다)
+      const local = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const to = local(new Date(Date.now() - 86_400_000));
+      const weekAgo = local(new Date(Date.now() - 7 * 86_400_000));
       const res = await fetch(`${helper}/okpos/fetch`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ from: weekAgo, to }) });
       const j = (await res.json()) as { ok: boolean; message?: string; needLogin?: boolean; fileName?: string; base64?: string; from?: string; to?: string };
       if (!j.ok || !j.base64) {
