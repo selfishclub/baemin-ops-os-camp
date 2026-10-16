@@ -14,8 +14,9 @@ body {
 .btn {
   @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-40;
 }
+/* 주 단추는 카페스이 코랄 (2026-10-17 사장님 "버튼을 코랄로"). 나머지 강조(선택 칸·링크)는 세이지 그대로 */
 .btn-primary {
-  @apply btn bg-orange-600 text-white hover:bg-orange-700;
+  @apply btn bg-[#ce6c56] text-white hover:bg-[#b85a45];
 }
 .btn-ghost {
   @apply btn bg-stone-100 text-stone-700 hover:bg-stone-200;
