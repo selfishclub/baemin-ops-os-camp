@@ -44,6 +44,12 @@ const TABS = [
   { href: "/market", label: "상권" },
   { href: "/rules", label: "규칙" },
 ];
+// PC 사이드바에서 메뉴를 세 묶음으로 (매일 쓰는 것 / 들여다보는 것 / 설정)
+const GROUPS: { title: string; hrefs: string[] }[] = [
+  { title: "매일", hrefs: ["/", "/today", "/upload"] },
+  { title: "분석", hrefs: ["/channels", "/costing", "/reviews", "/market"] },
+  { title: "설정", hrefs: ["/rules"] },
+];
 
 /** 하위 주소(/market/keywords)도 그 탭으로 본다 */
 const isActive = (pathname: string | null, href: string) => pathname === href || (href !== "/" && !!pathname?.startsWith(href + "/"));
@@ -110,31 +116,37 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <StorageFailureToast failure={failure} onDismiss={dismiss} />
       {/* 내 PC 모드이고 장부를 읽을 수 있을 때만 자동 백업 일꾼을 띄운다 */}
       {mode === "local" && health?.ok && <AutoBackupAgent />}
-      {/* PC: 왼쪽 사이드바 메뉴 — 밝은 바탕, 글자만. 지금 탭은 주황 글자 + 왼쪽 주황 막대 */}
-      <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:flex md:w-56 md:flex-col md:border-r md:border-stone-200 md:bg-white md:px-4 md:py-6">
+      {/* PC: 왼쪽 사이드바 메뉴 — 카페스이 색감(짙은 세이지), 글자만, 세 묶음 */}
+      <aside className="side hidden md:fixed md:inset-y-0 md:left-0 md:flex md:w-60 md:flex-col md:px-4 md:py-6">
         <h1 className="flex min-w-0 items-center gap-2.5 px-2">
-          <span className="h-3 w-3 shrink-0 rounded-sm bg-orange-600" aria-hidden />
+          <span className="h-3 w-3 shrink-0 rounded-sm bg-[#be9235]" aria-hidden />
           <span className="min-w-0">
-            <span className="block truncate text-sm font-bold text-stone-900">{title}</span>
-            <span className="block text-[11px] text-stone-400">한눈 손익 장부</span>
+            <span className="block truncate font-serif text-base font-bold text-white">{title}</span>
+            <span className="block text-[11px] text-stone-200/60">한눈 손익 장부</span>
           </span>
         </h1>
-        <nav className="mt-8 flex flex-col gap-0.5" aria-label="메뉴">
-          {TABS.map((t) => {
-            const active = isActive(pathname, t.href);
-            return (
-              <Link key={t.href} href={t.href} className={`side-nav ${active ? "side-nav-active" : ""}`} aria-current={active ? "page" : undefined}>
-                {t.label}
-              </Link>
-            );
-          })}
+        <nav className="mt-4 flex flex-col gap-0.5" aria-label="메뉴">
+          {GROUPS.map((g) => (
+            <div key={g.title} className="flex flex-col gap-0.5">
+              <div className="side-group">{g.title}</div>
+              {g.hrefs.map((href) => {
+                const t = TABS.find((x) => x.href === href)!;
+                const active = isActive(pathname, t.href);
+                return (
+                  <Link key={t.href} href={t.href} className={`side-nav ${active ? "side-nav-active" : ""}`} aria-current={active ? "page" : undefined}>
+                    {t.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
-        <div className="mt-auto px-2 text-[11px] leading-relaxed text-stone-400">
+        <div className="mt-auto px-2 text-[11px] leading-relaxed text-stone-200/60">
           {mode === "local" ? "내 PC 모드 — 데이터가 이 컴퓨터에만 저장돼요" : "시연 모드 — 가짜 데이터만 넣으세요"}
         </div>
       </aside>
 
-      <div className="flex min-h-screen flex-1 flex-col md:pl-56">
+      <div className="flex min-h-screen flex-1 flex-col md:pl-60">
         <div
           role="status"
           className={`px-4 py-1.5 text-center text-xs font-semibold ${
@@ -152,7 +164,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-10 border-b border-stone-200 bg-stone-100/85 px-4 pb-2 pt-3 backdrop-blur-md md:pb-3">
           <div className="flex items-center justify-between gap-2">
             <h1 className="flex min-w-0 items-center gap-2 text-sm font-bold md:hidden">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-orange-600" aria-hidden />
+              <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-[#be9235]" aria-hidden />
               <span className="truncate">{title}</span>
             </h1>
             <span className="hidden text-sm font-bold text-stone-700 md:block">{TABS.find((t) => isActive(pathname, t.href))?.label ?? ""}</span>

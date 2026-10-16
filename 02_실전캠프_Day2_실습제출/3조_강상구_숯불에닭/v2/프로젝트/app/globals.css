@@ -29,16 +29,23 @@ body {
   letter-spacing: -0.02em;
 }
 
-/* 왼쪽 사이드바 메뉴 (PC). 김씨육면 손익관리의 사이드 메뉴 구성: 어두운 바탕, 아이콘 + 이름, 고른 메뉴는 포인트색 */
+/* 왼쪽 사이드바 메뉴 (PC). 카페스이 색감 — 짙은 세이지 바탕(#4F6449), 크림 글자, 지금 탭은 밝은 칸 + 겨자색 점. 그림 없이 글자만, 18px */
+.side {
+  background: #4f6449;
+  color: #f4f1e8;
+}
+.side-group {
+  @apply px-3 pb-1 pt-4 text-[11.5px] font-extrabold tracking-[0.08em] text-stone-200/60;
+}
 .side-nav {
-  @apply relative flex w-full items-center rounded-lg px-4 py-2 text-[15px] font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-900;
+  @apply flex w-full items-center justify-between rounded-[10px] px-3.5 py-2.5 text-[18px] font-medium text-[#d8e0d2] transition hover:bg-white/10 hover:text-white;
 }
 .side-nav-active {
-  @apply bg-orange-50 font-bold text-orange-700 hover:bg-orange-50 hover:text-orange-700;
+  @apply bg-white/[0.14] font-bold text-white hover:bg-white/[0.14];
 }
-.side-nav-active::before {
+.side-nav-active::after {
   content: "";
-  @apply absolute bottom-2 left-0 top-2 w-[3px] rounded-full bg-orange-600;
+  @apply h-2 w-2 rounded-full bg-[#e6b94a];
 }
 
 /* 폰에서는 사이드바 대신 헤더 아래 가로 탭 (알약 모양, 옆으로 밀어서 본다) */
