@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { EXPORT_BAEMIN_KEY, EXPORT_COUPANG_KEY, EXPORT_MARKET_KEY, EXPORT_META_KEY, EXPORT_RANK_KEY, EXPORT_REVIEWS_KEY, type BaeminExport, type ExportMeta, type ExportReview, type LedgerExport, type MarketExport, type RankExport } from "@/lib/export/types";
+import { EXPORT_BAEMIN_KEY, EXPORT_COUPANG_KEY, EXPORT_MARKET_KEY, EXPORT_META_KEY, EXPORT_NAVERAD_KEY, EXPORT_RANK_KEY, EXPORT_REVIEWS_KEY, type BaeminExport, type ExportMeta, type ExportReview, type LedgerExport, type MarketExport, type RankExport } from "@/lib/export/types";
 import { applyMarks, pruneMarks, REPLY_MARKS_KEY, type ReplyMark } from "@/lib/reviews/marks";
 import { getStore } from "@/lib/storage";
+import type { NaverAdExport } from "@/lib/market/adStats";
 
 export interface ExportState {
   loaded: boolean;
@@ -13,6 +14,7 @@ export interface ExportState {
   baemin: BaeminExport | null;
   coupang: BaeminExport | null;
   market: MarketExport | null;
+  naverAd: NaverAdExport | null;
   save: (e: LedgerExport) => Promise<ExportMeta>;
   reload: () => Promise<void>;
 }
@@ -35,17 +37,18 @@ export async function applyExport(e: LedgerExport): Promise<ExportMeta> {
   if (e.baemin) await store.saveSetting(EXPORT_BAEMIN_KEY, e.baemin);
   if (e.coupang) await store.saveSetting(EXPORT_COUPANG_KEY, e.coupang);
   if (e.market) await store.saveSetting(EXPORT_MARKET_KEY, e.market);
+  if (e.naverAd) await store.saveSetting(EXPORT_NAVERAD_KEY, e.naverAd);
   await store.saveSetting(EXPORT_META_KEY, meta);
   return meta;
 }
 
 // 리뷰 수집기 내보내기 파일(리뷰·순위·배민 정산)을 설정 칸에서 읽고 쓴다. 리뷰·상권·정산 탭이 같이 쓴다.
 export function useExport(): ExportState {
-  const [state, setState] = useState<Pick<ExportState, "loaded" | "meta" | "reviews" | "rank" | "baemin" | "coupang" | "market">>({ loaded: false, meta: null, reviews: [], rank: null, baemin: null, coupang: null, market: null });
+  const [state, setState] = useState<Pick<ExportState, "loaded" | "meta" | "reviews" | "rank" | "baemin" | "coupang" | "market" | "naverAd">>({ loaded: false, meta: null, reviews: [], rank: null, baemin: null, coupang: null, market: null, naverAd: null });
 
   const reload = useCallback(async () => {
     const store = getStore();
-    const [meta, reviews, rank, baemin, market, marks, coupang] = await Promise.all([
+    const [meta, reviews, rank, baemin, market, marks, coupang, naverAd] = await Promise.all([
       store.getSetting<ExportMeta>(EXPORT_META_KEY),
       store.getSetting<ExportReview[]>(EXPORT_REVIEWS_KEY),
       store.getSetting<RankExport>(EXPORT_RANK_KEY),
@@ -53,12 +56,13 @@ export function useExport(): ExportState {
       store.getSetting<MarketExport>(EXPORT_MARKET_KEY),
       store.getSetting<ReplyMark[]>(REPLY_MARKS_KEY),
       store.getSetting<BaeminExport>(EXPORT_COUPANG_KEY),
+      store.getSetting<NaverAdExport>(EXPORT_NAVERAD_KEY),
     ]);
     // 사장님이 "답글 달았어요"로 표시한 리뷰는 수집기가 답글을 가져올 때까지 답한 것으로 본다. 가져왔으면 표시를 정리한다
     const list = reviews ?? [];
     const kept = pruneMarks(list, marks ?? []);
     if (kept.length !== (marks ?? []).length) await store.saveSetting(REPLY_MARKS_KEY, kept);
-    setState({ loaded: true, meta, reviews: applyMarks(list, kept), rank, baemin, coupang, market });
+    setState({ loaded: true, meta, reviews: applyMarks(list, kept), rank, baemin, coupang, market, naverAd });
   }, []);
 
   useEffect(() => {

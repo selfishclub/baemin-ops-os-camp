@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { AdResultsSection } from "@/components/AdResultsSection";
 import { SourceTag } from "@/components/SourceTag";
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
@@ -371,12 +372,7 @@ export default function AdPlanPage() {
             )}
           </section>
 
-          <section className="card space-y-1">
-            <h2 className="text-base font-bold">⑤ 성적 <span className="text-xs font-normal text-stone-500">켠 뒤 2주부터</span></h2>
-            <p className="text-sm text-stone-600">
-              광고를 켜면 다음 단계에서 도우미가 밤마다 키워드별 <b>노출 · 클릭 · 광고비 · 클릭 1번 값</b>을 읽어 와 여기에 붙여요(카페스이 광고 노트의 "기간별 성적·광고그룹별·파워링크 키워드" 표). 평소 4주와 비교해 위험·주의·제안도 그때 나와요. 지금은 켜기 전이라 비어 있어요.
-            </p>
-          </section>
+          <AdResultsSection ad={exp.naverAd} today={today} startedAt={plan.startedAt} />
         </>
       )}
     </>

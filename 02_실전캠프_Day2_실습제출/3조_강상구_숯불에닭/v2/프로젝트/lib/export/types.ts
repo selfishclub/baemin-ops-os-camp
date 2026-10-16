@@ -1,3 +1,4 @@
+import type { NaverAdExport } from "../market/adStats";
 // 리뷰 수집기(review-onetouch)의 "손익장부용 내보내기" 파일 모양 — npm run export:ledger 가 만드는 JSON.
 // 리뷰 · 답글 초안 · 네이버 플레이스 순위 · 배민 정산(수집했다면)이 한 파일에 들어온다.
 // 손익장부는 인터넷 DB 없이 내 PC 브라우저에 저장하므로, 이 파일을 올려서 리뷰 · 상권 · 정산 탭을 채운다.
@@ -163,6 +164,7 @@ export interface LedgerExport {
   baemin: BaeminExport | null;
   coupang?: BaeminExport | null; // 쿠팡이츠 — 같은 모양 (주문별 정산 항목으로 만듦)
   market?: MarketExport | null;
+  naverAd?: NaverAdExport | null; // 네이버 광고 구조·성적 (lib/market/adStats.ts)
 }
 
 // 저장 키 (설정 칸에 통째로 둔다)
@@ -172,6 +174,7 @@ export const EXPORT_BAEMIN_KEY = "export_baemin_v1";
 export const EXPORT_META_KEY = "export_meta_v1";
 export const EXPORT_MARKET_KEY = "export_market_v1";
 export const EXPORT_COUPANG_KEY = "export_coupang_v1";
+export { EXPORT_NAVERAD_KEY } from "../market/adStats";
 
 export interface ExportMeta {
   exportedAt: string;

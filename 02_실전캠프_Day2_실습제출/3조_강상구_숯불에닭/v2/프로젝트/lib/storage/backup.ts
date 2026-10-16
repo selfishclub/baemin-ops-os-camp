@@ -313,6 +313,7 @@ export const SETTING_LABEL: Record<string, string> = {
   export_coupang_v1: "쿠팡이츠 정산 수집 자료 (정산 탭)",
   export_market_v1: "동네 조사 자료 (상권 탭)",
   export_meta_v1: "수집 자료 받은 시각",
+  export_naverad_v1: "네이버 광고 성적 (광고 노트)",
   review_reply_marks_v1: "답글 등록했어요 표시",
   keyword_nav_v1: "키워드 네비게이션 엑셀 자료",
   keyword_volumes_v1: "키워드 월간 검색수",
