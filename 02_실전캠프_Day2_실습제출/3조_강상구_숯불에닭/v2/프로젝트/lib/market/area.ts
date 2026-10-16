@@ -1,6 +1,6 @@
 // 상권 탭 — "우리 동네가 어떤지": 반경 안 점포(업종별 수 · 같은 업종 가게 · 지난 조사와 비교), 동 인구, 키워드 검색 흐름, 경쟁 가게 리뷰 증가.
 // 자료는 리뷰 수집기의 npm run market (공공데이터 상가정보 · 통계청 SGIS · 네이버 데이터랩) 결과가 내보내기 파일로 온다.
-import type { MarketArea, MarketCompetitor, MarketTrend, MarketTrendGroup } from "../export/types";
+import type { MarketArea, MarketCompetitor, MarketStore, MarketTrend, MarketTrendGroup } from "../export/types";
 
 export interface AreaSummary {
   surveyedAt: string;
@@ -136,4 +136,45 @@ export function upcomingKeywords(trend: MarketTrend | null, today: string, month
     out.push({ keyword: g.name, month, index, peakMonth: best ? Number(best.period.slice(5, 7)) : null, ratio: hit.ratio });
   }
   return out.sort((a, b) => b.index - a.index);
+}
+
+// ── 상세보기 재료 ─────────────────────────────────────────────────────
+/** 가게에서 점포까지 직선 거리(m). 좌표가 없으면 null */
+export function distanceM(center: { lat: number; lng: number }, s: { lat?: number | null; lng?: number | null }): number | null {
+  if (s.lat === null || s.lat === undefined || s.lng === null || s.lng === undefined) return null;
+  const R = 6371000;
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const dLat = toRad(s.lat - center.lat);
+  const dLng = toRad(s.lng - center.lng);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(center.lat)) * Math.cos(toRad(s.lat)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(a)));
+}
+
+export const isFoodStore = (s: MarketStore) => (s.large ?? "").includes("음식");
+
+export interface CategoryNode {
+  name: string;
+  count: number;
+  children: CategoryNode[];
+}
+
+/** 대분류 → 중분류 → 소분류 개수 (많은 순) */
+export function categoryTree(area: MarketArea): CategoryNode[] {
+  const L = new Map<string, Map<string, Map<string, number>>>();
+  for (const s of area.stores) {
+    const l = s.large ?? "기타", m = s.mid ?? "기타", sm = s.small ?? "기타";
+    if (!L.has(l)) L.set(l, new Map());
+    const M = L.get(l)!;
+    if (!M.has(m)) M.set(m, new Map());
+    const S = M.get(m)!;
+    S.set(sm, (S.get(sm) ?? 0) + 1);
+  }
+  const sum = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
+  const byCount = (a: CategoryNode, b: CategoryNode) => b.count - a.count;
+  return [...L.entries()]
+    .map(([name, M]) => {
+      const children = [...M.entries()].map(([mn, S]) => ({ name: mn, count: sum(S), children: [...S.entries()].map(([sn, c]) => ({ name: sn, count: c, children: [] })).sort(byCount) })).sort(byCount);
+      return { name, count: children.reduce((a, c) => a + c.count, 0), children };
+    })
+    .sort(byCount);
 }

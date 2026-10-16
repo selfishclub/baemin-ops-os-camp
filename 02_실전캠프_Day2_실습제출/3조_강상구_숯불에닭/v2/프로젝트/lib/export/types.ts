@@ -106,6 +106,8 @@ export interface MarketStore {
   mid: string | null; // 중분류 (한식·카페·…)
   small: string | null; // 소분류 (닭/오리요리·커피전문점·…)
   addr: string | null;
+  lat?: number | null;
+  lng?: number | null;
 }
 export interface MarketArea {
   surveyedAt: string;

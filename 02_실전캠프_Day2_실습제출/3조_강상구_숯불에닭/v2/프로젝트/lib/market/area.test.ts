@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { areaSummary, competitorRows, trendSummary, upcomingKeywords } from "./area";
+import { areaSummary, categoryTree, competitorRows, distanceM, isFoodStore, trendSummary, upcomingKeywords } from "./area";
 import type { MarketArea, MarketCompetitor } from "../export/types";
 
 const st = (id: string, name: string, large: string, mid: string, small: string): MarketArea["stores"][number] => ({ id, name, large, mid, small, addr: null });
@@ -85,5 +85,30 @@ describe("다음 달 미리 잡을 키워드", () => {
   });
   it("자료가 없으면 빈 목록", () => {
     expect(upcomingKeywords(null, "2026-10-17")).toEqual([]);
+  });
+});
+
+describe("상세보기 재료", () => {
+  it("거리는 미터로, 좌표 없으면 null", () => {
+    const c = { lat: 36.6649806, lng: 127.4976337 };
+    expect(distanceM(c, { lat: 36.6648437, lng: 127.4921637 })).toBeGreaterThan(450);
+    expect(distanceM(c, { lat: 36.6648437, lng: 127.4921637 })).toBeLessThan(520);
+    expect(distanceM(c, { lat: null, lng: null })).toBeNull();
+  });
+  it("업종 나무는 대 → 중 → 소, 많은 순", () => {
+    const area = {
+      surveyedAt: "2026-10-17", center: { lat: 0, lng: 0 }, radius: 500, total: 4,
+      stores: [
+        { id: "1", name: "a", large: "음식", mid: "한식", small: "닭/오리요리", addr: null },
+        { id: "2", name: "b", large: "음식", mid: "한식", small: "백반", addr: null },
+        { id: "3", name: "c", large: "음식", mid: "카페", small: "커피전문점", addr: null },
+        { id: "4", name: "d", large: "소매", mid: "편의점", small: null, addr: null },
+      ],
+    };
+    const t = categoryTree(area);
+    expect(t[0]).toMatchObject({ name: "음식", count: 3 });
+    expect(t[0].children[0]).toMatchObject({ name: "한식", count: 2 });
+    expect(t[0].children[0].children.map((x) => x.name)).toEqual(["닭/오리요리", "백반"]);
+    expect(isFoodStore(area.stores[3])).toBe(false);
   });
 });

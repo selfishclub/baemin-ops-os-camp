@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ExportStatusLine } from "@/components/ExportUploadCard";
 import { SourceTag } from "@/components/SourceTag";
+import { AreaDetail } from "@/components/AreaDetail";
 import { MarketManualCard } from "@/components/MarketManualCard";
 import { RankCheckCard } from "@/components/RankCheckCard";
 import { useExport } from "@/components/useExport";
@@ -39,6 +40,7 @@ export default function MarketPage() {
   const [volumes, setVolumes] = useState<VolumeMap>({});
   const [ahead, setAhead] = useState<1 | 2>(1);
   const [addedTrack, setAddedTrack] = useState<string[]>([]);
+  const [areaDetail, setAreaDetail] = useState(false);
 
   useEffect(() => {
     // 처음엔 순위가 있는 키워드부터 (50위 밖만 있으면 첫 것)
@@ -315,7 +317,15 @@ export default function MarketPage() {
                 {market.population.households !== null && <> · {num(market.population.households)}가구</>}
               </p>
             )}
-            {area && <p className="num text-xs text-stone-400">조사일 {area.surveyedAt} · 공공데이터 상가정보는 등록 기준이라 실제와 몇 곳 다를 수 있어요</p>}
+            {area && market.area && (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="num text-xs text-stone-400">조사일 {area.surveyedAt} · 공공데이터 상가정보는 등록 기준이라 실제와 몇 곳 다를 수 있어요</p>
+                <button className="btn-ghost px-3 py-1 text-xs" onClick={() => setAreaDetail((v) => !v)}>
+                  {areaDetail ? "상세 접기" : "상세보기 — 가게 목록·업종별·변화"}
+                </button>
+              </div>
+            )}
+            {areaDetail && area && market.area && <AreaDetail area={market.area} summary={area} sameWords={SAME_WORDS} />}
           </>
         )}
       </section>
