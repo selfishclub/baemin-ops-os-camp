@@ -22,12 +22,18 @@ const emptyEntry = (month: string): ManualEntry => ({ month, footTraffic: null, 
 const prevYear = (m: string) => `${Number(m.slice(0, 4)) - 1}${m.slice(4)}`;
 const label = (m: string) => `${m.slice(0, 4)}년 ${Number(m.slice(5))}월`;
 
-function Delta({ now, before, unit }: { now: number | null; before: number | null; unit: string }) {
+const prevMonth = (m: string) => {
+  const y = Number(m.slice(0, 4)), mo = Number(m.slice(5));
+  return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, "0")}`;
+};
+
+/** 작년 같은 달이 있으면 그것과, 없으면(올해부터 적기 시작) 전달과 비교 */
+function Delta({ now, before, unit, label = "작년" }: { now: number | null; before: number | null; unit: string; label?: string }) {
   if (now === null || before === null || before === 0) return null;
   const pct = Math.round(((now - before) / before) * 1000) / 10;
   return (
     <span className={`num ml-1 text-[11px] ${pct > 0 ? "text-emerald-700" : pct < 0 ? "text-red-700" : "text-stone-500"}`}>
-      작년 {num(before)}
+      {label} {num(before)}
       {unit} ({pct > 0 ? "+" : ""}
       {pct}%)
     </span>
@@ -51,6 +57,10 @@ export function MarketManualCard({ today }: { today: string }) {
 
   const current = entries.find((e) => e.month === month) ?? emptyEntry(month);
   const lastYear = entries.find((e) => e.month === prevYear(month)) ?? null;
+  const lastMonth = entries.find((e) => e.month === prevMonth(month)) ?? null;
+  // 작년 자료가 없으면(올해부터 적기 시작) 전달과 비교한다
+  const cmp = lastYear ?? lastMonth;
+  const cmpLabel = lastYear ? "작년" : "전달";
   const months = [...new Set([thisMonth, ...entries.map((e) => e.month)])].sort().reverse();
 
   const save = (next: ManualEntry) => {
@@ -87,17 +97,17 @@ export function MarketManualCard({ today }: { today: string }) {
         <label className="block text-xs font-semibold text-stone-500">
           일평균 유동인구 (명)
           <MoneyInput label="일평균 유동인구" value={current.footTraffic} onChange={(v) => save({ ...current, footTraffic: v })} allowEmpty placeholder="예: 12,300" />
-          <Delta now={current.footTraffic} before={lastYear?.footTraffic ?? null} unit="명" />
+          <Delta now={current.footTraffic} before={cmp?.footTraffic ?? null} unit="명" label={cmpLabel} />
         </label>
         <label className="block text-xs font-semibold text-stone-500">
           상권 월 추정 매출 (원)
           <MoneyInput label="상권 월 추정 매출" value={current.areaSales} onChange={(v) => save({ ...current, areaSales: v })} allowEmpty placeholder="예: 3,200,000,000" />
-          <Delta now={current.areaSales} before={lastYear?.areaSales ?? null} unit="원" />
+          <Delta now={current.areaSales} before={cmp?.areaSales ?? null} unit="원" label={cmpLabel} />
         </label>
         <label className="block text-xs font-semibold text-stone-500">
           같은 업종 점포 수 (곳)
           <MoneyInput label="같은 업종 점포 수" value={current.sameStores} onChange={(v) => save({ ...current, sameStores: v })} allowEmpty placeholder="예: 24" />
-          <Delta now={current.sameStores} before={lastYear?.sameStores ?? null} unit="곳" />
+          <Delta now={current.sameStores} before={cmp?.sameStores ?? null} unit="곳" label={cmpLabel} />
         </label>
       </div>
       <input className="field" placeholder="메모 — 예: 10월 유동인구는 평일 저녁이 늘었음 (소상공인365 시간대 표)" value={current.note} onChange={(e) => save({ ...current, note: e.target.value })} />
