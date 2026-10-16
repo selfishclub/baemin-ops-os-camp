@@ -35,14 +35,14 @@ const MonthContext = createContext<{ month: Month; setMonth: (m: Month) => void 
 export const useMonth = () => useContext(MonthContext);
 
 const TABS = [
-  { href: "/", label: "손익", icon: "📊" },
-  { href: "/today", label: "오늘", icon: "📝" },
-  { href: "/upload", label: "올리기", icon: "📥" },
-  { href: "/channels", label: "정산", icon: "🛵" },
-  { href: "/costing", label: "원가율", icon: "🍗" },
-  { href: "/reviews", label: "리뷰", icon: "⭐" },
-  { href: "/market", label: "상권", icon: "📍" },
-  { href: "/rules", label: "규칙", icon: "⚙️" },
+  { href: "/", label: "손익" },
+  { href: "/today", label: "오늘" },
+  { href: "/upload", label: "올리기" },
+  { href: "/channels", label: "정산" },
+  { href: "/costing", label: "원가율" },
+  { href: "/reviews", label: "리뷰" },
+  { href: "/market", label: "상권" },
+  { href: "/rules", label: "규칙" },
 ];
 
 /** 하위 주소(/market/keywords)도 그 탭으로 본다 */
@@ -110,25 +110,26 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <StorageFailureToast failure={failure} onDismiss={dismiss} />
       {/* 내 PC 모드이고 장부를 읽을 수 있을 때만 자동 백업 일꾼을 띄운다 */}
       {mode === "local" && health?.ok && <AutoBackupAgent />}
-      {/* PC: 왼쪽 사이드바 메뉴 (김씨육면 손익관리의 사이드 메뉴 구성을 가져옴) */}
-      <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:flex md:w-56 md:flex-col md:gap-5 md:bg-stone-900 md:px-3 md:py-5">
-        <h1 className="flex min-w-0 items-center gap-2 px-2 text-base font-bold text-white">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-600 text-lg">🔥</span>
-          <span className="truncate">{title}</span>
+      {/* PC: 왼쪽 사이드바 메뉴 — 밝은 바탕, 글자만. 지금 탭은 주황 글자 + 왼쪽 주황 막대 */}
+      <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:flex md:w-56 md:flex-col md:border-r md:border-stone-200 md:bg-white md:px-4 md:py-6">
+        <h1 className="flex min-w-0 items-center gap-2.5 px-2">
+          <span className="h-3 w-3 shrink-0 rounded-sm bg-orange-600" aria-hidden />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-bold text-stone-900">{title}</span>
+            <span className="block text-[11px] text-stone-400">한눈 손익 장부</span>
+          </span>
         </h1>
-        <nav className="flex flex-col gap-1" aria-label="메뉴">
-          <div className="px-3 pb-1 text-[11px] font-bold tracking-wider text-stone-500">메뉴</div>
+        <nav className="mt-8 flex flex-col gap-0.5" aria-label="메뉴">
           {TABS.map((t) => {
             const active = isActive(pathname, t.href);
             return (
               <Link key={t.href} href={t.href} className={`side-nav ${active ? "side-nav-active" : ""}`} aria-current={active ? "page" : undefined}>
-                <span className="w-5 text-center text-base leading-none">{t.icon}</span>
                 {t.label}
               </Link>
             );
           })}
         </nav>
-        <div className="mt-auto px-2 text-[11px] leading-relaxed text-stone-500">
+        <div className="mt-auto px-2 text-[11px] leading-relaxed text-stone-400">
           {mode === "local" ? "내 PC 모드 — 데이터가 이 컴퓨터에만 저장돼요" : "시연 모드 — 가짜 데이터만 넣으세요"}
         </div>
       </aside>
@@ -151,7 +152,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-10 border-b border-stone-200 bg-stone-100/85 px-4 pb-2 pt-3 backdrop-blur-md md:pb-3">
           <div className="flex items-center justify-between gap-2">
             <h1 className="flex min-w-0 items-center gap-2 text-sm font-bold md:hidden">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-600 text-base">🔥</span>
+              <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-orange-600" aria-hidden />
               <span className="truncate">{title}</span>
             </h1>
             <span className="hidden text-sm font-bold text-stone-700 md:block">{TABS.find((t) => isActive(pathname, t.href))?.label ?? ""}</span>
@@ -162,7 +163,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
               const active = isActive(pathname, t.href);
               return (
                 <Link key={t.href} href={t.href} className={`tab ${active ? "tab-active" : ""}`} aria-current={active ? "page" : undefined}>
-                  <span className="mr-1">{t.icon}</span>
                   {t.label}
                 </Link>
               );
