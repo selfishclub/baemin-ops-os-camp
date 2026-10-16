@@ -14,7 +14,8 @@ import { channelFees, type ChannelFee } from "@/lib/channels";
 import { num, pctText, won } from "@/lib/format";
 import { isClosed, monthLabel, nextMonth, prevMonth } from "@/lib/month";
 import { sampleChannelSales } from "@/lib/seed";
-import { getStore, storageMode } from "@/lib/storage";
+import { getStore } from "@/lib/storage";
+import { isBasic } from "@/lib/edition";
 import type { ChannelSale } from "@/lib/types";
 import { checkChannelSale, type Issue } from "@/lib/validate";
 
@@ -161,7 +162,7 @@ export default function ChannelsPage() {
           <button className="btn-primary flex-1" onClick={trySave}>
             저장
           </button>
-          {storageMode() === "supabase" || ledger.sales.length === 0 ? (
+          {ledger.sales.length === 0 ? (
             <button className="btn-ghost" onClick={() => setForm(sampleChannelSales(month))}>
               가짜 예시 채우기
             </button>
@@ -261,8 +262,13 @@ export default function ChannelsPage() {
         </section>
       )}
 
-      <BaeminSettleSection platform="baemin" month={month} txs={ledger.txs} nextTxs={ledger.nextTxs} sales={ledger.sales} onSaved={ledger.reload} />
-      <BaeminSettleSection platform="coupang" month={month} txs={ledger.txs} nextTxs={ledger.nextTxs} sales={ledger.sales} onSaved={ledger.reload} />
+      {/* 배민·쿠팡 정산 명세는 리뷰 수집기 자료로 채우는 기능 — 전체판(사장님 PC)에만 */}
+      {!isBasic() && (
+        <>
+          <BaeminSettleSection platform="baemin" month={month} txs={ledger.txs} nextTxs={ledger.nextTxs} sales={ledger.sales} onSaved={ledger.reload} />
+          <BaeminSettleSection platform="coupang" month={month} txs={ledger.txs} nextTxs={ledger.nextTxs} sales={ledger.sales} onSaved={ledger.reload} />
+        </>
+      )}
 
       {asking && (
         <ConfirmDialog title="숫자를 한 번 더 확인해 주세요" confirmLabel="맞아요, 저장" onConfirm={save} onCancel={() => setAsking(false)}>

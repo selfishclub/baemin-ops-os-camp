@@ -5,6 +5,7 @@ import { useMonth } from "@/components/AppShell";
 import { CategorySelect, MoneyInput, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
 import { ExportUploadSection } from "@/components/ExportUploadCard";
+import { isBasic } from "@/lib/edition";
 import ExpenseSection from "@/components/ExpenseSection";
 import { BankParseError, parseBankSheet } from "@/lib/bank/parse";
 import { DEFAULT_CHANNELS, type ChannelId, type Major } from "@/lib/categories";
@@ -226,9 +227,12 @@ export default function UploadPage() {
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0], e.target.files[0].name)}
         />
         <div className="flex flex-wrap gap-2">
-          <button className="btn-primary" disabled={busy || bankFetching} onClick={() => void fetchFromBank()}>
-            {bankFetching ? "농협에서 받는 중… (20초쯤)" : "농협에서 바로 가져오기 (어제까지 7일)"}
-          </button>
+          {/* 도우미(같은 PC)가 받아 오는 기능 — 전체판에만 */}
+          {!isBasic() && (
+            <button className="btn-primary" disabled={busy || bankFetching} onClick={() => void fetchFromBank()}>
+              {bankFetching ? "농협에서 받는 중… (20초쯤)" : "농협에서 바로 가져오기 (어제까지 7일)"}
+            </button>
+          )}
           {SAMPLES.map((s) => (
             <button key={s.file} className="btn-ghost" disabled={busy} onClick={() => loadSample(s.file)}>
               가짜 {s.label} 파일로 해 보기
@@ -357,8 +361,13 @@ export default function UploadPage() {
           )}
         </section>
       )}
-      <div id="export" />
-      <ExportUploadSection />
+      {/* 리뷰 수집기 내보내기 파일 올리기 — 전체판(사장님 PC)에만 */}
+      {!isBasic() && (
+        <>
+          <div id="export" />
+          <ExportUploadSection />
+        </>
+      )}
     </>
   );
 }

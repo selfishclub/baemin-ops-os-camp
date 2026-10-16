@@ -11,7 +11,8 @@ export const metadata: Metadata = {
   icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#ea580c" };
+// 폰 상단 바 색 — 사이드바와 같은 브라운 (카페스이 브라운 크림)
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#3b302a" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

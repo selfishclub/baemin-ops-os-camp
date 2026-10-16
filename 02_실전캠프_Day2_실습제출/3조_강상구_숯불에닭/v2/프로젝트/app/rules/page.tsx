@@ -18,6 +18,8 @@ import RestoreDialog from "@/components/RestoreDialog";
 import { SettingsRestoreCard } from "@/components/SettingsRestoreCard";
 import PhotoBackupCard from "@/components/PhotoBackupCard";
 import AutoBackupCard from "@/components/AutoBackupCard";
+import { CloudImportCard } from "@/components/CloudImportCard";
+import { signOut } from "@/lib/supabase/client";
 import type { Rule } from "@/lib/types";
 import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, parsePayDays } from "@/lib/paydays";
 import { amountFor, emptyFixedCost, fixedCostGaps, FIXED_COSTS_KEY, setAmountFor, type FixedCost } from "@/lib/fixedCosts";
@@ -429,7 +431,15 @@ export default function RulesPage() {
             )}
           </>
         ) : (
-          <p className="text-sm text-stone-600">시연 모드예요. 데이터는 인터넷 데이터 창고(Supabase)에 저장되고 누구나 볼 수 있으니 가짜 데이터만 넣으세요.</p>
+          <>
+            <p className="text-sm text-stone-600">
+              인터넷 모드예요. 자료는 <b>로그인한 이메일(가게)의 인터넷 저장소</b>에 저장되고, 같은 이메일로 로그인한 폰·PC 어디서나 똑같이 보여요. 다른 가게 자료는 서로 보이지 않아요.
+            </p>
+            <CloudImportCard onDone={() => void ledger.reload()} />
+            <button className="btn-ghost" onClick={() => void signOut()}>
+              로그아웃
+            </button>
+          </>
         )}
         <button className="btn w-full bg-red-50 text-red-700 hover:bg-red-100" onClick={() => setConfirmDelete(true)}>
           {monthLabel(month)} 데이터 지우기

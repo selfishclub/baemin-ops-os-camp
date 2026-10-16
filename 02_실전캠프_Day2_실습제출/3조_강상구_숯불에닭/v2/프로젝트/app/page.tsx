@@ -16,6 +16,7 @@ import { num, pctText, signed, won } from "@/lib/format";
 import { closeMonth, isClosed, monthLabel, prevMonth } from "@/lib/month";
 import { compareLines, type Pnl, type PnlLine } from "@/lib/pnl";
 import { getStore } from "@/lib/storage";
+import { isBasic } from "@/lib/edition";
 import { monthFindings, monthSources, type FindingsInput } from "@/lib/findings";
 import { missingFixedCosts } from "@/lib/missingFixed";
 import { dayTotals } from "@/lib/weekday";
@@ -185,7 +186,8 @@ export default function PnlPage() {
 
       <FindingsCard sources={monthSources(findingsInput)} findings={monthFindings(findingsInput)} />
 
-      <ReviewSummaryCard month={month} />
+      {/* 리뷰 요약은 리뷰 수집기 자료로 채우는 기능 — 전체판(사장님 PC)에만 */}
+      {!isBasic() && <ReviewSummaryCard month={month} />}
 
       <section className="card">
         <div className="mb-2 flex items-baseline justify-between">

@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 // 핸드폰 홈 화면에 아이콘으로 붙이기 위한 설정 (안드로이드 "앱 설치", 아이폰 "홈 화면에 추가").
-//  주소창 없이 앱처럼 열리기만 하고, 오프라인으로는 안 돕니다 — 데이터는 그 기기 브라우저에만 남습니다.
+//  주소창 없이 앱처럼 열리기만 하고, 오프라인으로는 안 돕니다 — 인터넷 모드에서는 자료가 인터넷 저장소에 있어서 어느 기기에서나 같습니다.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "한눈 손익 장부",
@@ -10,8 +10,8 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#fafaf9",
-    theme_color: "#ea580c",
+    background_color: "#faf6ee",
+    theme_color: "#3b302a",
     lang: "ko",
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },

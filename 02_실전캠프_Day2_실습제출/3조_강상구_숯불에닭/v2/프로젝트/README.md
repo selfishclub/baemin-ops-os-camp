@@ -14,9 +14,9 @@ v1(월 정산 손익 한 장)에 **오늘 마감 입력 · 정산 주기 규칙�
 
 ## 열어 보기
 
-시연 주소: https://sootdak-ledger.vercel.app (v2 · 시연 모드 — **가짜 데이터만** 넣으세요. 로그인이 없어 누구나 볼 수 있습니다)
+인터넷 주소: https://sootdak-ledger.vercel.app (v2 · **인터넷 모드 · 기본판** — 이메일 링크로 로그인하면 내 가게 장부만 보입니다. 폰 홈 화면에 추가해 앱처럼 씁니다)
 
-고친 뒤 다시 올리기: 이 폴더에서 `npx vercel deploy --prod`
+고친 뒤 다시 올리기: 이 폴더에서 `npx vercel deploy --prod` (처음 준비는 `docs/인터넷모드_준비.md`)
 
 ## 실행
 
@@ -27,16 +27,22 @@ npm run dev      # http://localhost:3200
 
 처음이면 규칙 탭 맨 위 **"처음이세요? 사용법"**을 열어 보세요. 시연은 **오늘 탭 "가짜 예시 자료 넣기" → 올리기 탭 "가짜 9월 파일" → 정산 탭 "기본 규칙 넣기" → 원가율 탭 "가짜 품목·레시피 넣기"·"가짜 9월 포스 파일" → 손익 탭** 순서입니다.
 
-## 저장 모드 두 가지 (중요)
+## 저장 모드 두 가지 · 판 두 가지 (중요)
 
 | 모드 | 언제 | 데이터가 있는 곳 |
 |---|---|---|
 | **내 PC 모드** (기본) | 내 컴퓨터에서 `npm run dev` | 이 컴퓨터의 브라우저. 규칙 탭에서 백업 파일 저장/불러오기 |
-| **시연 모드** | `.env.local`에 `NEXT_PUBLIC_STORAGE=supabase` + 열쇠 2개 | Supabase. **로그인이 없어 누구나 볼 수 있으니 가짜 데이터만** |
+| **인터넷 모드** | `.env.local`에 `NEXT_PUBLIC_STORAGE=supabase` + 열쇠 2개 | Supabase. **이메일 링크로 로그인**한 가게의 줄만 읽고 씁니다(잠금 RLS). 가게마다 이메일 하나 |
 
-- 실제 통장·매출 숫자는 **내 PC 모드에서만** 넣습니다. 열쇠가 있어도 `NEXT_PUBLIC_STORAGE=supabase`가 없으면 Supabase로 보내지 않습니다.
+| 판 | 어디 | 탭 |
+|---|---|---|
+| **전체판** (내 PC 모드 기본) | 사장님 PC | 손익·오늘·올리기·정산·원가율·규칙 + 리뷰·상권(키워드·광고) + 오케이포스/농협 자동 가져오기 (리뷰 수집기 도우미가 같은 PC에 있어야 함) |
+| **기본판** (인터넷 모드 기본) | 폰 · 다른 사장님과 공유 | 캠프 때 만든 여섯 탭만. 나중에 덧붙인 기능은 공유하지 않기로 함 (2026-10-17) |
+
+- 열쇠가 있어도 `NEXT_PUBLIC_STORAGE=supabase`가 없으면 Supabase로 보내지 않습니다. 판은 `NEXT_PUBLIC_EDITION=full|basic`으로 바꿀 수 있습니다.
 - 은행 엑셀 파일은 브라우저 안에서만 읽습니다. 파일 자체는 어디에도 올라가지 않습니다.
-- 시연 모드 준비: `supabase/schema.sql`을 Supabase SQL Editor에서 실행 → `환경변수_예시.txt`를 보고 `.env.local` 작성 (service_role 키는 쓰지 않음).
+- 인터넷 모드 준비: `supabase/schema_v2.sql`을 Supabase SQL Editor에서 실행(시연용 v1 표를 지우고 다시 만듭니다) → 이메일 로그인 켜기 → `환경변수_예시.txt`를 보고 `.env.local`(또는 Vercel 환경변수) 작성. 순서는 `docs/인터넷모드_준비.md`. service_role 키는 쓰지 않습니다.
+- 내 PC 장부를 인터넷으로 옮기기: PC 규칙 탭 **백업 파일 저장** → 인터넷 사이트에 로그인 → 규칙 탭 **내 PC 장부를 여기로 옮기기**.
 
 ## 구조
 
@@ -47,9 +53,9 @@ lib/          categories(8개 대분류) · bank/parse(은행 엑셀 읽기) · 
               pnl(손익) · channels(수수료·입금 대조) · validate(이상 숫자) · month(마감·중복)
               daily(일별 매출·근무) · settlement(정산 규칙·입금 짝 맞추기) · effective(손익용 실매출) · weather(Open-Meteo·날씨별 분석)
               costing/(포스 ABC 파서 · 레시피 원가 · 원가율 리포트 · 가짜 시드)
-              storage/(local · supabase · backup) · seed(가짜 거래처 규칙·예시 실매출)
+              storage/(local · supabase · backup · cloudImport) · seed(가짜 거래처 규칙·예시 실매출) · edition(전체판/기본판) · supabase/client(로그인)
 scripts/      make-sample-xlsx.mjs(8월 은행) · make-sample-daily.mjs(9월 일별+은행) · make-sample-pos.mjs(9월 포스)
-supabase/     schema.sql — 시연 모드 테이블과 잠금(RLS)
+supabase/     schema_v2.sql — 인터넷 모드 표(user_id)와 잠금(RLS). schema.sql 은 옛 시연용
 ```
 
 ## 계산 규칙

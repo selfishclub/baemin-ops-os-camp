@@ -1,6 +1,9 @@
-# 시연 모드(Supabase)로 돌릴 때만 채웁니다. 값은 Supabase > Project Settings > API 에서 복사.
-# service_role 키는 절대 넣지 않습니다.
+# 인터넷 모드(폰·공유용, Supabase)로 돌릴 때만 채웁니다. 값은 Supabase > Project Settings > API 에서 복사.
+# service_role 키는 절대 넣지 않습니다. (anon public 키만)
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 # 이 줄이 supabase 일 때만 데이터를 Supabase에 저장합니다. 비워 두면 "내 PC 모드"(이 컴퓨터에만 저장).
 NEXT_PUBLIC_STORAGE=
+# 판: basic(기본판 — 손익·오늘·올리기·정산·원가율·규칙) | full(전체판 — 리뷰·상권·자동 가져오기까지).
+# 비워 두면 인터넷 모드는 basic, 내 PC 모드는 full. 공유용 사이트는 비워 둡니다(= basic).
+NEXT_PUBLIC_EDITION=

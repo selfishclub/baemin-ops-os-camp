@@ -15,6 +15,7 @@ import { checkDay, dayTotals, daysInMonth, hoursBetween, monthHoursByStaff, mont
 import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
 import { getStore } from "@/lib/storage";
+import { isBasic } from "@/lib/edition";
 import type { DailySale, Shift, Staff } from "@/lib/types";
 import { loadSampleData, SAMPLE_LABEL } from "@/lib/sampleData";
 import { useWeather } from "@/components/useWeather";
@@ -401,9 +402,12 @@ export default function TodayPage() {
             <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border-t border-stone-200 pt-2">
               <p className="text-xs text-stone-500">여러 날을 한 번에: 포스 ASP → 매출관리 → 승인현황의 카드승인현황·간편결제승인현황 엑셀 (둘 다 올리세요)</p>
               <input ref={cardFileRef} type="file" accept=".xls,.xlsx" aria-label="포스 카드승인현황 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readCardFile(e.target.files[0])} />
-              <button className="btn-primary px-3 py-1.5 text-xs" disabled={posBusy} onClick={() => void fetchFromPos()}>
-                {posBusy ? "오케이포스에서 받는 중… (20초쯤)" : "오케이포스에서 바로 가져오기 (어제까지 7일)"}
-              </button>
+              {/* 도우미(같은 PC)가 받아 오는 기능 — 전체판에만 */}
+              {!isBasic() && (
+                <button className="btn-primary px-3 py-1.5 text-xs" disabled={posBusy} onClick={() => void fetchFromPos()}>
+                  {posBusy ? "오케이포스에서 받는 중… (20초쯤)" : "오케이포스에서 바로 가져오기 (어제까지 7일)"}
+                </button>
+              )}
               <button className="btn-ghost px-3 py-1.5 text-xs" onClick={() => cardFileRef.current?.click()}>
                 카드·간편결제 승인현황 올리기
               </button>
