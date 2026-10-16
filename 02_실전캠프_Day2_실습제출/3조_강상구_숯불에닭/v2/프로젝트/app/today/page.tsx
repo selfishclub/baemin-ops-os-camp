@@ -181,17 +181,48 @@ export default function TodayPage() {
   const dow = DOW[(new Date(date + "T00:00:00Z").getUTCDay() + 6) % 7];
 
   // 포스 "승인현황 (카드승인현황)" 엑셀 → 날짜별 카드사 매출. 파일은 이 화면 안에서만 읽는다.
+  async function readCardBytes(buf: ArrayBuffer, name: string) {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.read(buf, { type: "array" });
+    const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true }) as never[][];
+    setCardFile({ parsed: parseCardApproval(grid), name });
+  }
   async function readCardFile(file: File) {
     setCardFileMsg(null);
     try {
-      const XLSX = await import("xlsx");
-      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-      const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true }) as never[][];
-      setCardFile({ parsed: parseCardApproval(grid), name: file.name });
+      await readCardBytes(await file.arrayBuffer(), file.name);
     } catch (e) {
       setCardFileMsg({ tone: "error", text: e instanceof CardApprovalError ? e.message : `파일을 읽지 못했어요. 포스 승인현황 엑셀(.xls, .xlsx)이 맞나요? (${e instanceof Error ? e.message : e})` });
     } finally {
       if (cardFileRef.current) cardFileRef.current.value = "";
+    }
+  }
+
+  // 오케이포스에서 바로 받기 — 리뷰 도우미가 Aside(사장님이 로그인해 둔 창)에서 승인현황 엑셀을 내려받아 건네준다.
+  // 받은 파일은 위 "올리기"와 똑같이 미리보기 → 확인 → 넣기 로 간다. 로그인·비밀번호는 프로그램이 건드리지 않는다.
+  const [posBusy, setPosBusy] = useState(false);
+  async function fetchFromPos() {
+    setCardFileMsg(null);
+    setPosBusy(true);
+    try {
+      const helper = process.env.NEXT_PUBLIC_HELPER_URL || "http://127.0.0.1:4599";
+      // 기본: 어제까지 7일. 이번 달 1일이 더 늦으면(월초) 1일부터
+      const to = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+      const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+      const res = await fetch(`${helper}/okpos/fetch`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ from: weekAgo, to }) });
+      const j = (await res.json()) as { ok: boolean; message?: string; needLogin?: boolean; fileName?: string; base64?: string; from?: string; to?: string };
+      if (!j.ok || !j.base64) {
+        setCardFileMsg({ tone: "error", text: j.needLogin ? "오케이포스 로그인이 필요해요. 리뷰 수집기 폴더에서 npm run login:source -- okpos 를 돌리고 Aside 창에서 로그인한 뒤 다시 눌러 주세요." : (j.message ?? "받지 못했어요.") });
+        return;
+      }
+      const bin = atob(j.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      await readCardBytes(bytes.buffer, j.fileName ?? "카드승인현황.xls");
+    } catch (e) {
+      setCardFileMsg({ tone: "error", text: e instanceof CardApprovalError ? e.message : "도우미에 연결하지 못했어요. 리뷰 수집기 폴더에서 npm run helper 를 켜 주세요." });
+    } finally {
+      setPosBusy(false);
     }
   }
 
@@ -369,6 +400,9 @@ export default function TodayPage() {
             <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border-t border-stone-200 pt-2">
               <p className="text-xs text-stone-500">여러 날을 한 번에: 포스 ASP → 매출관리 → 승인현황의 카드승인현황·간편결제승인현황 엑셀 (둘 다 올리세요)</p>
               <input ref={cardFileRef} type="file" accept=".xls,.xlsx" aria-label="포스 카드승인현황 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readCardFile(e.target.files[0])} />
+              <button className="btn-primary px-3 py-1.5 text-xs" disabled={posBusy} onClick={() => void fetchFromPos()}>
+                {posBusy ? "오케이포스에서 받는 중… (20초쯤)" : "오케이포스에서 바로 가져오기 (어제까지 7일)"}
+              </button>
               <button className="btn-ghost px-3 py-1.5 text-xs" onClick={() => cardFileRef.current?.click()}>
                 카드·간편결제 승인현황 올리기
               </button>
