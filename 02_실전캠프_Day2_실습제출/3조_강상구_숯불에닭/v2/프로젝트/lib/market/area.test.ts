@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { areaSummary, competitorRows, trendSummary } from "./area";
+import { areaSummary, competitorRows, trendSummary, upcomingKeywords } from "./area";
 import type { MarketArea, MarketCompetitor } from "../export/types";
 
 const st = (id: string, name: string, large: string, mid: string, small: string): MarketArea["stores"][number] => ({ id, name, large, mid, small, addr: null });
@@ -56,5 +56,34 @@ describe("경쟁 가게 변화", () => {
     expect(r.rows.find((x) => x.id === "c")!.visitorGain).toBeNull();
     const me = r.rows.find((x) => x.mine)!;
     expect(me).toMatchObject({ rankNow: 39, rankFirst: 43, visitorGain: 40 });
+  });
+});
+
+describe("다음 달 미리 잡을 키워드", () => {
+  const months = ["2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"];
+  const flat = months.map((p) => ({ period: p, ratio: 50 }));
+  const trend = {
+    fetchedAt: "2026-10-17",
+    start: "2025-11-01",
+    end: "2026-10-17",
+    groups: [
+      { name: "청주 야장", keywords: ["청주 야장"], data: flat.map((d) => (d.period === "2025-11" ? { ...d, ratio: 100 } : d.period === "2026-09" ? { ...d, ratio: 90 } : d)) }, // 11월에 평소보다 많이
+      { name: "청주맛집", keywords: ["청주맛집"], data: flat }, // 늘 비슷
+      { name: "청주 테라스 맛집", keywords: ["청주 테라스 맛집"], data: flat.map((d) => (d.period === "2025-11" ? { ...d, ratio: 20 } : d)) }, // 11월엔 적게
+    ],
+  };
+  it("다음 달(11월)에 평소보다 많이 찾는 것만, 비율 큰 순", () => {
+    const u = upcomingKeywords(trend, "2026-10-17");
+    expect(u.map((x) => x.keyword)).toEqual(["청주 야장"]);
+    expect(u[0].month).toBe(11);
+    expect(u[0].index).toBeGreaterThan(1.5);
+    expect(u[0].peakMonth).toBe(11);
+  });
+  it("두 달 뒤·해 넘김도 된다", () => {
+    expect(upcomingKeywords(trend, "2026-12-05", 1)[0]?.month ?? 1).toBe(1);
+    expect(upcomingKeywords(trend, "2026-09-01", 2).map((x) => x.month)).toEqual([11]);
+  });
+  it("자료가 없으면 빈 목록", () => {
+    expect(upcomingKeywords(null, "2026-10-17")).toEqual([]);
   });
 });

@@ -11,7 +11,8 @@ import { Notice } from "@/components/ui";
 import { todayStr } from "@/lib/daily";
 import { num } from "@/lib/format";
 import { CHANGE_TODO, EMPTY_PLACE_KEYWORDS, PLACE_KEYWORDS_KEY, SLOT_HINTS, SLOT_LABELS, keywordSummaries, nextSeasonKeyword, rankGrid, rankSeries, rankText, type PlaceKeywords } from "@/lib/market/rank";
-import { areaSummary, competitorRows, trendSummary } from "@/lib/market/area";
+import { areaSummary, competitorRows, trendSummary, upcomingKeywords } from "@/lib/market/area";
+import { KEYWORD_VOLUMES_KEY, normalizeKeyword, type VolumeMap } from "@/lib/market/keywordNav";
 import { getStore } from "@/lib/storage";
 import type { DailySale } from "@/lib/types";
 
@@ -35,6 +36,9 @@ export default function MarketPage() {
   const [sales, setSales] = useState<Map<string, number>>(new Map());
   const [pk, setPk] = useState<PlaceKeywords>(EMPTY_PLACE_KEYWORDS);
   const [pkLoaded, setPkLoaded] = useState(false);
+  const [volumes, setVolumes] = useState<VolumeMap>({});
+  const [ahead, setAhead] = useState<1 | 2>(1);
+  const [addedTrack, setAddedTrack] = useState<string[]>([]);
 
   useEffect(() => {
     // 처음엔 순위가 있는 키워드부터 (50위 밖만 있으면 첫 것)
@@ -48,6 +52,7 @@ export default function MarketPage() {
       for (const r of rows) m.set(r.date, (m.get(r.date) ?? 0) + r.amount);
       setSales(m);
     });
+    void store.getSetting<VolumeMap>(KEYWORD_VOLUMES_KEY).then((v) => setVolumes(v ?? {}));
     void store.getSetting<PlaceKeywords>(PLACE_KEYWORDS_KEY).then((v) => {
       if (v) setPk({ ...EMPTY_PLACE_KEYWORDS, ...v, slots: [...EMPTY_PLACE_KEYWORDS.slots].map((s, i) => v.slots?.[i] ?? s) as PlaceKeywords["slots"], todo: CHANGE_TODO.map((_, i) => v.todo?.[i] ?? false) });
       setPkLoaded(true);
@@ -68,6 +73,17 @@ export default function MarketPage() {
   const market = exp.market;
   const area = useMemo(() => (market?.area ? areaSummary(market.area, SAME_WORDS) : null), [market]);
   const trends = useMemo(() => (market?.trend ? market.trend.groups.map(trendSummary) : []), [market]);
+  const upcoming = useMemo(() => upcomingKeywords(market?.trend ?? null, today, ahead).slice(0, 8), [market, today, ahead]);
+  const volumeOfKw = (k: string) => volumes[normalizeKeyword(k)]?.total ?? null;
+  const trackedAll = [...(rank?.keywords ?? []), ...addedTrack];
+  const trackKw = async (k: string) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_HELPER_URL || "http://127.0.0.1:4599"}/rank/keywords`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keyword: k }) });
+      if ((await res.json()).ok) setAddedTrack((a) => [...a, k]);
+    } catch {
+      /* 도우미 꺼짐 — 아래 순위 카드의 안내를 따른다 */
+    }
+  };
   const competitor = useMemo(() => {
     const c = market?.competitors.find((x) => x.keyword === keyword) ?? market?.competitors[0];
     return c ? competitorRows(c) : null;
@@ -305,6 +321,56 @@ export default function MarketPage() {
       </section>
 
       <MarketManualCard today={today} />
+
+      {/* 다음 달 미리 잡을 키워드 — 검색 흐름에서 그 달에 평소보다 많이 찾는 말 */}
+      {market?.trend && (
+        <section className="card space-y-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-base font-bold">
+              {upcoming[0]?.month ?? (((Number(today.slice(5, 7)) - 1 + ahead) % 12) + 1)}월에 미리 잡을 키워드 <span className="text-xs font-normal text-stone-500">작년 같은 달에 평소보다 많이 찾은 말 · 검색이 오르기 전에 ⑤칸·광고에 넣어요</span>
+            </h2>
+            <div className="flex gap-1">
+              {([1, 2] as const).map((n) => (
+                <button key={n} className={`rounded-full px-2.5 py-1 text-xs font-semibold ${ahead === n ? "bg-orange-600 text-white" : "bg-stone-100 text-stone-600"}`} onClick={() => setAhead(n)}>
+                  {n === 1 ? "다음 달" : "두 달 뒤"}
+                </button>
+              ))}
+            </div>
+          </div>
+          {upcoming.length === 0 ? (
+            <p className="text-sm text-stone-500">그 달에 특별히 더 찾는 키워드가 없어요(추적 키워드 기준). 늘 찾는 말(청주맛집 등)은 평소대로 두면 돼요.</p>
+          ) : (
+            <ul className="divide-y divide-stone-100">
+              {upcoming.map((u) => {
+                const vol = volumeOfKw(u.keyword);
+                const inSeason = (pk.season[String(u.month)] ?? "").includes(normalizeKeyword(u.keyword));
+                const tracked = trackedAll.some((t) => normalizeKeyword(t) === normalizeKeyword(u.keyword));
+                return (
+                  <li key={u.keyword} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-sm">
+                    <span>
+                      <b>{u.keyword}</b>
+                      <span className="num ml-2 text-xs text-emerald-700">평소보다 {Math.round((u.index - 1) * 100)}% 더 찾음</span>
+                      {u.peakMonth !== null && <span className="num ml-2 text-xs text-stone-500">가장 많은 달 {u.peakMonth}월</span>}
+                      {vol !== null && <span className="num ml-2 text-xs text-stone-500">한 달 검색 {num(vol)}</span>}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      {inSeason ? (
+                        <span className="text-[11px] text-emerald-700">⑤칸 {u.month}월 후보에 있음</span>
+                      ) : (
+                        <button className="btn-ghost px-2 py-0.5 text-[11px]" onClick={() => savePk({ ...pk, season: { ...pk.season, [String(u.month)]: normalizeKeyword(u.keyword) } })}>
+                          ⑤칸 {u.month}월 후보로
+                        </button>
+                      )}
+                      {tracked ? <span className="text-[11px] text-stone-400">추적 중</span> : <button className="btn-ghost px-2 py-0.5 text-[11px]" onClick={() => void trackKw(u.keyword)}>추적</button>}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p className="text-xs text-stone-500">"평소보다 N%"는 작년 그 달의 검색량을 그 키워드의 1년 평균과 비교한 거예요. ⑤칸 후보로 넣으면 아래 "시즌 달력"에 적히고, 그 달 전달에 "다음 달 ⑤칸" 알림으로 떠요. 광고 시작안에도 같은 말을 입찰가 조금 올려 두면 좋아요.</p>
+        </section>
+      )}
 
       {/* 검색 흐름 */}
       {trends.length > 0 && market?.trend && (

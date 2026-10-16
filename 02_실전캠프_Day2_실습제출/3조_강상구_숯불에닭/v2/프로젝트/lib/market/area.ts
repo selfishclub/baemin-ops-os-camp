@@ -1,6 +1,6 @@
 // 상권 탭 — "우리 동네가 어떤지": 반경 안 점포(업종별 수 · 같은 업종 가게 · 지난 조사와 비교), 동 인구, 키워드 검색 흐름, 경쟁 가게 리뷰 증가.
 // 자료는 리뷰 수집기의 npm run market (공공데이터 상가정보 · 통계청 SGIS · 네이버 데이터랩) 결과가 내보내기 파일로 온다.
-import type { MarketArea, MarketCompetitor, MarketTrendGroup } from "../export/types";
+import type { MarketArea, MarketCompetitor, MarketTrend, MarketTrendGroup } from "../export/types";
 
 export interface AreaSummary {
   surveyedAt: string;
@@ -104,4 +104,36 @@ export function competitorRows(c: MarketCompetitor): { from: string; to: string;
   }
   const days = Math.round((Date.parse(c.latest.date) - Date.parse(c.first.date)) / 86_400_000);
   return { from: c.first.date, to: c.latest.date, days, rows };
+}
+
+// ── 다음 달 미리 잡을 키워드 ───────────────────────────────────────────
+// 검색 흐름(12개월 상대 검색량)에서 "다음 달"에 평소보다 많이 찾는 키워드를 골라 준다.
+// 작년 같은 달의 비율을 그 키워드의 1년 평균과 비교한다 (1.3 = 평소보다 30% 더 찾음).
+export interface UpcomingKeyword {
+  keyword: string;
+  month: number; // 1~12
+  index: number; // 그 달 비율 ÷ 1년 평균
+  peakMonth: number | null;
+  ratio: number; // 그 달 상대 검색량 (최대 100)
+}
+
+/** today 기준 monthsAhead 달 뒤(기본 다음 달)에 평소보다 많이 찾는 키워드, 많이 찾는 순 */
+export function upcomingKeywords(trend: MarketTrend | null, today: string, monthsAhead = 1, minIndex = 1.1): UpcomingKeyword[] {
+  if (!trend) return [];
+  const m0 = Number(today.slice(5, 7));
+  const month = ((m0 - 1 + monthsAhead) % 12) + 1;
+  const out: UpcomingKeyword[] = [];
+  for (const g of trend.groups) {
+    const data = g.data.filter((d) => Number.isFinite(d.ratio));
+    if (data.length < 6) continue;
+    const avg = data.reduce((a, d) => a + d.ratio, 0) / data.length;
+    if (avg <= 0) continue;
+    const hit = [...data].reverse().find((d) => Number(d.period.slice(5, 7)) === month); // 가장 최근의 그 달
+    if (!hit) continue;
+    const index = Math.round((hit.ratio / avg) * 100) / 100;
+    if (index < minIndex) continue;
+    const best = [...data].sort((a, b) => b.ratio - a.ratio)[0];
+    out.push({ keyword: g.name, month, index, peakMonth: best ? Number(best.period.slice(5, 7)) : null, ratio: hit.ratio });
+  }
+  return out.sort((a, b) => b.index - a.index);
 }
