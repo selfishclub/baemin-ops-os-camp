@@ -155,25 +155,33 @@ const Store = (() => {
   /* 저장 직전 합치기 (2026-10-10, 안산점 "체크가 다 풀림" 신고 뒤):
      문서를 통째로 덮어쓰는 구조라, 실시간 신호를 놓쳐 옛 상태를 든 기기가 저장하면 다른 기기의 체크가 전부 되돌아갔다.
      이제 서버에 내가 모르는 더 새 저장이 있으면 먼저 항목 단위로 합친 뒤 올린다 — 완료는 미완료에 지지 않고, 더 나중에 손댄 쪽이 이긴다. */
+  /* 돌려주는 값: { v, base, same } — base 는 읽은 서버본의 saved_at(없는 문서면 null). 올릴 때 "서버가 아직 base 일 때만" 덮어쓴다.
+     2026-10-17 "오전 체크가 오후에 풀림 · 며칠 전 체크가 풀림" 신고: 읽기와 쓰기 사이에 다른 기기가 저장하면 그 저장이 지워졌고,
+     "서버가 더 새것인가"를 기기 시계로 비교해 시계가 늦은 기기의 저장을 못 보고 덮어쓸 수 있었다 → 시계 비교 대신 '같은 판인가'로, 쓰기는 조건부로 */
   async function mergeBeforePut(k, v) {
-    if (!(k.startsWith('state:') || k.startsWith('shared:'))) return v;
+    if (!(k.startsWith('state:') || k.startsWith('shared:'))) return { v, base: undefined };
+    let base = null, same = false;
     try {
       const { data, error } = await supa.client.from('docs').select('doc, saved_at').eq('key', k).maybeSingle();
       if (error) throw Object.assign(new Error('서버 최신본을 읽지 못해 저장을 미룹니다: ' + (error.message || '')), { defer: true });
-      if (!data || !data.doc) { staleLocal.delete(k); return v; }   // 서버에 아직 없는 문서 — 처음 올리는 것
-      const srv = data.doc, srvAt = srv.savedAt || Number(data.saved_at) || 0;
+      if (!data || !data.doc) { staleLocal.delete(k); return { v, base: null }; }   // 서버에 아직 없는 문서 — 처음 올리는 것
+      base = Number(data.saved_at) || 0;
+      const srv = data.doc, srvAt = srv.savedAt || base;
       const mustMerge = staleLocal.has(k);   // 캐시로 연 기기 — 서버본을 본 적이 없으니 무조건 합친다
-      if (!mustMerge && (!(srvAt > (lastUp[k] || 0)) || srvAt === v.savedAt)) return v;
+      if (!mustMerge && (srvAt === (lastUp[k] || 0) || srvAt === v.savedAt)) return { v, base };   // 서버가 내가 마지막으로 맞춘 그 판 그대로
       staleLocal.delete(k);
-      const merged = mergeDocs(v, srv);
+      const merged = mergeDocs({ ...v, savedAt: Math.max(v.savedAt || 0, srvAt) + 1 }, srv);   // 지금 올리는 쪽을 최신으로 (기기 시계가 늦어도 내 변경이 지지 않게)
       merged.savedAt = Date.now();
+      same = docSig(merged) === docSig(srv);   // 합쳐 보니 서버본과 같으면 올릴 필요가 없다 (저장 핑퐁 방지)
+      if (same) merged.savedAt = srvAt;
       if (v.ui) merged.ui = v.ui;          // 날짜·필터·이름 선택은 이 기기 것 (서버본이 더 새것이면 다른 기기 화면 상태가 따라오던 문제 10/15)
       Object.keys(v).forEach((f) => { if (!(f in merged)) delete v[f]; });
       Object.assign(v, merged);           // 앱이 들고 있는 상태(S) 자체를 합친 결과로 바꾼다
       document.dispatchEvent(new CustomEvent('doc-merged', { detail: { key: k } }));
     } catch (e) { if (e && e.defer) throw e; /* 그 밖의 합치기 실패는 그냥 저장 */ }
-    return v;
+    return { v, base, same };
   }
+  const putting = new Set();      // 지금 서버에 올리는 중인 문서 — 그사이 도착한 다른 기기 저장으로 화면 상태(S)를 갈아끼우지 않는다
   const staleLocal = new Set();   // 서버를 못 읽고 캐시로 연 문서 — 다음 저장 때 반드시 합친다
   /* 2026-10-14 저장 폭주 사고: 두 기기가 내용이 똑같은 문서를 몇 초마다 번갈아 올려 하루 3만 번 저장 → 서버 디스크가 차서 읽기 전용이 됨.
      본문(savedAt·ui 제외)이 마지막으로 올렸거나 받은 것과 같으면 서버에는 올리지 않는다. 화면 상태(ui)는 이 기기 것이라 서버에 보낼 이유가 없다 */
@@ -188,15 +196,32 @@ const Store = (() => {
     if (supa) {
       try {
         const sig0 = docSig(v);
-        if (sig0 && sig0 === lastSig[k] && !staleLocal.has(k)) return true;   // 내용이 그대로 — 서버에 다시 올리지 않는다
-        v = await mergeBeforePut(k, v);
-        lastUp[k] = v.savedAt;
-        const { error } = await supa.client.from('docs').upsert({ key: k, doc: noUi(v), saved_at: v.savedAt || Date.now(), updated_at: new Date().toISOString() }, { onConflict: 'key' });
-        if (error) throw error;
+        if (sig0 && sig0 === lastSig[k] && !staleLocal.has(k)) { putting.delete(k); return true; }   // 내용이 그대로 — 서버에 다시 올리지 않는다
+        putting.add(k);
+        for (let attempt = 0; ; attempt++) {
+          const r = await mergeBeforePut(k, v); v = r.v;
+          if (r.same) { lastUp[k] = v.savedAt; break; }   // 서버에 이미 같은 내용이 있다
+          const row = { doc: noUi(v), saved_at: v.savedAt || Date.now(), updated_at: new Date().toISOString() };
+          if (r.base === undefined || r.base === null) {     // 새 문서(또는 합치지 않는 문서) — 예전처럼
+            const { error } = await supa.client.from('docs').upsert({ key: k, ...row }, { onConflict: 'key' });
+            if (error) throw error;
+          } else {                                           // 서버가 아직 내가 읽은 그 판일 때만 덮어쓴다
+            const { data, error } = await supa.client.from('docs').update(row).eq('key', k).eq('saved_at', r.base).select('key');
+            if (error) throw error;
+            if (!data || !data.length) {                     // 그사이 다른 기기가 저장했다 — 다시 읽어 합친 뒤 올린다
+              if (attempt < 4) continue;
+              throw Object.assign(new Error('다른 기기 저장과 겹쳐 잠시 뒤 다시 올립니다'), { defer: true });
+            }
+          }
+          lastUp[k] = v.savedAt;
+          break;
+        }
+        putting.delete(k);
         cloudRetry = null; lastSig[k] = docSig(v);
         if (cloudErr) { cloudErr = null; document.dispatchEvent(new Event('cloud-status')); }
         return true;
       } catch (e) {
+        /* putting 은 그대로 둔다 — 다시 올릴 때까지 다른 기기 저장으로 S 를 갈아끼우면 못 올린 변경이 화면에서 사라지고 다음 저장 때 지워진다 */
         cloudFail(e);
         /* 올리지 못한 저장은 잠시 뒤 다시 시도한다 (서버를 못 읽어 미룬 저장 포함). 덮어쓰기보다 늦는 쪽이 낫다 */
         cloudRetry = { k, v }; clearTimeout(cloudRetryTimer);
@@ -314,7 +339,7 @@ const Store = (() => {
     const tsOf = (x) => Number(x && (x.u || x.updatedAt || Math.max(x.doneAt || 0, x.claimedAt || 0)))
       || 0;
     [['purchases', 'id'], ['contracts', 'id'], ['recipes', 'id'], ['training', 'id'], ['deaths', 'id'],
-      ['health', 'id'], ['staff', 'name'], ['trainSeen', null], ['notices', 'id'], ['issues', 'id'], ['missions', 'id']].forEach(([f, by]) => {
+      ['health', 'id'], ['staff', 'name'], ['trainSeen', null], ['notices', 'id'], ['issues', 'id'], ['missions', 'id'], ['syncLog', 'id']].forEach(([f, by]) => {
       const v = by ? unionNewest(newer[f], older[f], by, tsOf) : unionBy(newer[f], older[f], by); if (v !== undefined) out[f] = v;
     });
     /* 교육 진도·퀴즈 — 사람별로 본 영상을 합친다 */
@@ -379,13 +404,15 @@ const Store = (() => {
   /* 다른 기기의 변경을 듣는다 — 내 쓰기가 되돌아오는 것(savedAt 같거나 이전)은 무시 */
   function supaWatch(k, list) {
     let timer = null;
+    const busy = () => putting.has(k) || (pending && k === curKey);   // 안 올린 변경 · 올리는 중 — 받은 문서로 갈아끼우면 내 변경이 사라진다. 저장 때 합쳐진다
     const poke = (savedAt) => {
-      if (!(savedAt > (lastUp[k] || 0))) return;
+      if (!savedAt || savedAt === (lastUp[k] || 0)) return;   // 내가 올렸거나 이미 받은 판 (시계 앞뒤 비교는 기기 시계가 다르면 틀린다)
       clearTimeout(timer);
       timer = setTimeout(async () => {
-        if (pending && k === curKey) return;   // 내 쪽에 아직 안 올라간 변경이 있으면 저장 때 합쳐진다
+        if (busy()) return;
         const doc = await cloudGet(k, null);
-        if (!doc || !(doc.savedAt > (lastUp[k] || 0))) return;
+        if (!doc || doc.savedAt === (lastUp[k] || 0)) return;
+        if (busy()) return;                    // 읽는 사이 체크했으면 이번 것은 건너뛴다 (60초 확인이나 다음 저장 때 합쳐진다)
         /* 앱이 실제로 받아들였을 때만 "서버 최신본을 봤다"고 기록한다. 입력 창이 열려 있어 받아들이지 못했는데
            기록만 앞당기면, 그 뒤 저장 때 합칠 필요가 없다고 보고 덮어써 버린다 (2026-10-11 두 매장 실제 시험에서 발견) */
         const applied = remoteCb ? remoteCb(k, doc) !== false : true;
@@ -694,8 +721,9 @@ const Store = (() => {
 
   async function flush() {
     if (!pending) return;
-    const v = pending; pending = null;
-    await putDoc(curKey, v);
+    const v = pending, k = curKey; pending = null;
+    putting.add(k);   // 로컬 저장 중에도 '올리는 중' — 그사이 받은 문서로 갈아끼우지 않게
+    try { await putDoc(k, v); } finally { if (!cloudRetry || cloudRetry.k !== k) putting.delete(k); }
   }
 
   async function setMeta(m) {

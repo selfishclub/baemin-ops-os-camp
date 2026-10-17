@@ -5845,18 +5845,28 @@ const App = (() => {
     list.push({ key, tid, u: rec.u, rec: JSON.parse(JSON.stringify(rec)) });
     jWrite(list);
   }
+  /* 이 기기 이름표 — 풀림 기록에서 어느 기기였는지 구분용 (기기마다 한 번 만들어 둔다) */
+  function devTag() {
+    let t = ''; try { t = localStorage.getItem('hm.devtag') || ''; } catch (_) { /* 무시 */ }
+    if (!t) { const ua = navigator.userAgent || ''; t = (/iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Win' : /Mac/.test(ua) ? 'Mac' : 'etc') + '-' + Math.random().toString(36).slice(2, 6); try { localStorage.setItem('hm.devtag', t); } catch (_) { /* 무시 */ } }
+    return t;
+  }
   function reconcileJournal(why) {
     if (DEMO) return 0;
-    const now = Date.now(), list = jRead().filter((e) => now - e.u < JOURNAL_MS); let fixed = 0; const names = [];
+    const now = Date.now(), list = jRead().filter((e) => now - e.u < JOURNAL_MS); let fixed = 0; const names = [], got = [];
     list.forEach((e) => {
       const d = S.days && S.days[e.key]; if (!d || !d.inst) return;
       const cur = d.inst[e.tid]; if (!cur) return;
       if (cur.u && cur.u >= e.u) return;                                   // 그 뒤에 누가 일부러 바꾼 것 — 존중
       if (cur.s === e.rec.s && (cur.note || '') === (e.rec.note || '') && (cur.by || '') === (e.rec.by || '')) return;
       d.inst[e.tid] = JSON.parse(JSON.stringify(e.rec)); fixed++; const t = tpl(e.tid); if (t && names.length < 3) names.push(t.title);
+      if (got.length < 8) got.push(`${e.key.slice(5)} ${e.tid} ${cur.s}←${e.rec.s}`);
     });
     jWrite(list);
-    if (fixed) { console.warn('[기기 수첩] 풀린 기록 되살림', fixed, why); save(); banner(`이 기기에서 한 체크 ${fixed}건이 풀려 있어 되살렸습니다`, names.join(' · ') + (fixed > 3 ? ' 외' : '')); }
+    if (fixed) {
+      /* 풀림이 실제로 일어났다는 흔적 — 매장 문서에 남겨 서버에서 확인한다 (10/17: 서버 기록만으로는 "했다가 풀림"과 "안 함"을 구분할 수 없었다) */
+      S.syncLog = [...(S.syncLog || []), { id: newId('sl'), at: Date.now(), dev: devTag(), why, n: fixed, items: got }].slice(-60);
+      console.warn('[기기 수첩] 풀린 기록 되살림', fixed, why); save(); banner(`이 기기에서 한 체크 ${fixed}건이 풀려 있어 되살렸습니다`, names.join(' · ') + (fixed > 3 ? ' 외' : '')); }
     return fixed;
   }
 
