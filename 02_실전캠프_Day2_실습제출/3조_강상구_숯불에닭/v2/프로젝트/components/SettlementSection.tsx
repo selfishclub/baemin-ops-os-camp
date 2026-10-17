@@ -77,7 +77,8 @@ export default function SettlementSection({
   const withStray = results.filter((r) => r.sales === 0 && strayOf(r) > 0);
   const prevMonthOnly = withStray.filter((r) => strayInfo(r).allPrevMonth);
   const noSales = withStray.filter((r) => !strayInfo(r).allPrevMonth);
-  const unmatchedShown = unmatched.filter((d) => !noSales.some((r) => r.channel === d.channel));
+  // 매출 없는 채널(따로 경고)과 "지난달 주문분"만 들어온 채널(따로 안내)은 짝이 안 맞는 입금 목록에서 뺀다 — 같은 걸 두 번 띄우지 않게
+  const unmatchedShown = unmatched.filter((d) => !withStray.some((r) => r.channel === d.channel));
   // 펼친 카드 채널에서 "입금이 포스 매출보다 많은" 묶음.
   //  포스가 간편결제로 찍은 건(토스페이카드 등)은 돈이 그 카드사에서 들어오고, 배달대행 기사 단말기로 받은
   //  만나서 카드결제도 포스 카드승인현황에 안 찍힌다. 이상이라고 띄우기 전에 그쪽부터 보게 안내한다.

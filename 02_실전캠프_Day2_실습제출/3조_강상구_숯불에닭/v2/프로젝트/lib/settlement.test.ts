@@ -54,6 +54,48 @@ describe("자정 넘은 결제가 하루 늦게 따로 들어올 때 (2026-10 �
     expect(r.settlements[0]).toMatchObject({ payout: "2026-10-15", deposit: 99_100, status: "일치" });
     expect(r.missing).toBe(0);
   });
+  it("앞 묶음은 모자라고 뒤 묶음은 넘치면 둘을 합쳐 일치로 본다", () => {
+    // 10/13 영업일 매출 197,000 중 95,000은 14일 0시 결제 → 카드사는 14일 매출과 같이 10/16에 넣음
+    const d3: DailySale[] = [
+      { date: "2026-10-13", channel: "card_kb", amount: 197_000 },
+      { date: "2026-10-14", channel: "card_kb", amount: 100_000 },
+    ];
+    const r = settleChannel("card_kb", "2026-10", kb, d3, [tx("2026-10-15", "card_kb", 101_080), { ...tx("2026-10-16", "card_kb", 193_050), id: "b16" }], "2026-10-16");
+    expect(r.settlements).toHaveLength(1);
+    expect(r.settlements[0]).toMatchObject({ from: "2026-10-13", to: "2026-10-14", sales: 297_000, deposit: 294_130, status: "일치" });
+    expect(r.unmatchedDeposits).toEqual([]);
+  });
+});
+
+describe("다른 달 주문분 입금은 짝이 안 맞는 입금으로 띄우지 않는다", () => {
+  const kb: SettlementRule = { channel: "card_kb", mode: "days", days: 2, weekday: 0 };
+  const daily: DailySale[] = [
+    { date: "2026-09-01", channel: "card_kb", amount: 100_000 }, // 화 → 9/3
+    { date: "2026-09-30", channel: "card_kb", amount: 200_000 }, // 수 → 10/2
+  ];
+  it("월초의 지난달 말 주문분, 다음 달의 다음 달 주문분은 빠지고, 이 달 안의 엉뚱한 입금은 남는다", () => {
+    const txs = [
+      tx("2026-09-01", "card_kb", 500_000), // 8/28 주문분
+      { ...tx("2026-09-02", "card_kb", 300_000), id: "a" }, // 8/31 주문분
+      { ...tx("2026-09-03", "card_kb", 99_100), id: "b" },
+      { ...tx("2026-09-17", "card_kb", 12_345), id: "c" }, // 이 달 안 엉뚱한 입금
+      { ...tx("2026-10-02", "card_kb", 198_200), id: "d" },
+      { ...tx("2026-10-07", "card_kb", 400_000), id: "e" }, // 10월 주문분
+    ];
+    const r = settleChannel("card_kb", "2026-09", kb, daily, txs, "2026-10-16");
+    expect(r.unmatchedDeposits).toEqual([{ date: "2026-09-17", amount: 12_345 }]);
+    expect(r.settlements.every((s) => s.status === "일치")).toBe(true);
+  });
+  it("연휴로 늦어져도 다음 달 1일 매출 입금일부터는 다음 달 몫", () => {
+    // 10/3(토)·10/5(월 대체공휴일) 연휴: 9/30 → 10/2, 10/1 → 10/6. 10/6·10/7 입금은 10월 주문분
+    const txs = [tx("2026-10-02", "card_kb", 198_200), { ...tx("2026-10-06", "card_kb", 173_540), id: "x" }, { ...tx("2026-10-07", "card_kb", 931_230), id: "y" }];
+    const r = settleChannel("card_kb", "2026-09", kb, [{ date: "2026-09-30", channel: "card_kb", amount: 200_000 }], txs, "2026-10-16", ["2026-10-05"]);
+    expect(r.unmatchedDeposits).toEqual([]);
+  });
+  it("이 달 매출이 하나도 없으면 다 띄운다 (매출 미입력 알림용)", () => {
+    const r = settleChannel("card_kb", "2026-09", kb, [], [tx("2026-09-01", "card_kb", 500_000)], "2026-09-30");
+    expect(r.unmatchedDeposits).toHaveLength(1);
+  });
 });
 
 describe("입금 짝 맞추기", () => {
@@ -73,7 +115,7 @@ describe("입금 짝 맞추기", () => {
     expect(s[2]).toMatchObject({ payout: "2026-09-21", deposit: 0, status: "예정" });
     expect(r.pending).toBe(300_000);
     expect(r.feeRate).toBe(round1(((6_000 + 150_000) / 900_000) * 100));
-    expect(r.unmatchedDeposits).toEqual([{ date: "2026-09-02", amount: 100_000 }]);
+    expect(r.unmatchedDeposits).toEqual([]); // 9/2 입금은 8월 말 주문분 — 8월 화면에서 맞춘다
   });
   it("입금일이 지났는데 없으면 미입금", () => {
     const r = settleChannel("hall_card", "2026-09", card, daily, [], "2026-09-30");
@@ -115,7 +157,7 @@ describe("직접 출금 신청하는 앱 (쿠팡이츠)", () => {
     expect(merged.deposit).toBe(89_662);
     expect(merged.payout).toBe("2026-09-15");
     expect(merged.status).toBe("일치");
-    expect(r.unmatchedDeposits).toEqual([{ date: "2026-09-03", amount: 132_853 }]); // 지난달 주문분
+    expect(r.unmatchedDeposits).toEqual([]); // 9/3 입금은 지난달 주문분 — 이 달 목록에 띄우지 않는다
     expect(r.settlements.find((s) => s.from === "2026-09-14")!.status).toBe("미입금"); // 9/18 정산인데 아직 출금 안 함
     expect(r.settlements.find((s) => s.from === "2026-09-16")!.status).toBe("예정");
     expect(r.missing).toBe(79_000);

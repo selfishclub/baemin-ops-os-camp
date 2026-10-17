@@ -1,6 +1,24 @@
 import { channelKind, type ChannelId } from "./categories";
 import { shiftDate } from "./daily";
+import { nextMonth } from "./month";
 import type { DailySale, Month, Transaction } from "./types";
+
+// 이 달 묶음이 받을 수 있는 입금의 범위. 그 밖의 입금은 다른 달 주문분이라 "짝이 안 맞는 입금"으로 띄우지 않는다.
+//  - 이 달 첫 입금 예정일보다 앞이면서, 지난달 말일 매출의 입금 예정일 + 1영업일(밤 12시 넘은 결제) 안 = 지난달 말 주문분
+//    (그 달 화면에서 짝을 맞춘다). 그보다 늦은 것(환급만 따로 들어온 입금 등)은 그대로 띄운다.
+//  - 다음 달이면서 이 달 마지막 입금 예정일 + 2영업일 뒤 = 다음 달 주문분
+// 이 달 매출 묶음이 하나도 없으면 범위를 두지 않는다 (매출 미입력을 알려야 하니까).
+function outsideMonthWindow(date: string, month: Month, payouts: string[], holidays: string[], rule: SettlementRule): boolean {
+  if (!payouts.length) return false;
+  const sorted = [...payouts].sort();
+  const prevLastDay = shiftDate(month + "-01", -1);
+  const prevBound = addBusinessDays(payoutDate(prevLastDay, rule, holidays), 1, holidays);
+  if (date < sorted[0] && date <= prevBound) return true;
+  const nextStart = nextMonth(month) + "-01";
+  if (date < nextStart) return false;
+  // 다음 달 1일 매출의 입금 예정일부터는 다음 달 주문분이 섞여 들어온다
+  return date > addBusinessDays(sorted[sorted.length - 1], 2, holidays) || date >= payoutDate(nextStart, rule, holidays);
+}
 
 // 정산 주기 규칙 — "언제 주문(매출)한 돈이 언제 통장에 들어오나"
 //  - days:   매출일 + N영업일 뒤에 그날 매출분이 들어온다 (카드사, 배달앱 일 정산)
@@ -150,7 +168,7 @@ export function settleChannel(
     groups.set(payout, g);
   }
 
-  if (rule.manual) return settleManual(channel, month, groups, deposits, daily, lastBankDate, adj);
+  if (rule.manual) return settleManual(channel, month, groups, deposits, daily, lastBankDate, adj, holidays, rule);
 
   const used = new Set<string>();
   const settlements: Settlement[] = [...groups.entries()]
@@ -221,15 +239,41 @@ export function settleChannel(
     };
   }
 
+  // 이웃한 두 묶음이 서로 모자라고 넘칠 때: 밤 12시 넘어 받은 결제가 장부에선 앞날, 카드사에선 다음 날이라
+  // 앞 묶음 입금은 모자라고 뒤 묶음 입금은 그만큼 많다. 둘 중 하나가 "차이"이고, 합치면 "일치"면 한 묶음으로 본다.
+  for (let i = 0; i + 1 < settlements.length; i++) {
+    const a = settlements[i];
+    const b = settlements[i + 1];
+    if (a.deposit <= 0 || b.deposit <= 0 || a.extra || b.extra) continue;
+    if (a.status !== "차이" && b.status !== "차이") continue;
+    if (!(a.deposit < a.sales && b.deposit > b.sales)) continue;
+    if (b.payout > addBusinessDays(a.payout, 2, holidays)) continue;
+    const sales = a.sales + b.sales;
+    const deposit = a.deposit + b.deposit;
+    if (judge(sales, deposit, floor) !== "일치") continue;
+    settlements.splice(i, 2, {
+      ...b,
+      from: a.from,
+      to: b.to,
+      sales,
+      deposit,
+      fee: sales - deposit,
+      feeRate: round1(((sales - deposit) / sales) * 100),
+      status: "일치",
+      note: `${a.payout}·${b.payout} 두 번에 나눠 들어왔어요 (밤 12시 넘어 받은 결제는 카드사가 다음 날 것으로 쳐요)`,
+    });
+  }
+
   const deposited = settlements.filter((s) => s.status === "일치" || s.status === "차이");
   const salesDeposited = deposited.reduce((a, s) => a + s.sales, 0);
   const refunds = [...adj.values()].reduce((a, x) => a + x.amount, 0);
   const fee = deposited.reduce((a, s) => a + s.fee, 0) - refunds; // 환급은 수수료를 돌려받은 것
 
-  // 이 달 입금 중 어느 묶음에도 안 붙은 것 (지난달 주문분 정산은 제외: 지난달 묶음의 payout일에 해당)
+  // 이 달 입금 중 어느 묶음에도 안 붙은 것. 지난달 말·다음 달 주문분 입금은 빼고 (outsideMonthWindow)
   const monthStart = month + "-01";
+  const groupPayouts = [...groups.keys()];
   const unmatchedDeposits = [...deposits.entries()]
-    .filter(([date, amount]) => date >= monthStart && date <= lastBankDate && !used.has(date) && !fullyRefund(adj.get(date), amount))
+    .filter(([date, amount]) => date >= monthStart && date <= lastBankDate && !used.has(date) && !fullyRefund(adj.get(date), amount) && !outsideMonthWindow(date, month, groupPayouts, holidays, rule))
     .map(([date, amount]) => ({ date, amount }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -287,17 +331,20 @@ function settleManual(
   daily: DailySale[],
   lastBankDate: string,
   adj: Map<string, SettlementAdjustment> = new Map(),
+  holidays: string[] = [],
+  rule?: SettlementRule,
 ): ChannelSettlementSummary {
   const floor = floorOf(channel);
   const bundles = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([payout, g]) => ({ payout, ...g, claimed: false }));
   const settlements: Settlement[] = [];
   const unmatchedDeposits: { date: string; amount: number }[] = [];
   const monthStart = month + "-01";
+  const payouts = bundles.map((b) => b.payout);
   for (const [date, raw] of [...deposits.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     if (raw <= 0) continue;
     const eligible = bundles.filter((b) => !b.claimed && b.payout <= date);
     if (eligible.length === 0) {
-      if (date >= monthStart && date <= lastBankDate && !fullyRefund(adj.get(date), raw)) unmatchedDeposits.push({ date, amount: raw });
+      if (date >= monthStart && date <= lastBankDate && !fullyRefund(adj.get(date), raw) && !(rule && outsideMonthWindow(date, month, payouts, holidays, rule))) unmatchedDeposits.push({ date, amount: raw });
       continue;
     }
     for (const b of eligible) b.claimed = true;
