@@ -20,6 +20,6 @@ export function edition(): Edition {
 export const isBasic = () => edition() === "basic";
 
 /** 기본판에 없는 기능(리뷰·상권·키워드·광고)이 쓰는 설정 키. 내 PC 백업을 인터넷 저장소로 옮길 때 이것들은 빼 둔다 */
-export const UPGRADE_SETTING_PREFIXES = ["export_", "keyword_", "ad_", "place_keywords", "review_reply_marks", "market_manual"];
+export const UPGRADE_SETTING_PREFIXES = ["export_", "keyword_", "ad_", "place_keywords", "review_reply_marks", "market_manual", "cardsales_"];
 
 export const isUpgradeSetting = (key: string) => UPGRADE_SETTING_PREFIXES.some((p) => key.startsWith(p));

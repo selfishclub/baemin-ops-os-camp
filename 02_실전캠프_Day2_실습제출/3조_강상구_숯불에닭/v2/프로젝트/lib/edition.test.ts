@@ -16,7 +16,7 @@ describe("판 고르기", () => {
 
 describe("업그레이드 설정 키", () => {
   it("리뷰·상권·키워드·광고 자료는 업그레이드", () => {
-    for (const k of ["export_reviews_v1", "export_meta_v1", "keyword_nav_v1", "keyword_volumes_v1", "ad_plan_v1", "ad_bids_v1", "place_keywords_v1", "review_reply_marks_v1", "market_manual_v1"]) {
+    for (const k of ["export_reviews_v1", "export_meta_v1", "keyword_nav_v1", "keyword_volumes_v1", "ad_plan_v1", "ad_bids_v1", "place_keywords_v1", "review_reply_marks_v1", "market_manual_v1", "cardsales_purchase_v1"]) {
       expect(isUpgradeSetting(k)).toBe(true);
     }
   });

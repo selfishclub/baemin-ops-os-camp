@@ -321,6 +321,7 @@ export const SETTING_LABEL: Record<string, string> = {
   ad_bids_v1: "키워드 예상 입찰가",
   place_keywords_v1: "대표 키워드 5칸 메모",
   market_manual_v1: "유동인구 옮겨 적기",
+  cardsales_purchase_v1: "여신협회 카드 지급예정 (정산 탭)",
 };
 export const settingLabel = (key: string) => SETTING_LABEL[key] ?? key;
 
