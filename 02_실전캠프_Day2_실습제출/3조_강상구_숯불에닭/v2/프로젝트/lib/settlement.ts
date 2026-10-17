@@ -193,6 +193,34 @@ export function settleChannel(
 
   splitSameDayDeposits(settlements, depositItemsByDate(txs, channel), floor, adj);
 
+  // 한 묶음이 두 번에 나눠 들어온 입금: 장부는 영업일(자정 넘어 받은 결제도 그날)로 적고, 카드사는 달력 날짜로 정산한다.
+  // 그래서 밤 12시를 넘겨 받은 결제는 하루 늦게 따로 들어온다 (2026-10-13 국민카드: 0시 0분 25초 결제 95,000원이 10/16에 따로).
+  // 입금이 모자란 묶음(차이·미입금) 바로 뒤 2영업일 안에, 다른 묶음의 입금일이 아니고 아직 아무 데도 안 붙은 입금이 있고,
+  // 그걸 더하면 "일치"가 되면 합친다. 한쪽이라도 안 맞으면 그냥 둔다.
+  const payoutDays = new Set(settlements.map((s) => s.payout));
+  for (let i = 0; i < settlements.length; i++) {
+    const a = settlements[i];
+    const short = a.status === "미입금" || (a.status === "차이" && a.deposit < a.sales);
+    if (!short || adj.has(a.payout)) continue;
+    const limit = addBusinessDays(a.payout, 2, holidays);
+    const late = [...deposits.entries()]
+      .filter(([d]) => d > a.payout && d <= limit && d <= lastBankDate && !used.has(d) && !payoutDays.has(d))
+      .sort((x, y) => x[0].localeCompare(y[0]))
+      .find(([, amt]) => judge(a.sales, a.deposit + amt, floor) === "일치");
+    if (!late) continue;
+    const [date, amt] = late;
+    const deposit = a.deposit + amt;
+    used.add(date);
+    settlements[i] = {
+      ...a,
+      deposit,
+      fee: a.sales - deposit,
+      feeRate: round1(((a.sales - deposit) / a.sales) * 100),
+      status: "일치",
+      note: a.deposit > 0 ? `나머지 ${amt.toLocaleString("ko-KR")}원이 ${date}에 따로 들어왔어요 (밤 12시 넘어 받은 결제는 카드사가 다음 날 것으로 쳐요)` : `${date}에 하루 늦게 들어왔어요`,
+    };
+  }
+
   const deposited = settlements.filter((s) => s.status === "일치" || s.status === "차이");
   const salesDeposited = deposited.reduce((a, s) => a + s.sales, 0);
   const refunds = [...adj.values()].reduce((a, x) => a + x.amount, 0);

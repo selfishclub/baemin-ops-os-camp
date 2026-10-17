@@ -21,6 +21,41 @@ describe("정산 주기 규칙", () => {
   });
 });
 
+describe("자정 넘은 결제가 하루 늦게 따로 들어올 때 (2026-10 국민카드 실제 숫자)", () => {
+  const kb: SettlementRule = { channel: "card_kb", mode: "days", days: 2, weekday: 0 };
+  // 10/13(화) 영업일 매출 197,000 = 13일 102,000 + 14일 0시 0분 25초 95,000. 카드사는 102,000분을 10/15, 95,000분을 10/16에 넣었다
+  const daily: DailySale[] = [
+    { date: "2026-10-13", channel: "card_kb", amount: 197_000 },
+    { date: "2026-10-15", channel: "card_kb", amount: 688_000 },
+  ];
+  const bank = [tx("2026-10-15", "card_kb", 101_080), { ...tx("2026-10-16", "card_kb", 94_050), id: "b16" }];
+
+  it("모자란 묶음에 다음 날 짝 없는 입금을 합쳐 일치로 본다", () => {
+    const r = settleChannel("card_kb", "2026-10", kb, daily, bank, "2026-10-16");
+    const s = r.settlements.find((x) => x.payout === "2026-10-15")!;
+    expect(s).toMatchObject({ deposit: 195_130, fee: 1_870, status: "일치" });
+    expect(s.note).toContain("2026-10-16");
+    expect(r.unmatchedDeposits).toEqual([]);
+    expect(r.feeRate).toBe(0.9);
+  });
+  it("다음 날이 다른 묶음의 입금일이면 가져오지 않는다", () => {
+    const d2 = [...daily, { date: "2026-10-14", channel: "card_kb", amount: 95_000 }];
+    const r = settleChannel("card_kb", "2026-10", kb, d2, bank, "2026-10-16");
+    expect(r.settlements.find((x) => x.payout === "2026-10-15")!.status).toBe("차이");
+    expect(r.settlements.find((x) => x.payout === "2026-10-16")!.status).toBe("일치");
+  });
+  it("합쳐도 안 맞으면 그냥 둔다", () => {
+    const r = settleChannel("card_kb", "2026-10", kb, daily, [tx("2026-10-15", "card_kb", 101_080), { ...tx("2026-10-16", "card_kb", 20_000), id: "b16" }], "2026-10-16");
+    expect(r.settlements.find((x) => x.payout === "2026-10-15")!.status).toBe("차이");
+    expect(r.unmatchedDeposits).toEqual([{ date: "2026-10-16", amount: 20_000 }]);
+  });
+  it("통째로 하루 늦게 들어온 묶음도 일치", () => {
+    const r = settleChannel("card_kb", "2026-10", kb, [{ date: "2026-10-13", channel: "card_kb", amount: 100_000 }], [tx("2026-10-16", "card_kb", 99_100)], "2026-10-16");
+    expect(r.settlements[0]).toMatchObject({ payout: "2026-10-15", deposit: 99_100, status: "일치" });
+    expect(r.missing).toBe(0);
+  });
+});
+
 describe("입금 짝 맞추기", () => {
   const card: SettlementRule = { channel: "hall_card", mode: "days", days: 2, weekday: 0 };
   const daily: DailySale[] = [
