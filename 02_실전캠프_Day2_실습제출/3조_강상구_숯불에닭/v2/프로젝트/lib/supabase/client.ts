@@ -21,8 +21,8 @@ export function friendlyAuthError(message: string): string {
   const m = message.toLowerCase();
   if (m.includes("rate limit") || m.includes("only request this after")) return "메일을 너무 자주 보냈어요. 1분쯤 뒤에 다시 눌러 주세요. (먼저 온 메일이 있으면 그걸 쓰면 돼요)";
   if (m.includes("invalid") && m.includes("email")) return "이메일 주소 모양이 아니에요. 다시 확인해 주세요.";
-  if (m.includes("token has expired") || m.includes("otp_expired") || m.includes("expired")) return "로그인 링크(숫자)가 만료됐어요. 메일을 다시 보내 주세요.";
-  if (m.includes("token") || m.includes("otp")) return "숫자가 맞지 않아요. 메일에 적힌 6자리를 다시 확인해 주세요.";
+  if (m.includes("token has expired") || m.includes("otp_expired") || m.includes("expired") || m.includes("invalid")) return "로그인 링크가 만료됐거나 이미 쓴 링크예요. 링크는 한 번만 쓸 수 있어요. 메일을 다시 보내 주세요.";
+  if (m.includes("token") || m.includes("otp")) return "로그인 링크가 맞지 않아요. 가장 최근에 온 메일의 링크를 써 주세요.";
   if (m.includes("signups not allowed")) return "이 저장소는 새 가입을 막아 뒀어요. 관리자(장부 만든 사람)에게 이메일을 알려 주세요.";
   if (m.includes("fetch") || m.includes("network")) return "인터넷 연결이 안 돼요. 와이파이·데이터를 확인해 주세요.";
   return `로그인에 실패했어요 (${message})`;
@@ -37,9 +37,34 @@ export async function sendLoginEmail(email: string): Promise<void> {
   if (error) throw new Error(friendlyAuthError(error.message));
 }
 
-/** 메일에 적힌 6자리 숫자로 로그인 — 아이폰 홈 화면 앱처럼 링크가 다른 브라우저에서 열리는 경우용 */
+/** 메일에 적힌 6자리 숫자로 로그인 — 메일 문구에 숫자를 넣었을 때만 쓴다 (기본 메일에는 링크만 있다) */
 export async function verifyLoginCode(email: string, code: string): Promise<void> {
   const { error } = await getSupabase().auth.verifyOtp({ email: email.trim(), token: code.replace(/\D/g, ""), type: "email" });
+  if (error) throw new Error(friendlyAuthError(error.message));
+}
+
+/**
+ * 메일의 로그인 링크 주소에서 열쇠(token)와 종류(type)를 꺼낸다.
+ * 링크 모양: https://<프로젝트>.supabase.co/auth/v1/verify?token=…&type=magiclink&redirect_to=…
+ */
+export function parseLoginLink(text: string): { tokenHash: string; type: "magiclink" | "signup" } | null {
+  const m = text.trim().match(/https?:\/\/\S+/);
+  if (!m) return null;
+  try {
+    const u = new URL(m[0]);
+    const tokenHash = u.searchParams.get("token") ?? u.searchParams.get("token_hash");
+    if (!tokenHash) return null;
+    return { tokenHash, type: u.searchParams.get("type") === "signup" ? "signup" : "magiclink" };
+  } catch {
+    return null;
+  }
+}
+
+/** 메일 링크를 누르지 않고 복사해 붙여 넣어 로그인 — 아이폰 홈 화면 앱처럼 링크가 다른 창(사파리)에서 열리는 경우용 */
+export async function loginWithPastedLink(text: string): Promise<void> {
+  const p = parseLoginLink(text);
+  if (!p) throw new Error("로그인 링크 주소가 아니에요. 메일의 '로그인' 링크를 길게 눌러 '링크 복사'한 뒤 붙여 넣어 주세요.");
+  const { error } = await getSupabase().auth.verifyOtp({ token_hash: p.tokenHash, type: p.type });
   if (error) throw new Error(friendlyAuthError(error.message));
 }
 

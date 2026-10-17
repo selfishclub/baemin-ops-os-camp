@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Notice } from "@/components/ui";
-import { sendLoginEmail, verifyLoginCode } from "@/lib/supabase/client";
+import { loginWithPastedLink, sendLoginEmail } from "@/lib/supabase/client";
 
-// 인터넷 모드 로그인 화면 — 비밀번호 없이 이메일 링크(또는 메일에 적힌 6자리 숫자)로 들어온다.
+// 인터넷 모드 로그인 화면 — 비밀번호 없이 이메일 링크로 들어온다.
 //  1 이메일 넣고 "로그인 메일 보내기" → 2 메일의 링크를 누르면 끝.
-//  아이폰 홈 화면 앱처럼 링크가 다른 창에서 열리는 경우엔 메일에 적힌 6자리 숫자를 여기 넣는다.
+//  아이폰 홈 화면 앱처럼 링크가 다른 창(사파리)에서 열리는 경우엔, 링크를 누르지 말고 길게 눌러 복사해 여기 붙여 넣는다.
+//  (Supabase 기본 메일에는 6자리 숫자가 없다 — 문구를 바꾸려면 메일 서버를 따로 붙여야 해서 링크 붙여넣기로 대신한다)
 //  가게마다 이메일 하나. 처음 보는 이메일이면 그 자리에서 가게(계정)가 새로 생긴다.
 const LAST_EMAIL_KEY = "sootdak-ledger-login-email";
 
@@ -45,11 +46,11 @@ export default function LoginScreen() {
   }
 
   async function verify() {
-    if (busy || code.replace(/\D/g, "").length < 6) return;
+    if (busy || !code.trim()) return;
     setBusy(true);
     setMsg(null);
     try {
-      await verifyLoginCode(email, code);
+      await loginWithPastedLink(code);
       // 로그인되면 AppShell 이 알아차려 장부를 띄운다
     } catch (e) {
       setMsg({ tone: "error", text: e instanceof Error ? e.message : String(e) });
@@ -102,7 +103,7 @@ export default function LoginScreen() {
           </p>
           <div className="rounded-xl bg-stone-50 p-3">
             <p className="text-xs text-stone-600">
-              링크가 다른 창에서 열려서 여기가 그대로라면(아이폰 홈 화면 앱 등), 메일에 적힌 <b>6자리 숫자</b>를 넣어 주세요.
+              <b>아이폰 홈 화면 앱</b>에서는 링크를 누르면 사파리가 열려서 여기는 그대로예요. 그럴 땐 메일의 링크를 <b>누르지 말고 길게 눌러 "링크 복사"</b>한 뒤 아래에 붙여 넣으세요. (링크는 한 번만 쓸 수 있어요)
             </p>
             <form
               className="mt-2 flex gap-2"
@@ -112,18 +113,17 @@ export default function LoginScreen() {
               }}
             >
               <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                className="field num flex-1 text-center tracking-widest"
-                placeholder="6자리 숫자"
-                maxLength={8}
+                type="url"
+                inputMode="url"
+                autoComplete="off"
+                className="field flex-1"
+                placeholder="메일 링크 붙여넣기"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                aria-label="메일에 적힌 6자리 숫자"
+                aria-label="메일의 로그인 링크"
               />
-              <button type="submit" className="btn-primary" disabled={busy || code.replace(/\D/g, "").length < 6}>
-                {busy ? "확인 중…" : "숫자로 로그인"}
+              <button type="submit" className="btn-primary" disabled={busy || !code.trim()}>
+                {busy ? "확인 중…" : "링크로 로그인"}
               </button>
             </form>
           </div>
