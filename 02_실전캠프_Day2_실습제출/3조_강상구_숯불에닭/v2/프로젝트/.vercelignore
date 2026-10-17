@@ -1,0 +1,5 @@
+# Vercel 에 올리지 않을 것 — 열쇠·백업·로컬 전용 자료
+.env*
+*backup*.json
+data/
+tsconfig.tsbuildinfo
