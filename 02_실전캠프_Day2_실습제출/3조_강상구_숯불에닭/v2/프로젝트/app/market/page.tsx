@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ExportStatusLine } from "@/components/ExportUploadCard";
 import { SourceTag } from "@/components/SourceTag";
 import { AreaDetail } from "@/components/AreaDetail";
+import { MarketInsightCard } from "@/components/MarketInsightCard";
 import { MarketManualCard } from "@/components/MarketManualCard";
 import { MarketYearTrend } from "@/components/MarketYearTrend";
 import { RankCheckCard } from "@/components/RankCheckCard";
@@ -42,6 +43,8 @@ export default function MarketPage() {
   const [ahead, setAhead] = useState<1 | 2>(1);
   const [addedTrack, setAddedTrack] = useState<string[]>([]);
   const [areaDetail, setAreaDetail] = useState(false);
+  // 보고서를 새로 넣으면 옮겨 적기·해마다 견줘 보기를 다시 읽게 한다
+  const [reportVer, setReportVer] = useState(0);
 
   useEffect(() => {
     // 처음엔 순위가 있는 키워드부터 (50위 밖만 있으면 첫 것)
@@ -331,9 +334,11 @@ export default function MarketPage() {
         )}
       </section>
 
-      <MarketManualCard today={today} />
+      <MarketInsightCard onSaved={() => setReportVer((v) => v + 1)} />
 
-      <MarketYearTrend />
+      <MarketManualCard key={`manual-${reportVer}`} today={today} />
+
+      <MarketYearTrend key={`trend-${reportVer}`} />
 
       {/* 다음 달 미리 잡을 키워드 — 검색 흐름에서 그 달에 평소보다 많이 찾는 말 */}
       {market?.trend && (
