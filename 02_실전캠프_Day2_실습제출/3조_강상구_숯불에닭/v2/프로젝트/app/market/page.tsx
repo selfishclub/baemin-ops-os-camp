@@ -6,6 +6,7 @@ import { ExportStatusLine } from "@/components/ExportUploadCard";
 import { SourceTag } from "@/components/SourceTag";
 import { AreaDetail } from "@/components/AreaDetail";
 import { MarketManualCard } from "@/components/MarketManualCard";
+import { MarketYearTrend } from "@/components/MarketYearTrend";
 import { RankCheckCard } from "@/components/RankCheckCard";
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
@@ -331,6 +332,8 @@ export default function MarketPage() {
       </section>
 
       <MarketManualCard today={today} />
+
+      <MarketYearTrend />
 
       {/* 다음 달 미리 잡을 키워드 — 검색 흐름에서 그 달에 평소보다 많이 찾는 말 */}
       {market?.trend && (

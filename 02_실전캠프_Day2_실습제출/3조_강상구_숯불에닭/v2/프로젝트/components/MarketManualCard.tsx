@@ -18,6 +18,23 @@ export interface ManualEntry {
   note: string;
 }
 
+// 지난 달도 다 고를 수 있어야 한다. 이번 달만 띄우면 지난 달 숫자를 몰아 적을 수가 없고,
+// 작년 같은 달 비교도 작년 치가 들어가 있어야 나온다. (2026-10-19 사장님이 24년부터 넣기로 했다.)
+const START_MONTH = "2024-01";
+
+/** from 부터 to 까지 달 목록 ("2024-01" … "2026-10") */
+function monthsFrom(from: string, to: string): string[] {
+  const out: string[] = [];
+  let y = Number(from.slice(0, 4)), m = Number(from.slice(5));
+  for (let i = 0; i < 600; i++) {
+    const cur = `${y}-${String(m).padStart(2, "0")}`;
+    if (cur > to) break;
+    out.push(cur);
+    if (m === 12) { y += 1; m = 1; } else m += 1;
+  }
+  return out;
+}
+
 const emptyEntry = (month: string): ManualEntry => ({ month, footTraffic: null, areaSales: null, sameStores: null, note: "" });
 const prevYear = (m: string) => `${Number(m.slice(0, 4)) - 1}${m.slice(4)}`;
 const label = (m: string) => `${m.slice(0, 4)}년 ${Number(m.slice(5))}월`;
@@ -61,10 +78,7 @@ export function MarketManualCard({ today }: { today: string }) {
   // 작년 자료가 없으면(올해부터 적기 시작) 전달과 비교한다
   const cmp = lastYear ?? lastMonth;
   const cmpLabel = lastYear ? "작년" : "전달";
-  // 올해 1월부터 이번 달까지 다 고를 수 있어야 한다. 이번 달만 띄우면 지난 달 숫자를 몰아 적을 수가 없다
-  //  (2026-10-19 사장님이 올해 치를 넣으려는데 10월밖에 안 보였다.)
-  const yearStart = Array.from({ length: Number(thisMonth.slice(5)) }, (_, i) => `${thisMonth.slice(0, 4)}-${String(i + 1).padStart(2, "0")}`);
-  const months = [...new Set([...yearStart, thisMonth, ...entries.map((e) => e.month)])].sort().reverse();
+  const months = [...new Set([...monthsFrom(START_MONTH, thisMonth), thisMonth, ...entries.map((e) => e.month)])].sort().reverse();
 
   const save = (next: ManualEntry) => {
     const list = [...entries.filter((e) => e.month !== next.month), next].sort((a, b) => a.month.localeCompare(b.month));
