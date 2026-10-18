@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { Notice } from "@/components/ui";
 import { todayStr } from "@/lib/daily";
-import { HISTORY_KEY, historyByMonth, mergeHistory, parseOkposDaily, type HistoryDay } from "@/lib/history";
+import { HISTORY_KEY, historyByMonth, mergeHistory, parseDeliveryHistory, parseOkposDaily, type HistoryDay } from "@/lib/history";
 import { getStore } from "@/lib/storage";
 import { loadStoreProfile } from "@/lib/storeProfile";
 import { fetchPastWeather } from "@/lib/weather";
@@ -35,9 +35,18 @@ export function HistorySalesCard({ onSaved }: { onSaved?: () => void }) {
       const bad: string[] = [];
       let added = 0;
       for (const file of [...files]) {
-        const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-        const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" });
-        const got = parseOkposDaily(rows);
+        let got: HistoryDay[] | null;
+        if (/\.json$/i.test(file.name)) {
+          // 리뷰 수집기가 만든 배달 지난 매출 (배민·쿠팡 주문 수집을 날마다 합친 것)
+          try {
+            got = parseDeliveryHistory(JSON.parse(await file.text()));
+          } catch {
+            got = null;
+          }
+        } else {
+          const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+          got = parseOkposDaily(XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" }));
+        }
         if (!got) bad.push(file.name);
         else {
           all = mergeHistory(all, got);
@@ -46,7 +55,7 @@ export function HistorySalesCard({ onSaved }: { onSaved?: () => void }) {
       }
       await getStore().saveSetting(HISTORY_KEY, all);
       setDays(all);
-      setMsg({ tone: bad.length ? "error" : "ok", text: `${added}일치를 넣었어요.${bad.length ? ` 일별종합 파일이 아니라 못 읽은 것: ${bad.join(", ")}` : ""}` });
+      setMsg({ tone: bad.length ? "error" : "ok", text: `${added}일치를 넣었어요.${bad.length ? ` 일별종합·배달 파일이 아니라 못 읽은 것: ${bad.join(", ")}` : ""}` });
       onSaved?.();
     } catch (e) {
       setMsg({ tone: "error", text: `넣지 못했어요: ${e instanceof Error ? e.message : String(e)}` });
@@ -79,27 +88,28 @@ export function HistorySalesCard({ onSaved }: { onSaved?: () => void }) {
 
   if (!loaded) return null;
   const months = historyByMonth(days);
+  const delivDays = days.filter((d) => d.baemin !== undefined || d.coupang !== undefined).length;
 
   return (
     <section className="card space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-bold">
-          지난 매출 (참고용) <span className="text-xs font-normal text-stone-500">장부 쓰기 전 포스 매출 · 손익에는 안 들어가요</span>
+          지난 매출 (참고용) <span className="text-xs font-normal text-stone-500">장부 쓰기 전 포스·배달 매출 · 손익에는 안 들어가요</span>
         </h2>
         {days.length > 0 && (
           <span className="num text-xs text-stone-500">
-            {days[0].date} ~ {days[days.length - 1].date} · {months.size}개월 · 영업일 {[...months.values()].reduce((a, m) => a + m.days, 0)}일
+            {days[0].date} ~ {days[days.length - 1].date} · {months.size}개월 · 영업일 {[...months.values()].reduce((a, m) => a + m.days, 0)}일 · 배달 {delivDays ? `${delivDays}일치` : "아직 없음"}
           </span>
         )}
       </div>
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
       <p className="text-sm text-stone-600">
-        오케이포스 「일별종합」 엑셀을 올리면 위 「상권 읽어 주기」가 우리 가게 지난 겨울·요일·비 오는 날까지 길게 보고, 아래 「해마다 견줘 보기」의 우리 매출 칸이 채워져요. 포스에는 배달이 안 찍혀서 홀 매출만이에요.
+        오케이포스 「일별종합」 엑셀을 올리면 위 「상권 읽어 주기」가 우리 가게 지난 겨울·요일·비 오는 날까지 길게 보고, 아래 「해마다 견줘 보기」의 우리 매출 칸이 채워져요. 포스에는 배달이 안 찍혀서 배달은 리뷰 수집기가 만든 배달 파일(.json)로 따로 올려요.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <label className={`btn-primary cursor-pointer px-3 py-1.5 text-sm ${busy ? "pointer-events-none opacity-50" : ""}`}>
-          일별종합 엑셀 올리기 (여러 개 가능)
-          <input type="file" accept=".xls,.xlsx" multiple className="hidden" onChange={(e) => void addFiles(e.target.files).finally(() => (e.target.value = ""))} />
+          파일 올리기 — 포스 일별종합 · 배달 (여러 개 가능)
+          <input type="file" accept=".xls,.xlsx,.json" multiple className="hidden" onChange={(e) => void addFiles(e.target.files).finally(() => (e.target.value = ""))} />
         </label>
         {days.length > 0 && (
           <button type="button" className="btn-ghost px-3 py-1.5 text-sm" disabled={busy} onClick={() => void fillWeather()}>

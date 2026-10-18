@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { historyByMonth, mergeHistory, parseOkposDaily } from "./history";
+import { DELIVERY_FILE_KIND, historyByMonth, mergeHistory, parseDeliveryHistory, parseOkposDaily } from "./history";
 import { buildInsights, ownOutlook, withHistory, type DaySales } from "./market/insight";
 
 // 오케이포스 「일별종합」 엑셀 첫 시트를 header:1 로 읽은 모양 (2026-10-10~16 실제 파일과 같은 머리줄)
@@ -28,7 +28,7 @@ describe("지난 매출 (포스 일별종합)", () => {
     const a = [{ date: "2026-10-15", hall: 1, receipts: null, customers: null }];
     const b = [{ date: "2026-10-15", hall: 2, receipts: null, customers: null }, { date: "2026-10-14", hall: 3, receipts: null, customers: null }];
     expect(mergeHistory(a, b).map((d) => [d.date, d.hall])).toEqual([["2026-10-14", 3], ["2026-10-15", 2]]);
-    expect(historyByMonth(b).get("2026-10")).toEqual({ hall: 5, days: 2 });
+    expect(historyByMonth(b).get("2026-10")).toEqual({ total: 5, delivery: 0, days: 2 });
   });
 });
 
@@ -41,6 +41,27 @@ function year(from: string, to: string, perMonth: Record<string, number>): DaySa
   }
   return out;
 }
+
+describe("배달 지난 매출", () => {
+  const pos = [{ date: "2025-01-10", hall: 1_000_000, receipts: 12, customers: 20 }];
+  it("포스 홀 칸은 지키고 배달 칸만 더한다 — 순서가 바뀌어도", () => {
+    const deliv = parseDeliveryHistory({ kind: DELIVERY_FILE_KIND, days: [{ date: "2025-01-10", baemin: 80_000, coupang: 0 }, { date: "2025-01-11", baemin: 50_000 }, { date: "x" }] })!;
+    expect(deliv).toHaveLength(2);
+    const a = mergeHistory(pos, deliv);
+    const b = mergeHistory(deliv, pos);
+    expect(a.find((d) => d.date === "2025-01-10")).toEqual({ date: "2025-01-10", hall: 1_000_000, receipts: 12, customers: 20, baemin: 80_000, coupang: 0 });
+    expect(b.find((d) => d.date === "2025-01-10")).toEqual(a.find((d) => d.date === "2025-01-10"));
+    expect(historyByMonth(a).get("2025-01")).toEqual({ total: 1_130_000, delivery: 130_000, days: 2 });
+  });
+  it("쿠팡 파일을 나중에 올려도 배민 칸은 남는다", () => {
+    const withB = mergeHistory(pos, parseDeliveryHistory({ kind: DELIVERY_FILE_KIND, days: [{ date: "2025-01-10", baemin: 80_000 }] })!);
+    const withC = mergeHistory(withB, parseDeliveryHistory({ kind: DELIVERY_FILE_KIND, days: [{ date: "2025-01-10", coupang: 30_000 }] })!);
+    expect(withC[0]).toMatchObject({ hall: 1_000_000, baemin: 80_000, coupang: 30_000 });
+  });
+  it("배달 파일이 아니면 null", () => {
+    expect(parseDeliveryHistory({ days: [] })).toBeNull();
+  });
+});
 
 describe("우리 가게 지난 기록으로 앞으로 석 달", () => {
   const hist = year("2024-09-01", "2026-08-26", { "12": 1_100_000, "01": 1_000_000 }).map((d) => ({ date: d.date, hall: d.total, receipts: null, customers: null }));

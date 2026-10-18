@@ -17,7 +17,7 @@ const METRICS: { id: MetricId; name: string; unit: string; hint: string }[] = [
   { id: "footTraffic", name: "일평균 유동인구", unit: "명", hint: "동네에 사람이 얼마나 다니나 (업종과 상관없는 숫자)" },
   { id: "areaSales", name: "상권 월매출", unit: "원", hint: "같은 업종 가게 한 곳이 한 달에 파는 평균" },
   { id: "sameStores", name: "같은 업종 점포 수", unit: "곳", hint: "늘면 경쟁이 는 것" },
-  { id: "ourSales", name: "우리 매출", unit: "원", hint: "오늘 탭에 넣은 채널 합계 (그 달에 넣은 날까지만). 장부 쓰기 전 달은 지난 매출(포스 홀 매출, 배달 빠짐)" },
+  { id: "ourSales", name: "우리 매출", unit: "원", hint: "오늘 탭에 넣은 채널 합계 (그 달에 넣은 날까지만). 장부 쓰기 전 달은 지난 매출(포스 홀 + 받아 둔 배달)" },
 ];
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -49,7 +49,7 @@ export function MarketYearTrend() {
         days.set(k, (days.get(k) ?? new Set()).add(r.date));
       }
       // 장부에 반 달도 안 들어간 달(장부 시작 달 등)은 지난 매출이 있으면 그걸로
-      for (const [k, h] of historyByMonth(hist ?? [])) if ((days.get(k)?.size ?? 0) < 15) m.set(k, h.hall);
+      for (const [k, h] of historyByMonth(hist ?? [])) if ((days.get(k)?.size ?? 0) < 15) m.set(k, h.total);
       setOurByMonth(m);
     });
   }, []);

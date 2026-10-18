@@ -1,5 +1,5 @@
 import type { DailyWeather } from "@/lib/weather";
-import type { HistoryDay } from "@/lib/history";
+import { dayTotal, type HistoryDay } from "@/lib/history";
 import type { Shift } from "@/lib/types";
 import type { SbizReport } from "./sbizReport";
 
@@ -164,10 +164,10 @@ export function monthPace(report: SbizReport | null, days: DaySales[], today: st
   return { thisPerDay, lastPerDay, ours: round1(((thisPerDay - lastPerDay) / lastPerDay) * 100), area, days: cur.length };
 }
 
-/** 장부 매출 + 장부 쓰기 전 지난 매출(포스 홀). 같은 날은 장부가 먼저 */
+/** 장부 매출 + 장부 쓰기 전 지난 매출(포스 홀 + 받아 둔 배달). 같은 날은 장부가 먼저 */
 export function withHistory(days: DaySales[], history: HistoryDay[]): DaySales[] {
   const have = new Set(days.map((d) => d.date));
-  return [...days, ...history.filter((h) => !have.has(h.date)).map((h) => ({ date: h.date, total: h.hall }))].sort((a, b) => a.date.localeCompare(b.date));
+  return [...days, ...history.filter((h) => !have.has(h.date)).map((h) => ({ date: h.date, total: dayTotal(h) }))].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export interface OwnMonth {
@@ -241,7 +241,7 @@ export function buildInsights(report: SbizReport | null, allDays: DaySales[], we
       id: "ownSeason",
       tone: weak.length ? "warn" : "info",
       title: weak.length ? `우리 가게는 ${weak.map((o) => `${o.month}월`).join("·")}에 약했어요` : "앞으로 석 달은 우리 가게 평소만큼 나왔어요",
-      detail: `${own.map((o) => `${o.year % 100}년 ${o.month}월 하루 ${man(o.perDay)} (${o.vsAvg > 0 ? "+" : ""}${o.vsAvg}%)`).join(" · ")} — 우리 1년 평균 대비. 장부 전 달은 포스 홀 매출이라 배달이 빠져 있어요.${taxes.length ? ` 그리고 ${taxes.join(", ")}.` : ""}`,
+      detail: `${own.map((o) => `${o.year % 100}년 ${o.month}월 하루 ${man(o.perDay)} (${o.vsAvg > 0 ? "+" : ""}${o.vsAvg}%)`).join(" · ")} — 우리 1년 평균 대비. 장부 전 달은 지난 매출(포스 홀${history.some((h) => h.baemin !== undefined || h.coupang !== undefined) ? " + 배달" : "만, 배달 빠짐"}).${taxes.length ? ` 그리고 ${taxes.join(", ")}.` : ""}`,
       todo: weak.length ? "약한 달에 맞춰 일할 사람·재료 주문을 줄이고, 한 달 전부터 예약·행사를 미리 알리세요." : undefined,
     });
   }
