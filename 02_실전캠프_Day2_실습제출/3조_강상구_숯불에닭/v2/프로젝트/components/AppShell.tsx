@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { AutoExportSync } from "@/components/AutoExportSync";
+import { CollectStatusBanner } from "@/components/CollectStatusBanner";
 import { monthLabel, nextMonth, prevMonth } from "@/lib/month";
 import { storageMode } from "@/lib/storage";
 import { isBasic } from "@/lib/edition";
@@ -221,6 +222,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
         {/* 리뷰 수집기 도우미와의 자동 연결은 전체판(사장님 PC)에서만 */}
         {!basic && <AutoExportSync />}
+        {!basic && <CollectStatusBanner />}
 
         <main className="mx-auto w-full max-w-3xl flex-1 space-y-4 px-4 pb-10 pt-4">
           {/* 장부를 읽을 수 없으면 화면을 띄우지 않는다 — 어떤 화면도 빈 장부를 보고 저장하지 못하게 */}
