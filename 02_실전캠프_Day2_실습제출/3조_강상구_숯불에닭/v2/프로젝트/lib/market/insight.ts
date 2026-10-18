@@ -1,4 +1,5 @@
 import type { DailyWeather } from "@/lib/weather";
+import type { HistoryDay } from "@/lib/history";
 import type { Shift } from "@/lib/types";
 import type { SbizReport } from "./sbizReport";
 
@@ -163,6 +164,39 @@ export function monthPace(report: SbizReport | null, days: DaySales[], today: st
   return { thisPerDay, lastPerDay, ours: round1(((thisPerDay - lastPerDay) / lastPerDay) * 100), area, days: cur.length };
 }
 
+/** 장부 매출 + 장부 쓰기 전 지난 매출(포스 홀). 같은 날은 장부가 먼저 */
+export function withHistory(days: DaySales[], history: HistoryDay[]): DaySales[] {
+  const have = new Set(days.map((d) => d.date));
+  return [...days, ...history.filter((h) => !have.has(h.date)).map((h) => ({ date: h.date, total: h.hall }))].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export interface OwnMonth {
+  month: number; // 1~12
+  year: number; // 어느 해 기록인가
+  perDay: number; // 영업일 하루 평균 (원)
+  vsAvg: number; // 우리 1년 평균 대비 %
+}
+
+/** 우리 가게 지난 기록으로 앞으로 석 달 — 같은 달의 가장 최근 해(영업일 15일 이상), 1년 평균은 최근 12개월 */
+export function ownOutlook(days: DaySales[], today: string, ahead = 3): OwnMonth[] {
+  const by = new Map<string, number[]>();
+  for (const d of days) {
+    const k = d.date.slice(0, 7);
+    if (k >= today.slice(0, 7)) continue; // 이번 달은 아직 덜 찼다
+    by.set(k, [...(by.get(k) ?? []), d.total]);
+  }
+  const full = [...by].filter(([, v]) => v.length >= 15).map(([k, v]) => ({ k, perDay: avg(v) })).sort((a, b) => a.k.localeCompare(b.k));
+  if (full.length < 6) return [];
+  const mean = avg(full.slice(-12).map((x) => x.perDay));
+  const out: OwnMonth[] = [];
+  for (let i = 1; i <= ahead; i++) {
+    const mo = addMonths(today.slice(0, 7), i).slice(5, 7);
+    const hit = [...full].reverse().find((x) => x.k.slice(5, 7) === mo);
+    if (hit) out.push({ month: Number(mo), year: Number(hit.k.slice(0, 4)), perDay: hit.perDay, vsAvg: round1(((hit.perDay - mean) / mean) * 100) });
+  }
+  return out;
+}
+
 /** 보고서가 몇 달 지났나 (장부에 넣은 날 기준) */
 export function reportAgeDays(report: SbizReport, today: string): number {
   return Math.floor((Date.parse(today) - Date.parse(report.savedAt)) / 86_400_000);
@@ -170,8 +204,10 @@ export function reportAgeDays(report: SbizReport, today: string): number {
 
 const man = (won: number) => `${Math.round(won / 10000).toLocaleString("ko-KR")}만원`;
 
-export function buildInsights(report: SbizReport | null, allDays: DaySales[], weather: DailyWeather[], shifts: Shift[], today: string): Insight[] {
+export function buildInsights(report: SbizReport | null, allDays: DaySales[], weather: DailyWeather[], shifts: Shift[], today: string, history: HistoryDay[] = []): Insight[] {
   const days = openDays(allDays, today);
+  // 요일·날씨·계절은 지난 매출까지 넣어 길게 본다 (이번 달 흐름·크기 비교는 장부만)
+  const longDays = openDays(withHistory(allDays, history), today);
   const out: Insight[] = [];
 
   // 1. 이번 달 흐름 — 가장 먼저 봐야 할 경고
@@ -196,6 +232,20 @@ export function buildInsights(report: SbizReport | null, allDays: DaySales[], we
     }
   }
 
+  // 우리 가게 지난 기록으로 본 앞으로 석 달 — 지난 매출이 있어야 나온다
+  const own = ownOutlook(longDays, today);
+  if (own.length) {
+    const weak = own.filter((o) => o.vsAvg <= -5);
+    const taxes = own.map((o) => TAX[o.month]).filter(Boolean);
+    out.push({
+      id: "ownSeason",
+      tone: weak.length ? "warn" : "info",
+      title: weak.length ? `우리 가게는 ${weak.map((o) => `${o.month}월`).join("·")}에 약했어요` : "앞으로 석 달은 우리 가게 평소만큼 나왔어요",
+      detail: `${own.map((o) => `${o.year % 100}년 ${o.month}월 하루 ${man(o.perDay)} (${o.vsAvg > 0 ? "+" : ""}${o.vsAvg}%)`).join(" · ")} — 우리 1년 평균 대비. 장부 전 달은 포스 홀 매출이라 배달이 빠져 있어요.${taxes.length ? ` 그리고 ${taxes.join(", ")}.` : ""}`,
+      todo: weak.length ? "약한 달에 맞춰 일할 사람·재료 주문을 줄이고, 한 달 전부터 예약·행사를 미리 알리세요." : undefined,
+    });
+  }
+
   if (!report) return out;
 
   // 2. 동네와 견준 우리 크기
@@ -218,7 +268,7 @@ export function buildInsights(report: SbizReport | null, allDays: DaySales[], we
   }
 
   // 3. 요일
-  const wk = weekdayCompare(report, days);
+  const wk = weekdayCompare(report, longDays);
   if (wk) {
     const weak = [...wk].sort((a, b) => a.gap - b.gap)[0];
     const strong = [...wk].sort((a, b) => b.gap - a.gap)[0];
@@ -237,7 +287,7 @@ export function buildInsights(report: SbizReport | null, allDays: DaySales[], we
   }
 
   // 4. 비 오는 날
-  const rg = rainGap(days, weather);
+  const rg = rainGap(longDays, weather);
   if (rg && rg.pct <= -10) {
     out.push({
       id: "rain",

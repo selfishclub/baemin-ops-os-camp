@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Notice } from "@/components/ui";
 import { MARKET_MANUAL_KEY, type ManualEntry } from "@/components/MarketManualCard";
 import { todayStr } from "@/lib/daily";
-import { buildInsights, openDays, reportAgeDays, weekdayCompare, type DaySales, type Insight } from "@/lib/market/insight";
+import { HISTORY_KEY, type HistoryDay } from "@/lib/history";
+import { buildInsights, openDays, reportAgeDays, weekdayCompare, withHistory, type DaySales, type Insight } from "@/lib/market/insight";
 import { MARKET_REPORT_KEY, parseSbizReport, type SbizReport } from "@/lib/market/sbizReport";
 import { getStore } from "@/lib/storage";
 import type { DailyWeather } from "@/lib/weather";
@@ -43,6 +44,7 @@ export function MarketInsightCard({ onSaved }: { onSaved?: () => void }) {
   const [days, setDays] = useState<DaySales[]>([]);
   const [weather, setWeather] = useState<DailyWeather[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [history, setHistory] = useState<HistoryDay[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [paste, setPaste] = useState("");
@@ -50,19 +52,20 @@ export function MarketInsightCard({ onSaved }: { onSaved?: () => void }) {
 
   useEffect(() => {
     const store = getStore();
-    void Promise.all([store.getSetting<SbizReport>(MARKET_REPORT_KEY), store.listAllDailySales(), store.listWeather("2000-01-01", "2100-01-01"), store.listAllShifts()]).then(([r, sales, w, sh]) => {
+    void Promise.all([store.getSetting<SbizReport>(MARKET_REPORT_KEY), store.listAllDailySales(), store.listWeather("2000-01-01", "2100-01-01"), store.listAllShifts(), store.getSetting<HistoryDay[]>(HISTORY_KEY)]).then(([r, sales, w, sh, hist]) => {
       const by = new Map<string, number>();
       for (const s of sales) by.set(s.date, (by.get(s.date) ?? 0) + s.amount);
       setReport(r ?? null);
       setDays([...by].map(([date, total]) => ({ date, total })).sort((a, b) => a.date.localeCompare(b.date)));
       setWeather(w);
       setShifts(sh);
+      setHistory(hist ?? []);
       setLoaded(true);
     });
   }, []);
 
-  const insights = useMemo(() => buildInsights(report, days, weather, shifts, today), [report, days, weather, shifts, today]);
-  const weekday = useMemo(() => (report ? weekdayCompare(report, openDays(days, today)) : null), [report, days, today]);
+  const insights = useMemo(() => buildInsights(report, days, weather, shifts, today, history), [report, days, weather, shifts, today, history]);
+  const weekday = useMemo(() => (report ? weekdayCompare(report, openDays(withHistory(days, history), today)) : null), [report, days, history, today]);
 
   const savePaste = async () => {
     const r = parseSbizReport(paste, today);

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ExportStatusLine } from "@/components/ExportUploadCard";
 import { SourceTag } from "@/components/SourceTag";
 import { AreaDetail } from "@/components/AreaDetail";
+import { HistorySalesCard } from "@/components/HistorySalesCard";
 import { MarketInsightCard } from "@/components/MarketInsightCard";
 import { MarketManualCard } from "@/components/MarketManualCard";
 import { MarketYearTrend } from "@/components/MarketYearTrend";
@@ -334,7 +335,9 @@ export default function MarketPage() {
         )}
       </section>
 
-      <MarketInsightCard onSaved={() => setReportVer((v) => v + 1)} />
+      <MarketInsightCard key={`insight-${reportVer}`} onSaved={() => setReportVer((v) => v + 1)} />
+
+      <HistorySalesCard onSaved={() => setReportVer((v) => v + 1)} />
 
       <MarketManualCard key={`manual-${reportVer}`} today={today} />
 
