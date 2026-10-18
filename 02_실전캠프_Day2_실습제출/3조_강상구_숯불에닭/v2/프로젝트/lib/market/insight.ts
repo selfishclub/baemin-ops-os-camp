@@ -294,7 +294,8 @@ export function buildInsights(report: SbizReport | null, allDays: DaySales[], we
       tone: "warn",
       title: `비·눈 오는 날 매출이 ${Math.abs(rg.pct)}% 줄어요`,
       detail: `비·눈 온 날 ${rg.rainDays}일 평균 ${man(rg.rainAvg)} · 안 온 날 ${rg.dryDays}일 평균 ${man(rg.dryAvg)}.`,
-      todo: "비 예보가 있는 날은 오후에 배달 쪽 알림(배달 앱 할인·Threads 날씨 글)을 미리 올려 보세요. 돈이 드는 광고는 정하고 켜세요.",
+      // 2년 기록(2024-09~2026-08)에서 비 온 날 배민 주문은 늘지 않았다 — 배달을 미는 것보다 준비량을 맞추는 쪽
+      todo: "비 예보가 있는 날은 재료·일할 사람을 조금 줄여 잡으세요. 우리 가게는 비 와도 배달이 늘지 않았어요(2년 기록) — 배달 할인은 한두 번 시험해 보고 정하세요.",
     });
   }
 
