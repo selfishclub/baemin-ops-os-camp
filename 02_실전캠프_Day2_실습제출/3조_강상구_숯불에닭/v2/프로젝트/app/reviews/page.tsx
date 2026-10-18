@@ -8,7 +8,7 @@ import { MarketingIdeasCard, MonthlyReportCard } from "@/components/ReviewMonthl
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
 import type { ExportReview } from "@/lib/export/types";
-import { PLATFORM_NAME, dayOf, replyDaysLeft, reviewStats, type FirstKind, type PeriodStats } from "@/lib/reviews/stats";
+import { PLATFORM_NAME, canReply, dayOf, isReplyUnavailable, replyDaysLeft, reviewStats, type FirstKind, type PeriodStats } from "@/lib/reviews/stats";
 import { todayStr } from "@/lib/daily";
 import { num, pctText } from "@/lib/format";
 
@@ -63,7 +63,7 @@ export default function ReviewsPage() {
               <span className="text-xs text-stone-500">답글을 달 수 있는 리뷰만</span>
             </div>
             {stats.first.length === 0 ? (
-              <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">먼저 볼 리뷰가 없어요. 다 답했어요 👍</p>
+              <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">지금 답글을 달 수 있는 미답변 리뷰가 없어요 👍</p>
             ) : (
               <ul className="space-y-1.5">
                 {stats.first.map((f) => (
@@ -96,8 +96,9 @@ export default function ReviewsPage() {
                     <th className="py-1">플랫폼</th>
                     <th className="text-right">리뷰</th>
                     <th className="text-right">답글</th>
-                    <th className="text-right">미답변</th>
-                    <th className="text-right">답변률</th>
+                    <th className="text-right">답글 대기</th>
+                    <th className="text-right">작성 불가</th>
+                    <th className="text-right">전체 답변률</th>
                     <th className="text-right">평균 별점</th>
                     <th className="text-right">답글까지</th>
                   </tr>
@@ -108,11 +109,9 @@ export default function ReviewsPage() {
                       <td className="py-1.5 font-semibold">{p.name}</td>
                       <td className="text-right">{num(p.total)}</td>
                       <td className="text-right">{num(p.answered)}</td>
-                      <td className="text-right">
-                        {num(p.unanswered)}
-                        {p.unansweredOpen !== p.unanswered && <span className="ml-1 text-xs text-stone-400">(달 수 있는 {p.unansweredOpen})</span>}
-                      </td>
-                      <td className={`text-right font-bold ${(p.answerRate ?? 0) < 80 ? "text-red-700" : ""}`}>{pctText(p.answerRate)}</td>
+                      <td className="text-right">{num(p.unanswered)}</td>
+                      <td className="text-right text-stone-500">{num(p.replyUnavailable)}</td>
+                      <td className={`text-right font-bold ${p.unanswered > 0 && (p.answerRate ?? 0) < 80 ? "text-red-700" : ""}`}>{pctText(p.answerRate)}</td>
                       <td className="text-right">{p.avgRating === null ? "–" : p.avgRating.toFixed(2)}</td>
                       <td className="text-right">{p.medianReplyHours === null ? "–" : hoursText(p.medianReplyHours)}</td>
                     </tr>
@@ -120,7 +119,7 @@ export default function ReviewsPage() {
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-stone-500">답글까지는 답한 리뷰들의 중앙값이에요. 배민·쿠팡이츠는 30일이 지나면 답글을 달 수 없어서 "달 수 있는" 수를 따로 적었어요.</p>
+            <p className="text-xs text-stone-500">답글 대기는 지금 작성할 수 있는 미답변만 셉니다. 배민·쿠팡이츠의 30일이 지난 미답변은 작성 불가로 따로 보관해요. 전체 답변률은 과거 기록을 포함한 실제 답변 비율이고, 답글까지는 답한 리뷰들의 중앙값이에요.</p>
           </section>
 
           {/* 별점 · 요일 */}
@@ -162,10 +161,20 @@ export default function ReviewsPage() {
             </section>
           )}
 
+          {stats.unavailableList.length > 0 && (
+            <details className="card space-y-2">
+              <summary className="cursor-pointer text-sm font-bold text-stone-600">작성 불가 · 답글 기간 만료 {num(stats.unavailableList.length)}건</summary>
+              <p className="text-xs text-stone-500">작성 기간이 지난 미답변입니다. 답변 완료로 바꾸지 않고 기록만 보관하며, 할 일과 답글 초안 생성 대상에서 제외해요.</p>
+              <ul className="space-y-2">
+                {stats.unavailableList.map((r) => <ReviewRow key={`expired-${r.platform}-${r.id}`} r={r} today={today} />)}
+              </ul>
+            </details>
+          )}
+
           {/* 미답변 목록 */}
           <section className="card space-y-2">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-base font-bold">미답변 리뷰 <span className="num text-xs font-normal text-stone-500">{stats.unansweredList.length}건 · 최근 것부터</span></h2>
+              <h2 className="text-base font-bold">답글 대기 리뷰 <span className="num text-xs font-normal text-stone-500">{stats.unansweredList.length}건 · 최근 것부터</span></h2>
               <div className="flex gap-1">
                 {["all", "naver", "baemin", "coupang"].map((p) => (
                   <button key={p} className={`rounded-full px-2.5 py-1 text-xs font-semibold ${listPlatform === p ? "bg-orange-600 text-white" : "bg-stone-100 text-stone-600"}`} onClick={() => setListPlatform(p)}>
@@ -247,7 +256,8 @@ function Bars({ rows, horizontal = true }: { rows: { label: string; value: numbe
 
 function ReviewRow({ r, today }: { r: ExportReview; today: string }) {
   const left = replyDaysLeft(r, today);
-  const isUnansweredRow = !r.reply; // 초안이 없어도 미답변이면 직접 쓸 수 있게
+  const unavailable = isReplyUnavailable(r, today);
+  const editable = canReply(r, today);
   return (
     <li className="rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-stone-200">
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -256,11 +266,12 @@ function ReviewRow({ r, today }: { r: ExportReview; today: string }) {
         {r.rating !== null && <span className="text-amber-600">{"★".repeat(Math.round(r.rating))}</span>}
         <span className="num text-stone-400">{dayOf(r.date)}</span>
         {r.menu && <span className="truncate text-stone-500">· {r.menu}</span>}
-        {left !== null && left >= 0 && <span className={`num ml-auto rounded px-1.5 py-0.5 ${left <= 5 ? "bg-red-50 text-red-700" : "bg-stone-100 text-stone-600"}`}>답글 {left}일 남음</span>}
+        {unavailable && <span className="ml-auto rounded bg-stone-100 px-1.5 py-0.5 text-stone-500">작성 불가 · 기간 만료</span>}
+        {editable && left !== null && left >= 0 && <span className={`num ml-auto rounded px-1.5 py-0.5 ${left <= 5 ? "bg-red-50 text-red-700" : "bg-stone-100 text-stone-600"}`}>답글 {left}일 남음</span>}
       </div>
       <p className="mt-1 whitespace-pre-wrap text-stone-800">{r.content}</p>
       {/* 답글 쓰기·확정·답글칸 채우기 — 등록은 사장님이 플랫폼에서 */}
-      {(r.draft || isUnansweredRow) && <ReplyEditor key={`${r.platform}-${r.id}-${r.draft?.status ?? ""}`} review={r} />}
+      {editable && <ReplyEditor key={`${r.platform}-${r.id}-${r.draft?.status ?? ""}`} review={r} />}
     </li>
   );
 }

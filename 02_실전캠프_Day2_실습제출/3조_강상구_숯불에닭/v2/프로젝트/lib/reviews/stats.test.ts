@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { monthReviewSummary, reviewStats, weekStart } from "./stats";
+import { canReply, isReplyUnavailable, monthReviewSummary, reviewStats, weekStart } from "./stats";
 import type { ExportReview } from "../export/types";
 
 const r = (o: Partial<ExportReview> & { id: string; date: string }): ExportReview => ({
@@ -54,7 +54,9 @@ describe("리뷰 통계", () => {
     expect(naver.answerRate).toBe(25);
     expect(naver.medianReplyHours).toBe(10);
     const coupang = s.platforms.find((p) => p.platform === "coupang")!;
-    expect(coupang.unanswered).toBe(1);
+    expect(coupang.unanswered).toBe(0);
+    expect(coupang.replyUnavailable).toBe(1);
+    expect(s.unavailableList.map((x) => x.id)).toEqual(["5"]);
     expect(coupang.unansweredOpen).toBe(0); // 기간 지남
   });
 
@@ -72,6 +74,31 @@ describe("리뷰 통계", () => {
   });
 
   it("이 달 요약", () => {
-    expect(monthReviewSummary(reviews, "2026-10")).toEqual({ count: 4, unanswered: 3, complaints: 1, avgRating: 3.67 });
+    expect(monthReviewSummary(reviews, "2026-10", TODAY)).toEqual({ count: 4, unanswered: 3, replyUnavailable: 0, complaints: 1, avgRating: 3.67 });
+  });
+});
+
+
+describe("기간이 지난 미답변은 작성 불가로 보관", () => {
+  it.each(["baemin", "coupang"] as const)("%s는 30일까지 대기, 31일부터 작성 불가", (platform) => {
+    const boundary = r({ id: "boundary", platform, date: "2026-09-15T12:00:00Z" });
+    const expired = r({ id: "expired", platform, date: "2026-09-14T12:00:00Z" });
+    expect(canReply(boundary, TODAY)).toBe(true);
+    expect(isReplyUnavailable(expired, TODAY)).toBe(true);
+    const stats = reviewStats([boundary, expired], TODAY);
+    expect(stats.unansweredList.map((x) => x.id)).toEqual(["boundary"]);
+    expect(stats.platforms[0]).toMatchObject({ total: 2, answered: 0, unanswered: 1, replyUnavailable: 1 });
+    expect(stats.first.flatMap((x) => x.reviews).some((x) => x.id === "expired")).toBe(false);
+    expect(monthReviewSummary([expired], "2026-09", TODAY)).toMatchObject({ unanswered: 0, replyUnavailable: 1 });
+    expect(expired.reply).toBeNull();
+  });
+  it("네이버의 오래된 리뷰와 날짜가 불명확한 리뷰를 기간 만료로 단정하지 않는다", () => {
+    expect(canReply(r({ id: "naver", date: "2025-01-01" }), TODAY)).toBe(true);
+    expect(isReplyUnavailable({ ...r({ id: "unknown", platform: "baemin", date: "2026-01-01" }), date: null }, TODAY)).toBe(false);
+  });
+  it("오래되어도 실제 답글이 있는 리뷰는 작성 불가가 아니라 답변 완료다", () => {
+    const answered = r({ id: "answered", platform: "coupang", date: "2025-01-01", reply: "감사합니다" });
+    expect(isReplyUnavailable(answered, TODAY)).toBe(false);
+    expect(canReply(answered, TODAY)).toBe(false);
   });
 });

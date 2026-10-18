@@ -19,7 +19,8 @@ export function ReviewSummaryCard({ month }: { month: Month }) {
           <p className="num mt-1 text-sm">
             <b className="text-lg">{s.count}건</b>
             {s.avgRating !== null && <span className="ml-2 text-amber-600">★ {s.avgRating.toFixed(1)}</span>}
-            {s.unanswered > 0 ? <span className="ml-2 font-bold text-red-700">미답변 {s.unanswered}</span> : <span className="ml-2 text-emerald-700">다 답했어요</span>}
+            {s.unanswered > 0 ? <span className="ml-2 font-bold text-red-700">답글 대기 {s.unanswered}</span> : <span className="ml-2 text-emerald-700">답글 대기 없음</span>}
+            {s.replyUnavailable > 0 && <span className="ml-2 text-stone-500">작성 불가 {s.replyUnavailable}</span>}
             {s.complaints > 0 && <span className="ml-2 text-stone-500">아쉬움 {s.complaints}</span>}
           </p>
         ) : (

@@ -1,6 +1,7 @@
 // 리뷰 탭 계산 — 카페스이 리뷰 모음소 대시보드 틀(이번 주 vs 지난주 · 오늘 먼저 볼 것 · 플랫폼별 답변률 ·
 // 답글까지 걸린 시간 · 별점 분포 · 요일별)을 우리 리뷰 수집기 자료로 낸다. 화면은 계산하지 않고 여기 결과만 보여 준다.
 import type { ExportReview, ReviewPlatform } from "../export/types";
+import { todayStr } from "../daily";
 
 export const PLATFORM_NAME: Record<ReviewPlatform, string> = { naver: "네이버", baemin: "배민", coupang: "쿠팡이츠" };
 
@@ -32,6 +33,14 @@ export function replyDaysLeft(r: ExportReview, today: string): number | null {
   const d = dayOf(r.date);
   if (!w || !d) return null;
   return w - daysBetween(d, today);
+}
+
+/** 기간 만료와 답변 완료를 구분한다. 날짜가 없으면 작성 불가로 단정하지 않는다. */
+export function isReplyUnavailable(r: ExportReview, today: string): boolean {
+  return !r.ownerOnly && isUnanswered(r) && (replyDaysLeft(r, today) ?? 0) < 0;
+}
+export function canReply(r: ExportReview, today: string): boolean {
+  return !r.ownerOnly && isUnanswered(r) && !isReplyUnavailable(r, today);
 }
 
 export interface PeriodStats {
@@ -74,6 +83,7 @@ export interface PlatformStats {
   avgRating: number | null;
   medianReplyHours: number | null; // 답글까지 걸린 시간 (중앙값)
   unansweredOpen: number; // 아직 달 수 있는 미답변
+  replyUnavailable: number; // 기간이 지나 더는 답글을 달 수 없는 리뷰
 }
 
 export interface ReviewStats {
@@ -89,6 +99,7 @@ export interface ReviewStats {
   monthly: { month: string; count: number; unanswered: number; avgRating: number | null }[]; // 최근 12개월
   topics: { topic: string; count: number; positive: number; negative: number }[]; // 많이 나온 순
   unansweredList: ExportReview[]; // 최근 것부터, 달 수 있는 것만
+  unavailableList: ExportReview[]; // 기간 만료: 할 일에서 빼고 보관
 }
 
 export function reviewStats(all: ExportReview[], today: string): ReviewStats {
@@ -97,7 +108,8 @@ export function reviewStats(all: ExportReview[], today: string): ReviewStats {
   const thisWeek = periodStats(rs, ws, today);
   const lastWeek = periodStats(rs, shift(ws, -7), shift(ws, -1));
 
-  const open = (r: ExportReview) => isUnanswered(r) && (replyDaysLeft(r, today) ?? 1) >= 0;
+  const open = (r: ExportReview) => canReply(r, today);
+  const unavailableList = rs.filter((r) => isReplyUnavailable(r, today)).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   const unansweredOpen = rs.filter(open).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   const first: FirstItem[] = [];
   const complaints = unansweredOpen.filter(isComplaint);
@@ -124,7 +136,8 @@ export function reviewStats(all: ExportReview[], today: string): ReviewStats {
         name: PLATFORM_NAME[p],
         total: mine.length,
         answered: answered.length,
-        unanswered: mine.length - answered.length,
+        unanswered: mine.filter(open).length,
+        replyUnavailable: mine.filter((r) => isReplyUnavailable(r, today)).length,
         answerRate: mine.length ? Math.round((answered.length / mine.length) * 1000) / 10 : null,
         avgRating: rated.length ? Math.round((rated.reduce((a, r) => a + r.rating!, 0) / rated.length) * 100) / 100 : null,
         medianReplyHours: hours.length ? Math.round(hours[Math.floor(hours.length / 2)] * 10) / 10 : null,
@@ -159,12 +172,12 @@ export function reviewStats(all: ExportReview[], today: string): ReviewStats {
   }
   const topics = [...topicMap].map(([topic, m]) => ({ topic, ...m })).sort((a, b) => b.count - a.count).slice(0, 12);
 
-  return { today, total: rs.length, thisWeek, lastWeek, first, platforms, ratingDist, noRating: rs.filter((r) => r.rating === null).length, weekday, monthly, topics, unansweredList: unansweredOpen };
+  return { today, total: rs.length, thisWeek, lastWeek, first, platforms, ratingDist, noRating: rs.filter((r) => r.rating === null).length, weekday, monthly, topics, unansweredList: unansweredOpen, unavailableList };
 }
 
 /** 손익 첫 화면용 — 이 달 리뷰 수·미답변·평균 별점 */
-export function monthReviewSummary(all: ExportReview[], month: string) {
+export function monthReviewSummary(all: ExportReview[], month: string, today = todayStr()) {
   const rs = visible(all).filter((r) => dayOf(r.date)!.startsWith(month));
   const rated = rs.filter((r) => r.rating !== null);
-  return { count: rs.length, unanswered: rs.filter(isUnanswered).length, complaints: rs.filter(isComplaint).length, avgRating: rated.length ? Math.round((rated.reduce((a, r) => a + r.rating!, 0) / rated.length) * 100) / 100 : null };
+  return { count: rs.length, unanswered: rs.filter((r) => canReply(r, today)).length, replyUnavailable: rs.filter((r) => isReplyUnavailable(r, today)).length, complaints: rs.filter(isComplaint).length, avgRating: rated.length ? Math.round((rated.reduce((a, r) => a + r.rating!, 0) / rated.length) * 100) / 100 : null };
 }

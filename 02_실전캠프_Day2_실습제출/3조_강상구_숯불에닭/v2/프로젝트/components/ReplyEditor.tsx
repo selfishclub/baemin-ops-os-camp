@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { todayStr } from "@/lib/daily";
+import { isReplyUnavailable } from "@/lib/reviews/stats";
 import { EXPORT_UPDATED_EVENT } from "@/components/useExport";
 import { EXPORT_REVIEWS_KEY, type ExportReview } from "@/lib/export/types";
 import { getStore } from "@/lib/storage";
@@ -95,6 +97,8 @@ export function ReplyEditor({ review }: { review: ExportReview }) {
       setBusy(null);
     }
   }
+
+  if (isReplyUnavailable(review, todayStr())) return <p className="mt-2 text-xs text-stone-500">작성 불가 · 답글 작성 기간이 지났어요.</p>;
 
   const changed = text !== (review.draft?.text ?? "");
   const canFill = status === "approved" && !changed && !text.includes("【");
