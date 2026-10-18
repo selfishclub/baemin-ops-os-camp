@@ -61,7 +61,10 @@ export function MarketManualCard({ today }: { today: string }) {
   // 작년 자료가 없으면(올해부터 적기 시작) 전달과 비교한다
   const cmp = lastYear ?? lastMonth;
   const cmpLabel = lastYear ? "작년" : "전달";
-  const months = [...new Set([thisMonth, ...entries.map((e) => e.month)])].sort().reverse();
+  // 올해 1월부터 이번 달까지 다 고를 수 있어야 한다. 이번 달만 띄우면 지난 달 숫자를 몰아 적을 수가 없다
+  //  (2026-10-19 사장님이 올해 치를 넣으려는데 10월밖에 안 보였다.)
+  const yearStart = Array.from({ length: Number(thisMonth.slice(5)) }, (_, i) => `${thisMonth.slice(0, 4)}-${String(i + 1).padStart(2, "0")}`);
+  const months = [...new Set([...yearStart, thisMonth, ...entries.map((e) => e.month)])].sort().reverse();
 
   const save = (next: ManualEntry) => {
     const list = [...entries.filter((e) => e.month !== next.month), next].sort((a, b) => a.month.localeCompare(b.month));
