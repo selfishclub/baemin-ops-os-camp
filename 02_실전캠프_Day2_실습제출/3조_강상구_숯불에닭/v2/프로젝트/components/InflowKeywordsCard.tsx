@@ -15,34 +15,39 @@ export function InflowKeywordsCard({ inflow }: { inflow: MarketInflow | null | u
   const [all, setAll] = useState(false);
   const s = useMemo(() => inflowSummary(inflow, range, new Map()), [inflow, range]);
 
+  const monthIndex = months.indexOf(range);
+  const selectMonth = (month: string) => { setRange(month as InflowRange); setAll(false); };
+
   if (!inflow) return null;
   return (
     <section className="card space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-bold">
-          손님이 검색해 들어온 말 <span className="text-xs font-normal text-stone-500">스마트플레이스 유입 키워드 전체 · {new Date(inflow.collectedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", dateStyle: "short", timeStyle: "short" })} 받음</span>
+          손님이 검색해 들어온 말 <span className="text-xs font-normal text-stone-500">네이버검색 유입 키워드 · {new Date(inflow.collectedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", dateStyle: "short", timeStyle: "short" })} 받음</span>
         </h2>
-        <label className="flex items-center gap-2 text-sm">
+        <div role="group" aria-label="유입 키워드 조회 월 이동" className="flex items-center gap-2 text-sm">
+          <button type="button" aria-label="유입 키워드 이전 달" className="btn-ghost px-3 py-2 disabled:opacity-30" disabled={monthIndex < 0 || monthIndex >= months.length - 1} onClick={() => selectMonth(months[monthIndex + 1])}>◀</button>
           조회 월
-          <select aria-label="유입 키워드 조회 월" className="field py-1" value={range} onChange={e => { setRange(e.target.value as InflowRange); setAll(false); }}>
+          <select aria-label="유입 키워드 조회 월" className="field py-1" value={range} onChange={e => selectMonth(e.target.value)}>
             {months.map(month => <option key={month} value={month}>{month.slice(0, 4)}년 {Number(month.slice(5))}월</option>)}
           </select>
-        </label>
+          <button type="button" aria-label="유입 키워드 다음 달" className="btn-ghost px-3 py-2 disabled:opacity-30" disabled={monthIndex <= 0} onClick={() => selectMonth(months[monthIndex - 1])}>▶</button>
+        </div>
       </div>
       {!s || !s.total ? (
         <p className="text-sm text-stone-500">{range.replace("-", "년 ")}월 자료 없음. 월별 수집 전이거나 네이버에서 제공한 키워드 자료가 없는 달이에요.</p>
       ) : (
         <>
           <p className="num text-sm">
-            {s.start} ~ {s.end} · 유입 <b>{num(s.total)}회</b> · 가게 이름 검색 {num(s.brand.pv)}회({s.total ? Math.round((s.brand.pv / s.total) * 100) : 0}%) · <b>다른 말로 찾아온 {num(s.rows.reduce((a, x) => a + x.pv, 0))}회</b> ({num(s.rows.length)}개 말)
+            {s.start} ~ {s.end} · 네이버검색 유입 <b>{num(s.total)}회</b> · 가게 이름 검색 {num(s.brand.pv)}회({s.total ? Math.round((s.brand.pv / s.total) * 100) : 0}%) · <b>다른 말로 찾아온 {num(s.rows.reduce((a, x) => a + x.pv, 0))}회</b> ({num(s.rows.length)}개 말)
           </p>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[22rem] text-sm">
               <thead className="text-left text-xs text-stone-500">
                 <tr>
                   <th className="py-1">검색한 말</th>
-                  <th className="text-right">유입</th>
-                  <th className="text-right">비율</th>
+                  <th className="text-right">검색 유입</th>
+                  <th className="text-right">검색 유입 내 비율</th>
                 </tr>
               </thead>
               <tbody className="num divide-y divide-stone-100">
@@ -61,7 +66,7 @@ export function InflowKeywordsCard({ inflow }: { inflow: MarketInflow | null | u
               {all ? `많은 ${LIMIT}개만 보기` : `모두 보기 (${s.rows.length}개)`}
             </button>
           )}
-          <p className="text-xs text-stone-500">선택한 달에 네이버가 제공한 키워드를 모두 보여요. 이번 달은 어제까지 집계해요.</p>
+          <p className="text-xs text-stone-500">위 합계와 비율은 네이버검색 유입 기준이에요. 네이버지도·블로그 등 다른 경로를 포함한 리포트의 전체 플레이스 유입과는 달라요. 가게 이름 검색과 검색어 없음은 아래 키워드 목록에서 제외해요. 이번 달은 어제까지 집계해요.</p>
         </>
       )}
     </section>
