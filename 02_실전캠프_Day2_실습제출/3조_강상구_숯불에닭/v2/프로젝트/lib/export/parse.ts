@@ -49,6 +49,6 @@ export function parseLedgerExport(text: string): LedgerExport {
     baemin: raw.baemin && Array.isArray(raw.baemin.settlements) ? raw.baemin : null,
     coupang: raw.coupang && Array.isArray(raw.coupang.settlements) ? raw.coupang : null,
     naverAd: raw.naverAd && Array.isArray(raw.naverAd.keywords) ? raw.naverAd : null,
-    market: raw.market && typeof raw.market === "object" ? { area: raw.market.area ?? null, population: raw.market.population ?? null, trend: raw.market.trend ?? null, competitors: Array.isArray(raw.market.competitors) ? raw.market.competitors : [], inflow: raw.market.inflow && typeof raw.market.inflow === "object" && raw.market.inflow.ranges ? raw.market.inflow : null } : null,
+    market: raw.market && typeof raw.market === "object" ? { area: raw.market.area ?? null, population: raw.market.population ?? null, trend: raw.market.trend ?? null, competitors: Array.isArray(raw.market.competitors) ? raw.market.competitors : [], inflow: raw.market.inflow && typeof raw.market.inflow === "object" && (raw.market.inflow.months || raw.market.inflow.ranges) ? raw.market.inflow : null } : null,
   };
 }

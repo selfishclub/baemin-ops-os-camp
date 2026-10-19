@@ -157,10 +157,11 @@ export interface MarketExport {
   inflow?: MarketInflow | null; // 스마트플레이스 유입 키워드
 }
 
-/** 스마트플레이스 통계 "유입키워드" 전체 (화면은 5개만 보여 줌) — 최근 7·30·90일 */
+/** 스마트플레이스 통계 "유입키워드" 전체 (화면은 5개만 보여 줌) — 월별 자료 (기존 7·30·90일 자료도 읽음) */
 export interface MarketInflow {
   collectedAt: string;
-  ranges: Partial<Record<"d7" | "d30" | "d90", { start: string; end: string; items: { keyword: string; pv: number }[] }>>;
+  months?: Record<string, { start: string; end: string; items: { keyword: string; pv: number }[] }>;
+  ranges?: Partial<Record<"d7" | "d30" | "d90", { start: string; end: string; items: { keyword: string; pv: number }[] }>>;
 }
 
 export interface LedgerExport {
