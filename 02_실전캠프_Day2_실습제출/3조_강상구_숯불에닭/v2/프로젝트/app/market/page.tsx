@@ -6,6 +6,7 @@ import { ExportStatusLine } from "@/components/ExportUploadCard";
 import { SourceTag } from "@/components/SourceTag";
 import { AreaDetail } from "@/components/AreaDetail";
 import { HistorySalesCard } from "@/components/HistorySalesCard";
+import { InflowKeywordsCard } from "@/components/InflowKeywordsCard";
 import { MarketInsightCard } from "@/components/MarketInsightCard";
 import { MarketManualCard } from "@/components/MarketManualCard";
 import { MarketYearTrend } from "@/components/MarketYearTrend";
@@ -209,6 +210,8 @@ export default function MarketPage() {
       )}
 
       <RankCheckCard tracked={rank?.keywords ?? []} />
+
+      <InflowKeywordsCard inflow={exp.market?.inflow} summaries={summaries} />
 
       <section className="card flex flex-wrap items-center justify-between gap-2">
         <div>
