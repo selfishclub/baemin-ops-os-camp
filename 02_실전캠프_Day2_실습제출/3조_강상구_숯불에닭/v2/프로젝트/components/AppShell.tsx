@@ -48,12 +48,13 @@ const ALL_TABS = [
   { href: "/costing", label: "원가율" },
   { href: "/reviews", label: "리뷰", fullOnly: true },
   { href: "/market", label: "상권", fullOnly: true },
+  { href: "/smartplace", label: "스마트플레이스", fullOnly: true },
   { href: "/rules", label: "규칙" },
 ];
 // PC 사이드바에서 메뉴를 세 묶음으로 (매일 쓰는 것 / 들여다보는 것 / 설정)
 const GROUPS: { title: string; hrefs: string[] }[] = [
   { title: "매일", hrefs: ["/", "/today", "/upload"] },
-  { title: "분석", hrefs: ["/channels", "/costing", "/reviews", "/market"] },
+  { title: "분석", hrefs: ["/channels", "/costing", "/reviews", "/market", "/smartplace"] },
   { title: "설정", hrefs: ["/rules"] },
 ];
 

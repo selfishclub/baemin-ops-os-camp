@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import { num } from "@/lib/format";
 import type { MarketInflow } from "@/lib/export/types";
-import { inflowSummary, rankMap, type InflowRange } from "@/lib/market/inflow";
+import { inflowSummary, type InflowRange } from "@/lib/market/inflow";
 
 // 손님이 검색해 들어온 말 — 스마트플레이스 통계의 유입키워드 전체 (화면은 5개만 보여 줌).
-// 가게 이름 검색은 따로 묶고, 새 손님이 찾은 말을 많은 순으로 보여 준다. 순위 추적 중이면 순위를 옆에.
+// 가게 이름 검색은 따로 묶고, 새 손님이 찾은 말을 많은 순으로 보여 준다. 스마트플레이스 숫자만 쓴다(순위 추적과 섞지 않음).
 const RANGES: { id: InflowRange; label: string }[] = [
   { id: "d7", label: "7일" },
   { id: "d30", label: "30일" },
@@ -14,18 +14,17 @@ const RANGES: { id: InflowRange; label: string }[] = [
 ];
 const LIMIT = 20;
 
-export function InflowKeywordsCard({ inflow, summaries }: { inflow: MarketInflow | null | undefined; summaries: { keyword: string; rank: number | null }[] }) {
+export function InflowKeywordsCard({ inflow }: { inflow: MarketInflow | null | undefined }) {
   const [range, setRange] = useState<InflowRange>("d30");
   const [all, setAll] = useState(false);
-  const ranks = useMemo(() => rankMap(summaries), [summaries]);
-  const s = useMemo(() => inflowSummary(inflow, range, ranks), [inflow, range, ranks]);
+  const s = useMemo(() => inflowSummary(inflow, range, new Map()), [inflow, range]);
 
   if (!inflow) return null;
   return (
     <section className="card space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-bold">
-          손님이 검색해 들어온 말 <span className="text-xs font-normal text-stone-500">스마트플레이스 유입 키워드 전체 · {inflow.collectedAt.slice(0, 10)} 받음</span>
+          손님이 검색해 들어온 말 <span className="text-xs font-normal text-stone-500">스마트플레이스 유입 키워드 전체 · {new Date(inflow.collectedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", dateStyle: "short", timeStyle: "short" })} 받음</span>
         </h2>
         <div className="flex gap-1">
           {RANGES.map((r) => (
@@ -49,7 +48,6 @@ export function InflowKeywordsCard({ inflow, summaries }: { inflow: MarketInflow
                   <th className="py-1">검색한 말</th>
                   <th className="text-right">유입</th>
                   <th className="text-right">비율</th>
-                  <th className="text-right">플레이스 순위</th>
                 </tr>
               </thead>
               <tbody className="num divide-y divide-stone-100">
@@ -58,9 +56,6 @@ export function InflowKeywordsCard({ inflow, summaries }: { inflow: MarketInflow
                     <td className="py-1">{r.keyword}</td>
                     <td className="text-right font-bold">{num(r.pv)}</td>
                     <td className="text-right text-stone-500">{r.share}%</td>
-                    <td className="text-right">
-                      {!r.tracked ? <span className="text-xs text-stone-400">추적 안 함</span> : r.rank === null ? <span className="text-stone-400">밖</span> : <span className={r.rank <= 5 ? "font-bold text-red-600" : r.rank <= 10 ? "font-semibold text-pink-700" : ""}>{r.rank}위</span>}
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -71,7 +66,7 @@ export function InflowKeywordsCard({ inflow, summaries }: { inflow: MarketInflow
               {all ? `많은 ${LIMIT}개만 보기` : `모두 보기 (${s.rows.length}개)`}
             </button>
           )}
-          <p className="text-xs text-stone-500">스마트플레이스 통계 화면은 5개만 보여 주지만 여기서는 전부 보여요. 많이 들어오는데 "추적 안 함"인 말은 순위 추적에 넣고, 대표 키워드·소식 글에도 써 보세요. 리뷰 수집기 <code>npx tsx scripts/collect-smartplace-inflow.ts</code> → 내보내기로 새로 받아요.</p>
+          <p className="text-xs text-stone-500">스마트플레이스 통계 화면은 5개만 보여 주지만 여기서는 전부 보여요. 많이 들어오는 말은 대표 키워드·소식 글에 써 보세요. 리뷰 수집기 <code>npx tsx scripts/collect-smartplace-inflow.ts</code> → 내보내기로 새로 받아요.</p>
         </>
       )}
     </section>
