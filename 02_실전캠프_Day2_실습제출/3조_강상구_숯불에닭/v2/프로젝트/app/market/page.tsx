@@ -88,6 +88,36 @@ export default function MarketPage() {
   const trends = useMemo(() => (market?.trend ? market.trend.groups.map(trendSummary) : []), [market]);
   const upcoming = useMemo(() => upcomingKeywords(market?.trend ?? null, today, ahead).slice(0, 8), [market, today, ahead]);
   const volumeOfKw = (k: string) => volumes[normalizeKeyword(k)]?.total ?? null;
+  // 순위 추적 키워드의 한 달 검색량 — 키워드 네비게이션과 같은 저장소(keyword_volumes_v1)를 쓴다. 빠진 것만 도우미로 받는다
+  const [volBusy, setVolBusy] = useState<string | null>(null);
+  const missingVol = summaries.map((s) => normalizeKeyword(s.keyword)).filter((k) => !volumes[k]);
+  const fetchMissingVolumes = async () => {
+    const want = [...new Set(missingVol)];
+    if (!want.length) return;
+    const next: VolumeMap = { ...volumes };
+    try {
+      for (let i = 0; i < want.length; i += 100) {
+        setVolBusy(`네이버에 ${Math.min(i + 100, want.length)}/${want.length}개 검색량을 묻는 중…`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_HELPER_URL || "http://127.0.0.1:4599"}/keyword-volume`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ keywords: want.slice(i, i + 100) }) });
+        const j = (await res.json()) as { ok: boolean; message?: string; exact?: { keyword: string; pc: number; mobile: number; total: number; under10: boolean; comp?: string | null }[] };
+        if (!j.ok) { setVolBusy(j.message ?? "검색량을 읽지 못했어요."); return; }
+        for (const v of j.exact ?? []) next[normalizeKeyword(v.keyword)] = { total: v.total, pc: v.pc, mobile: v.mobile, under10: v.under10, at: today, comp: v.comp ?? null };
+      }
+      // 네이버가 답을 안 준 말(검색이 거의 없는 말)은 0으로 적어 두어 다시 묻지 않는다
+      for (const k of want) if (!next[k]) next[k] = { total: 0, pc: 0, mobile: 0, under10: true, at: today };
+      setVolumes(next);
+      await getStore().saveSetting(KEYWORD_VOLUMES_KEY, next);
+      setVolBusy(null);
+    } catch {
+      setVolBusy("도우미에 연결하지 못했어요. 리뷰 수집기 폴더에서 npm run helper 를 켜 주세요.");
+    }
+  };
+  /** "월 1,530" · 10 미만이면 "월 10 미만" · 모르면 null */
+  const volText = (k: string) => {
+    const v = volumes[normalizeKeyword(k)];
+    if (!v) return null;
+    return v.under10 || v.total < 10 ? "월 10 미만" : `월 ${num(v.total)}`;
+  };
   const trackedAll = [...(rank?.keywords ?? []), ...addedTrack];
   const trackKw = async (k: string) => {
     try {
@@ -120,12 +150,21 @@ export default function MarketPage() {
           <>
           <p className="num text-xs text-stone-500">
             추적 {summaries.length}개 중 <b className="text-stone-800">50위 안 {summaries.filter((s) => s.rank !== null).length}개</b> · 5위 안 {summaries.filter((s) => s.rank !== null && s.rank <= 5).length}개 · 10위 안 {summaries.filter((s) => s.rank !== null && s.rank <= 10).length}개
+            {missingVol.length > 0 && (
+              <button className="btn-ghost ml-2 px-2 py-0.5 text-[11px]" disabled={!!volBusy} onClick={() => void fetchMissingVolumes()}>
+                검색량 받기 ({missingVol.length}개 빠짐)
+              </button>
+            )}
           </p>
+          {volBusy && <p className="text-xs text-stone-500">{volBusy}</p>}
           <div className="grid gap-2 sm:grid-cols-2">
             {(allCards ? summaries : summaries.slice(0, CARD_LIMIT)).map((s) => (
               <button key={s.keyword} className={`rounded-xl px-3 py-2 text-left ring-1 ${keyword === s.keyword ? "bg-orange-50 ring-orange-300" : "bg-stone-50 ring-stone-200"}`} onClick={() => setKeyword(s.keyword)}>
                 <p className="flex items-baseline justify-between">
-                  <span className="text-sm font-bold">{s.keyword}</span>
+                  <span className="text-sm font-bold">
+                    {s.keyword}
+                    {volText(s.keyword) && <span className="num ml-1.5 text-[11px] font-normal text-stone-500">{volText(s.keyword)}</span>}
+                  </span>
                   <span className="num text-lg font-extrabold">{s.rank === null ? (s.days ? "50위 밖" : "–") : `${s.rank}위`}</span>
                 </p>
                 <p className="num mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-stone-500">
@@ -182,6 +221,7 @@ export default function MarketPage() {
                   <tr key={k} className={k === keyword ? "bg-orange-50" : ""}>
                     <td className="sticky left-0 cursor-pointer bg-white py-1 pr-2 text-left font-semibold" onClick={() => setKeyword(k)}>
                       {k}
+                      {volText(k) && <span className="num ml-1 text-[10px] font-normal text-stone-400">{volText(k)}</span>}
                     </td>
                     {grid.dates.map((d) => {
                       const c = grid.cells[k][d];
