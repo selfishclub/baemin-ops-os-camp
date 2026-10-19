@@ -3,7 +3,7 @@ import type { MarketInflow } from "../export/types";
 // 스마트플레이스 유입 키워드 — 손님이 어떤 말로 검색해 우리 플레이스에 들어왔나.
 // 가게 이름 검색(이미 우리를 아는 손님)과 그 밖의 검색(새 손님이 찾은 말)을 나눠 본다.
 
-export type InflowRange = "d7" | "d30" | "d90" | `${number}-${number}`;
+export type InflowRange = "d7" | "d30" | "d90" | `${number}-${number}` | `${number}-${number}-${number}/${number}-${number}-${number}`;
 
 /** 한국 시간 이번 달까지 선택 가능. 월별 자료가 없는 달도 목록에 남긴다. */
 export function inflowMonths(now = new Date()): string[] {
@@ -41,7 +41,7 @@ const BRAND = /숯불에\s?닭|숯불의\s?닭|숮불에\s?닭|숯불에닥/;
 const norm = (s: string) => s.replace(/\s+/g, "");
 
 export function inflowSummary(inflow: MarketInflow | null | undefined, range: InflowRange, ranks: Map<string, number | null>): InflowSummary | null {
-  const r = /^\d{4}-\d{2}$/.test(range) ? inflow?.months?.[range] : inflow?.ranges?.[range as "d7" | "d30" | "d90"];
+  const r = range.includes("/") ? inflow?.periods?.[range] : /^\d{4}-\d{2}$/.test(range) ? inflow?.months?.[range] : inflow?.ranges?.[range as "d7" | "d30" | "d90"];
   if (!r) return null;
   const total = r.items.reduce((a, x) => a + x.pv, 0);
   const brandItems = r.items.filter((x) => BRAND.test(x.keyword));

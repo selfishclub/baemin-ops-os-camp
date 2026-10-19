@@ -45,3 +45,10 @@ it("월별 내보내기 파일을 읽고 키워드 자료를 유지한다", asyn
   const parsed = parseLedgerExport(JSON.stringify({ kind: "sootdak-ledger-export", version: 1, reviews: [], market: { inflow: { collectedAt: inflow.collectedAt, months } } }));
   expect(parsed.market?.inflow?.months).toEqual(months);
 });
+
+it("일간·주간 자료를 월간 자료와 섞지 않는다", () => {
+  const daily = { start: "2026-09-01", end: "2026-09-01", items: [{ keyword: "청주맛집", pv: 4 }] };
+  const input = { ...inflow, periods: { "2026-09-01/2026-09-01": daily } };
+  expect(inflowSummary(input, "2026-09-01/2026-09-01", new Map())?.total).toBe(4);
+  expect(inflowSummary(input, "2026-09-01/2026-09-07", new Map())).toBeNull();
+});
