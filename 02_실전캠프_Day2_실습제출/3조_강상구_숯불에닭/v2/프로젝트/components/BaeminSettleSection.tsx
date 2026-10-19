@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ExportStatusLine } from "@/components/ExportUploadCard";
 import { SourceTag } from "@/components/SourceTag";
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
-import { adEfficiency, channelSaleFromOrders, matchSettlements, perOrderBreakdown, type DepositState } from "@/lib/baemin/settle";
+import { SETTLE_CONFIRM_KEY, adEfficiency, applyConfirms, channelSaleFromOrders, matchSettlements, perOrderBreakdown, type DepositState, type SettleConfirm } from "@/lib/baemin/settle";
 import { todayStr } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
@@ -29,7 +29,18 @@ export function BaeminSettleSection({ platform = "baemin", month, txs, nextTxs, 
   const [msg, setMsg] = useState<string | null>(null);
   const b = platform === "baemin" ? exp.baemin : exp.coupang;
 
-  const rows = useMemo(() => (b ? matchSettlements(b.settlements, [...txs, ...nextTxs], today, P.channel).filter((r) => r.depositDueDate.startsWith(month)) : []), [b, txs, nextTxs, month, today]);
+  // 자동으로 못 맞춘 건을 매출내역서 등으로 확인해 적어 둔 기록
+  const [confirms, setConfirms] = useState<SettleConfirm[]>([]);
+  useEffect(() => {
+    void getStore()
+      .getSetting<SettleConfirm[]>(SETTLE_CONFIRM_KEY)
+      .then((v) => setConfirms(v ?? []));
+  }, []);
+
+  const rows = useMemo(
+    () => (b ? applyConfirms(matchSettlements(b.settlements, [...txs, ...nextTxs], today, P.channel), confirms, P.channel).filter((r) => r.depositDueDate.startsWith(month)) : []),
+    [b, txs, nextTxs, month, today, confirms, P.channel],
+  );
   const per = useMemo(() => (b ? perOrderBreakdown(b.orders, month) : null), [b, month]);
   const ad = useMemo(() => adEfficiency(b, month), [b, month]);
   const suggested = b ? channelSaleFromOrders(b.orders, month) : null;
@@ -105,6 +116,7 @@ export function BaeminSettleSection({ platform = "baemin", month, txs, nextTxs, 
                           <td>
                             <span className={`rounded px-1.5 py-0.5 text-xs font-bold ${STATE_TONE[r.state]}`}>{r.state}</span>
                             {r.bankDate && <span className="ml-1 text-xs text-stone-500">{r.bankDate.slice(5)}{r.daysLate ? ` (${r.daysLate > 0 ? "+" : ""}${r.daysLate}일)` : ""}</span>}
+                            {r.note && <p className="mt-0.5 text-[11px] text-stone-500">{r.note}</p>}
                           </td>
                         </tr>
                       ))}

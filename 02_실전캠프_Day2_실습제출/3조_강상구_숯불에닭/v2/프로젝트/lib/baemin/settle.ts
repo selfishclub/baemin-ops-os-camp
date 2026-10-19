@@ -14,6 +14,28 @@ export interface SettlementRow extends BaeminSettlement {
   bankAmount: number | null;
   bankGap: number | null; // 입금액 − 통장 입금 (짝이 맞았을 때 0)
   daysLate: number | null; // 통장 입금일 − 입금 예정일
+  note?: string; // 손으로 확인한 기록의 메모
+}
+
+// 수집한 정산 금액이 통장과 딱 맞지 않아 자동으로 못 맞춘 건을, 다른 자료(쿠팡이츠 매출내역서 등)로 확인해 적어 둔 기록.
+// 쿠팡이츠는 출금 신청 때 며칠치가 합쳐지고, 수집한 정산금액엔 따로 들어오는 상생 환급이 더해져 있어서 1:1 금액 맞추기가 자주 빗나간다.
+export const SETTLE_CONFIRM_KEY = "settle_confirm_v1";
+
+export interface SettleConfirm {
+  channel: string; // "coupang" · "baemin"
+  giveId: string; // 정산 건 id
+  bankDate: string | null; // 실제로 들어온 통장 날짜 (합쳐 들어왔으면 그 입금일)
+  note: string; // 어떻게 확인했나
+}
+
+/** 자동으로 못 맞춘 건(입금 대기·입금 안 맞음)에 확인 기록이 있으면 "입금 확인"으로 */
+export function applyConfirms(rows: SettlementRow[], confirms: SettleConfirm[], channel: string): SettlementRow[] {
+  const by = new Map(confirms.filter((c) => c.channel === channel).map((c) => [c.giveId, c]));
+  return rows.map((r) => {
+    const c = by.get(r.giveId);
+    if (!c || r.state === "입금 확인") return r;
+    return { ...r, state: "입금 확인", bankDate: c.bankDate, bankAmount: null, bankGap: null, daysLate: c.bankDate ? daysBetween(r.depositDueDate, c.bankDate) : null, note: c.note };
+  });
 }
 
 const MS_DAY = 86_400_000;

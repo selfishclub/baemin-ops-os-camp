@@ -46,6 +46,16 @@ export interface SettlementAdjustment {
 // 매출 정산이 아니라 환급만 들어온 입금(쿠팡이츠 상생 요금제 월 환급 등)은 "짝이 안 맞는 입금"으로 띄우지 않는다
 const fullyRefund = (a: SettlementAdjustment | undefined, amount: number) => !!a && a.amount >= amount;
 
+// 이 달 수수료에서 뺄 환급 — 한 환급은 한 달에서만 뺀다.
+//  - 정산 입금에 섞인 환급: 그 입금이 붙은 이 달 묶음(extra)에서
+//  - 환급만 따로 들어온 입금: 들어온 달에서
+// (2026-10-19 전에는 그 채널의 환급을 달 구분 없이 다 빼서, 9월·10월 쿠팡이츠 수수료에서 두 환급이 두 번씩 빠졌다)
+function refundsOf(month: Month, settlements: Settlement[], adj: Map<string, SettlementAdjustment>, deposits: Map<string, number>): number {
+  const mixed = settlements.reduce((a, s) => a + (s.extra ?? 0), 0);
+  const alone = [...adj.values()].filter((a) => a.date.startsWith(month) && fullyRefund(a, deposits.get(a.date) ?? 0)).reduce((a, x) => a + x.amount, 0);
+  return mixed + alone;
+}
+
 export const HOLIDAYS_KEY = "holidays"; // "2026-10-03" 같은 날짜 목록
 
 const dow = (date: string) => (new Date(date + "T00:00:00Z").getUTCDay() + 6) % 7; // 월=0
@@ -266,7 +276,7 @@ export function settleChannel(
 
   const deposited = settlements.filter((s) => s.status === "일치" || s.status === "차이");
   const salesDeposited = deposited.reduce((a, s) => a + s.sales, 0);
-  const refunds = [...adj.values()].reduce((a, x) => a + x.amount, 0);
+  const refunds = refundsOf(month, settlements, adj, deposits);
   const fee = deposited.reduce((a, s) => a + s.fee, 0) - refunds; // 환급은 수수료를 돌려받은 것
 
   // 이 달 입금 중 어느 묶음에도 안 붙은 것. 지난달 말·다음 달 주문분 입금은 빼고 (outsideMonthWindow)
@@ -342,6 +352,7 @@ function settleManual(
   const payouts = bundles.map((b) => b.payout);
   for (const [date, raw] of [...deposits.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     if (raw <= 0) continue;
+    if (fullyRefund(adj.get(date), raw)) continue; // 환급만 들어온 입금은 매출 묶음을 가져가지 않는다
     const eligible = bundles.filter((b) => !b.claimed && b.payout <= date);
     if (eligible.length === 0) {
       if (date >= monthStart && date <= lastBankDate && !fullyRefund(adj.get(date), raw) && !(rule && outsideMonthWindow(date, month, payouts, holidays, rule))) unmatchedDeposits.push({ date, amount: raw });
@@ -364,7 +375,7 @@ function settleManual(
   settlements.sort((a, b) => a.from.localeCompare(b.from));
   const deposited = settlements.filter((s) => s.status === "일치" || s.status === "차이");
   const salesDeposited = deposited.reduce((a, s) => a + s.sales, 0);
-  const refunds = [...adj.values()].reduce((a, x) => a + x.amount, 0);
+  const refunds = refundsOf(month, settlements, adj, deposits);
   const fee = deposited.reduce((a, s) => a + s.fee, 0) - refunds;
   return {
     channel,

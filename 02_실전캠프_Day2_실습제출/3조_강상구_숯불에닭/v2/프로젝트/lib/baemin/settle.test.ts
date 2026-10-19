@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adEfficiency, channelSaleFromOrders, matchSettlements, perOrderBreakdown } from "./settle";
+import { adEfficiency, applyConfirms, channelSaleFromOrders, matchSettlements, perOrderBreakdown } from "./settle";
 import type { BaeminExport, BaeminOrderDay, BaeminSettlement } from "../export/types";
 import type { Transaction } from "../types";
 
@@ -72,5 +72,19 @@ describe("광고 효율 (우리가게클릭)", () => {
   it("자료 없는 달은 null, 광고비 모르는 달은 비움", () => {
     expect(adEfficiency(b, "2026-08")).toBeNull();
     expect(adEfficiency(null, "2026-09")).toBeNull();
+  });
+});
+
+describe("확인 기록 (자동으로 못 맞춘 정산 건)", () => {
+  const base = { giveId: "coupang-2026-10-01", depositDueDate: "2026-10-01", status: "정산완료", periodStart: "2026-09-24", periodEnd: "2026-09-26", depositAmount: 114_323, adCost: 0, adDaily: [], adjustment: 0, orders: 3 };
+  it("입금 대기 건에 기록이 있으면 입금 확인으로, 메모와 실제 입금일을 단다", () => {
+    const rows = matchSettlements([base], [], "2026-10-19", "coupang");
+    expect(rows[0].state).toBe("입금 대기");
+    const out = applyConfirms(rows, [{ channel: "coupang", giveId: "coupang-2026-10-01", bankDate: "2026-10-01", note: "9/23~26분 합쳐 214,289원" }], "coupang");
+    expect(out[0]).toMatchObject({ state: "입금 확인", bankDate: "2026-10-01", daysLate: 0, note: "9/23~26분 합쳐 214,289원" });
+  });
+  it("다른 채널 기록이나 없는 건은 그대로", () => {
+    const rows = matchSettlements([base], [], "2026-10-19", "coupang");
+    expect(applyConfirms(rows, [{ channel: "baemin", giveId: "coupang-2026-10-01", bankDate: null, note: "" }], "coupang")[0].state).toBe("입금 대기");
   });
 });
