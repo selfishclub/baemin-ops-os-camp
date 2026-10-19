@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { InflowDateCalendar } from "@/components/InflowDateCalendar";
 import { num } from "@/lib/format";
 import type { MarketInflow } from "@/lib/export/types";
 import { inflowSummary, type InflowRange } from "@/lib/market/inflow";
@@ -14,6 +15,7 @@ const LIMIT = 20;
 export function InflowKeywordsCard({ inflow }: { inflow: MarketInflow | null | undefined }) {
   const [mode, setMode] = useState<InflowMode>("monthly");
   const [anchor, setAnchor] = useState(() => inflowYesterday());
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [all, setAll] = useState(false);
   const [queried, setQueried] = useState<NonNullable<MarketInflow["periods"]>>({});
   const [loading, setLoading] = useState(false);
@@ -22,7 +24,7 @@ export function InflowKeywordsCard({ inflow }: { inflow: MarketInflow | null | u
   const range = (mode === "monthly" && inflow?.months?.[period.start.slice(0, 7)]?.end === period.end
     ? period.start.slice(0, 7) : period.key) as InflowRange;
   const s = useMemo(() => inflowSummary({ ...inflow, collectedAt: inflow?.collectedAt ?? "", periods: { ...inflow?.periods, ...queried } }, range, new Map()), [inflow, queried, range]);
-  const changePeriod = (next: string) => { setAnchor(next); setAll(false); setError(null); };
+  const changePeriod = (next: string) => { setAnchor(next); setAll(false); setError(null); setCalendarOpen(false); };
   const hasPeriod = s !== null;
   const ready = !!inflow;
   useEffect(() => {
@@ -55,18 +57,18 @@ export function InflowKeywordsCard({ inflow }: { inflow: MarketInflow | null | u
         </h2>
       </div>
       <div className="grid grid-cols-[104px_minmax(0,1fr)] items-stretch gap-2 sm:grid-cols-[144px_minmax(0,1fr)] sm:gap-3">
-        <select aria-label="키워드 조회 단위" className="h-14 w-full min-w-0 rounded-xl border border-stone-200 bg-white px-3 text-sm font-medium outline-none focus:border-emerald-500 disabled:opacity-60 sm:px-4" value={mode} disabled={loading} onChange={e => { setMode(e.target.value as InflowMode); setAll(false); setError(null); }}>
+        <select aria-label="키워드 조회 단위" className="h-14 w-full min-w-0 rounded-xl border border-stone-200 bg-white px-3 text-sm font-medium sm:text-base outline-none focus:border-emerald-500 disabled:opacity-60 sm:px-4" value={mode} disabled={loading} onChange={e => { setMode(e.target.value as InflowMode); setAll(false); setError(null); setCalendarOpen(false); }}>
           <option value="daily">일간</option><option value="weekly">주간</option><option value="monthly">월간</option>
         </select>
         <div role="group" aria-label="키워드 조회 기간 이동" className="flex h-14 min-w-0 items-center justify-between gap-1 rounded-xl border border-stone-200 bg-white px-1 sm:gap-3 sm:px-3">
           <button type="button" aria-label="이전 기간" className="shrink-0 px-2 py-3 text-emerald-600 disabled:opacity-30" disabled={loading || period.start <= INFLOW_FIRST_DAY} onClick={() => changePeriod(moveInflowPeriod(mode, anchor, -1))}>◀</button>
-          <label className="relative min-w-0 flex-1 cursor-pointer text-center text-xs font-semibold leading-snug sm:text-base">
+          <button type="button" aria-label="조회 날짜 달력 열기" aria-expanded={calendarOpen} aria-haspopup="dialog" className="min-w-0 flex-1 py-3 text-center text-sm font-medium leading-snug sm:text-base" disabled={loading} onClick={() => setCalendarOpen(open => !open)}>
             {inflowPeriodLabel(period.start, period.end)}
-            <input type="date" aria-label="키워드 조회 기준 날짜" className="absolute inset-0 w-full cursor-pointer opacity-0" min={INFLOW_FIRST_DAY} max={period.latest} value={anchor} disabled={loading} onChange={e => { if (e.target.value) changePeriod(e.target.value); }} />
-          </label>
+          </button>
           <button type="button" aria-label="다음 기간" className="shrink-0 px-2 py-3 text-emerald-600 disabled:opacity-30" disabled={loading || period.end >= period.latest} onClick={() => changePeriod(moveInflowPeriod(mode, anchor, 1))}>▶</button>
         </div>
       </div>
+      {calendarOpen && <InflowDateCalendar anchor={anchor} latest={period.latest} mode={mode} onApply={changePeriod} onCancel={() => setCalendarOpen(false)} />}
       {loading && <p role="status" className="py-2 text-sm text-stone-500">선택한 기간의 자료를 불러오는 중이에요…</p>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
 
