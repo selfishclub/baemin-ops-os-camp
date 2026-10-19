@@ -1,0 +1,15 @@
+// 공개 행사 일정만 보관한다. 실제 가게 유입 수와 검색어는 로컬 내보내기에서 계산한다.
+export const INFLOW_RESEARCHED_AT = "2026-10-20";
+export interface InflowEvent { id: string; title: string; place: string; pattern: string; start: string; end: string; source: string; url: string; note: string; }
+const city2026 = "https://www.cheongju.go.kr/www/selectBbsNttView.do?bbsNo=40&integrDeptCode=&key=23485&nttNo=252608&pageIndex=1&searchCnd=all&searchCtgry=&searchKrwd=";
+export const INFLOW_EVENTS: InflowEvent[] = [
+  { id: "forest-2026", title: "2026 대한민국 산림박람회", place: "생명누리공원", pattern: "생명누리", start: "2026-10-16", end: "2026-10-18", source: "산림청 공식 보도자료", url: "https://m.korea.kr/briefing/pressReleaseView.do?newsId=156785422", note: "행사 날짜와 생명누리공원 관련 유입 집중일이 겹치는지 비교합니다." },
+  { id: "chojeong-2026", title: "제20회 세종대왕과 초정약수축제", place: "초정행궁·초정치유마을", pattern: "초정", start: "2026-10-16", end: "2026-10-18", source: "충북예총 개최 안내", url: "https://artcb.co.kr/49/?bmode=view&idx=175008011", note: "산림박람회와 같은 기간이지만 장소와 검색어를 구분해 비교합니다." },
+  { id: "hip-2026", title: "2026 힙한 청주 페스티벌 in 제조창", place: "문화제조창 잔디광장", pattern: "제조창|비엔날레|공예", start: "2026-08-15", end: "2026-08-16", source: "청주시 연간 축제 보도자료", url: city2026, note: "공연과 주변 식당 검색이 연결됐을 가능성을 살펴봅니다. 문화제조창의 다른 전시·상설시설 영향도 있을 수 있습니다." },
+  { id: "garden-2026", title: "대한민국 정원박람회 2026 청주 가드닝 페스티벌", place: "생명누리공원", pattern: "생명누리", start: "2026-05-07", end: "2026-05-10", source: "청주시 연간 축제 보도자료", url: city2026, note: "같은 달 어린이날 행사와 구분해야 합니다. 5월 전체 유입을 이 행사만의 효과로 볼 수 없습니다." },
+  { id: "children-2026", title: "제104회 어린이날 청주 어린이 큰잔치", place: "생명누리공원", pattern: "생명누리", start: "2026-05-05", end: "2026-05-05", source: "충북교육청 서현초등학교 행사 안내", url: "https://school.cbe.go.kr/cjseohyun-e/M010302/view/5735089?s_idx=3", note: "검색어에 어린이날이 직접 포함되는지와 행사 당일 유입을 함께 확인합니다." },
+  { id: "sled-2026", title: "생명누리공원 눈썰매장 운영", place: "생명누리공원", pattern: "생명누리", start: "2025-12-27", end: "2026-02-08", source: "청주시 관광서비스 청주여기 운영 안내", url: "https://skweb.cjsmarttour.kr/home/sub.do?menukey=6009&mode=viewApi&no=1472", note: "매주 월요일 휴장. 썰매장이 직접 포함된 검색어는 방문 목적의 단서지만, 운영 기간 전체의 유입 증가를 입증하지는 않습니다." },
+  { id: "education-2025", title: "2025 공감·동행 충북교육박람회", place: "충북교육문화원·생명누리공원", pattern: "생명누리", start: "2025-10-22", end: "2025-10-26", source: "한국교원대학교 공식 행사 안내", url: "https://www.knue.ac.kr/www/selectBbsNttView.do?bbsNo=258&key=1625&nttNo=76872", note: "교육문화원과 공원 방문객의 주변 식당 탐색 가능성을 살펴봅니다." },
+  { id: "chojeong-2025", title: "제19회 세종대왕과 초정약수축제", place: "초정행궁", pattern: "초정", start: "2025-10-17", end: "2025-10-19", source: "청주시 관광과 공식 개최 안내", url: "https://www.cheongju.go.kr/citydevelop/selectBbsNttView.do?bbsNo=40&integrDeptCode=&key=7506&nttNo=241690", note: "행사가 열렸더라도 비교일보다 유입이 늘지 않았다면 증가 확인 안 됨으로 표시합니다." },
+  { id: "biennale-2025", title: "2025 청주공예비엔날레", place: "문화제조창", pattern: "제조창|비엔날레|공예", start: "2025-09-04", end: "2025-11-02", source: "충북문화재단·조직위원회 행사 개요", url: "https://www.cbfc.or.kr/home/sub.php?menukey=6434&mod=view&no=1802188", note: "장기 전시입니다. 9~11월 월별 유입과 행사일의 일간 유입을 구분하며, 11월 전체를 행사 기간으로 계산하지 않습니다." },
+];

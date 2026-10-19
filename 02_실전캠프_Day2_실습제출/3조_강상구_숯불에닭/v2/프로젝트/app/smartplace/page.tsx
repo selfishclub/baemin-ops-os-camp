@@ -1,5 +1,6 @@
 "use client";
 
+import { InflowInsights } from "@/components/InflowInsights";
 import { InflowKeywordsCard } from "@/components/InflowKeywordsCard";
 import { ExportStatusLine } from "@/components/ExportUploadCard";
 import { useExport } from "@/components/useExport";
@@ -14,12 +15,13 @@ export default function SmartplacePage() {
   return (
     <>
       <ExportStatusLine exp={exp} need="스마트플레이스 통계" />
+      {inflow && <div className="flex justify-end"><a href="#inflow-insights" className="btn-ghost text-sm text-emerald-700">검색 유입 이유 분석 보기 ↓</a></div>}
       {!inflow ? (
         <Notice tone="info">
           아직 스마트플레이스 통계가 없어요. 리뷰 수집기에서 <code>npx tsx scripts/collect-smartplace-inflow.ts</code> → <code>npm run export:ledger</code> 뒤 올리기 탭에서 내보내기 파일을 올리면(도우미가 켜져 있으면 자동) 여기에 보여요.
         </Notice>
       ) : (
-        <InflowKeywordsCard inflow={inflow} />
+        <div className="space-y-5"><InflowKeywordsCard inflow={inflow} /><InflowInsights inflow={inflow} /></div>
       )}
     </>
   );
