@@ -35,7 +35,13 @@ export default function MarketPage() {
   const exp = useExport();
   const today = todayStr();
   const rank = exp.rank;
-  const summaries = useMemo(() => (rank ? keywordSummaries(rank.history, rank.keywords) : []), [rank]);
+  // 잘 뜨는 키워드가 위로 — 최근 순위 순, 50위 밖·못 읽은 키워드는 아래 (추적 키워드가 100개 가까이로 늘어서, 2026-10-20)
+  const summaries = useMemo(
+    () => (rank ? keywordSummaries(rank.history, rank.keywords).sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999)) : []),
+    [rank],
+  );
+  const [allCards, setAllCards] = useState(false);
+  const CARD_LIMIT = 12;
   const [keyword, setKeyword] = useState<string>("");
   const [sales, setSales] = useState<Map<string, number>>(new Map());
   const [pk, setPk] = useState<PlaceKeywords>(EMPTY_PLACE_KEYWORDS);
@@ -73,7 +79,7 @@ export default function MarketPage() {
 
   const series = useMemo(() => (rank && keyword ? rankSeries(rank.history, keyword, 30) : []), [rank, keyword]);
   const [gridDays, setGridDays] = useState<14 | 30>(14);
-  const grid = useMemo(() => (rank ? rankGrid(rank.history, rank.keywords.length ? rank.keywords : [...new Set(rank.history.map((h) => h.keyword))], gridDays, today) : null), [rank, gridDays, today]);
+  const grid = useMemo(() => (rank ? rankGrid(rank.history, summaries.length ? summaries.map((s) => s.keyword) : [...new Set(rank.history.map((h) => h.keyword))], gridDays, today) : null), [rank, summaries, gridDays, today]);
   const latestResult = rank?.latest?.results.find((r) => r.keyword === keyword) ?? null;
   const nextSeason = nextSeasonKeyword(pk, today);
   // 우리 동네 (npm run market 결과). 같은 종류 가게는 우리 가게 업종 글자로 고른다 — 닭·치킨·닭갈비
@@ -111,8 +117,12 @@ export default function MarketPage() {
         {!rank || summaries.length === 0 ? (
           <Notice tone="info">순위 기록이 아직 없어요. 리뷰 수집기에서 <code>npm run rank</code> 를 돌린 뒤 올리기 탭에서 내보내기 파일을 올리면 키워드별 순위가 보여요.</Notice>
         ) : (
+          <>
+          <p className="num text-xs text-stone-500">
+            추적 {summaries.length}개 중 <b className="text-stone-800">50위 안 {summaries.filter((s) => s.rank !== null).length}개</b> · 5위 안 {summaries.filter((s) => s.rank !== null && s.rank <= 5).length}개 · 10위 안 {summaries.filter((s) => s.rank !== null && s.rank <= 10).length}개
+          </p>
           <div className="grid gap-2 sm:grid-cols-2">
-            {summaries.map((s) => (
+            {(allCards ? summaries : summaries.slice(0, CARD_LIMIT)).map((s) => (
               <button key={s.keyword} className={`rounded-xl px-3 py-2 text-left ring-1 ${keyword === s.keyword ? "bg-orange-50 ring-orange-300" : "bg-stone-50 ring-stone-200"}`} onClick={() => setKeyword(s.keyword)}>
                 <p className="flex items-baseline justify-between">
                   <span className="text-sm font-bold">{s.keyword}</span>
@@ -131,6 +141,12 @@ export default function MarketPage() {
               </button>
             ))}
           </div>
+          {summaries.length > CARD_LIMIT && (
+            <button className="btn-ghost w-full py-1.5 text-xs" onClick={() => setAllCards((v) => !v)}>
+              {allCards ? "순위 좋은 12개만 보기" : `모두 보기 (${summaries.length}개)`}
+            </button>
+          )}
+          </>
         )}
       </section>
 
