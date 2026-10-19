@@ -171,10 +171,15 @@ export default function MarketPage() {
                       const c = grid.cells[k][d];
                       if (!c) return <td key={d} className="px-1 text-center text-stone-200">·</td>;
                       if (c.unread) return <td key={d} className="px-1 text-center text-stone-300" title="못 읽음">×</td>;
-                      const tone = c.delta === null || c.delta === 0 ? "text-stone-700" : c.delta > 0 ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800";
+                      // 바탕색은 순위(5위 안 빨강 · 10위 안 분홍), 오르내림은 작은 화살표 (2026-10-19 사장님 요청)
+                      const top = c.rank !== null && c.rank <= 5;
+                      const tone = top ? "bg-red-500 font-bold text-white" : c.rank !== null && c.rank <= 10 ? "bg-pink-100 font-semibold text-pink-900" : "text-stone-700";
+                      const arrow = !c.delta ? null : c.delta > 0 ? "▲" : "▼";
+                      const arrowTone = top ? "text-white/80" : c.delta && c.delta > 0 ? "text-emerald-600" : "text-sky-600";
                       return (
                         <td key={d} className={`px-1 text-center ${tone}`} title={c.delta ? `${c.delta > 0 ? "▲" : "▼"} ${Math.abs(c.delta)}` : ""}>
                           {c.rank === null ? "밖" : c.rank}
+                          {arrow && <span className={`ml-px align-top text-[8px] ${arrowTone}`}>{arrow}</span>}
                         </td>
                       );
                     })}
@@ -183,7 +188,7 @@ export default function MarketPage() {
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-stone-500">숫자는 그날 순위(작을수록 좋음). 초록은 전에 읽은 날보다 올라간 날, 빨강은 내려간 날, ×는 못 읽은 날, "밖"은 50위 밖. 키워드를 누르면 아래 추이가 그 키워드로 바뀝니다. 추적 키워드는 "순위 바로 측정"에서 더할 수 있어요.</p>
+          <p className="text-xs text-stone-500">숫자는 그날 순위(작을수록 좋음). <span className="rounded bg-red-500 px-1 font-bold text-white">빨강</span>은 5위 안, <span className="rounded bg-pink-100 px-1 font-semibold text-pink-900">분홍</span>은 10위 안. 작은 <span className="text-emerald-600">▲</span>는 전에 읽은 날보다 올라간 날, <span className="text-sky-600">▼</span>는 내려간 날, ×는 못 읽은 날, "밖"은 50위 밖. 키워드를 누르면 아래 추이가 그 키워드로 바뀝니다. 추적 키워드는 "순위 바로 측정"에서 더할 수 있어요.</p>
         </section>
       )}
 
