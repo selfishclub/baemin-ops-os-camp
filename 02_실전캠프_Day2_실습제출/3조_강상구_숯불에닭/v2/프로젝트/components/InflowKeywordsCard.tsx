@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { num } from "@/lib/format";
 import type { MarketInflow } from "@/lib/export/types";
 import { inflowSummary, type InflowRange } from "@/lib/market/inflow";
@@ -23,19 +23,29 @@ export function InflowKeywordsCard({ inflow }: { inflow: MarketInflow | null | u
     ? period.start.slice(0, 7) : period.key) as InflowRange;
   const s = useMemo(() => inflowSummary({ ...inflow, collectedAt: inflow?.collectedAt ?? "", periods: { ...inflow?.periods, ...queried } }, range, new Map()), [inflow, queried, range]);
   const changePeriod = (next: string) => { setAnchor(next); setAll(false); setError(null); };
-  async function loadPeriod() {
+  const hasPeriod = s !== null;
+  const ready = !!inflow;
+  useEffect(() => {
+    if (!ready || hasPeriod) { setLoading(false); return; }
+    let cancelled = false;
     setLoading(true); setError(null);
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_HELPER_URL || "http://127.0.0.1:4599"}/smartplace/inflow`, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ start: period.start, end: period.end }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.ok) throw new Error(result.message || "이 기간을 조회하지 못했어요.");
-      setQueried(previous => ({ ...previous, [period.key]: result.period }));
-    } catch (e) { setError(e instanceof TypeError ? "자료를 받는 도우미에 연결할 수 없어요. 도우미를 켜고 다시 조회해 주세요." : e instanceof Error ? e.message : "자료를 받지 못했어요."); }
-    finally { setLoading(false); }
-  }
-
+    // 빠르게 기간을 바꿀 때 중간 선택은 조회하지 않는다.
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_HELPER_URL || "http://127.0.0.1:4599"}/smartplace/inflow`, {
+            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ start: period.start, end: period.end }),
+          });
+          const result = await response.json();
+          if (!response.ok || !result.ok) throw new Error(result.message || "이 기간을 조회하지 못했어요.");
+          if (!cancelled) setQueried(previous => ({ ...previous, [period.key]: result.period }));
+        } catch (e) {
+          if (!cancelled) setError(e instanceof TypeError ? "자료 도우미에 연결할 수 없어요. 도우미를 켠 뒤 기간을 다시 선택해 주세요." : e instanceof Error ? e.message : "자료를 받지 못했어요.");
+        } finally { if (!cancelled) setLoading(false); }
+      })();
+    }, 350);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [ready, hasPeriod, period.start, period.end, period.key]);
   if (!inflow) return null;
   return (
     <section className="card space-y-2">
@@ -44,28 +54,24 @@ export function InflowKeywordsCard({ inflow }: { inflow: MarketInflow | null | u
           손님이 검색해 들어온 말 <span className="text-xs font-normal text-stone-500">네이버검색 유입 키워드 · {new Date(inflow.collectedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", dateStyle: "short", timeStyle: "short" })} 받음</span>
         </h2>
       </div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-        <select aria-label="키워드 조회 단위" className="field min-h-[64px] bg-white px-5 sm:w-64" value={mode} disabled={loading} onChange={e => { setMode(e.target.value as InflowMode); setAll(false); setError(null); }}>
+      <div className="grid grid-cols-[104px_minmax(0,1fr)] items-stretch gap-2 sm:grid-cols-[144px_minmax(0,1fr)] sm:gap-3">
+        <select aria-label="키워드 조회 단위" className="h-14 w-full min-w-0 rounded-xl border border-stone-200 bg-white px-3 text-sm font-medium outline-none focus:border-emerald-500 disabled:opacity-60 sm:px-4" value={mode} disabled={loading} onChange={e => { setMode(e.target.value as InflowMode); setAll(false); setError(null); }}>
           <option value="daily">일간</option><option value="weekly">주간</option><option value="monthly">월간</option>
         </select>
-        <div className="hidden border-l border-stone-200 sm:my-3 sm:block" />
-        <div role="group" aria-label="키워드 조회 기간 이동" className="flex min-h-[64px] flex-1 items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white px-3">
-          <button type="button" aria-label="이전 기간" className="px-2 py-3 text-emerald-600 disabled:opacity-30" disabled={loading || period.start <= INFLOW_FIRST_DAY} onClick={() => changePeriod(moveInflowPeriod(mode, anchor, -1))}>◀</button>
-          <label className="relative flex-1 cursor-pointer text-center text-sm font-bold sm:text-base">
+        <div role="group" aria-label="키워드 조회 기간 이동" className="flex h-14 min-w-0 items-center justify-between gap-1 rounded-xl border border-stone-200 bg-white px-1 sm:gap-3 sm:px-3">
+          <button type="button" aria-label="이전 기간" className="shrink-0 px-2 py-3 text-emerald-600 disabled:opacity-30" disabled={loading || period.start <= INFLOW_FIRST_DAY} onClick={() => changePeriod(moveInflowPeriod(mode, anchor, -1))}>◀</button>
+          <label className="relative min-w-0 flex-1 cursor-pointer text-center text-xs font-semibold leading-snug sm:text-base">
             {inflowPeriodLabel(period.start, period.end)}
             <input type="date" aria-label="키워드 조회 기준 날짜" className="absolute inset-0 w-full cursor-pointer opacity-0" min={INFLOW_FIRST_DAY} max={period.latest} value={anchor} disabled={loading} onChange={e => { if (e.target.value) changePeriod(e.target.value); }} />
           </label>
-          <button type="button" aria-label="다음 기간" className="px-2 py-3 text-emerald-600 disabled:opacity-30" disabled={loading || period.end >= period.latest} onClick={() => changePeriod(moveInflowPeriod(mode, anchor, 1))}>▶</button>
+          <button type="button" aria-label="다음 기간" className="shrink-0 px-2 py-3 text-emerald-600 disabled:opacity-30" disabled={loading || period.end >= period.latest} onClick={() => changePeriod(moveInflowPeriod(mode, anchor, 1))}>▶</button>
         </div>
       </div>
-      {!s && <div className="flex flex-wrap items-center gap-3 py-2">
-        <button type="button" className="btn-primary" disabled={loading} onClick={() => void loadPeriod()}>{loading ? "조회 중…" : "이 기간 조회"}</button>
-        <span className="text-xs text-stone-500">처음 선택한 기간은 조회를 누르면 네이버에서 받아요. 받은 자료는 PC에 저장돼요.</span>
-      </div>}
+      {loading && <p role="status" className="py-2 text-sm text-stone-500">선택한 기간의 자료를 불러오는 중이에요…</p>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
 
-      {!s || !s.total ? (
-        <p className="text-sm text-stone-500">{s ? "이 기간에 네이버가 제공한 검색 키워드 자료가 없어요." : "아직 이 기간을 조회하지 않았어요."}</p>
+      {!s ? null : !s.total ? (
+        <p className="text-sm text-stone-500">이 기간에 네이버가 제공한 검색 키워드 자료가 없어요.</p>
       ) : (
         <>
           <p className="num text-sm">
