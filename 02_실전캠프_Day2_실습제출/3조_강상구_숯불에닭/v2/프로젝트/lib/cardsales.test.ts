@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardsalesMonth, CardsalesParseError, covered, mergeCardsales, mergeRanges, parseCardsalesPurchase, rangesToFetch, type CardsalesData } from "./cardsales";
+import { cardsalesMonth, CardsalesParseError, covered, isCardDeposit, mergeCardsales, mergeRanges, parseCardsalesPurchase, rangesToFetch, type CardsalesData } from "./cardsales";
 import type { Transaction } from "./types";
 
 // 여신협회 "기간별 매입내역 - 세부내역" 엑셀 모양 (카드번호는 가짜)
@@ -63,6 +63,13 @@ describe("통장과 대조", () => {
   it("장부 채널로 분류된 입금도 짝이 된다", () => {
     const m = cardsalesMonth(data, "2026-10", [tx("2026-10-02", "가맹점입금", 148800, "card_kb")], "2026-10-10");
     expect(m.checks.find((c) => c.issuer === "KB카드")!.status).toBe("일치");
+  });
+  it("다른 카드사로 분류된 입금은 글자가 겹쳐도 더하지 않는다", () => {
+    // 롯데카드 대금도 "PC-SC제일"로 들어온다 — 비씨 입금에 섞이면 안 된다
+    const lotte = tx("2026-10-13", "PC-SC제일 롯데35160008", 62370, "card_lotte");
+    expect(isCardDeposit(lotte, "card_bc")).toBe(false);
+    expect(isCardDeposit(lotte, "card_lotte")).toBe(true);
+    expect(isCardDeposit(tx("2026-10-13", "PC-SC제일 739166817B", 827548, "card_bc"), "card_bc")).toBe(true);
   });
   it("금액이 다르면 차이, 늦게 들어오면 늦게 들어옴, 통장 끝 뒤면 예정", () => {
     const m = cardsalesMonth(data, "2026-10", [tx("2026-10-02", "KB카드", 140000), tx("2026-10-06", "NH카드", 99100)], "2026-10-10");

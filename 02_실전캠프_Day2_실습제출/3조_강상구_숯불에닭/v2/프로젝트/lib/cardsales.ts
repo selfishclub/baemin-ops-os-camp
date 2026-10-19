@@ -148,6 +148,9 @@ const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) 
 export function isCardDeposit(t: Transaction, channel: ChannelId): boolean {
   if (t.in <= 0) return false;
   if (t.channel === channel) return true;
+  // 이미 다른 카드사로 분류된 입금은 남의 것이다 — 롯데카드 대금도 비씨처럼 "PC-SC제일"로 들어와서
+  // 글자만 보면 비씨 입금에 롯데 몫이 더해졌다 (2026-10-13·16 비씨 "차이")
+  if (t.channel) return false;
   const p = CARD_PRESETS.find((x) => x.id === channel);
   return !!p && p.keywords.some((k) => t.payee.toUpperCase().includes(k.toUpperCase()));
 }
