@@ -14,7 +14,8 @@ import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
 import { todayStr } from "@/lib/daily";
 import { num } from "@/lib/format";
-import { CHANGE_TODO, EMPTY_PLACE_KEYWORDS, PLACE_KEYWORDS_KEY, SLOT_HINTS, SLOT_LABELS, keywordSummaries, nextSeasonKeyword, rankGrid, rankSeries, rankText, type PlaceKeywords } from "@/lib/market/rank";
+import { CHANGE_TODO, EMPTY_PLACE_KEYWORDS, PLACE_KEYWORDS_KEY, SLOT_HINTS, SLOT_LABELS, diffSlots, keywordSummaries, nextSeasonKeyword, rankGrid, rankSeries, rankText, type PlaceKeywords } from "@/lib/market/rank";
+import { KeywordChangeEffect } from "@/components/KeywordChangeEffect";
 import { areaSummary, competitorRows, trendSummary, upcomingKeywords } from "@/lib/market/area";
 import { KEYWORD_VOLUMES_KEY, normalizeKeyword, type VolumeMap } from "@/lib/market/keywordNav";
 import { getStore } from "@/lib/storage";
@@ -580,7 +581,12 @@ export default function MarketPage() {
             <div className="rounded-xl bg-stone-50 p-3">
               <p className="flex items-center justify-between text-xs font-semibold text-stone-500">
                 바꾸는 날 할 일
-                <button className="rounded bg-stone-800 px-2 py-0.5 text-[11px] font-bold text-white" onClick={() => savePk({ ...pk, changedAt: today, todo: CHANGE_TODO.map(() => false) })}>
+                <button className="rounded bg-stone-800 px-2 py-0.5 text-[11px] font-bold text-white" onClick={() => {
+                    // 지난번 "바꿨어요" 때의 다섯 칸과 비교해 뺀 말·넣은 말을 기록한다 (바꾼 뒤 효과 카드에 쓰임)
+                    const d = pk.applied ? diffSlots(pk.applied, pk.slots) : { removed: [], added: [] };
+                    const changes = d.removed.length || d.added.length ? [...(pk.changes ?? []), { date: today, removed: d.removed, added: d.added }] : pk.changes;
+                    savePk({ ...pk, changedAt: today, todo: CHANGE_TODO.map(() => false), applied: [...pk.slots], changes });
+                  }}>
                   오늘 바꿨어요 (체크 새로)
                 </button>
               </p>
@@ -594,8 +600,10 @@ export default function MarketPage() {
                   </li>
                 ))}
               </ul>
+              {!pk.applied && <p className="mt-1.5 text-[11px] text-stone-500">스마트플레이스에서 바꾼 뒤 위 칸을 똑같이 고치고 이 단추를 누르면, 뺀 말·넣은 말이 기록돼 아래 "바꾼 뒤 효과"에서 순위 변화를 보여 드려요.</p>}
               {pk.changedAt && <p className="num mt-1.5 text-xs text-stone-500">마지막으로 바꾼 날 {pk.changedAt} → {daysSince(pk.changedAt, today) >= 7 ? "순위를 다시 측정할 때예요 (위 순위 카드)" : `${7 - daysSince(pk.changedAt, today)}일 뒤에 순위를 다시 측정해 보세요`}</p>}
             </div>
+            <KeywordChangeEffect rank={rank} pk={pk} />
           </>
         )}
       </section>

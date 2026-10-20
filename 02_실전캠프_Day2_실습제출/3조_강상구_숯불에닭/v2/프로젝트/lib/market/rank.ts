@@ -72,6 +72,16 @@ export interface PlaceKeywords {
   season: Record<string, string>; // "1".."12" 월 → 그 달에 ⑤칸에 넣을 말
   changedAt: string | null; // ⑤칸을 마지막으로 바꾼 날 (1~2주 뒤 순위 측정용)
   todo: boolean[]; // 바꾸는 날 할 일 5개 체크
+  applied?: string[]; // 마지막으로 "오늘 바꿨어요" 누른 때의 다섯 칸 (다음 바꿈과 비교용)
+  changes?: SlotChange[]; // 바꾼 기록 — 뺀 말·넣은 말 (효과 추적용)
+}
+
+/** 대표 키워드를 바꾼 기록 한 번 */
+export interface SlotChange {
+  date: string;
+  removed: string[]; // 뺀 말 (예: 테라스야장)
+  added: string[]; // 넣은 말 (예: 율량3지구)
+  note?: string;
 }
 
 export const SLOT_LABELS = ["① 지역 + 업종", "② 대표 상품", "③ 동네 · 랜드마크", "④ 용도 · 선물", "⑤ 시즌 (이 칸만 바꿔요)"] as const;
@@ -131,4 +141,76 @@ export function rankGrid(history: RankPoint[], keywords: string[], days = 14, to
     }
   }
   return { dates, keywords, cells };
+}
+
+// ── 대표 키워드 바꾼 뒤 효과 ───────────────────────────────────────────
+const squash = (k: string) => k.replace(/\s+/g, "");
+
+/** 칸마다 앞뒤 같은 부분을 떼고 바뀐 조각만 — "가성비…아이랑테라스야장" → "가성비…아이랑율량3지구" 이면 뺀 "테라스야장", 넣은 "율량3지구" */
+export function diffSlots(before: string[], after: string[]): { removed: string[]; added: string[] } {
+  const removed: string[] = [];
+  const added: string[] = [];
+  for (let i = 0; i < Math.max(before.length, after.length); i++) {
+    const a = squash(before[i] ?? "");
+    const b = squash(after[i] ?? "");
+    if (a === b) continue;
+    let p = 0;
+    while (p < a.length && p < b.length && a[p] === b[p]) p++;
+    let q = 0;
+    while (q < a.length - p && q < b.length - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
+    const r = a.slice(p, a.length - q);
+    const n = b.slice(p, b.length - q);
+    if (r) removed.push(r);
+    if (n) added.push(n);
+  }
+  return { removed, added };
+}
+
+/** 여러 키워드 앞에 공통으로 붙는 지역 말 (청주·율량·율량동) — 이 말이 겹친다고 같은 말로 치지 않는다 */
+export function regionStems(keywords: string[]): string[] {
+  const ks = keywords.map(squash).filter(Boolean);
+  const count = new Map<string, number>();
+  for (const k of ks) for (const len of [2, 3]) if (k.length > len) count.set(k.slice(0, len), (count.get(k.slice(0, len)) ?? 0) + 1);
+  return [...count.entries()].filter(([, n]) => n >= 2 && n >= ks.length * 0.2).map(([w]) => w).sort((a, b) => b.length - a.length);
+}
+
+/** 조각이 이 키워드와 관계있나 — 조각 전체가 들어 있거나, 지역 말을 뗀 뒤 두 글자 이상 말이 겹치면 ("테라스야장" ↔ "율량동야장") */
+export function touches(fragment: string, keyword: string, stems: string[] = [], minLen = 2): boolean {
+  let f = squash(fragment);
+  let k = squash(keyword);
+  if (!f || !k) return false;
+  if (k.includes(f)) return true;
+  for (const st of stems) {
+    k = k.split(st).join(" ");
+    f = f.split(st).join(" ");
+  }
+  const pieces = f.split(" ").filter((x) => x.length >= minLen);
+  for (const piece of pieces) {
+    for (let len = Math.min(piece.length, 6); len >= minLen; len--) {
+      for (let i = 0; i + len <= piece.length; i++) if (k.includes(piece.slice(i, i + len))) return true;
+    }
+  }
+  return false;
+}
+
+export interface ChangeEffectRow { keyword: string; kind: "넣은 말" | "뺀 말" | "그대로"; before: number | null; beforeDate: string | null; now: number | null; nowDate: string | null; delta: number | null }
+
+/** 바꾼 날(포함) 전 마지막 순위 vs 가장 최근 순위. delta 양수 = 올라감. 50위 밖은 51로 계산 */
+export function changeEffect(history: RankPoint[], change: SlotChange, keywords: string[]): { rows: ChangeEffectRow[]; days: number | null } {
+  const read = history.filter((p) => !p.note);
+  const lastDate = read.reduce((m, p) => (p.date > m ? p.date : m), "");
+  const rows: ChangeEffectRow[] = [];
+  const stems = regionStems(keywords);
+  for (const keyword of keywords) {
+    const kind: ChangeEffectRow["kind"] = change.added.some((f) => touches(f, keyword, stems)) ? "넣은 말" : change.removed.some((f) => touches(f, keyword, stems)) ? "뺀 말" : "그대로";
+    const mine = read.filter((p) => p.keyword === keyword).sort((a, b) => a.date.localeCompare(b.date));
+    const before = [...mine].reverse().find((p) => p.date <= change.date) ?? null;
+    const now = mine.length ? mine[mine.length - 1] : null;
+    const val = (p: RankPoint | null) => (p ? p.rank ?? 51 : null);
+    const b = val(before);
+    const n = now && now.date > change.date ? val(now) : null;
+    rows.push({ keyword, kind, before: before?.rank ?? null, beforeDate: before?.date ?? null, now: now && now.date > change.date ? now.rank : null, nowDate: now && now.date > change.date ? now.date : null, delta: b !== null && n !== null ? b - n : null });
+  }
+  const days = lastDate && lastDate > change.date ? Math.round((Date.parse(lastDate) - Date.parse(change.date)) / 86_400_000) : null;
+  return { rows, days };
 }

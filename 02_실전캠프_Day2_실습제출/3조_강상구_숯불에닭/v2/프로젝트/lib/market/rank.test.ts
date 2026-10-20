@@ -71,3 +71,34 @@ describe("키워드별 순위 변화 표", () => {
     expect(g.cells.B["2026-10-12"]).toBeUndefined();
   });
 });
+
+describe("대표 키워드 바꾼 뒤 효과", () => {
+  it("칸마다 바뀐 조각만 뽑는다", async () => {
+    const { diffSlots } = await import("./rank");
+    expect(diffSlots(["가성비느좋숨은아이랑테라스야장", "명암저수지"], ["가성비느좋숨은아이랑율량3지구", "명암저수지"])).toEqual({ removed: ["테라스야장"], added: ["율량3지구"] });
+    expect(diffSlots(["가족모임로컬근교외식문화제조창"], ["가족외식문화제조창율량3지구"])).toEqual({ removed: ["모임로컬근교외식문화제조창"], added: ["외식문화제조창율량3지구"] });
+    expect(diffSlots(["같음"], ["같 음"])).toEqual({ removed: [], added: [] });
+  });
+  it("조각 안의 두 글자 이상 말로 관계있는 키워드를 찾는다", async () => {
+    const { touches } = await import("./rank");
+    expect(touches("테라스야장", "율량동야장")).toBe(true);
+    expect(touches("테라스야장", "청주 테라스 맛집")).toBe(true);
+    expect(touches("율량3지구", "율량3지구맛집")).toBe(true);
+    expect(touches("테라스야장", "문화제조창 맛집")).toBe(false);
+    expect(touches("율량3지구", "율량동야장", ["율량동", "율량"])).toBe(false); // 지역 말만 겹치면 아님
+    const { regionStems } = await import("./rank");
+    expect(regionStems(["청주맛집", "청주닭발", "율량동맛집", "율량동닭발", "문화제조창 맛집"])).toEqual(["율량동", "청주", "율량"]);
+  });
+  it("바꾼 날까지의 마지막 순위와 그 뒤 최근 순위를 비교한다 (50위 밖은 51로)", async () => {
+    const { changeEffect } = await import("./rank");
+    const p = (date: string, keyword: string, rank: number | null): RankPoint => ({ date, keyword, rank, blog: null, visitor: null, save: null, total: null });
+    const h = [p("2026-10-19", "율량동야장", 1), p("2026-10-20", "율량동야장", 1), p("2026-10-27", "율량동야장", 4), p("2026-10-20", "율량3지구맛집", 3), p("2026-10-27", "율량3지구맛집", 1), p("2026-10-20", "문화제조창 맛집", 3), p("2026-10-27", "문화제조창 맛집", null)];
+    const r = changeEffect(h, { date: "2026-10-20", removed: ["테라스야장"], added: ["율량3지구"] }, ["율량3지구맛집", "율량동야장", "문화제조창 맛집"]);
+    expect(r.days).toBe(7);
+    expect(r.rows.map((x) => [x.keyword, x.kind, x.before, x.now, x.delta])).toEqual([
+      ["율량3지구맛집", "넣은 말", 3, 1, 2],
+      ["율량동야장", "뺀 말", 1, 4, -3],
+      ["문화제조창 맛집", "그대로", 3, null, -48],
+    ]);
+  });
+});
