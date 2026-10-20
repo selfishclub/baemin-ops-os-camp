@@ -5,6 +5,8 @@ import { Notice } from "@/components/ui";
 import { num } from "@/lib/format";
 import { adAlerts, byGroup, byKeyword, compareWeek, inspectText, keywordIds, monthlyCost, totals, weeklySeries, type NaverAdExport, type Totals } from "@/lib/market/adStats";
 import { shiftDate } from "@/lib/market/rank";
+import { adOpsAlerts, belowMinBid, bizmoneyDays, effectiveBid, exposureSummary } from "@/lib/market/adOps";
+import { SourceTag } from "@/components/SourceTag";
 
 // 광고 노트 ⑤ 성적 — 카페스이 광고 노트의 틀: 이번 주 챙길 것(위험·주의·제안) → 기간별 성적 → 주별 흐름 → 광고그룹별 → 키워드별.
 // 숫자는 도우미가 밤마다 네이버 광고 API에서 읽어 온 것. 광고비는 VAT 뺀 금액이라 청구서보다 10% 적게 보여요.
@@ -44,7 +46,16 @@ export function AdResultsSection({ ad, today, startedAt }: { ad: NaverAdExport |
   const weeks = useMemo(() => (ad ? weeklySeries(ad, today, 8) : []), [ad, today]);
   const groups = useMemo(() => (ad ? byGroup(ad, from, today) : []), [ad, from, today]);
   const kws = useMemo(() => (ad ? byKeyword(ad, from, today) : []), [ad, from, today]);
-  const alerts = useMemo(() => (ad ? adAlerts(ad, today) : []), [ad, today]);
+  // 기존 경고 + 카페스이 광고 노트에서 가져온 경고(문구 없는 묶음·최소 노출선·충전금·묶음별 급락) — 위험·주의·제안 순
+  const alerts = useMemo(() => {
+    if (!ad) return [];
+    const order = { 위험: 0, 주의: 1, 제안: 2 } as const;
+    return [...adOpsAlerts(ad, today), ...adAlerts(ad, today)].sort((a, b) => order[a.level] - order[b.level]).slice(0, 14);
+  }, [ad, today]);
+  const low = useMemo(() => (ad ? belowMinBid(ad) : []), [ad]);
+  const bm = useMemo(() => (ad ? bizmoneyDays(ad, today) : null), [ad, today]);
+  const expo = useMemo(() => (ad ? exposureSummary(ad, from, today) : null), [ad, from, today]);
+  const [showLow, setShowLow] = useState(false);
   const periodT = useMemo(() => (ad ? totals(ad.stats, ids, from, today) : null), [ad, ids, from, today]);
   const [showAllKw, setShowAllKw] = useState(false);
 
@@ -86,6 +97,11 @@ export function AdResultsSection({ ad, today, startedAt }: { ad: NaverAdExport |
             {campaign?.name ?? "–"} <span className={`ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold ${campaign?.on ? "bg-emerald-100 text-emerald-800" : "bg-stone-200 text-stone-600"}`}>{campaign?.on ? "ON" : "OFF"}</span>
           </p>
           <p className="num text-xs text-stone-500">하루 예산 {campaign?.dailyBudget ? `${num(campaign.dailyBudget)}원` : "–"}{days !== null ? ` · 켠 지 ${days}일` : ""}</p>
+          {bm && (
+            <p className={`num text-xs ${bm.days !== null && bm.days <= 7 ? "font-bold text-red-700" : "text-stone-500"}`}>
+              충전금 {num(bm.left)}원{bm.days !== null ? ` · 약 ${bm.days}일치` : ""}
+            </p>
+          )}
         </div>
         <div className="rounded-xl bg-stone-50 px-3 py-2">
           <p className="text-xs font-semibold text-stone-500">광고그룹 · 키워드</p>
@@ -106,7 +122,10 @@ export function AdResultsSection({ ad, today, startedAt }: { ad: NaverAdExport |
 
       {/* 이번 주 챙길 것 */}
       <div>
-        <p className="text-sm font-semibold">이번 주 챙길 것 <span className="text-xs font-normal text-stone-500">지난 7일을 평소 4주와 비교했어요</span></p>
+        <p className="text-sm font-semibold">
+          이번 주 챙길 것 <span className="text-xs font-normal text-stone-500">지난 7일을 평소 4주와 비교했어요</span>
+          <SourceTag from="카페스이" />
+        </p>
         {alerts.length === 0 ? (
           <p className="mt-1 text-sm text-stone-500">{hasData ? "눈에 띄는 문제가 없어요." : "아직 성적 숫자가 없어요. 검토가 끝나고 광고가 나가기 시작하면 여기에 붙어요."}</p>
         ) : (
@@ -118,6 +137,23 @@ export function AdResultsSection({ ad, today, startedAt }: { ad: NaverAdExport |
               </li>
             ))}
           </ul>
+        )}
+        {low.length > 0 && (
+          <div className="mt-2">
+            <button className="text-xs font-semibold text-red-700 underline" onClick={() => setShowLow((v) => !v)}>
+              {showLow ? "접기" : `안 뜨는 키워드 ${low.length}개 전부 보기 (지금 입찰가 → 최소 노출선)`}
+            </button>
+            {showLow && (
+              <ul className="num mt-1 grid gap-x-4 gap-y-0.5 text-xs text-stone-700 sm:grid-cols-2">
+                {low.map((x) => (
+                  <li key={x.group + x.keyword}>
+                    {x.keyword} <span className="text-stone-400">{x.group}</span> · {num(x.bid)}원 → <b className="text-red-700">{num(x.min)}원</b>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {showLow && <p className="mt-1 text-[11px] text-stone-500">최소 노출선은 네이버 "예상 입찰가"의 모바일 기준이에요. 다 올리면 비싸지니, 검색량 많은 핵심 키워드만 최소선까지 올리고 나머지는 끄는 게 좋아요.</p>}
+          </div>
         )}
       </div>
 
@@ -203,6 +239,11 @@ export function AdResultsSection({ ad, today, startedAt }: { ad: NaverAdExport |
               </tbody>
             </table>
           </div>
+          {expo && (
+            <p className="num text-xs text-stone-600">
+              켜진 키워드 {num(expo.on)}개 중 최근 {period}일 광고가 뜬 것 <b>{num(expo.shown)}개</b>, 클릭이 생긴 것 <b>{num(expo.clicked)}개</b>
+            </p>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs text-stone-500">
@@ -229,7 +270,10 @@ export function AdResultsSection({ ad, today, startedAt }: { ad: NaverAdExport |
                     <td className="text-right">{r.t.cost ? `${num(r.t.cost)}원` : "–"}</td>
                     <td className="text-right">{r.t.cpc === null ? "–" : `${num(r.t.cpc)}원`}</td>
                     <td className="text-right">{r.t.avgRank === null ? "–" : `${r.t.avgRank}위`}</td>
-                    <td className="text-right">{r.bidShown === null ? "–" : `${num(r.bidShown)}원`}</td>
+                    <td className="text-right">
+                      {r.bidShown === null ? "–" : `${num(r.bidShown)}원`}
+                      {r.k.minBid != null && (effectiveBid(ad, r.k) ?? 0) < r.k.minBid && <span className="block text-[10px] font-bold text-red-700">최소 {num(r.k.minBid)}원</span>}
+                    </td>
                     <td className="text-center">{r.k.quality === null ? "–" : `${r.k.quality}/7`}</td>
                     <td className="text-center text-xs">{inspectText(r.k)}</td>
                   </tr>

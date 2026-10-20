@@ -322,6 +322,9 @@ export const SETTING_LABEL: Record<string, string> = {
   place_keywords_v1: "대표 키워드 5칸 메모",
   market_manual_v1: "유동인구 옮겨 적기",
   cardsales_purchase_v1: "여신협회 카드 지급예정 (정산 탭)",
+  ad_week_notes_v1: "광고 주간 기록 (이번 주 바꾼 것)",
+  ad_budget_v1: "광고 월 상한·손님 1명당 한도",
+  ad_ops_checks_v1: "광고 운영 점검 (했어요 표시)",
 };
 export const settingLabel = (key: string) => SETTING_LABEL[key] ?? key;
 

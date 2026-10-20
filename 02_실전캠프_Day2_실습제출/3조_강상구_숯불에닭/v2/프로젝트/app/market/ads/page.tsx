@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AdResultsSection } from "@/components/AdResultsSection";
+import { AdWeeklyRecord } from "@/components/AdWeeklyRecord";
+import { AdBudgetCard } from "@/components/AdBudgetCard";
+import { AdOpsChecklist } from "@/components/AdOpsChecklist";
 import { SourceTag } from "@/components/SourceTag";
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
@@ -373,6 +376,9 @@ export default function AdPlanPage() {
           </section>
 
           <AdResultsSection ad={exp.naverAd} today={today} startedAt={plan.startedAt} />
+          <AdWeeklyRecord ad={exp.naverAd} today={today} log={plan.log} />
+          <AdBudgetCard ad={exp.naverAd} today={today} />
+          <AdOpsChecklist today={today} />
         </>
       )}
     </>

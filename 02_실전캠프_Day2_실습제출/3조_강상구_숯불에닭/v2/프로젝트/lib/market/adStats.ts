@@ -3,8 +3,8 @@
 import { shiftDate } from "./rank";
 
 export interface AdCampaignRow { id: string; name: string; type: string; dailyBudget: number | null; status: string; on: boolean }
-export interface AdGroupRow { id: string; campaignId: string; name: string; bid: number | null; dailyBudget: number | null; status: string; on: boolean }
-export interface AdKeywordRow { id: string; groupId: string; keyword: string; bid: number | null; useGroupBid: boolean; status: string; inspect: string | null; quality: number | null; on: boolean }
+export interface AdGroupRow { id: string; campaignId: string; name: string; bid: number | null; dailyBudget: number | null; status: string; on: boolean; adCount?: number | null }
+export interface AdKeywordRow { id: string; groupId: string; keyword: string; bid: number | null; useGroupBid: boolean; status: string; inspect: string | null; quality: number | null; on: boolean; minBid?: number | null }
 export interface AdStatRow { id: string; date: string; imp: number; clk: number; cost: number; ctr: number | null; cpc: number | null; avgRank: number | null }
 export interface NaverAdExport {
   collectedAt: string | null;
@@ -12,6 +12,7 @@ export interface NaverAdExport {
   groups: AdGroupRow[];
   keywords: AdKeywordRow[];
   stats: AdStatRow[];
+  bizmoney?: number | null; // 충전금 잔액 (도우미가 읽어 옴)
 }
 export const EXPORT_NAVERAD_KEY = "export_naverad_v1";
 
@@ -73,8 +74,10 @@ export function byGroup(d: NaverAdExport, from: string, to: string): GroupStat[]
   const pFrom = shiftDate(from, -len), pTo = shiftDate(from, -1);
   return d.groups
     .map((g) => {
-      const ids = new Set(d.keywords.filter((k) => k.groupId === g.id).map((k) => k.id));
-      return { group: g, t: totals(d.stats, ids, from, to), prev: totals(d.stats, ids, pFrom, pTo), keywords: ids.size, on: g.on };
+      const kw = new Set(d.keywords.filter((k) => k.groupId === g.id).map((k) => k.id));
+      // 그룹 자체 성적 줄이 있으면 그것을 쓴다 — 플레이스 광고그룹은 키워드가 없어서 키워드 합으로는 0이 된다
+      const ids = d.stats.some((r) => r.id === g.id) ? new Set([g.id]) : kw;
+      return { group: g, t: totals(d.stats, ids, from, to), prev: totals(d.stats, ids, pFrom, pTo), keywords: kw.size, on: g.on };
     })
     .sort((a, b) => b.t.cost - a.t.cost);
 }
