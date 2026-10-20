@@ -310,6 +310,36 @@ const Store = (() => {
   function isSynced(k) { try { return !!localStorage.getItem(SYNCED + k); } catch (_) { return false; } }
   function markSynced(k) { try { localStorage.setItem(SYNCED + k, String(Date.now())); } catch (_) { /* 무시 */ } }
 
+  /* 이름 합치기 (2026-10-20, 같은 사람이 두 이름으로 남아 랭킹에 두 번 나온 문제).
+     doc.renames = [{ id, from, to, at, keep }] — 직원 이름을 바꾸거나 두 이름을 합치면 여기에 남고,
+     문서를 열 때·합칠 때·저장할 때마다 다시 적용한다. 다른 기기의 옛 사본과 합쳐져 옛 이름이 되살아나도 곧바로 다시 합쳐진다.
+     바뀌는 곳: 할 일 완료자(by·noteBy)·미션(who)·근무표·배치(name)·교육 진도·퀴즈·급여명세(이름이 열쇠인 것)·직원 명단(중복 제거) */
+  function applyRenames(doc) {
+    const list = Array.isArray(doc && doc.renames) ? doc.renames.filter((r) => r && r.from && r.to && r.from !== r.to) : [];
+    if (!list.length) return doc;
+    const map = {}; list.forEach((r) => { map[r.from] = r.to; });
+    const to = (n) => { let x = n, i = 0; while (map[x] && i++ < 10) x = map[x]; return x; };   // 연쇄(가→나→다)도 따라간다
+    const KEYS = new Set(['by', 'noteBy', 'who', 'name']);
+    const SKIP = new Set(['renames', 'blobs', 'templates', 'settings', 'training', 'recipes', 'contracts', 'ui']);
+    const walk = (o, depth) => {
+      if (!o || typeof o !== 'object' || depth > 14) return;
+      if (Array.isArray(o)) { for (let i = 0; i < o.length; i++) { if (typeof o[i] === 'string') { if (map[o[i]]) o[i] = to(o[i]); } else walk(o[i], depth + 1); } return; }
+      Object.keys(o).forEach((k) => { if (depth === 0 && SKIP.has(k)) return; const v = o[k]; if (typeof v === 'string') { if (KEYS.has(k) && map[v]) o[k] = to(v); } else walk(v, depth + 1); });
+    };
+    walk(doc, 0);
+    const mergeKeyed = (obj) => { if (!obj || typeof obj !== 'object') return; Object.keys(obj).forEach((k) => { const t = to(k); if (t !== k) { obj[t] = { ...(obj[k] || {}), ...(obj[t] || {}) }; delete obj[k]; } }); };
+    mergeKeyed(doc.trainDone); mergeKeyed(doc.trainQuiz);
+    Object.values(doc.payroll || {}).forEach((p) => mergeKeyed(p && p.slips));
+    if (Array.isArray(doc.staff)) {   // 같은 이름이 둘이면 하나만 — 합칠 때 고른 쪽(keep)을 남긴다
+      const keep = {}; list.forEach((r) => { if (r.keep) keep[to(r.to)] = r.keep; });
+      const seen = new Set();
+      const ordered = doc.staff.slice().sort((x, y) => (keep[x.name] === x.id ? -1 : 0) - (keep[y.name] === y.id ? -1 : 0));
+      const drop = new Set(ordered.filter((st) => { if (!st || !st.name) return false; if (seen.has(st.name)) return true; seen.add(st.name); return false; }).map((st) => st.id));
+      if (drop.size) doc.staff = doc.staff.filter((st) => !drop.has(st.id));
+    }
+    return doc;
+  }
+
   /* 두 문서 합치기 — 더 최근 것(base)을 바탕으로, 목록은 합집합, 날짜별 기록은 진행된 쪽 우선 */
   function mergeDocs(a, b) {
     const newer = (a.savedAt || 0) >= (b.savedAt || 0) ? a : b;
@@ -392,6 +422,7 @@ const Store = (() => {
     }
     out.routineVer = Math.max(newer.routineVer || 0, older.routineVer || 0) || undefined;
     if (out.routineVer === undefined) delete out.routineVer;
+    const rn = unionBy(newer.renames, older.renames, 'id'); if (rn) { out.renames = rn; applyRenames(out); }   // 합친 뒤 옛 이름이 섞여 들어왔으면 다시 합친다
     return out;
   }
 
@@ -788,7 +819,7 @@ const Store = (() => {
   }
 
   return {
-    init, load, save, flush, setMeta, switchTo, dumpAll, restoreAll, loadStore, saveStore, loadShared, saveShared, watchShared,
+    init, load, save, flush, setMeta, applyRenames, switchTo, dumpAll, restoreAll, loadStore, saveStore, loadShared, saveShared, watchShared,
     supaSetConfig, supaSignIn, supaSignOut, supaEvent, supaEvents, supaTgUpdates, watchDoc,
     deviceRegister, deviceList, deviceRevoke, deviceHash, deviceForget, deviceLink, netList, netRevoke, myIp, deviceTouch, trainingDoc, trainingSave,
     get supa() { const cfg = supaCfg || supaConfig(); return { configured: !!(cfg && cfg.url && cfg.key), url: cfg ? cfg.url : '', signedIn: !!supa, anon: !!(supa && supa.anon), deviceOk: supa ? supa.deviceOk !== false : true, device: !!devKey(), viaNet: !!(supa && supa.viaNet), email: supa ? supa.email : '', libLoaded: !!(window.supabase && window.supabase.createClient) }; },

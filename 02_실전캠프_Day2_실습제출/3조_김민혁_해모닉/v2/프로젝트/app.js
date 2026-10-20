@@ -217,7 +217,7 @@ const App = (() => {
     'tankCount', 'tankCareDel', 'tankLogDel', 'deadDel', 'purchaseDel', 'purchaseCsv', 'salesDel', 'salesCsv',
     'reset', 'import', 'sampleLoad', 'sampleClear', 'fixedAdd', 'fixedEdit', 'fixedDel', 'weeklyPay', 'sper', 'toggleAskWho', 'toggleReport', 'toggleSound', 'toggleTgInstant', 'tgFind', 'tgTest', 'supaClear', 'laborConfirm', 'laborUnconfirm', 'sealUpload', 'sealDel', 'guideEdit', 'doneMemo', 'staffLockToggle',
     'cAdd', 'cDel', 'cVoid', 'cEdit', 'cSign', 'cStamp', 'cDeliver', 'cAttach', 'cFileDel', 'cSaveBack', 'sendReportNow', 'testAlarm',
-    'msApprove', 'issueDel', 'healthMonths',   // 10/15 점검: 직원이 자기 미션 승인 · 남의 글 삭제 · 보건증 유효기간 변경이 되던 구멍
+    'msApprove', 'issueDel', 'healthMonths', 'staffMerge',   // 10/15 점검: 직원이 자기 미션 승인 · 남의 글 삭제 · 보건증 유효기간 변경이 되던 구멍
   ]);
   const STAFF_ASK = new Set(['noticeAdd', 'msApprove']);   // 잠겨 있어도 버튼은 보여 주고, 누르면 비밀번호를 묻는 것
   const staffLocked = () => S.settings && S.settings.staffLock !== false && !ownerOn();
@@ -601,6 +601,7 @@ const App = (() => {
   /* 등록 안 된 기기 = 교육 자료 전용 모드. 매장 기록은 서버가 내주지 않고, 교육 진도만 RPC로 오간다 */
   let LIMITED = false, limitedTimer = null;
   function save() {
+    if (S.renames && S.renames.length) Store.applyRenames(S);   // 합친 이름이 기기 수첩 등으로 되살아나지 않게 저장 때마다
     if (!LIMITED) { Store.save(S); return; }
     clearTimeout(limitedTimer);
     limitedTimer = setTimeout(() => {
@@ -1342,7 +1343,7 @@ const App = (() => {
       if (st.id === cur) continue;
       try { const doc = await Store.loadStore(st.id); if (doc && doc.templates) { dashDocs[st.id] = doc; changed = true; } } catch (_) { /* 무시 */ }
     }
-    if (changed && view === 'dash') render();
+    if (changed && (view === 'dash' || view === 'training') && $('#modal').hidden) render();   // 랭킹(교육 자료)도 다른 매장 기록이 오면 갱신
   }
 
   /* ── 수조 관리표 ─────────────────────────────────────────── */
@@ -2859,6 +2860,37 @@ const App = (() => {
   }
 
   /* 직원 편집 대상 — 현재 매장이면 S, 아니면 불러온 다른 매장 문서 */
+  /* 이름 합치기·바꾸기 기록 — 적용은 Store.applyRenames 가 한다 */
+  function addRename(doc, from, to, keepId) {
+    doc.renames = [...(doc.renames || []).filter((r) => !(r.from === from && r.to === to)), { id: newId('rn'), from, to, at: Date.now(), keep: keepId || undefined }];
+    Store.applyRenames(doc);
+  }
+  /* 문서에 등장하는 사람 이름 전부 — 직원 명단 + 기록에만 남은 이름(퇴사자·옛 이름) */
+  function namesInDoc(doc) {
+    const out = new Set((doc.staff || []).map((x) => x.name));
+    Object.keys(doc.trainDone || {}).forEach((n) => out.add(n)); Object.keys(doc.trainQuiz || {}).forEach((n) => out.add(n));
+    (doc.missions || []).forEach((m) => { if (m.who) out.add(m.who); });
+    Object.values(doc.days || {}).forEach((d) => { Object.values((d && d.inst) || {}).forEach((r) => { if (r && r.by) out.add(r.by); }); ((d && d.extras) || []).forEach((e) => { if (e.by) out.add(e.by); }); });
+    Object.values(doc.roster || {}).forEach((rows) => (rows || []).forEach((e) => { if (e && e.name) out.add(e.name); }));
+    out.delete(''); out.delete('이름 없음'); return [...out];
+  }
+  function staffMergeModal(storeId, id) {
+    const c = staffCtx(storeId); if (!c.doc) return;
+    const s = c.doc.staff.find((x) => x.id === id); if (!s) return;
+    const staffNames = new Set(c.doc.staff.map((x) => x.name));
+    const cands = namesInDoc(c.doc).filter((n) => n !== s.name).sort((x, y) => x.localeCompare(y, 'ko'));
+    modal(`이름 합치기 → ${s.name}`, `<p class="hint keep" style="margin-top:0">같은 사람이 두 이름으로 남아 있을 때 씁니다. 고른 이름의 할 일 체크·교육 진도·퀴즈·미션·근무표 기록이 전부 <b>${esc(s.name)}</b>으로 합쳐지고, 고른 이름은 명단에서 사라집니다. 되돌릴 수 없습니다.</p>
+      <div class="mlabel">어느 이름을 합칠까요?</div>
+      <div class="roles wrap big" id="smList">${cands.length ? cands.map((n) => `<button type="button" class="rl" data-n="${esc(n)}">${esc(n)}${staffNames.has(n) ? '' : ' <small>(기록에만)</small>'}</button>`).join('') : '<span class="hint">합칠 다른 이름이 없습니다.</span>'}</div>`, () => {
+      const sel = document.querySelector('#smList .rl.on'); if (!sel) { alert('합칠 이름을 골라 주세요.'); return false; }
+      const from = sel.dataset.n;
+      if (!confirm(`「${from}」 기록을 전부 「${s.name}」으로 합칩니다. 계속할까요?`)) return false;
+      addRename(c.doc, from, s.name, s.id);
+      staffCommit(c);
+      banner(`「${from}」을 「${s.name}」으로 합쳤습니다`, '랭킹·교육 진도·지난 체크 기록이 한 사람으로 모였습니다.');
+    }, '합치기');
+    $('#smList').addEventListener('click', (e) => { const b = e.target.closest('.rl'); if (!b) return; $('#smList').querySelectorAll('.rl').forEach((x) => x.classList.remove('on')); b.classList.add('on'); });
+  }
   function staffCtx(storeId) {
     const mt = Store.meta;
     if (!mt || !storeId || storeId === mt.current) return { doc: S, cur: true };
@@ -2893,6 +2925,7 @@ const App = (() => {
         <div class="roles">${ROLES.map((x) => `<button class="rl${(s2.roles || []).includes(x) ? ' on' : ''}" data-act="staffRole" data-store="${tab}" data-id="${s2.id}" data-r="${x}">${x}</button>`).join('')}</div>
         <button class="more" data-act="staffDel" data-store="${tab}" data-id="${s2.id}" aria-label="삭제">✕</button>
         <div class="stRule">
+          <div><span class="stLbl">이름 정리</span><button class="btn sm ghost" data-act="staffMerge" data-store="${tab}" data-id="${s2.id}">다른 이름과 합치기</button> <small class="hint keep" style="display:inline">이름 칸을 고치면 지난 기록도 같이 바뀝니다</small></div>
           <label>고용 형태<select class="stSel" data-act="staffType" data-store="${tab}" data-id="${s2.id}">${Object.entries(EMP_TYPES).map(([k, v]) => `<option value="${k}"${(s2.type || 'regular') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
           <div><span class="stLbl">고정 휴무</span><div class="roles sm">${WD.map((n, i) => `<button class="rl${(s2.offDays || []).includes(i) ? ' on' : ''}" data-act="staffOff" data-store="${tab}" data-id="${s2.id}" data-d="${i}">${n}</button>`).join('')}</div></div>
           <div><span class="stLbl">기본 구간 <small>(비우면 모든 구간)</small></span><div class="roles sm">${SEGMENTS_DEFAULT.map((sg) => `<button class="rl${(s2.segs || []).includes(sg.key) ? ' on' : ''}" data-act="staffSeg" data-store="${tab}" data-id="${s2.id}" data-k="${sg.key}">${(segList().find((x) => x.key === sg.key) || sg).name}</button>`).join('')}</div></div>
@@ -6456,6 +6489,7 @@ const App = (() => {
           const c = staffCtx(b.dataset.store); if (!c.doc) return;
           c.doc.staff.push({ id: 's' + Date.now(), name: '새 직원', roles: [], active: true }); staffCommit(c); break;
         }
+        case 'staffMerge': staffMergeModal(b.dataset.store, b.dataset.id); break;
         case 'staffDel': {
           const c = staffCtx(b.dataset.store); if (!c.doc) return;
           if (c.doc.staff.length <= 1) { alert('최소 한 명은 있어야 합니다.'); return; }
@@ -6576,8 +6610,12 @@ const App = (() => {
       if (b.dataset.act === 'staffName') {
         const c = staffCtx(b.dataset.store); if (!c.doc) return;
         const s = c.doc.staff.find((x) => x.id === b.dataset.id);
-        s.name = b.value.trim() || '이름 없음';
+        const nv = b.value.trim() || '이름 없음', ov = s.name;
+        if (nv === ov) return;
+        s.name = nv;
+        if (ov && ov !== '이름 없음' && nv !== '이름 없음') addRename(c.doc, ov, nv, s.id);   // 지난 체크·교육 진도·근무표의 이름도 같이 바뀐다
         if (c.cur) save(); else Store.saveStore(c.id, c.doc);
+        render();
       }
       if (b.dataset.act === 'datePick') {
         const v = b.value;
@@ -6782,6 +6820,7 @@ const App = (() => {
   function hydrate(keepUi) {
     if (!S.ui) S.ui = { who: null, whoDate: null, filter: 'all' };
     migrateRoles(S);
+    Store.applyRenames(S);
 
     /* 루틴 갱신 — 템플릿은 저장소에 복사되므로 data.js 를 고쳐도 여기서 갈아끼워야 한다.
        지난 체크 기록(days)은 그대로 두고 목록만 교체한다. */
