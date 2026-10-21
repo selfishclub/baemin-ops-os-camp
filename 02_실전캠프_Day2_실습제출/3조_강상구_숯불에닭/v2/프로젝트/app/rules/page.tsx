@@ -25,7 +25,7 @@ import { DEFAULT_PAY_DAYS, PAY_DAYS_KEY, parsePayDays } from "@/lib/paydays";
 import { amountFor, emptyFixedCost, fixedCostGaps, FIXED_COSTS_KEY, setAmountFor, type FixedCost } from "@/lib/fixedCosts";
 import PhotoStrip from "@/components/PhotoStrip";
 import { deletePhotosOf } from "@/lib/photos";
-import { num, parseNum, won } from "@/lib/format";
+import { num, parseNum, won, fileDate } from "@/lib/format";
 import { EMPTY_PROFILE, loadStoreProfile, saveStoreProfile, searchLocations, type StoreLocation, type StoreProfile } from "@/lib/storeProfile";
 
 export default function RulesPage() {
@@ -142,7 +142,7 @@ export default function RulesPage() {
     const blob = new Blob([text], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `sootdak-ledger-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `sootdak-ledger-backup-${fileDate()}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
     // 브라우저는 파일이 실제로 저장됐는지 알려 주지 않는다. "시작했다"고만 기록하고 확인은 사장님께 맡긴다.

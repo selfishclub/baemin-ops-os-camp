@@ -15,7 +15,7 @@ import { defaultFeeRatePct } from "@/lib/costing/priceSim";
 import { mergePosReports, parsePosAbcGrid, PosParseError } from "@/lib/costing/okpos";
 import sample from "@/lib/costing/sample.json";
 import { ITEMS_KEY, MENUS_KEY, POS_KEY_PREFIX, RECIPES_KEY, type BaseUnit, type Item, type Menu, type PosSalesReport, type Recipe } from "@/lib/costing/types";
-import { num, pctText, won, parseNum } from "@/lib/format";
+import { num, pctText, won, parseNum, fileDate } from "@/lib/format";
 import { monthLabel, prevMonth } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 
@@ -370,7 +370,7 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
     const blob = new Blob([JSON.stringify({ app: "sootdak-ledger-costing", version: 1, exportedAt: new Date().toISOString(), items, menus, recipes }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `레시피_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `레시피_${fileDate()}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
     setIoNote({ tone: "ok", text: "레시피 파일을 저장했어요. 가게 노하우라 GitHub·단톡방에 올리지 마세요." });

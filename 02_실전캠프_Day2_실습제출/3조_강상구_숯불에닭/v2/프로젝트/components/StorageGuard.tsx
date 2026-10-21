@@ -1,5 +1,6 @@
 "use client";
 
+import { fileStamp } from "@/lib/format";
 import { useEffect, useRef, useState } from "react";
 import { Notice } from "@/components/ui";
 import { mb } from "@/lib/storage/errors";
@@ -72,7 +73,7 @@ export function DamagedRecovery({ read, onRecovered }: { read: Extract<LocalRead
     const blob = new Blob([read.raw], { type: "text/plain" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `sootdak-ledger-damaged-${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
+    a.download = `sootdak-ledger-damaged-${fileStamp()}.txt`;
     a.click();
     URL.revokeObjectURL(a.href);
     setNote({ tone: "info", text: "손상된 원본 내려받기를 시작했어요. 다운로드 폴더에 파일이 있는지 확인하고, 지우지 말고 보관해 주세요." });

@@ -1,5 +1,6 @@
 "use client";
 
+import { fileDate, fileStamp } from "@/lib/format";
 import { useEffect, useRef, useState } from "react";
 import { Notice } from "@/components/ui";
 import PhotoRestoreDialog from "@/components/PhotoRestoreDialog";
@@ -84,12 +85,12 @@ export default function PhotoBackupCard({ onLedgerBackup }: { onLedgerBackup?: (
         if (withLedger) {
           const text = exportBackup(); // 장부가 손상 상태면 여기서 오류 → 아래 catch
           ledgerSavedAt = (JSON.parse(text) as { savedAt?: string }).savedAt ?? null;
-          downloadText(text, `sootdak-ledger-backup-${new Date().toISOString().slice(0, 10)}.json`, "application/json");
+          downloadText(text, `sootdak-ledger-backup-${fileDate()}.json`, "application/json");
           markBackupStarted();
           onLedgerBackup?.();
         }
         const zip = await makeZip(ledgerSavedAt);
-        const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        const stamp = fileStamp();
         downloadBytes(zip, `sootdak-ledger-photos-${stamp}.zip`, "application/zip");
         markPhotoBackupStarted();
         setTick((t) => t + 1);

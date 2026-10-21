@@ -1,5 +1,6 @@
 "use client";
 
+import { fileStamp } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { Notice } from "@/components/ui";
 import { countPhotosByOwner } from "@/lib/photos";
@@ -67,7 +68,7 @@ export default function RestoreDialog({ file, current, onClose, onRestored }: { 
   }, [file]);
 
   function downloadPreBackup() {
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const stamp = fileStamp();
     if (damaged) download(current.raw, `sootdak-ledger-damaged-${stamp}.txt`, "text/plain");
     else download(exportBackup(), `sootdak-ledger-before-restore-${stamp}.json`);
     setPreBackupStarted(true);
