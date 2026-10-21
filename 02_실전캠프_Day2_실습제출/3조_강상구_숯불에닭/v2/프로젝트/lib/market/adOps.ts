@@ -25,6 +25,12 @@ export function spendIds(d: NaverAdExport): Set<string> {
   return new Set(d.keywords.map((k) => k.id));
 }
 
+/** 플레이스 캠페인의 광고그룹 — 키워드가 없고, 광고 문구 수(adCount)를 API 가 0 으로 돌려준다 */
+export function placeGroupIds(d: NaverAdExport): Set<string> {
+  const place = new Set(d.campaigns.filter((c) => c.type === "PLACE").map((c) => c.id));
+  return new Set(d.groups.filter((g) => place.has(g.campaignId)).map((g) => g.id));
+}
+
 /** 그 날이 속한 주의 월요일 */
 export function mondayOf(date: string): string {
   const dow = new Date(`${date}T00:00:00Z`).getUTCDay(); // 0=일
@@ -118,8 +124,15 @@ export function belowMinBid(d: NaverAdExport): { keyword: string; group: string;
 /** 충전금이 며칠치 남았나 (최근 14일 하루 평균, VAT 포함) */
 export function bizmoneyDays(d: NaverAdExport, today: string): { left: number; perDay: number; days: number | null } | null {
   if (d.bizmoney == null) return null;
-  const t = totals(d.stats, spendIds(d), shiftDate(today, -13), today);
-  const perDay = Math.round((t.cost * VAT) / 14);
+  const ids = spendIds(d);
+  const from = shiftDate(today, -13);
+  const t = totals(d.stats, ids, from, today);
+  // 최근 14일 중 광고를 켠 뒤 지난 날로 나눈다 — 켠 지 하루면 하루치로 (14로 나누면 며칠치가 부풀려진다)
+  //  끝은 성적이 들어온 마지막 날 — 오늘처럼 아직 성적이 없는 날까지 세면 하루 광고비가 작게 잡힌다
+  const spent = d.stats.filter((r) => ids.has(r.id) && r.date >= from && r.date <= today && r.cost > 0).map((r) => r.date).sort();
+  const last = d.stats.filter((r) => r.date <= today).map((r) => r.date).sort().pop() ?? today;
+  const days = spent.length ? Math.floor((Date.parse(last) - Date.parse(spent[0])) / 86_400_000) + 1 : 14;
+  const perDay = Math.round((t.cost * VAT) / Math.max(1, Math.min(14, days)));
   return { left: d.bizmoney, perDay, days: perDay > 0 ? Math.floor(d.bizmoney / perDay) : null };
 }
 
@@ -137,7 +150,8 @@ export function adOpsAlerts(d: NaverAdExport, today: string): AdAlert[] {
   const uTo = shiftDate(from, -1);
 
   // 광고 문구 없는 묶음 — 키워드가 있어도 광고가 안 나간다
-  const noCopy = d.groups.filter((g) => g.on && g.adCount === 0);
+  const place = placeGroupIds(d);
+  const noCopy = d.groups.filter((g) => g.on && g.adCount === 0 && !place.has(g.id));
   if (noCopy.length) out.push({ level: "위험", text: `광고 문구가 없는 묶음 ${noCopy.length}개 (${noCopy.map((g) => g.name).join(", ")}) — 문구가 없으면 광고가 안 나가요. 광고주센터에서 문구를 하나 이상 넣으세요` });
 
   // 최소 노출선보다 낮은 입찰가

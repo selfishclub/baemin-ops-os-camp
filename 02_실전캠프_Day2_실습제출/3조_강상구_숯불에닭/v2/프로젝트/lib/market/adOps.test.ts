@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CHANNELS } from "../categories";
-import { adOpsAlerts, belowMinBid, bizmoneyDays, budgetPlan, customerAdLimit, exposureSummary, hallVersusUsual, mondayOf, weeklyRecord } from "./adOps";
+import { adOpsAlerts, belowMinBid, bizmoneyDays, budgetPlan, customerAdLimit, exposureSummary, hallVersusUsual, mondayOf, placeGroupIds, weeklyRecord } from "./adOps";
 import type { NaverAdExport } from "./adStats";
 
 const base = (): NaverAdExport => ({
@@ -73,6 +73,20 @@ describe("경고", () => {
     expect(a.find((x) => x.text.includes("충전금"))?.level).toBe("주의"); // 10일치
     d.bizmoney = 15_000;
     expect(adOpsAlerts(d, "2026-10-20").find((x) => x.text.includes("충전금"))?.level).toBe("위험"); // 5일치
+  });
+  it("켠 지 하루면 하루치 광고비로 며칠 버틸지 센다 (14로 나누지 않는다)", () => {
+    const d = base();
+    d.bizmoney = 49_224;
+    d.stats.push({ id: "c2", date: "2026-10-21", imp: 299, clk: 10, cost: 776, ctr: 3.34, cpc: 78, avgRank: 6.2 });
+    expect(bizmoneyDays(d, "2026-10-21")).toEqual({ left: 49_224, perDay: 854, days: 57 });
+    expect(bizmoneyDays(d, "2026-10-22")?.days).toBe(57); // 다음 날 아침(그날 성적 없음)에 봐도 같다
+  });
+  it("플레이스 묶음은 키워드·광고 문구가 없어도 '문구 없는 묶음'으로 경고하지 않는다", () => {
+    const d = base();
+    d.groups[2].adCount = 0; // 평일낮 회식 (플레이스)
+    d.groups[1].adCount = 1;
+    expect(adOpsAlerts(d, "2026-10-20").some((x) => x.text.includes("광고 문구가 없는 묶음"))).toBe(false);
+    expect([...placeGroupIds(d)]).toEqual(["g3"]);
   });
   it("묶음 클릭 급락과 유난히 비싼 묶음", () => {
     const d = base();

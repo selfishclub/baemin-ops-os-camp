@@ -3,9 +3,9 @@
 import { useMemo, useState } from "react";
 import { Notice } from "@/components/ui";
 import { num } from "@/lib/format";
-import { adAlerts, byGroup, byKeyword, compareWeek, inspectText, keywordIds, monthlyCost, totals, weeklySeries, type NaverAdExport, type Totals } from "@/lib/market/adStats";
+import { adAlerts, byGroup, byKeyword, compareWeek, inspectText, monthlyCost, totals, weeklySeries, type NaverAdExport, type Totals } from "@/lib/market/adStats";
 import { shiftDate } from "@/lib/market/rank";
-import { adOpsAlerts, belowMinBid, bizmoneyDays, effectiveBid, exposureSummary } from "@/lib/market/adOps";
+import { adOpsAlerts, belowMinBid, bizmoneyDays, effectiveBid, exposureSummary, placeGroupIds, spendIds } from "@/lib/market/adOps";
 import { SourceTag } from "@/components/SourceTag";
 
 // 광고 노트 ⑤ 성적 — 카페스이 광고 노트의 틀: 이번 주 챙길 것(위험·주의·제안) → 기간별 성적 → 주별 흐름 → 광고그룹별 → 키워드별.
@@ -41,9 +41,11 @@ function Tile({ label, t, u, kind }: { label: string; t: Totals; u: Totals; kind
 export function AdResultsSection({ ad, today, startedAt }: { ad: NaverAdExport | null; today: string; startedAt: string | null }) {
   const [period, setPeriod] = useState<7 | 14 | 30>(7);
   const from = shiftDate(today, -(period - 1));
-  const ids = useMemo(() => (ad ? keywordIds(ad) : new Set<string>()), [ad]);
-  const cmp = useMemo(() => (ad ? compareWeek(ad, today) : null), [ad, today]);
-  const weeks = useMemo(() => (ad ? weeklySeries(ad, today, 8) : []), [ad, today]);
+  // 합계·주별 흐름은 광고비 전체로 — 캠페인 성적이 있으면 캠페인(파워링크+플레이스), 없으면 키워드 합. 플레이스 광고는 키워드가 없어서 키워드만 더하면 빠진다 (2026-10-22)
+  const ids = useMemo(() => (ad ? spendIds(ad) : new Set<string>()), [ad]);
+  const placeGroups = useMemo(() => (ad ? placeGroupIds(ad) : new Set<string>()), [ad]);
+  const cmp = useMemo(() => (ad ? compareWeek(ad, today, ids) : null), [ad, today, ids]);
+  const weeks = useMemo(() => (ad ? weeklySeries(ad, today, 8, ids) : []), [ad, today, ids]);
   const groups = useMemo(() => (ad ? byGroup(ad, from, today) : []), [ad, from, today]);
   const kws = useMemo(() => (ad ? byKeyword(ad, from, today) : []), [ad, from, today]);
   // 기존 경고 + 카페스이 광고 노트에서 가져온 경고(문구 없는 묶음·최소 노출선·충전금·묶음별 급락) — 위험·주의·제안 순
@@ -222,7 +224,7 @@ export function AdResultsSection({ ad, today, startedAt }: { ad: NaverAdExport |
                 {groups.map((g) => (
                   <tr key={g.group.id} className={g.on ? "" : "text-stone-400"}>
                     <td className="py-1 font-semibold">
-                      {g.group.name} <span className="text-[11px] font-normal text-stone-400">{g.keywords}개</span>
+                      {g.group.name} <span className="text-[11px] font-normal text-stone-400">{placeGroups.has(g.group.id) ? "플레이스" : `${g.keywords}개`}</span>
                     </td>
                     <td className="text-right">
                       {num(g.t.cost)}원<Delta now={g.t.cost} before={g.prev.cost} unit="원" goodUp={false} />
