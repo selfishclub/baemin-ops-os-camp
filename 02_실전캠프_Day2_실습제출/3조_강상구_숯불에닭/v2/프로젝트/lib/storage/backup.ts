@@ -325,6 +325,11 @@ export const SETTING_LABEL: Record<string, string> = {
   ad_week_notes_v1: "광고 주간 기록 (이번 주 바꾼 것)",
   ad_budget_v1: "광고 월 상한·손님 1명당 한도",
   ad_ops_checks_v1: "광고 운영 점검 (했어요 표시)",
+  neighborhood_journal_v1: "짧은 장사 일지 (상권 탭)",
+  neighborhood_parking_v1: "주차 관찰 기록 (상권 탭)",
+  neighborhood_tables_v1: "전체 테이블 수 설정",
+  neighborhood_visitors_v1: "관광 데이터랩 율량·사천동 방문자",
+  neighborhood_bus_v1: "청주 버스 정류소 일별 승하차",
 };
 export const settingLabel = (key: string) => SETTING_LABEL[key] ?? key;
 

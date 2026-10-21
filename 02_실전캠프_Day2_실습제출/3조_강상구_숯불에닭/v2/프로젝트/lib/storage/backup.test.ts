@@ -300,3 +300,29 @@ describe("13. 설정만 골라 되살리기", () => {
     expect(after.data.settings.find((s) => s.key === "ad_plan_v1")?.value).toEqual({ items: [1, 2] });
   });
 });
+
+describe("오늘 동네와 우리 가게 — 일지·주차 기록도 백업에 들어간다", () => {
+  it("저장 → 백업 → 다른 장부에 복원하면 그대로, 설정만 골라 되살려도 매출은 안 건드린다", async () => {
+    const s = new LocalStore();
+    await s.saveDailySales("2026-10-21", [sale("2026-10-21")]);
+    const j = [{ id: "j1", date: "2026-10-21", time: "20:00", seated: 0, totalTables: 12, street: "한산함", nearby: null, tags: ["날씨"], memo: "가짜 메모", teamsIn: null, savedAt: "" }];
+    const p = [{ id: "p1", lot: "율량동 주차타워", date: "2026-10-21", time: "19:55", sourceTime: null, total: 107, available: 90, method: "직접 입력", note: "", savedAt: "" }];
+    await s.saveSetting("neighborhood_journal_v1", j);
+    await s.saveSetting("neighborhood_parking_v1", p);
+    const text = exportBackup();
+
+    fake.clear();
+    await new LocalStore().saveDailySales("2026-10-22", [sale("2026-10-22", "hall_card", 70000)]);
+    const insp = inspectBackup(text);
+    expect(insp.ok).toBe(true);
+    if (!insp.ok) return;
+    expect(insp.summary.settingKeys).toEqual(expect.arrayContaining(["neighborhood_journal_v1", "neighborhood_parking_v1"]));
+    expect(settingChoices(insp.data, null).find((c) => c.key === "neighborhood_journal_v1")?.label).toBe("짧은 장사 일지 (상권 탭)");
+
+    mergeSettings(insp.data, ["neighborhood_journal_v1", "neighborhood_parking_v1"]);
+    const r = new LocalStore();
+    expect(await r.getSetting("neighborhood_journal_v1")).toEqual(j); // seated 0 은 0 그대로 (빈 값과 다름)
+    expect(await r.getSetting("neighborhood_parking_v1")).toEqual(p);
+    expect((await r.listAllDailySales()).map((x) => x.date)).toEqual(["2026-10-22"]); // 지금 매출은 그대로
+  });
+});

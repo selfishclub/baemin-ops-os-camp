@@ -9,6 +9,7 @@ import { HistorySalesCard } from "@/components/HistorySalesCard";
 import { MarketInsightCard } from "@/components/MarketInsightCard";
 import { MarketManualCard } from "@/components/MarketManualCard";
 import { MarketYearTrend } from "@/components/MarketYearTrend";
+import { NeighborhoodToday } from "@/components/NeighborhoodToday";
 import { RankCheckCard } from "@/components/RankCheckCard";
 import { useExport } from "@/components/useExport";
 import { Notice } from "@/components/ui";
@@ -138,6 +139,9 @@ export default function MarketPage() {
   return (
     <>
       <ExportStatusLine exp={exp} need="순위 · 동네 조사" />
+
+      {/* 오늘 동네와 우리 가게 — 같은 시각의 주변·매장 기록 (docs/오늘동네와우리가게 PRD v1) */}
+      <NeighborhoodToday center={exp.market?.area?.center ?? null} />
 
       {/* 순위 요약 */}
       <section className="card space-y-2">
