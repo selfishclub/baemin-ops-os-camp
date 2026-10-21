@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Notice } from "@/components/ui";
 import { mb } from "@/lib/storage/errors";
 import { onStorageFailure, type StorageFailedDetail } from "@/lib/storage/events";
-import { inspectLocal, type LocalRead } from "@/lib/storage/local";
+import { initLocalStorage, inspectLocal, type LocalRead } from "@/lib/storage/local";
 import RestoreDialog from "@/components/RestoreDialog";
 
 // 저장소가 실패했을 때 화면에 보이는 두 가지:
@@ -53,9 +53,10 @@ export function StorageFailureToast({ failure, onDismiss }: { failure: StorageFa
 
 export function useLocalHealth(enabled: boolean) {
   const [health, setHealth] = useState<LocalRead | null>(null);
+  // 처음 한 번은 장부 창고 준비(작은 서랍 → 큰 창고 옮기기)가 끝난 뒤에 확인한다
   const recheck = () => {
     if (!enabled) return;
-    setHealth(inspectLocal());
+    void initLocalStorage().then(() => setHealth(inspectLocal()));
   };
   useEffect(recheck, [enabled]); // eslint-disable-line react-hooks/exhaustive-deps
   return { health, recheck };

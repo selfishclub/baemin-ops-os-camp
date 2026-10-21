@@ -34,10 +34,10 @@ export function SettingsRestoreCard({ onDone }: { onDone?: () => void }) {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  function apply() {
+  async function apply() {
     if (!inspection || picked.size === 0) return;
     try {
-      const r = mergeSettings(inspection.data, [...picked]);
+      const r = await mergeSettings(inspection.data, [...picked]);
       window.dispatchEvent(new CustomEvent(EXPORT_UPDATED_EVENT));
       setMsg({ tone: "ok", text: `설정 ${r.added.length + r.replaced.length}개를 넣었어요 (새로 ${r.added.length} · 덮어씀 ${r.replaced.length}). 거래·매출은 그대로예요. 리뷰·상권 탭을 열면 보여요.` });
       setInspection(null);

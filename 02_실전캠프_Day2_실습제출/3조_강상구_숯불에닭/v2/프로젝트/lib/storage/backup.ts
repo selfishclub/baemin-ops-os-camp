@@ -298,8 +298,8 @@ export function canRestore(g: RestoreGate): boolean {
 
 // ── 쓰기 ─────────────────────────────────────────────────────────
 // 한 번의 setItem. 지우고 다시 쓰지 않는다 — 실패하면 브라우저가 이전 값을 그대로 둔다.
-export function applyBackup(inspection: Extract<BackupInspection, { ok: true }>): LocalData {
-  writeLocal(inspection.data);
+export async function applyBackup(inspection: Extract<BackupInspection, { ok: true }>): Promise<LocalData> {
+  await writeLocal(inspection.data);
   return inspection.data;
 }
 
@@ -349,7 +349,7 @@ export function settingChoices(backup: LocalData, current: LocalData | null): Se
 }
 
 /** 고른 설정 키만 백업에서 꺼내 지금 장부에 넣는다 (한 번의 쓰기). 거래·매출 등 다른 칸은 그대로 */
-export function mergeSettings(backup: LocalData, keys: string[]): { added: string[]; replaced: string[] } {
+export async function mergeSettings(backup: LocalData, keys: string[]): Promise<{ added: string[]; replaced: string[] }> {
   const current = readLocal();
   const want = new Set(keys);
   const fromBackup = backup.settings.filter((s) => want.has(s.key));
@@ -357,6 +357,6 @@ export function mergeSettings(backup: LocalData, keys: string[]): { added: strin
   const added = fromBackup.filter((s) => !existing.has(s.key)).map((s) => s.key);
   const replaced = fromBackup.filter((s) => existing.has(s.key)).map((s) => s.key);
   const settings = [...current.settings.filter((s) => !want.has(s.key)), ...fromBackup];
-  writeLocal({ ...current, settings });
+  await writeLocal({ ...current, settings });
   return { added, replaced };
 }

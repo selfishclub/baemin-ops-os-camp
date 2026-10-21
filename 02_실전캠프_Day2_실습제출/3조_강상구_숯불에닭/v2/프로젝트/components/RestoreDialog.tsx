@@ -73,10 +73,10 @@ export default function RestoreDialog({ file, current, onClose, onRestored }: { 
     setPreBackupStarted(true);
   }
 
-  function restore() {
+  async function restore() {
     if (!inspection?.ok || !canRestore({ hasCurrent, typed, preBackupConfirmed })) return;
     try {
-      applyBackup(inspection);
+      await applyBackup(inspection);
       try {
         window.localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString()); // 방금 사전 백업을 받았으니 백업 시각으로 친다
       } catch {}

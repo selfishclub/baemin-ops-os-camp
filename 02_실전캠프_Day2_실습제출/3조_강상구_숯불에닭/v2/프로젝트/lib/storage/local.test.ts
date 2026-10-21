@@ -128,12 +128,12 @@ describe("손상된 장부", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.kind).toBe("unavailable");
   });
-  it("백업 파일로 복원하는 길은 열려 있다 (복구 경로)", () => {
+  it("백업 파일로 복원하는 길은 열려 있다 (복구 경로)", async () => {
     fake.map.set(LOCAL_KEY, damagedRaw);
     const backup = JSON.stringify({ app: "sootdak-ledger", version: 1, savedAt: "2026-10-01T00:00:00Z", data: { ...emptyData(), rules: [sampleRule], transactions: [] } });
     const ins = inspectBackup(backup);
     expect(ins.ok).toBe(true);
-    if (ins.ok) applyBackup(ins);
+    if (ins.ok) await applyBackup(ins);
     const r = inspectLocal();
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.data.rules).toEqual([sampleRule]);
@@ -165,9 +165,9 @@ describe("저장 실패 (공간 부족 등)", () => {
     expect(got[0].kind).toBe("write");
     expect(fake.map.has(LOCAL_KEY)).toBe(false);
   });
-  it("writeLocal 도 같은 규칙으로 던진다 (복원 경로에서도 실패가 숨지 않는다)", () => {
+  it("writeLocal 도 같은 규칙으로 던진다 (복원 경로에서도 실패가 숨지 않는다)", async () => {
     fake.failNextSet = quotaError();
-    expect(() => writeLocal(emptyData())).toThrow(StorageFullError);
+    await expect(writeLocal(emptyData())).rejects.toThrow(StorageFullError);
   });
 });
 

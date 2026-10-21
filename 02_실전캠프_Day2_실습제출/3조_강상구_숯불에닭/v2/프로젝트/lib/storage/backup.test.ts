@@ -227,11 +227,11 @@ describe("9·10. 저장 공간 부족으로 복원 실패 → 기존 데이터 �
     expect(ins.ok).toBe(true);
     if (!ins.ok) return;
     fake.failNextSet = Object.assign(new Error("full"), { name: "QuotaExceededError" });
-    expect(() => applyBackup(ins)).toThrow(StorageFullError);
+    await expect(applyBackup(ins)).rejects.toThrow(StorageFullError);
     expect(fake.map.get(LOCAL_KEY)).toBe(before);
     expect(JSON.parse(before!).transactions[0].id).toBe("keep");
   });
-  it("성공하면 한 번의 쓰기로 바뀐다 (지우고 다시 쓰지 않음)", () => {
+  it("성공하면 한 번의 쓰기로 바뀐다 (지우고 다시 쓰지 않음)", async () => {
     fake.map.set(LOCAL_KEY, JSON.stringify({ ...emptyData(), transactions: [tx("old")] }));
     const ins = inspectBackup(wrap(fakeData()));
     if (!ins.ok) throw new Error("검사 실패");
@@ -239,7 +239,7 @@ describe("9·10. 저장 공간 부족으로 복원 실패 → 기존 데이터 �
     fake.removeItem = () => {
       removed = true;
     };
-    applyBackup(ins);
+    await applyBackup(ins);
     expect(removed).toBe(false);
     const r = inspectLocal();
     expect(r.ok && r.data.transactions.length).toBe(3);
@@ -247,13 +247,13 @@ describe("9·10. 저장 공간 부족으로 복원 실패 → 기존 데이터 �
 });
 
 describe("11. 손상된 장부에서 복원", () => {
-  it("손상 상태에서도 검사·적용이 되고, 적용 전에는 손상 원본이 그대로다", () => {
+  it("손상 상태에서도 검사·적용이 되고, 적용 전에는 손상 원본이 그대로다", async () => {
     const damaged = '{"transactions":[{"id":"t1"';
     fake.map.set(LOCAL_KEY, damaged);
     const ins = inspectBackup(wrap(fakeData()));
     expect(ins.ok).toBe(true);
     expect(fake.map.get(LOCAL_KEY)).toBe(damaged);
-    if (ins.ok) applyBackup(ins);
+    if (ins.ok) await applyBackup(ins);
     expect(inspectLocal().ok).toBe(true);
   });
 });
@@ -280,7 +280,7 @@ describe("12. JSON 복원 후 사진 연결 위험", () => {
 });
 
 describe("13. 설정만 골라 되살리기", () => {
-  it("백업에만 있는 설정이 먼저 오고, 고른 키만 들어가며 거래·매출은 그대로", () => {
+  it("백업에만 있는 설정이 먼저 오고, 고른 키만 들어가며 거래·매출은 그대로", async () => {
     const current: LocalData = { ...emptyData(), transactions: [tx("new1", "2026-10", "2026-10-16")], dailySales: [sale("2026-10-16")], settings: [{ key: "channels", value: [1] }] };
     fake.setItem(LOCAL_KEY, JSON.stringify(current));
     const backup: LocalData = { ...emptyData(), transactions: [tx("old1")], settings: [{ key: "channels", value: [] }, { key: "ad_plan_v1", value: { items: [1, 2] } }, { key: "keyword_nav_v1", value: { regions: [] } }] };
@@ -289,7 +289,7 @@ describe("13. 설정만 골라 되살리기", () => {
     expect(choices[0].inCurrent).toBe(false);
     expect(choices[2].inCurrent).toBe(true);
     expect(choices[0].label).toContain("광고 시작안");
-    const r = mergeSettings(backup, ["ad_plan_v1", "keyword_nav_v1"]);
+    const r = await mergeSettings(backup, ["ad_plan_v1", "keyword_nav_v1"]);
     expect(r.added.sort()).toEqual(["ad_plan_v1", "keyword_nav_v1"]);
     expect(r.replaced).toEqual([]);
     const after = inspectLocal();
@@ -319,7 +319,7 @@ describe("오늘 동네와 우리 가게 — 일지·주차 기록도 백업에 
     expect(insp.summary.settingKeys).toEqual(expect.arrayContaining(["neighborhood_journal_v1", "neighborhood_parking_v1"]));
     expect(settingChoices(insp.data, null).find((c) => c.key === "neighborhood_journal_v1")?.label).toBe("짧은 장사 일지 (상권 탭)");
 
-    mergeSettings(insp.data, ["neighborhood_journal_v1", "neighborhood_parking_v1"]);
+    await mergeSettings(insp.data, ["neighborhood_journal_v1", "neighborhood_parking_v1"]);
     const r = new LocalStore();
     expect(await r.getSetting("neighborhood_journal_v1")).toEqual(j); // seated 0 은 0 그대로 (빈 값과 다름)
     expect(await r.getSetting("neighborhood_parking_v1")).toEqual(p);

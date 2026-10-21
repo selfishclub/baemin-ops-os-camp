@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { mb } from "@/lib/storage/errors";
-import { readLastBackupAt, readLastBackupConfirmedAt, storageUsage, type StorageUsage } from "@/lib/storage/local";
+import { readLastBackupAt, readLastBackupConfirmedAt, storageBackend, storageUsage, type StorageUsage } from "@/lib/storage/local";
 
 // 규칙 탭 "데이터 관리" 안에 보이는 저장 공간·백업 상태.
 // 브라우저는 한도를 알려 주지 않으므로 "추정"이라고 적는다. 백업 시각은 "내려받기를 시작한" 시각이다.
@@ -48,7 +48,9 @@ export default function StorageUsageCard({ refreshKey = 0 }: { refreshKey?: numb
         <div className={`h-full ${bar}`} style={{ width: `${pct}%` }} />
       </div>
       <p className="text-xs text-stone-500">
-        브라우저가 정확한 한도를 알려 주지 않아요. 보통 5MB 안팎이라 그 값으로 어림했어요 ({pct}%).
+        {storageBackend() === "idb"
+          ? `장부는 크롬의 큰 창고(IndexedDB)에 있어요. 한도는 컴퓨터 디스크 여유에 따라 브라우저가 정해요 (${pct}%).`
+          : `장부는 크롬의 작은 서랍(localStorage)에 있어요. 브라우저가 정확한 한도를 알려 주지 않아 보통 5MB 안팎으로 어림했어요 (${pct}%).`}
         {usage.level !== "ok" && <b className="text-red-700"> 공간이 거의 찼어요. 백업 파일을 받은 뒤 오래된 달을 정리하세요.</b>}
       </p>
       <div className={`rounded-lg px-2 py-1.5 text-xs ${backup.tone === "ok" ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}>

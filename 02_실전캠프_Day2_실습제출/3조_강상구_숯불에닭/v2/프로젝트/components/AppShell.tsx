@@ -144,7 +144,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const body =
     health && !health.ok ? (
       <DamagedRecovery read={health} onRecovered={recheck} />
-    ) : cloud && !ready ? null : cloud && !session ? (
+    ) : mode === "local" && !health ? null : cloud && !ready ? null : cloud && !session ? (
       <LoginScreen />
     ) : month ? (
       <MonthContext.Provider value={{ month, setMonth }}>{children}</MonthContext.Provider>

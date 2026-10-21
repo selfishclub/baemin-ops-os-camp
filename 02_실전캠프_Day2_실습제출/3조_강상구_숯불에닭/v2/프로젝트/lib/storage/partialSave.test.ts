@@ -87,13 +87,13 @@ describe("같은 저장소에서 한 번에 쓰면 부분 저장이 없다 (권�
   it("LocalStore 의 한 번의 update 는 전부 되거나 전부 안 된다", async () => {
     const store = new LocalStore();
     // 지금 인터페이스에는 '여러 항목을 한 번에' 쓰는 함수가 없다. 아래는 그런 함수가 있다면 어떻게 되는지를 private update 로 보인 것.
-    const combined = (s: LocalStore) => (s as unknown as { update: (fn: (d: ReturnType<typeof data>) => ReturnType<typeof data>) => void }).update;
+    const combined = (s: LocalStore) => (s as unknown as { update: (fn: (d: ReturnType<typeof data>) => ReturnType<typeof data>) => Promise<void> }).update;
     fake.failOnWriteNumber = 1;
-    expect(() => combined(store).call(store, (d) => ({ ...d, dailySales: [{ date: "2026-09-05", channel: "hall_card", amount: 1 }], shifts: [{ date: "2026-09-05", staffId: "s1", hours: 1 }] }))).toThrow(StorageFullError);
+    await expect(combined(store).call(store, (d) => ({ ...d, dailySales: [{ date: "2026-09-05", channel: "hall_card", amount: 1 }], shifts: [{ date: "2026-09-05", staffId: "s1", hours: 1 }] }))).rejects.toThrow(StorageFullError);
     expect(data().dailySales.length).toBe(0);
     expect(data().shifts.length).toBe(0);
     fake.failOnWriteNumber = null;
-    combined(store).call(store, (d) => ({ ...d, dailySales: [{ date: "2026-09-05", channel: "hall_card", amount: 1 }], shifts: [{ date: "2026-09-05", staffId: "s1", hours: 1 }] }));
+    await combined(store).call(store, (d) => ({ ...d, dailySales: [{ date: "2026-09-05", channel: "hall_card", amount: 1 }], shifts: [{ date: "2026-09-05", staffId: "s1", hours: 1 }] }));
     expect(data().dailySales.length).toBe(1);
     expect(data().shifts.length).toBe(1);
   });
