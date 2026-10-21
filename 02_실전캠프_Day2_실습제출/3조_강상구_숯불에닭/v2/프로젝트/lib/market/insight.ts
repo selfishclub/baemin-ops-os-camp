@@ -1,5 +1,5 @@
 import type { DailyWeather } from "@/lib/weather";
-import { dayTotal, type HistoryDay } from "@/lib/history";
+import { dayTotal, ledgerMonths, type HistoryDay } from "@/lib/history";
 import type { Shift } from "@/lib/types";
 import type { SbizReport } from "./sbizReport";
 
@@ -164,10 +164,14 @@ export function monthPace(report: SbizReport | null, days: DaySales[], today: st
   return { thisPerDay, lastPerDay, ours: round1(((thisPerDay - lastPerDay) / lastPerDay) * 100), area, days: cur.length };
 }
 
-/** 장부 매출 + 장부 쓰기 전 지난 매출(포스 홀 + 받아 둔 배달). 같은 날은 장부가 먼저 */
+/** 장부 매출 + 장부 쓰기 전 지난 매출(포스 홀 + 받아 둔 배달).
+ *  같은 날이 둘 다 있으면 장부가 제대로 들어간 달(15일 이상)은 장부, 아닌 달(장부 시작 달처럼 배달만 먼저 들어간 날)은 지난 매출 */
 export function withHistory(days: DaySales[], history: HistoryDay[]): DaySales[] {
-  const have = new Set(days.map((d) => d.date));
-  return [...days, ...history.filter((h) => !have.has(h.date)).map((h) => ({ date: h.date, total: dayTotal(h) }))].sort((a, b) => a.date.localeCompare(b.date));
+  const full = ledgerMonths(days.map((d) => d.date));
+  const hist = new Map(history.filter((h) => dayTotal(h) > 0).map((h) => [h.date, h]));
+  const kept = days.filter((d) => full.has(d.date.slice(0, 7)) || !hist.has(d.date));
+  const have = new Set(kept.map((d) => d.date));
+  return [...kept, ...[...hist.values()].filter((h) => !have.has(h.date)).map((h) => ({ date: h.date, total: dayTotal(h) }))].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export interface OwnMonth {

@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { num } from "@/lib/format";
 import { getStore } from "@/lib/storage";
 import { MARKET_MANUAL_KEY, type ManualEntry } from "@/components/MarketManualCard";
-import { HISTORY_KEY, historyByMonth, type HistoryDay } from "@/lib/history";
+import { HISTORY_KEY, type HistoryDay } from "@/lib/history";
+import { withHistory } from "@/lib/market/insight";
 import type { DailySale } from "@/lib/types";
 
 // 해마다 같은 달끼리 나란히 — "작년 이맘때보다 나은가"를 한 화면에서 본다.
@@ -41,15 +42,11 @@ export function MarketYearTrend() {
       setLoaded(true);
     });
     void Promise.all([store.listAllDailySales(), store.getSetting<HistoryDay[]>(HISTORY_KEY)]).then(([rows, hist]: [DailySale[], HistoryDay[] | null]) => {
+      const byDay = new Map<string, number>();
+      for (const r of rows) byDay.set(r.date, (byDay.get(r.date) ?? 0) + r.amount);
+      // 장부에 반 달도 안 들어간 달(장부 시작 달 등)은 날짜마다 지난 매출이 있으면 그걸로, 없는 날만 장부로
       const m = new Map<string, number>();
-      const days = new Map<string, Set<string>>();
-      for (const r of rows) {
-        const k = r.date.slice(0, 7);
-        m.set(k, (m.get(k) ?? 0) + r.amount);
-        days.set(k, (days.get(k) ?? new Set()).add(r.date));
-      }
-      // 장부에 반 달도 안 들어간 달(장부 시작 달 등)은 지난 매출이 있으면 그걸로
-      for (const [k, h] of historyByMonth(hist ?? [])) if ((days.get(k)?.size ?? 0) < 15) m.set(k, h.total);
+      for (const d of withHistory([...byDay].map(([date, total]) => ({ date, total })), hist ?? [])) m.set(d.date.slice(0, 7), (m.get(d.date.slice(0, 7)) ?? 0) + d.total);
       setOurByMonth(m);
     });
   }, []);

@@ -73,9 +73,16 @@ describe("우리 가게 지난 기록으로 앞으로 석 달", () => {
     expect(o[0].vsAvg).toBeLessThan(-20);
     expect(o[2].vsAvg).toBeGreaterThan(0);
   });
-  it("장부와 겹치는 날은 장부를 쓴다", () => {
-    const merged = withHistory([{ date: "2026-08-27", total: 9 }], [{ date: "2026-08-27", hall: 1, receipts: null, customers: null }]);
-    expect(merged).toEqual([{ date: "2026-08-27", total: 9 }]);
+  it("장부가 제대로 들어간 달은 겹치는 날 장부를 쓴다", () => {
+    const merged = withHistory(ledger, [{ date: "2026-09-02", hall: 1, receipts: null, customers: null }]);
+    expect(merged.find((d) => d.date === "2026-09-02")).toEqual(ledger.find((d) => d.date === "2026-09-02"));
+  });
+  it("장부 시작 달처럼 며칠만 들어간 달은 지난 매출을 쓰고, 지난 매출에 없는 날만 장부로", () => {
+    const merged = withHistory(
+      [{ date: "2026-08-30", total: 82_000 }, { date: "2026-08-31", total: 18_000 }],
+      [{ date: "2026-08-30", hall: 875_000, receipts: null, customers: null, baemin: 82_000 }],
+    );
+    expect(merged).toEqual([{ date: "2026-08-30", total: 957_000 }, { date: "2026-08-31", total: 18_000 }]);
   });
   it("지난 매출이 있으면 보고서 없이도 문장이 나온다", () => {
     const ids = buildInsights(null, ledger, [], [], "2026-11-10", hist).map((x) => x.id);

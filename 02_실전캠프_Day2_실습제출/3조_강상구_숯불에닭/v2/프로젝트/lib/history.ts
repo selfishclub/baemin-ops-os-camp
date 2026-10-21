@@ -87,6 +87,16 @@ export function mergeHistory(old: HistoryDay[], add: HistoryDay[]): HistoryDay[]
   return [...by.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** 장부가 15일 이상 들어간 달. 그보다 적은 달(장부 시작 달 등)은 지난 매출을 기준으로 본다 */
+export function ledgerMonths(dates: Iterable<string>): Set<string> {
+  const days = new Map<string, Set<string>>();
+  for (const d of dates) {
+    const k = d.slice(0, 7);
+    days.set(k, (days.get(k) ?? new Set()).add(d));
+  }
+  return new Set([...days].filter(([, s]) => s.size >= 15).map(([k]) => k));
+}
+
 /** 달마다 합계(홀+배달)·영업일 */
 export function historyByMonth(days: HistoryDay[]): Map<string, { total: number; delivery: number; days: number }> {
   const m = new Map<string, { total: number; delivery: number; days: number }>();
