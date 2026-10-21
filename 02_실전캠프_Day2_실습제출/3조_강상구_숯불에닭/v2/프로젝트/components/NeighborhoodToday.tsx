@@ -24,6 +24,7 @@ import {
   isValidDate,
   isValidTime,
   kstNow,
+  mergeAutoParking,
   missingMonths,
   newId,
   parkingAge,
@@ -36,6 +37,7 @@ import {
   type BusStore,
   type Feel,
   type JournalEntry,
+  type ParkingReading,
   type ParkingRecord,
   type TablesSetting,
   type VisitorStore,
@@ -47,6 +49,10 @@ import type { DailySale } from "@/lib/types";
 // 상권 탭 맨 위 — 오늘 동네와 우리 가게 (PRD v1).
 //  A 주차 현황(직접 입력) · B 짧은 장사 일지 · C 그날 시간 흐름 비교 + 하루 단위 자료(나중에 오는 자료는 따로) · D 자료 가져오기.
 //  자동 판정은 하지 않는다. 숫자가 없으면 "–" 이고 0 으로 채우지 않는다.
+
+// 리뷰 수집기 도우미 (내 컴퓨터 127.0.0.1:4599) — 주차 자동 기록을 여기서 받아 온다
+const HELPER = process.env.NEXT_PUBLIC_HELPER_URL || "http://127.0.0.1:4599";
+type AutoState = { kind: "loading" } | { kind: "off" } | { kind: "ok"; last: ParkingReading | null; added: number; lastError: { at: string; reason: string; stop?: boolean } | null };
 
 const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
@@ -113,6 +119,7 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
   const [manual, setManual] = useState<ManualEntry[]>([]);
   const [salesByDay, setSalesByDay] = useState<Map<string, { total: number; ledger: boolean }>>(new Map());
   const [msg, setMsg] = useState<{ tone: "ok" | "error" | "warn"; text: string } | null>(null);
+  const [auto, setAuto] = useState<AutoState>({ kind: "loading" });
 
   // 주차 입력 칸
   const [pTotal, setPTotal] = useState<number | null>(null);
@@ -158,8 +165,32 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
       const lastP = [...(p ?? [])].sort((a, c) => a.date.localeCompare(c.date) || a.time.localeCompare(c.time)).pop();
       if (lastP) setPTotal(lastP.total);
       setLoaded(true);
+      void pullAuto(p ?? []);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** 도우미에서 최근 60일 자동 기록을 받아 장부 주차 기록에 더한다 (같은 날짜·시각은 한 번만) */
+  async function pullAuto(current: ParkingRecord[]) {
+    const since = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 4000);
+      const res = await fetch(`${HELPER}/parking/readings?since=${since}`, { signal: ctl.signal });
+      clearTimeout(timer);
+      if (!res.ok) return setAuto({ kind: "off" });
+      const body = (await res.json()) as { readings?: ParkingReading[]; lastError?: { at: string; reason: string; stop?: boolean } | null };
+      const readings = body.readings ?? [];
+      const m = mergeAutoParking(current, readings);
+      if (m.added) {
+        await getStore().saveSetting(PARKING_KEY, m.list);
+        setParking(m.list);
+      }
+      setAuto({ kind: "ok", last: readings[readings.length - 1] ?? null, added: m.added, lastError: body.lastError ?? null });
+    } catch {
+      setAuto({ kind: "off" });
+    }
+  }
 
   const isToday = date === now.date;
   const tableCount = tablesOn(tables, date);
@@ -302,11 +333,22 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
           </a>
         </div>
         <p className="text-xs text-stone-600">
-          확보 방식: <b>직접 입력</b>. 자동 수집은 <b>확인 안 됨</b> — 공식 제공 방식(API·조건·갱신 주기)을 찾지 못했고,{" "}
+          확보 방식: <b>자동 수집</b> — 수집기가 통합주차포털 공개 첫 화면을 저녁 18~22시 매시 한 번 읽어요(컴퓨터가 켜져 있을 때만). 그 사이 시각은 <b>직접 입력</b>으로 더해요. 공식 API·이용 조건은 확인하지 못했고{" "}
           <a className="underline" href={PARKING_CITY_URL} target="_blank" rel="noreferrer">
-            청주 교통빅데이터 실시간 잔여주차공간
+            청주 교통빅데이터
           </a>
-          은 율량·사천동 조회 결과가 없었어요(2026-10-22 확인). 포털 화면을 보고 숫자를 옮겨 적어 주세요.
+          에는 율량·사천동 주차장이 없어요. 포털 화면에 자료 기준 시각이 없어 &quot;읽은 시각&quot;만 남아요.
+        </p>
+        <p className="num text-xs">
+          {auto.kind === "loading" && <span className="text-stone-500">자동 기록 받는 중…</span>}
+          {auto.kind === "off" && <span className="font-semibold text-amber-800">도우미가 꺼져 있어 자동 기록을 못 받았어요 — 수집기 도우미(npm run helper)를 켜면 다음에 열 때 들어와요.</span>}
+          {auto.kind === "ok" && (
+            <span className="text-stone-600">
+              자동 기록: {auto.last ? `마지막으로 읽은 때 ${md(auto.last.date)} ${auto.last.time} (가능 ${num(auto.last.available)}/${num(auto.last.total)})` : "아직 읽은 기록 없음 (18시부터)"}
+              {auto.added > 0 && ` · 이번에 ${auto.added}건 받아 왔어요`}
+              {auto.lastError && <span className="ml-1 font-semibold text-red-700">· 마지막 실패 {auto.lastError.at.slice(5, 16).replace("T", " ")}: {auto.lastError.reason}</span>}
+            </span>
+          )}
         </p>
         {lastPark ? (
           (() => {
@@ -314,7 +356,7 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
             return (
               <p className="num text-sm">
                 마지막 기록 <b>{lastPark.time}</b> · 전체 {num(lastPark.total)}면 · 가능 {num(lastPark.available)} · 사용 중 <b>{num(u.used)}</b> · 점유율 <b>{u.rate === null ? "–" : `${u.rate}%`}</b>
-                <span className="text-xs text-stone-500"> · 출처 기준 시각 {lastPark.sourceTime ?? "미제공"} · {lastPark.method}</span>
+                <span className="text-xs text-stone-500"> · {lastPark.status ? `포털 표시 ${lastPark.status} · ` : ""}출처 기준 시각 {lastPark.sourceTime ?? "미제공"} · {lastPark.method}</span>
                 {lastAge !== null && lastAge > 60 && <span className="ml-1 text-xs font-semibold text-amber-800">· {lastAge}분 전 값 — 지금은 다를 수 있어요</span>}
               </p>
             );
@@ -351,11 +393,11 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
             <table className="w-full min-w-[26rem] text-sm">
               <thead className="text-left text-xs text-stone-500">
                 <tr>
-                  <th className="py-1">본 시각</th>
+                  <th className="py-1">시각</th>
                   <th className="text-right">가능/전체</th>
                   <th className="text-right">사용 중</th>
                   <th className="text-right">점유율</th>
-                  <th className="pl-2">출처 기준</th>
+                  <th className="pl-2">방식 · 출처 기준</th>
                   <th />
                 </tr>
               </thead>
@@ -370,7 +412,11 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
                       </td>
                       <td className="text-right">{num(u.used)}</td>
                       <td className="text-right">{u.rate === null ? "–" : `${u.rate}%`}</td>
-                      <td className="pl-2 text-xs text-stone-500">{p.sourceTime ?? "미제공"}{p.note ? ` · ${p.note}` : ""}</td>
+                      <td className="pl-2 text-xs text-stone-500">
+                        {p.method}
+                        {p.status ? ` (${p.status})` : ""} · {p.sourceTime ?? "미제공"}
+                        {p.note ? ` · ${p.note}` : ""}
+                      </td>
                       <td className="text-right">
                         <button type="button" className="text-xs text-stone-400 underline" onClick={() => void removeParking(p.id)}>
                           지우기

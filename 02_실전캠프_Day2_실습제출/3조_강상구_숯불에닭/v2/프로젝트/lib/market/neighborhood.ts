@@ -13,7 +13,8 @@ export const BUS_KEY = "neighborhood_bus_v1";
 
 export const PARKING_LOT = "율량동 주차타워";
 export const PARKING_URL = "https://parking.cjuc.or.kr/main";
-// 2026-10-22 확인: 청주 교통빅데이터 "실시간 잔여주차공간"에서 율량·사천동을 조회하면 결과가 없다 → 자동 수집 경로 미확인
+// 2026-10-22 확인: 청주 교통빅데이터 "실시간 잔여주차공간"에서 율량·사천동을 조회하면 결과가 없고 공식 API·이용 조건도 못 찾음.
+//  같은 날 사장님 결정으로 문의 없이 통합주차포털 공개 첫 화면을 저녁 18~22시 매시 읽는다 (수집기 npm run parking → 도우미 /parking/readings).
 export const PARKING_CITY_URL = "https://tdata.cheongju.go.kr/data/anls/trfa/pklotPage";
 export const VISITOR_URL = "https://datalab.visitkorea.or.kr/datalab/portal/bda/getMetcoAna.do";
 export const BUS_URL = "https://tdata.cheongju.go.kr/data/dwnld/page";
@@ -48,9 +49,36 @@ export interface ParkingRecord {
   sourceTime: string | null; // 출처 화면에 적힌 기준 시각 — 화면에 없으면 null (미제공)
   total: number; // 전체 면수 (그때 화면 값 — 고정값으로 두지 않는다)
   available: number; // 주차 가능 대수
-  method: "직접 입력";
+  method: "직접 입력" | "자동 수집";
+  status?: string | null; // 포털 화면 표시 (여유·혼잡·만차) — 자동 수집만
   note: string;
   savedAt: string;
+}
+
+/** 도우미가 주는 한 번 읽은 값 (수집기 scripts/collect-parking.ts 의 ParkingReading) */
+export interface ParkingReading {
+  lot: string;
+  date: string;
+  time: string;
+  readAt: string;
+  total: number;
+  available: number;
+  status: string | null;
+  sourceTime: null;
+}
+
+/** 자동으로 읽은 값을 장부 기록에 더한다. id 가 날짜·시각이라 여러 번 받아도 한 번만 들어간다. 이상한 숫자는 버린다 */
+export function mergeAutoParking(list: ParkingRecord[], readings: ParkingReading[]): { list: ParkingRecord[]; added: number } {
+  const have = new Set(list.map((r) => r.id));
+  const add: ParkingRecord[] = [];
+  for (const r of readings) {
+    const id = `auto-${r.date}-${r.time}`;
+    if (have.has(id) || !isValidDate(r.date) || !isValidTime(r.time) || validateParking(r.total, r.available)) continue;
+    have.add(id);
+    add.push({ id, lot: r.lot, date: r.date, time: r.time, sourceTime: null, total: r.total, available: r.available, method: "자동 수집", status: r.status ?? null, note: "", savedAt: r.readAt });
+  }
+  if (!add.length) return { list, added: 0 };
+  return { list: [...list, ...add].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)), added: add.length };
 }
 
 export interface TablesSetting {

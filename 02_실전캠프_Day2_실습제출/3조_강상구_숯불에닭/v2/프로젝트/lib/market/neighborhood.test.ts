@@ -5,6 +5,7 @@ import {
   dayTimeline,
   isValidDate,
   kstNow,
+  mergeAutoParking,
   mergeBus,
   mergeVisitors,
   missingMonths,
@@ -45,6 +46,15 @@ describe("주차", () => {
   it("전체 면수 0 이면 점유율을 계산하지 않는다", () => {
     expect(parkingUse({ total: 107, available: 102 })).toEqual({ used: 5, rate: 4.7 });
     expect(parkingUse({ total: 0, available: 0 })).toEqual({ used: 0, rate: null });
+  });
+  it("자동으로 읽은 값은 같은 날짜·시각이면 한 번만, 이상한 숫자는 버린다", () => {
+    const rd = (time: string, available: number) => ({ lot: "율량동 주차타워", date: "2026-10-22", time, readAt: "", total: 107, available, status: "여유", sourceTime: null });
+    const a = mergeAutoParking([P("m", "19:30", 70)], [rd("18:00", 100), rd("19:00", 90), rd("20:00", 200)]);
+    expect(a.added).toBe(2);
+    expect(a.list.map((r) => [r.time, r.method])).toEqual([["18:00", "자동 수집"], ["19:00", "자동 수집"], ["19:30", "직접 입력"]]);
+    const b = mergeAutoParking(a.list, [rd("18:00", 100), rd("19:00", 90)]);
+    expect(b.added).toBe(0);
+    expect(b.list).toBe(a.list);
   });
   it("30분 안 가장 가까운 기록만 붙인다", () => {
     const recs = [P("a", "19:40", 60), P("b", "20:10", 50), P("c", "20:00", 40, "2026-10-21")];
