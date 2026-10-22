@@ -13,7 +13,7 @@ describe("정산 건과 통장 입금 짝 맞추기", () => {
   });
 
   it("같은 통장 줄을 두 정산에 붙이지 않는다", () => {
-    const rows = matchSettlements([st("a", "2026-09-10", 500_000), st("b", "2026-09-17", 500_000)], [tx("2026-09-11", 500_000)], "2026-10-15");
+    const rows = matchSettlements([st("a", "2026-09-10", 500_000), st("b", "2026-09-17", 500_000)], [tx("2026-09-11", 500_000), tx("2026-09-30", 1_000, null)], "2026-10-15");
     expect(rows.map((r) => r.state)).toEqual(["입금 확인", "입금 대기"]);
   });
 
@@ -21,6 +21,27 @@ describe("정산 건과 통장 입금 짝 맞추기", () => {
     const rows = matchSettlements([st("a", "2026-10-20", 300_000), st("b", "2026-10-01", 300_000)], [tx("2026-10-02", 300_000, "coupang")], "2026-10-15");
     expect(rows.find((r) => r.giveId === "a")!.state).toBe("예정");
     expect(rows.find((r) => r.giveId === "b")!.state).toBe("입금 대기");
+  });
+
+  it("통장 자료가 예정일 앞에서 끝나면 입금 대기가 아니라 예정(확인 전)", () => {
+    const rows = matchSettlements([st("a", "2026-10-22", 35_833)], [tx("2026-10-21", 172_888)], "2026-10-22");
+    expect(rows[0]).toMatchObject({ state: "예정", note: expect.stringContaining("10-21까지") });
+  });
+
+  it("쿠팡이츠 — 출금 가능 금액이 같이 들어와 조금 더 큰 입금도 짝으로 (같은 금액 짝은 먼저)", () => {
+    const rows = matchSettlements(
+      [st("a", "2026-10-20", 70_569), st("b", "2026-10-21", 11_572)],
+      [tx("2026-10-20", 73_155, "coupang"), tx("2026-10-21", 11_572, "coupang")],
+      "2026-10-22",
+      "coupang",
+    );
+    expect(rows[0]).toMatchObject({ state: "입금 확인", bankDate: "2026-10-20", bankGap: -2586, note: expect.stringContaining("2,586원 더") });
+    expect(rows[1]).toMatchObject({ state: "입금 확인", bankGap: 0 });
+  });
+
+  it("배민은 금액이 다르면 짝으로 보지 않는다", () => {
+    const rows = matchSettlements([st("a", "2026-10-20", 70_569)], [tx("2026-10-20", 73_155), tx("2026-10-23", 1_000)], "2026-10-25");
+    expect(rows[0].state).toBe("입금 대기");
   });
 });
 

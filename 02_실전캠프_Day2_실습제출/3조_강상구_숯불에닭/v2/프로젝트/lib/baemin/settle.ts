@@ -45,23 +45,53 @@ const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.p
  * 정산 건과 통장 입금 짝 맞추기.
  * 통장 줄은 채널이 배민인 입금만 본다. 금액이 같은 줄을 입금 예정일에서 가장 가까운 것으로 고른다(앞뒤 10일 안).
  * 같은 줄을 두 정산에 붙이지 않는다. 금액이 같은 줄이 없고 예정일이 지났으면 "입금 대기", 안 지났으면 "예정".
+ * 통장 자료가 입금 예정일까지 아직 안 올라왔으면 "입금 대기"가 아니라 "예정"(확인 전).
+ * 쿠팡이츠는 출금 가능 금액(환급 등 남은 돈)이 다음 정산과 합쳐 들어오기도 해서, 같은 금액이 없으면
+ * 예정일부터 3일 안에 조금(5천원 이하) 더 큰 입금을 짝으로 본다.
  */
 export function matchSettlements(settlements: BaeminSettlement[], txs: Transaction[], today: string, channelId = "baemin"): SettlementRow[] {
   const bank = txs.filter((t) => t.channel === channelId && t.in > 0).map((t) => ({ ...t, used: false }));
-  return [...settlements]
-    .sort((a, b) => a.depositDueDate.localeCompare(b.depositDueDate))
-    .map((s) => {
-      const candidates = bank
-        .filter((b) => !b.used && b.in === s.depositAmount && Math.abs(daysBetween(s.depositDueDate, b.date)) <= 10)
-        .sort((a, b) => Math.abs(daysBetween(s.depositDueDate, a.date)) - Math.abs(daysBetween(s.depositDueDate, b.date)));
-      const hit = candidates[0];
+  const lastBankDate = txs.filter((t) => t.source === "bank").reduce((m, t) => (t.date > m ? t.date : m), "");
+  const sorted = [...settlements].sort((a, b) => a.depositDueDate.localeCompare(b.depositDueDate));
+  const near = (s: BaeminSettlement, b: { date: string }) => Math.abs(daysBetween(s.depositDueDate, b.date));
+
+  // 1) 금액이 같은 입금부터 — 합쳐 들어온 입금이 같은 금액 짝을 가로채지 않게 먼저 모두 맞춘다
+  const exact: (SettlementRow | null)[] = sorted.map((s) => {
+    const hit = bank.filter((b) => !b.used && b.in === s.depositAmount && near(s, b) <= 10).sort((a, b) => near(s, a) - near(s, b))[0];
+    if (!hit) return null;
+    hit.used = true;
+    return { ...s, state: "입금 확인" as const, bankDate: hit.date, bankAmount: hit.in, bankGap: 0, daysLate: daysBetween(s.depositDueDate, hit.date) };
+  });
+
+  // 2) 남은 건
+  return sorted.map((s, i) => {
+    const done = exact[i];
+    if (done) return done;
+    if (channelId === "coupang") {
+      const hit = bank
+        .filter((b) => !b.used && b.in > s.depositAmount && b.in - s.depositAmount <= 5000 && daysBetween(s.depositDueDate, b.date) >= 0 && daysBetween(s.depositDueDate, b.date) <= 3)
+        .sort((a, b) => near(s, a) - near(s, b))[0];
       if (hit) {
         hit.used = true;
-        return { ...s, state: "입금 확인" as const, bankDate: hit.date, bankAmount: hit.in, bankGap: 0, daysLate: daysBetween(s.depositDueDate, hit.date) };
+        const extra = hit.in - s.depositAmount;
+        return {
+          ...s,
+          state: "입금 확인" as const,
+          bankDate: hit.date,
+          bankAmount: hit.in,
+          bankGap: s.depositAmount - hit.in,
+          daysLate: daysBetween(s.depositDueDate, hit.date),
+          note: `통장엔 ${hit.in.toLocaleString("ko-KR")}원 — ${extra.toLocaleString("ko-KR")}원 더 들어왔어요. 쿠팡에 남아 있던 출금 가능 금액(환급 등)이 같이 들어온 것으로 보여요.`,
+        };
       }
-      const due = s.depositDueDate <= today;
-      return { ...s, state: due ? ("입금 대기" as const) : ("예정" as const), bankDate: null, bankAmount: null, bankGap: null, daysLate: null };
-    });
+    }
+    const due = s.depositDueDate <= today;
+    // 통장 자료가 예정일보다 앞에서 끝나면 아직 확인할 수 없다
+    if (due && lastBankDate && lastBankDate < s.depositDueDate) {
+      return { ...s, state: "예정" as const, bankDate: null, bankAmount: null, bankGap: null, daysLate: null, note: `통장 자료가 ${lastBankDate.slice(5)}까지라 아직 확인 전이에요` };
+    }
+    return { ...s, state: due ? ("입금 대기" as const) : ("예정" as const), bankDate: null, bankAmount: null, bankGap: null, daysLate: null };
+  });
 }
 
 export interface PerOrder {

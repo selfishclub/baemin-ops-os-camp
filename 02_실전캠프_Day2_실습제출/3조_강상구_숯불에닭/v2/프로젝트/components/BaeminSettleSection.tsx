@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { ExportStatusLine } from "@/components/ExportUploadCard";
 import { SourceTag } from "@/components/SourceTag";
 import { useExport } from "@/components/useExport";
@@ -27,7 +27,16 @@ export function BaeminSettleSection({ platform = "baemin", month, txs, nextTxs, 
   const today = todayStr();
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const b = platform === "baemin" ? exp.baemin : exp.coupang;
+  // 메모는 접어 두고 누르면 표 아래 한 줄로 펼친다 (줄마다 높이가 들쭉날쭉하지 않게)
+  const [openNotes, setOpenNotes] = useState<Set<string>>(new Set());
+  const toggleNote = (id: string) =>
+    setOpenNotes((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const b =platform === "baemin" ? exp.baemin : exp.coupang;
 
   // 자동으로 못 맞춘 건을 매출내역서 등으로 확인해 적어 둔 기록
   const [confirms, setConfirms] = useState<SettleConfirm[]>([]);
@@ -100,25 +109,38 @@ export function BaeminSettleSection({ platform = "baemin", month, txs, nextTxs, 
                         <th className="text-right">입금액</th>
                         <th className="text-right">광고비</th>
                         <th className="text-right">조정</th>
-                        <th>통장</th>
+                        <th className="pl-3">통장</th>
                       </tr>
                     </thead>
                     <tbody className="num divide-y divide-stone-100">
                       {rows.map((r) => (
-                        <tr key={r.giveId}>
-                          <td className="py-1.5">{r.depositDueDate.slice(5)}</td>
-                          <td className="text-xs text-stone-500">
-                            {r.periodStart.slice(5)} ~ {r.periodEnd.slice(5)}
-                          </td>
-                          <td className="text-right font-bold">{num(r.depositAmount)}</td>
-                          <td className="text-right text-stone-500">{r.adCost ? num(r.adCost) : "–"}</td>
-                          <td className="text-right text-stone-500">{r.adjustment ? num(r.adjustment) : "–"}</td>
-                          <td>
-                            <span className={`rounded px-1.5 py-0.5 text-xs font-bold ${STATE_TONE[r.state]}`}>{r.state}</span>
-                            {r.bankDate && <span className="ml-1 text-xs text-stone-500">{r.bankDate.slice(5)}{r.daysLate ? ` (${r.daysLate > 0 ? "+" : ""}${r.daysLate}일)` : ""}</span>}
-                            {r.note && <p className="mt-0.5 text-[11px] text-stone-500">{r.note}</p>}
-                          </td>
-                        </tr>
+                        <Fragment key={r.giveId}>
+                          <tr className="whitespace-nowrap">
+                            <td className="py-1.5">{r.depositDueDate.slice(5)}</td>
+                            <td className="text-xs text-stone-500">
+                              {r.periodStart === r.periodEnd ? r.periodStart.slice(5) : `${r.periodStart.slice(5)} ~ ${r.periodEnd.slice(5)}`}
+                            </td>
+                            <td className="text-right font-bold">{num(r.depositAmount)}</td>
+                            <td className="text-right text-stone-500">{r.adCost ? num(r.adCost) : "–"}</td>
+                            <td className="text-right text-stone-500">{r.adjustment ? num(r.adjustment) : "–"}</td>
+                            <td className="pl-3">
+                              <span className={`rounded px-1.5 py-0.5 text-xs font-bold ${STATE_TONE[r.state]}`}>{r.state}</span>
+                              {r.bankDate && <span className="ml-1 text-xs text-stone-500">{r.bankDate.slice(5)}{r.daysLate ? ` (${r.daysLate > 0 ? "+" : ""}${r.daysLate}일)` : ""}</span>}
+                              {r.note && (
+                                <button type="button" className="ml-1 rounded border border-stone-200 px-1 text-[11px] text-stone-500 hover:bg-stone-50" onClick={() => toggleNote(r.giveId)}>
+                                  {openNotes.has(r.giveId) ? "접기" : "메모"}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                          {r.note && openNotes.has(r.giveId) && (
+                            <tr className="!border-t-0">
+                              <td colSpan={6} className="pb-1.5 text-[11px] text-stone-500">
+                                ↳ {r.note}
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>
