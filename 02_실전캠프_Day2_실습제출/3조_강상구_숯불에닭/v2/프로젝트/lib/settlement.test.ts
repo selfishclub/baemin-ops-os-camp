@@ -214,6 +214,16 @@ describe("환급 포함 표시 · 늦은 입금 합치기", () => {
     expect(oct.fee).toBe(9_240 - 25_950);
     expect(oct.deposited).toBe(40_760 + 25_950);
   });
+  it("자정 넘은 결제분이 아직 통장 자료 뒤면 차이가 아니라 예정, 통장을 더 받으면 합쳐서 일치", () => {
+    // 2026-10-19(월) 롯데: 20:31 107,000원 → 10/21, 0시 9분 129,000원 → 카드사 기준 10/20 거래 → 10/22
+    const rule: SettlementRule = { channel: "card_lotte", mode: "days", days: 2, weekday: 0 };
+    const daily: DailySale[] = [{ date: "2026-10-19", channel: "card_lotte", amount: 236_000 }];
+    const first = settleChannel("card_lotte", "2026-10", rule, daily, [tx("2026-10-21", "card_lotte", 105_930)], "2026-10-21");
+    expect(first.settlements[0]).toMatchObject({ status: "예정", deposit: 105_930, feeRate: null });
+    expect(first.feeRate).toBeNull();
+    const later = settleChannel("card_lotte", "2026-10", rule, daily, [tx("2026-10-21", "card_lotte", 105_930), tx("2026-10-22", "card_lotte", 127_710)], "2026-10-22");
+    expect(later.settlements[0]).toMatchObject({ status: "일치", deposit: 233_640 });
+  });
   it("카드 입금이 하루 늦게 앞날 것과 같이 들어오면 두 묶음을 합친다", () => {
     const rule: SettlementRule = { channel: "card_hyundai", mode: "days", days: 2, weekday: 0 };
     const daily: DailySale[] = [

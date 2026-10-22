@@ -249,6 +249,17 @@ export function settleChannel(
     };
   }
 
+  // 일부만 들어왔고 나머지가 들어올 날(2영업일 안)이 아직 통장 자료 뒤면 "차이"가 아니라 "예정" — 통장을 더 받으면 위 규칙으로 합쳐진다.
+  // (2026-10-19 롯데카드: 20:31 결제 107,000원은 10/21, 0시 9분 결제 129,000원은 카드사 기준 10/20 거래라 10/22 — 10/21까지 통장만 있어 수수료 55%로 보였다)
+  for (let i = 0; i < settlements.length; i++) {
+    const a = settlements[i];
+    if (a.status !== "차이" || a.deposit <= 0 || a.deposit >= a.sales || adj.has(a.payout)) continue;
+    // 입금일 뒤로 통장 자료가 하루라도 있으면 그대로 "차이" (다음 날 통장에도 없었다는 뜻)
+    if (lastBankDate > a.payout) continue;
+    const limit = addBusinessDays(a.payout, 2, holidays);
+    settlements[i] = { ...a, fee: 0, feeRate: null, status: "예정", note: `${a.deposit.toLocaleString("ko-KR")}원만 먼저 들어왔어요 — 나머지는 ${limit}까지 따로 들어올 수 있어요 (밤 12시 넘어 받은 결제는 카드사가 다음 날 것으로 쳐요)` };
+  }
+
   // 이웃한 두 묶음이 서로 모자라고 넘칠 때: 밤 12시 넘어 받은 결제가 장부에선 앞날, 카드사에선 다음 날이라
   // 앞 묶음 입금은 모자라고 뒤 묶음 입금은 그만큼 많다. 둘 중 하나가 "차이"이고, 합치면 "일치"면 한 묶음으로 본다.
   for (let i = 0; i + 1 < settlements.length; i++) {
