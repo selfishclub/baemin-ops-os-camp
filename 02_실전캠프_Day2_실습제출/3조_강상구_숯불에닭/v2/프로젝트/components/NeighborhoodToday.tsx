@@ -44,7 +44,9 @@ import {
   type TablesSetting,
   type VisitorStore,
 } from "@/lib/market/neighborhood";
+import { POS_HOURLY_KEY, compareHours, mergePosHourly, parsePosHourly, type PosHourlyStore } from "@/lib/market/posHourly";
 import { MARKET_REPORT_KEY, type SbizReport } from "@/lib/market/sbizReport";
+import * as XLSX from "xlsx";
 import { getStore } from "@/lib/storage";
 import type { DailySale } from "@/lib/types";
 
@@ -123,6 +125,7 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
   const [salesByDay, setSalesByDay] = useState<Map<string, { total: number; ledger: boolean }>>(new Map());
   const [msg, setMsg] = useState<{ tone: "ok" | "error" | "warn"; text: string } | null>(null);
   const [auto, setAuto] = useState<AutoState>({ kind: "loading" });
+  const [posHourly, setPosHourly] = useState<PosHourlyStore | null>(null);
 
   // 주차 입력 칸
   const [pTotal, setPTotal] = useState<number | null>(null);
@@ -182,9 +185,40 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
       setOutInput(t?.outside ?? null);
       setLoaded(true);
       void pullAuto(p ?? [], gone ?? []);
+      void pullPosHourly();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** 도우미가 받아 둔 포스 시간대별 주문 파일(최초주문시각)을 읽어 날마다 저장한다. 오늘 탭에서 오케이포스 받을 때 같이 받아진다 */
+  async function pullPosHourly() {
+    const saved = (await getStore().getSetting<PosHourlyStore>(POS_HOURLY_KEY)) ?? null;
+    setPosHourly(saved);
+    const since = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 6000);
+      const res = await fetch(`${HELPER}/okpos/hourly?since=${since}`, { signal: ctl.signal });
+      clearTimeout(timer);
+      if (!res.ok) return;
+      const body = (await res.json()) as { files?: { date: string; fileName: string; base64: string }[] };
+      let next = saved;
+      for (const f of body.files ?? []) {
+        if (next?.days[f.date]) continue; // 이미 읽은 날
+        const bytes = Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0));
+        const wb = XLSX.read(bytes, { type: "array" });
+        const parsed = parsePosHourly(XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false }));
+        if (parsed.error || !parsed.date) continue;
+        next = mergePosHourly(next, parsed.date, parsed.hours);
+      }
+      if (next && next !== saved) {
+        await getStore().saveSetting(POS_HOURLY_KEY, next);
+        setPosHourly(next);
+      }
+    } catch {
+      // 도우미가 꺼져 있으면 저장된 것만 보여 준다
+    }
+  }
 
   /** 도우미에서 최근 60일 자동 기록을 받아 장부 주차 기록에 더한다 (같은 날짜·시각은 한 번만) */
   async function pullAuto(current: ParkingRecord[], deleted: string[]) {
@@ -233,6 +267,8 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
   const dayParking = useMemo(() => parking.filter((p) => p.date === date).sort((a, b) => a.time.localeCompare(b.time)), [parking, date]);
   const dayJournal = useMemo(() => journal.filter((j) => j.date === date), [journal, date]);
   const timeline = useMemo(() => dayTimeline(journal, parking, date), [journal, parking, date]);
+  const hourCmp = useMemo(() => compareHours(posHourly, date), [posHourly, date]);
+  const peakSales = hourCmp.reduce((m, h) => Math.max(m, h.sales), 0);
   const recordedDates = useMemo(() => [...new Set([...journal.map((j) => j.date), ...parking.map((p) => p.date)])].sort().reverse(), [journal, parking]);
   const lastPark = dayParking[dayParking.length - 1] ?? null;
   const lastAge = lastPark ? parkingAge(lastPark, now) : null;
@@ -592,6 +628,7 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
                   <th className="pl-3">거리</th>
                   <th>주변 식당</th>
                   <th>특이사항·메모</th>
+                  <th className="text-right">그 시간 포스 주문</th>
                 </tr>
               </thead>
               <tbody className="num divide-y divide-stone-100">
@@ -608,6 +645,12 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
                       <td className="pl-3">{r.journal?.street ?? "–"}</td>
                       <td>{r.journal?.nearby ?? "–"}</td>
                       <td className="text-xs text-stone-600">{r.journal ? [r.journal.tags.join("·"), r.journal.memo].filter(Boolean).join(" · ") || "–" : r.parking?.note || "–"}</td>
+                      <td className="text-right">
+                        {(() => {
+                          const h = hourCmp.find((x) => x.hour === Number(r.time.slice(0, 2)));
+                          return h ? `${num(h.sales / 10_000)}만` : "–";
+                        })()}
+                      </td>
                     </tr>
                   );
                 })}
@@ -615,6 +658,54 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
             </table>
           </div>
         )}
+
+        {/* 포스 시간대별 주문 — 최초주문시각 기준, 같은 요일 평소와 견줌 */}
+        <div className="space-y-1 rounded-lg bg-white p-2 ring-1 ring-stone-200">
+          <p className="text-xs font-semibold text-stone-600">
+            포스 시간대별 주문 <span className="font-normal text-stone-500">(오케이포스 상품시간대별 · 손님이 처음 주문한 시각 기준 · 평소 = 같은 요일 지난 기록 평균)</span>
+          </p>
+          {hourCmp.length ? (
+            <div className="overflow-x-auto">
+              <table className="num w-full min-w-[26rem] text-xs">
+                <tbody>
+                  <tr className="text-stone-500">
+                    <td className="py-0.5 pr-2">시간</td>
+                    {hourCmp.map((h) => (
+                      <td key={h.hour} className="text-right">{h.hour}시</td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 pr-2 text-stone-500">주문 매출</td>
+                    {hourCmp.map((h) => (
+                      <td key={h.hour} className={`text-right ${h.sales === peakSales && h.sales > 0 ? "font-bold" : ""}`}>{num(h.sales / 10_000)}만</td>
+                    ))}
+                  </tr>
+                  <tr className="text-stone-500">
+                    <td className="py-0.5 pr-2">주문 수량</td>
+                    {hourCmp.map((h) => (
+                      <td key={h.hour} className="text-right">{num(h.qty)}</td>
+                    ))}
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 pr-2 text-stone-500">평소 대비</td>
+                    {hourCmp.map((h) => (
+                      <td key={h.hour} className={`text-right ${h.pct === null ? "text-stone-400" : h.pct < 70 ? "text-sky-700" : h.pct > 130 ? "font-semibold text-orange-700" : "text-stone-700"}`}>
+                        {h.pct === null ? "–" : `${h.pct}%`}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+              <p className="pt-1 text-[11px] text-stone-500">
+                {hourCmp[0].basis >= 2 ? `같은 ${dow(date)}요일 ${hourCmp[0].basis}번의 평균과 견줬어요. 70% 밑은 파랑(한산 쪽), 130% 넘으면 주황(붐빔 쪽) — 임시 기준이에요.` : `같은 ${dow(date)}요일 기록이 2번 이상 쌓이면 평소와 견줘요 (지금 ${hourCmp[0].basis}번).`}
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-stone-500">
+              {isToday ? "오늘 것은 아직 없어요 — 오늘 탭에서 오케이포스 자료를 받을 때 같이 받아져서 다음 날 보여요." : "이날 포스 시간대별 자료가 없어요 (오케이포스에서 받은 날만 있어요)."}
+            </p>
+          )}
+        </div>
 
         <p className="pt-1 text-xs font-semibold text-stone-500">하루 단위 자료 — 그 시각의 관찰이 아니라 나중에 들어오는 하루·한 달 숫자예요</p>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">

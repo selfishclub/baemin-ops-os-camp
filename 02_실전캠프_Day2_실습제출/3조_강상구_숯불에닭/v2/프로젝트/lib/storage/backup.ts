@@ -329,6 +329,7 @@ export const SETTING_LABEL: Record<string, string> = {
   neighborhood_parking_v1: "주차 관찰 기록 (상권 탭)",
   neighborhood_tables_v1: "테이블 수 (내부·야장, 야장 연 날)",
   neighborhood_parking_deleted_v1: "지운 자동 주차 기록 (다시 안 받기)",
+  pos_hourly_v1: "포스 시간대별 주문 (최초주문시각)",
   neighborhood_visitors_v1: "관광 데이터랩 율량·사천동 방문자",
   neighborhood_bus_v1: "청주 버스 정류소 일별 승하차",
 };
