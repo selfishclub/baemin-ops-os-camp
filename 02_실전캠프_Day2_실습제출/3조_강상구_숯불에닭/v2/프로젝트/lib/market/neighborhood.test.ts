@@ -55,6 +55,14 @@ describe("주차", () => {
     const b = mergeAutoParking(a.list, [rd("18:00", 100), rd("19:00", 90)]);
     expect(b.added).toBe(0);
     expect(b.list).toBe(a.list);
+    // 사장님이 지운 자동 기록은 다시 받아 와도 안 들어간다
+    const c = mergeAutoParking([], [rd("18:00", 100), rd("19:00", 90)], ["auto-2026-10-22-18:00"]);
+    expect(c.list.map((r) => r.time)).toEqual(["19:00"]);
+  });
+  it("테이블 수 — 내부는 늘, 야장은 연 날만", () => {
+    const s = { history: [], inside: 14, outside: 8, terraceDays: { "2026-10-23": true } };
+    expect(tablesOn(s, "2026-10-22")).toBe(14);
+    expect(tablesOn(s, "2026-10-23")).toBe(22);
   });
   it("30분 안 가장 가까운 기록만 붙인다", () => {
     const recs = [P("a", "19:40", 60), P("b", "20:10", 50), P("c", "20:00", 40, "2026-10-21")];

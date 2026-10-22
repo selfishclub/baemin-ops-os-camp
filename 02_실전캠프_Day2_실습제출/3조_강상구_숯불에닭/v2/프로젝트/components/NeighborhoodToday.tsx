@@ -12,6 +12,7 @@ import {
   FEELS,
   JOURNAL_KEY,
   PARKING_CITY_URL,
+  PARKING_DELETED_KEY,
   PARKING_KEY,
   PARKING_LOT,
   PARKING_URL,
@@ -30,6 +31,7 @@ import {
   parkingAge,
   parkingUse,
   tablesOn,
+  terraceOpen,
   upsertById,
   validateJournal,
   validateParking,
@@ -129,7 +131,8 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
   const [pNote, setPNote] = useState("");
   // 일지 입력 칸
   const [draft, setDraft] = useState<Draft>(emptyDraft(now.time, null));
-  const [tableInput, setTableInput] = useState<number | null>(null);
+  const [inInput, setInInput] = useState<number | null>(null);
+  const [outInput, setOutInput] = useState<number | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(kstNow()), 60_000);
@@ -148,7 +151,8 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
       store.getSetting<ManualEntry[]>(MARKET_MANUAL_KEY),
       store.listAllDailySales(),
       store.getSetting<HistoryDay[]>(HISTORY_KEY),
-    ]).then(([j, p, t, v, b, r, m, rows, hist]: [JournalEntry[] | null, ParkingRecord[] | null, TablesSetting | null, VisitorStore | null, BusStore | null, SbizReport | null, ManualEntry[] | null, DailySale[], HistoryDay[] | null]) => {
+      store.getSetting<string[]>(PARKING_DELETED_KEY),
+    ]).then(([j, p, t, v, b, r, m, rows, hist, gone]: [JournalEntry[] | null, ParkingRecord[] | null, TablesSetting | null, VisitorStore | null, BusStore | null, SbizReport | null, ManualEntry[] | null, DailySale[], HistoryDay[] | null, string[] | null]) => {
       setJournal(j ?? []);
       setParking(p ?? []);
       setTables(t);
@@ -164,14 +168,16 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
       setSalesByDay(new Map(merged.map((d) => [d.date, { total: d.total, ledger: ledgerDates.has(d.date) && byDay.get(d.date) === d.total }])));
       const lastP = [...(p ?? [])].sort((a, c) => a.date.localeCompare(c.date) || a.time.localeCompare(c.time)).pop();
       if (lastP) setPTotal(lastP.total);
+      setInInput(t?.inside ?? null);
+      setOutInput(t?.outside ?? null);
       setLoaded(true);
-      void pullAuto(p ?? []);
+      void pullAuto(p ?? [], gone ?? []);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /** 도우미에서 최근 60일 자동 기록을 받아 장부 주차 기록에 더한다 (같은 날짜·시각은 한 번만) */
-  async function pullAuto(current: ParkingRecord[]) {
+  async function pullAuto(current: ParkingRecord[], deleted: string[]) {
     const since = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
     try {
       const ctl = new AbortController();
@@ -181,7 +187,9 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
       if (!res.ok) return setAuto({ kind: "off" });
       const body = (await res.json()) as { readings?: ParkingReading[]; lastError?: { at: string; reason: string; stop?: boolean } | null };
       const readings = body.readings ?? [];
-      const m = mergeAutoParking(current, readings);
+      // 저장 직전에 저장소의 최신 목록 위에 더한다 (다른 탭이 사이에 바꿨어도 덮어쓰지 않게)
+      const latest = (await getStore().getSetting<ParkingRecord[]>(PARKING_KEY)) ?? current;
+      const m = mergeAutoParking(latest, readings, deleted);
       if (m.added) {
         await getStore().saveSetting(PARKING_KEY, m.list);
         setParking(m.list);
@@ -223,7 +231,7 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
     const err = validateParking(pTotal, pAvail) ?? (!isValidTime(pTime) ? "본 시각을 00:00~23:59 로 적어 주세요." : null) ?? (pSource && !isValidTime(pSource) ? "출처 기준 시각은 00:00 모양으로 적거나 비워 두세요." : null);
     if (err) return setMsg({ tone: "error", text: err });
     const rec: ParkingRecord = { id: newId(), lot: PARKING_LOT, date, time: pTime, sourceTime: pSource || null, total: pTotal!, available: pAvail!, method: "직접 입력", note: pNote.trim(), savedAt: new Date().toISOString() };
-    const next = upsertById(parking, rec);
+    const next = upsertById((await getStore().getSetting<ParkingRecord[]>(PARKING_KEY)) ?? parking, rec);
     if (await save(PARKING_KEY, next, `주차 ${md(date)} ${pTime} 기록했어요.`)) {
       setParking(next);
       setPAvail(null);
@@ -232,8 +240,13 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
     }
   }
   async function removeParking(id: string) {
-    const next = parking.filter((p) => p.id !== id);
-    if (await save(PARKING_KEY, next, "주차 기록을 지웠어요.")) setParking(next);
+    // 자동 기록은 지운 id 를 남겨 두어 도우미에서 다시 받아 와도 안 들어오게 한다
+    if (id.startsWith("auto-")) {
+      const gone = (await getStore().getSetting<string[]>(PARKING_DELETED_KEY)) ?? [];
+      if (!gone.includes(id) && !(await save(PARKING_DELETED_KEY, [...gone, id], ""))) return;
+    }
+    const next = ((await getStore().getSetting<ParkingRecord[]>(PARKING_KEY)) ?? parking).filter((p) => p.id !== id);
+    if (await save(PARKING_KEY, next, id.startsWith("auto-") ? "주차 기록을 지웠어요. 자동 기록이라도 다시 받아 오지 않아요." : "주차 기록을 지웠어요.")) setParking(next);
   }
 
   async function saveJournal() {
@@ -252,27 +265,27 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
     };
     const err = validateJournal(entry);
     if (err) return setMsg({ tone: "error", text: err });
-    const next = upsertById(journal, entry);
+    const next = upsertById((await getStore().getSetting<JournalEntry[]>(JOURNAL_KEY)) ?? journal, entry);
     if (await save(JOURNAL_KEY, next, `${md(date)} ${entry.time} 일지를 ${draft.id ? "고쳤어요" : "저장했어요"}.`)) {
       setJournal(next);
       setDraft(emptyDraft(isToday ? kstNow().time : draft.time, tableCount));
     }
   }
   async function removeJournal(id: string) {
-    const next = journal.filter((j) => j.id !== id);
+    const next = ((await getStore().getSetting<JournalEntry[]>(JOURNAL_KEY)) ?? journal).filter((j) => j.id !== id);
     if (await save(JOURNAL_KEY, next, "일지를 지웠어요.")) {
       setJournal(next);
       if (draft.id === id) setDraft(emptyDraft(draft.time, tableCount));
     }
   }
   async function saveTables() {
-    if (tableInput === null || tableInput <= 0) return setMsg({ tone: "error", text: "전체 테이블 수를 1 이상으로 적어 주세요." });
-    const history = [...(tables?.history ?? []).filter((h) => h.from !== date), { from: date, total: tableInput }].sort((a, b) => a.from.localeCompare(b.from));
-    const next = { history };
-    if (await save(TABLES_KEY, next, `${md(date)}부터 전체 테이블 ${tableInput}개로 적었어요.`)) {
-      setTables(next);
-      setTableInput(null);
-    }
+    if (inInput === null || inInput <= 0) return setMsg({ tone: "error", text: "내부 테이블 수를 1 이상으로 적어 주세요." });
+    const next: TablesSetting = { history: tables?.history ?? [], terraceDays: tables?.terraceDays ?? {}, inside: inInput, outside: outInput ?? 0 };
+    if (await save(TABLES_KEY, next, `테이블 수를 내부 ${inInput}개 · 야장 ${outInput ?? 0}개로 적었어요.`)) setTables(next);
+  }
+  async function setTerrace(open: boolean) {
+    const next: TablesSetting = { history: tables?.history ?? [], inside: tables?.inside, outside: tables?.outside, terraceDays: { ...(tables?.terraceDays ?? {}), [date]: open } };
+    if (await save(TABLES_KEY, next, `${md(date)} 야장 ${open ? "열었어요" : "안 열었어요"}로 적었어요.`)) setTables(next);
   }
 
   if (!loaded) return null;
@@ -496,12 +509,24 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
             </button>
           )}
         </div>
-        <div className="flex flex-wrap items-end gap-2 text-xs text-stone-600">
-          <span>전체 테이블 수 설정: {tableCount === null ? "아직 없음" : `${tableCount}개 (${tables?.history.filter((h) => h.from <= date).pop()?.from}부터)`}</span>
-          <input className="field num w-24 py-1" inputMode="numeric" placeholder="새 값" value={tableInput ?? ""} onChange={(e) => setTableInput(e.target.value.replace(/\D/g, "") === "" ? null : Number(e.target.value.replace(/\D/g, "")))} aria-label="전체 테이블 수 설정" />
-          <button type="button" className="btn-ghost text-xs" onClick={() => void saveTables()}>
-            {md(date)}부터 이 값으로
-          </button>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-stone-600">
+          <span>
+            테이블: {tableCount === null ? "아직 안 정함" : `이날 ${tableCount}개`}
+            {tables?.inside != null && ` (내부 ${tables.inside}${terraceOpen(tables, date) ? ` + 야장 ${tables.outside ?? 0}` : " · 야장 닫음"})`}
+          </span>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={terraceOpen(tables, date)} onChange={(e) => void setTerrace(e.target.checked)} disabled={tables?.inside == null} />
+            {md(date)} 야장 열었어요
+          </label>
+          <span className="ml-auto flex items-center gap-1">
+            내부
+            <input className="field num w-14 py-1" inputMode="numeric" value={inInput ?? ""} onChange={(e) => setInInput(e.target.value.replace(/\D/g, "") === "" ? null : Number(e.target.value.replace(/\D/g, "")))} aria-label="내부 테이블 수" />
+            야장
+            <input className="field num w-14 py-1" inputMode="numeric" value={outInput ?? ""} onChange={(e) => setOutInput(e.target.value.replace(/\D/g, "") === "" ? null : Number(e.target.value.replace(/\D/g, "")))} aria-label="야장 테이블 수" />
+            <button type="button" className="btn-ghost text-xs" onClick={() => void saveTables()}>
+              테이블 수 저장
+            </button>
+          </span>
         </div>
         {dayJournal.length > 0 && (
           <ul className="divide-y divide-stone-200 text-sm">

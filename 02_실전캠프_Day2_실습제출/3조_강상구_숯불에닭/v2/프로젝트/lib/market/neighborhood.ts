@@ -8,6 +8,8 @@ import { unzipSync } from "fflate";
 export const JOURNAL_KEY = "neighborhood_journal_v1";
 export const PARKING_KEY = "neighborhood_parking_v1";
 export const TABLES_KEY = "neighborhood_tables_v1";
+/** 사장님이 지운 자동 주차 기록 id — 도우미에서 다시 받아 와도 다시 넣지 않는다 */
+export const PARKING_DELETED_KEY = "neighborhood_parking_deleted_v1";
 export const VISITORS_KEY = "neighborhood_visitors_v1";
 export const BUS_KEY = "neighborhood_bus_v1";
 
@@ -68,8 +70,8 @@ export interface ParkingReading {
 }
 
 /** 자동으로 읽은 값을 장부 기록에 더한다. id 가 날짜·시각이라 여러 번 받아도 한 번만 들어간다. 이상한 숫자는 버린다 */
-export function mergeAutoParking(list: ParkingRecord[], readings: ParkingReading[]): { list: ParkingRecord[]; added: number } {
-  const have = new Set(list.map((r) => r.id));
+export function mergeAutoParking(list: ParkingRecord[], readings: ParkingReading[], deleted: Iterable<string> = []): { list: ParkingRecord[]; added: number } {
+  const have = new Set([...list.map((r) => r.id), ...deleted]); // 지운 것도 "있는 것"으로 쳐서 다시 넣지 않는다
   const add: ParkingRecord[] = [];
   for (const r of readings) {
     const id = `auto-${r.date}-${r.time}`;
@@ -82,8 +84,15 @@ export function mergeAutoParking(list: ParkingRecord[], readings: ParkingReading
 }
 
 export interface TablesSetting {
-  history: { from: string; total: number }[]; // 그날부터 쓸 수 있는 테이블 수 (바뀌면 한 줄 더)
+  history: { from: string; total: number }[]; // 예전 방식: 그날부터 쓸 수 있는 테이블 수 (바뀌면 한 줄 더)
+  // 2026-10-22 사장님: 내부 14개 · 야장 8개. 야장은 여는 날만 더한다
+  inside?: number;
+  outside?: number;
+  terraceDays?: Record<string, boolean>; // 그날 야장을 열었나
 }
+
+/** 그날 야장을 열었나 — 적어 둔 날이 없으면 닫힘 */
+export const terraceOpen = (s: TablesSetting | null, date: string) => !!s?.terraceDays?.[date];
 
 export interface VisitorDay {
   total: number | null; // 전체 방문자
@@ -198,6 +207,7 @@ export function nearestParking(records: ParkingRecord[], date: string, time: str
 
 /** 그날 쓸 수 있던 전체 테이블 수 — from 이 그날 이전인 것 중 가장 최근 */
 export function tablesOn(s: TablesSetting | null, date: string): number | null {
+  if (s?.inside != null) return s.inside + (terraceOpen(s, date) ? s.outside ?? 0 : 0);
   const rows = (s?.history ?? []).filter((h) => h.from <= date).sort((a, b) => a.from.localeCompare(b.from));
   return rows.length ? rows[rows.length - 1].total : null;
 }
