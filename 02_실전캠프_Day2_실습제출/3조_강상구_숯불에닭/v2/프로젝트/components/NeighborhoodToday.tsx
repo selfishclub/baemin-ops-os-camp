@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Notice } from "@/components/ui";
 import { MARKET_MANUAL_KEY, type ManualEntry } from "@/components/MarketManualCard";
 import { NeighborhoodImports } from "@/components/NeighborhoodImports";
@@ -131,6 +131,15 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
   const [pNote, setPNote] = useState("");
   // 일지 입력 칸
   const [draft, setDraft] = useState<Draft>(emptyDraft(now.time, null));
+  // "고치기"를 누르면 입력 칸이 목록보다 위에 있어 눈에 안 띈다 → 입력 칸으로 올려 보내고 착석 칸에 커서 (2026-10-22 사장님: 고치기가 안 되는 것 같다)
+  const journalFormRef = useRef<HTMLDivElement>(null);
+  function startEdit(j: JournalEntry) {
+    setDraft({ id: j.id, time: j.time, seated: j.seated, totalTables: j.totalTables, street: j.street, nearby: j.nearby, tags: j.tags, memo: j.memo, teamsIn: j.teamsIn });
+    setTimeout(() => {
+      journalFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      journalFormRef.current?.querySelector<HTMLInputElement>('input[aria-label="착석 테이블 수"]')?.focus({ preventScroll: true });
+    }, 50);
+  }
   const [inInput, setInInput] = useState<number | null>(null);
   const [outInput, setOutInput] = useState<number | null>(null);
 
@@ -445,7 +454,7 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
       </div>
 
       {/* B. 짧은 장사 일지 */}
-      <div className="space-y-2 rounded-xl bg-stone-50 p-3">
+      <div ref={journalFormRef} className={`space-y-2 rounded-xl p-3 ${draft.id ? "bg-amber-50 ring-2 ring-amber-300" : "bg-stone-50"}`}>
         <p className="text-sm font-semibold">
           B. 짧은 장사 일지 <span className="text-xs font-normal text-stone-500">하루에 여러 번 · 처음엔 18·20·22시를 제안해요(정해진 시각은 아니에요)</span>
         </p>
@@ -459,7 +468,7 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
               {t}
             </button>
           ))}
-          {draft.id && <span className="text-xs font-semibold text-orange-700">{draft.time} 기록을 고치는 중</span>}
+          {draft.id && <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900">✏️ {draft.time} 기록을 고치는 중 — 바꾼 뒤 아래 &quot;고친 내용 저장&quot;</span>}
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
           <label className="text-xs text-stone-600">
@@ -540,7 +549,7 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
                   {j.memo && <span className="text-xs text-stone-500"> · {j.memo}</span>}
                 </span>
                 <span className="flex gap-2">
-                  <button type="button" className="text-xs text-stone-500 underline" onClick={() => setDraft({ id: j.id, time: j.time, seated: j.seated, totalTables: j.totalTables, street: j.street, nearby: j.nearby, tags: j.tags, memo: j.memo, teamsIn: j.teamsIn })}>
+                  <button type="button" className="text-xs text-stone-500 underline" onClick={() => startEdit(j)}>
                     고치기
                   </button>
                   <button type="button" className="text-xs text-stone-400 underline" onClick={() => void removeJournal(j.id)}>
