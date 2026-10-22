@@ -7,7 +7,13 @@ import { useExport, type ExportState } from "@/components/useExport";
 import { ExportParseError, parseLedgerExport } from "@/lib/export/parse";
 
 const SAMPLE = "/sample/가짜_리뷰수집기_내보내기.json";
-const fmt = (iso: string | null | undefined) => (iso ? iso.replace("T", " ").slice(0, 16) : "–");
+// 한국 시각으로 (저장된 값은 영국 시각 ISO 라 그대로 자르면 9시간 이르게 보인다)
+const fmt = (iso: string | null | undefined) => {
+  if (!iso) return "–";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.replace("T", " ").slice(0, 16);
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
+};
 
 // 리뷰 수집기에서 만든 내보내기 파일(data/ledger-export.json)을 올린다. 리뷰·상권·정산 탭 위에 같은 카드가 있다.
 export function ExportUploadCard({ exp, what }: { exp: ExportState; what: string }) {
