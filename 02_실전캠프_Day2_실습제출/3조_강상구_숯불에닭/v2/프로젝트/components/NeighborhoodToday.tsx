@@ -97,6 +97,7 @@ function Chips<T extends string>({ options, value, onChange, label }: { options:
 
 interface Draft {
   id: string | null; // 고치는 중이면 그 기록 id
+  origTime?: string; // 고치기 시작할 때의 시각 — 시각을 바꾸면 "새 기록으로 저장"을 권한다
   time: string;
   seated: number | null;
   totalTables: number | null;
@@ -134,7 +135,7 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
   // "고치기"를 누르면 입력 칸이 목록보다 위에 있어 눈에 안 띈다 → 입력 칸으로 올려 보내고 착석 칸에 커서 (2026-10-22 사장님: 고치기가 안 되는 것 같다)
   const journalFormRef = useRef<HTMLDivElement>(null);
   function startEdit(j: JournalEntry) {
-    setDraft({ id: j.id, time: j.time, seated: j.seated, totalTables: j.totalTables, street: j.street, nearby: j.nearby, tags: j.tags, memo: j.memo, teamsIn: j.teamsIn });
+    setDraft({ id: j.id, origTime: j.time, time: j.time, seated: j.seated, totalTables: j.totalTables, street: j.street, nearby: j.nearby, tags: j.tags, memo: j.memo, teamsIn: j.teamsIn });
     setTimeout(() => {
       journalFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       journalFormRef.current?.querySelector<HTMLInputElement>('input[aria-label="착석 테이블 수"]')?.focus({ preventScroll: true });
@@ -258,9 +259,10 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
     if (await save(PARKING_KEY, next, id.startsWith("auto-") ? "주차 기록을 지웠어요. 자동 기록이라도 다시 받아 오지 않아요." : "주차 기록을 지웠어요.")) setParking(next);
   }
 
-  async function saveJournal() {
+  // asNew: 고치는 중이어도 원래 기록은 두고 새 기록으로 (2026-10-22 사장님이 19:05 기록을 고쳐 20:47 로 바꾸며 19:05 가 사라짐)
+  async function saveJournal(asNew = false) {
     const entry: JournalEntry = {
-      id: draft.id ?? newId(),
+      id: asNew || !draft.id ? newId() : draft.id,
       date,
       time: draft.time,
       seated: draft.seated,
@@ -468,7 +470,7 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
               {t}
             </button>
           ))}
-          {draft.id && <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900">✏️ {draft.time} 기록을 고치는 중 — 바꾼 뒤 아래 &quot;고친 내용 저장&quot;</span>}
+          {draft.id && <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-900">✏️ {draft.origTime ?? draft.time} 기록을 고치는 중 — 새로 적을 땐 &quot;고치기 그만&quot;</span>}
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
           <label className="text-xs text-stone-600">
@@ -511,12 +513,22 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
         <input className="field text-sm" placeholder="메모 — 예: 옆 고깃집도 비어 있음, 비가 그침" value={draft.memo} onChange={(e) => setDraft({ ...draft, memo: e.target.value })} />
         <div className="flex flex-wrap gap-2">
           <button type="button" className="btn-primary" onClick={() => void saveJournal()}>
-            {draft.id ? "고친 내용 저장" : "일지 저장"}
+            {draft.id ? `${draft.origTime ?? ""} 기록 고쳐 저장` : "일지 저장"}
           </button>
           {draft.id && (
-            <button type="button" className="btn-ghost" onClick={() => setDraft(emptyDraft(draft.time, tableCount))}>
+            <button type="button" className={draft.origTime && draft.time !== draft.origTime ? "btn-primary" : "btn-ghost"} onClick={() => void saveJournal(true)}>
+              {draft.time} 새 기록으로 저장
+            </button>
+          )}
+          {draft.id && (
+            <button type="button" className="btn-ghost" onClick={() => setDraft(emptyDraft(isToday ? kstNow().time : draft.time, tableCount))}>
               고치기 그만
             </button>
+          )}
+          {draft.id && draft.origTime && draft.time !== draft.origTime && (
+            <p className="w-full text-xs font-semibold text-amber-800">
+              시각을 {draft.origTime} → {draft.time} 로 바꿨어요. {draft.origTime} 기록을 남기고 따로 적으려면 &quot;새 기록으로 저장&quot;을 누르세요.
+            </p>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-stone-600">
