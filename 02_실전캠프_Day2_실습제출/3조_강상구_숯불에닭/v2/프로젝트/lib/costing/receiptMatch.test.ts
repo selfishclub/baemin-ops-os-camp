@@ -29,6 +29,16 @@ describe("영수증 없는 체크카드 결제", () => {
     expect(r.missing.map((t) => t.out)).toEqual([12000]);
   });
 
+  it("영수증 한 장을 카드 2건(면세·과세)으로 나눠 냈으면 두 결제 모두 그 영수증과 짝", () => {
+    const txs = [tx("2026-10-03", "NH체크 (주)토동", 59800), tx("2026-10-03", "NH체크 주식회사와이물류대전점", 20110), tx("2026-10-03", "NH체크 가짜상회", 5000)];
+    const r = matchCardReceipts(txs, [buy("p1", "2026-10-03", "와이식자재마트 대전점", 79910)]);
+    expect(r.matched.map((m) => [m.tx.out, m.purchases[0].id])).toEqual([
+      [59800, "p1"],
+      [20110, "p1"],
+    ]);
+    expect(r.missing.map((t) => t.out)).toEqual([5000]);
+  });
+
   it("할인이 있으면 할인 뺀 금액(결제액)으로 맞춘다", () => {
     const r = matchCardReceipts([tx("2026-08-12", "NH체크 (주)가짜유통", 69780)], [buy("p1", "2026-08-12", "가짜식자재마트", 79780, 10000)]);
     expect(r.missing).toEqual([]);

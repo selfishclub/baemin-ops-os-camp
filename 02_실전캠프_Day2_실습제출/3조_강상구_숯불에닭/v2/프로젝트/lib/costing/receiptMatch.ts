@@ -103,7 +103,23 @@ export function matchCardReceipts(txs: Transaction[], purchases: Purchase[], exe
     }
     return still;
   };
-  out.missing.push(...matchAll(need));
+  // 영수증 한 장을 카드 2건으로 나눠 낸 경우 (면세·과세를 따로 긁는 식자재마트 등) — 같은 날쯤의 결제 둘의 합이 영수증 한 장
+  const matchSplit = (list: Transaction[]): Transaction[] => {
+    const done = new Set<string>();
+    for (let i = 0; i < list.length; i++)
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i];
+        const b = list[j];
+        if (done.has(a.id) || done.has(b.id) || Math.abs(dayDiff(a.date, b.date)) > 1) continue;
+        const hit = cands(a).find((x) => x.total === a.out + b.out && Math.abs(dayDiff(x.p.date, b.date)) <= WINDOW_DAYS);
+        if (!hit) continue;
+        hit.taken = true;
+        done.add(a.id).add(b.id);
+        out.matched.push({ tx: a, purchases: [hit.p] }, { tx: b, purchases: [hit.p] });
+      }
+    return list.filter((t) => !done.has(t.id));
+  };
+  out.missing.push(...matchSplit(matchAll(need)));
 
   // 4) "필요 없음"으로 둔 결제도 남은 영수증과 맞춰 본다 — 나중에 영수증을 넣었으면 "영수증과 맞음"으로 (영수증이 먼저 필요한 결제부터 다 쓴 뒤)
   const leftIds = new Set(matchAll(skipped.map((s) => s.tx)).map((t) => t.id));
