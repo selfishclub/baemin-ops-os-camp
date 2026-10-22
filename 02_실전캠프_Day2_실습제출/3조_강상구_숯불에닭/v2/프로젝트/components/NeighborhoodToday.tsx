@@ -467,8 +467,9 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
             <IntInput label="착석 테이블 수" value={draft.seated} onChange={(v) => setDraft({ ...draft, seated: v })} />
           </label>
           <label className="text-xs text-stone-600">
-            쓸 수 있는 전체 테이블
+            오늘 연 전체 테이블 <span className="text-stone-400">(빈 테이블 아님 · 아래 설정에서 자동)</span>
             <IntInput label="전체 테이블 수" value={draft.totalTables} onChange={(v) => setDraft({ ...draft, totalTables: v })} placeholder={tableCount === null ? "아래에서 한 번 정해 두기" : String(tableCount)} />
+            {draft.seated !== null && draft.totalTables !== null && draft.seated <= draft.totalTables && <span className="num text-stone-500">빈 테이블 {draft.totalTables - draft.seated}개</span>}
           </label>
           <label className="text-xs text-stone-600">
             직전 기록 뒤 들어온 팀 (선택)
@@ -533,7 +534,7 @@ export function NeighborhoodToday({ center }: { center: { lat: number; lng: numb
             {dayJournal.map((j) => (
               <li key={j.id} className="flex flex-wrap items-baseline justify-between gap-2 py-1">
                 <span className="num">
-                  <b>{j.time}</b> 착석 {j.seated === null ? "–" : j.seated}/{j.totalTables ?? "–"} · 거리 {j.street ?? "–"} · 주변 {j.nearby ?? "–"}
+                  <b>{j.time}</b> 착석 {j.seated === null ? "–" : j.seated}/{j.totalTables ?? "–"}{j.seated !== null && j.totalTables !== null && j.seated <= j.totalTables ? ` (빈 ${j.totalTables - j.seated})` : ""} · 거리 {j.street ?? "–"} · 주변 {j.nearby ?? "–"}
                   {j.teamsIn !== null && ` · 들어온 팀 ${j.teamsIn}`}
                   {j.tags.length > 0 && <span className="text-xs text-orange-800"> · {j.tags.join("·")}</span>}
                   {j.memo && <span className="text-xs text-stone-500"> · {j.memo}</span>}
