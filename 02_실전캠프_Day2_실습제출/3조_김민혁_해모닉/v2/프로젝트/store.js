@@ -270,7 +270,9 @@ const Store = (() => {
     } catch (e) { cloudFail(e); return false; }
   }
 
-  async function getDoc(k, readOnly) {
+  /* 어떤 경로로 읽든 이름 합치기를 적용한 문서를 돌려준다 — 다른 매장 문서(대시보드·랭킹·직원 명단 탭)도 합친 이름으로 보이게 (10/23) */
+  async function getDoc(k, readOnly) { const d = await getDoc0(k, readOnly); return d && Array.isArray(d.renames) && d.renames.length ? applyRenames(d) : d; }
+  async function getDoc0(k, readOnly) {
     const local = await localGet(k);
     if (!cloudOn() || !CLOUD_KEYS(k)) return local;
     const remote = await cloudGet(k, local && local.blobs);
@@ -466,7 +468,7 @@ const Store = (() => {
     const ch = supa.client.channel('dash-' + k.replace(/[^a-zA-Z0-9]/g, '_'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'docs_poke', filter: 'key=eq.' + k }, () => {
         clearTimeout(timer);
-        timer = setTimeout(async () => { try { const doc = await cloudGet(k, null); if (doc) { await localPut(k, doc); cb(doc); } } catch (_) { /* 무시 */ } }, 300);
+        timer = setTimeout(async () => { try { const doc = await cloudGet(k, null); if (doc) { await localPut(k, doc); cb(doc.renames && doc.renames.length ? applyRenames(doc) : doc); } } catch (_) { /* 무시 */ } }, 300);
       }).subscribe();
     return () => { try { supa.client.removeChannel(ch); } catch (_) { /* 무시 */ } };
   }
