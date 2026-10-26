@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, Notice } from "@/components/ui";
 import { BreakevenCard } from "@/components/BreakevenCard";
+import { GasBillCard } from "@/components/GasBillCard";
 import { ReviewSummaryCard } from "@/components/ReviewSummaryCard";
 import { WeekdayCard } from "@/components/WeekdayCard";
 import { FindingsCard } from "@/components/FindingsCard";
@@ -252,6 +253,8 @@ export default function PnlPage() {
       <WeekdayCard month={month} sales={daily.sales} channels={daily.channels} />
 
       <BreakevenCard month={month} pnl={pnl} openDays={openDays} />
+
+      <GasBillCard month={month} />
 
       {missing.length > 0 && (
         <div className="rounded-xl bg-rose-50 p-3 text-sm">
