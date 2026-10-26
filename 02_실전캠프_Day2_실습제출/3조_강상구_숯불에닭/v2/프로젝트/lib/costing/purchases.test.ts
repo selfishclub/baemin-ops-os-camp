@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyPurchaseToItems, costFromPurchases, guessItemQty, lineNet, lineUnitCost, purchaseTotal, summarizePurchases, type Purchase } from "./purchases";
+import { applyPurchaseToItems, costFromPurchases, guessItemQty, lineGrossPaid, lineNet, lineSupply, lineUnitCost, lineVat, materialPaidBasis, purchasePayable, purchaseSupply, purchaseTotal, summarizePurchases, type Purchase } from "./purchases";
 import type { Item } from "./types";
 
 const items: Item[] = [
@@ -83,5 +83,52 @@ describe("월 평균 기준단가", () => {
     expect(costFromPurchases("m", "monthAvg", [a, b, old])).toBe(8500);
     expect(costFromPurchases("m", "latest", [a, b, old])).toBe(8000);
     expect(costFromPurchases("x", "latest", [a])).toBeNull();
+  });
+});
+
+describe("매입 영수증 부가세 (원가율은 공급가, 미지급금은 부가세 포함)", () => {
+  // 마트 영수증: 계란(면세) 59,800 + 과자(과세) 11,000 — 부가세 1,000 포함
+  const mart: Purchase = {
+    id: "m1",
+    date: "2026-10-22",
+    vendor: "가짜마트",
+    discount: 0,
+    vat: 1_000,
+    lines: [
+      { name: "판계란 30구", unitPrice: 5_980, qty: 10, amount: 59_800, category: "원재료비", itemId: "egg", itemQty: 300, taxFree: true },
+      { name: "과자", unitPrice: 11_000, qty: 1, amount: 11_000, category: "기타", itemId: null, itemQty: 0 },
+    ],
+  };
+  // 거래명세표: 줄은 공급가, 부가세 별도
+  const hq: Purchase = {
+    id: "h1",
+    date: "2026-10-21",
+    vendor: "(주)가짜본사",
+    discount: 0,
+    vat: 65_200,
+    vatExcluded: true,
+    lines: [
+      { name: "소스A (10kg)", unitPrice: 185_000, qty: 1, amount: 185_000, category: "원재료비", itemId: "radish", itemQty: 10 },
+      { name: "소스B", unitPrice: 467_000, qty: 1, amount: 467_000, category: "원재료비", itemId: null, itemQty: 0 },
+    ],
+  };
+  it("부가세는 면세 아닌 줄에만 나눠 매긴다", () => {
+    expect([lineVat(mart, mart.lines[0]), lineVat(mart, mart.lines[1])]).toEqual([0, 1_000]);
+    expect(lineUnitCost(mart, mart.lines[0])).toBe(199.3); // 면세라 그대로
+    expect(lineSupply(mart, mart.lines[1])).toBe(10_000);
+    expect([purchaseTotal(mart), purchaseSupply(mart)]).toEqual([70_800, 69_800]);
+  });
+  it("공급가로 적힌 명세표는 합계에 부가세를 더하고, 단가는 공급가 그대로", () => {
+    expect([purchaseTotal(hq), purchaseSupply(hq)]).toEqual([717_200, 652_000]);
+    expect(lineUnitCost(hq, hq.lines[0])).toBe(18_500);
+    expect(lineGrossPaid(hq, hq.lines[0])).toBe(203_500);
+    expect(materialPaidBasis([hq, mart])).toBe(717_200 + 59_800);
+  });
+  it("보증금 순액은 원가가 아니라 미지급금에만", () => {
+    const liq: Purchase = { ...mart, id: "l1", vat: undefined, deposit: 72_900 };
+    expect([purchaseTotal(liq), purchasePayable(liq)]).toEqual([70_800, 143_700]);
+  });
+  it("부가세를 모르면 공급가 = 금액 (예전 영수증)", () => {
+    expect(lineSupply(p, p.lines[0])).toBe(lineNet(p, p.lines[0]));
   });
 });

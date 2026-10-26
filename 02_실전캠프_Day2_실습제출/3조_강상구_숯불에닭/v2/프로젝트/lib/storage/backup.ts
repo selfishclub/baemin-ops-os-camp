@@ -332,6 +332,7 @@ export const SETTING_LABEL: Record<string, string> = {
   pos_hourly_v1: "포스 시간대별 주문 (최초주문시각)",
   gas_bills_v1: "가스 요금안내 (사용량·단가)",
   tax_notices_v1: "세금 고지서 (금액·납부기한)",
+  payables_v1: "미지급금 (시작일·거래처 잔액)",
   neighborhood_visitors_v1: "관광 데이터랩 율량·사천동 방문자",
   neighborhood_bus_v1: "청주 버스 정류소 일별 승하차",
 };

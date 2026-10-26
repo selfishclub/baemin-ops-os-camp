@@ -254,6 +254,9 @@ export function liquorDayToPurchase(day: LiquorDay, vendor: string, items: Item[
     lines,
     discount,
     memo: `주류 원장에서 읽음${memo ? ` · ${memo} (보증금은 원가에서 뺌)` : ""}`,
+    // 술값은 전부 과세(공급가 + 부가세 10%) — 부가세 = 술값 합 ÷ 11. 보증금은 원가가 아니라 미지급금에만
+    vat: Math.round(Math.max(0, lines.reduce((a, l) => a + l.amount, 0) - discount) / 11),
+    ...(day.deposit || day.returned ? { deposit: day.deposit - day.returned } : {}),
   };
 }
 

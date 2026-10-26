@@ -342,6 +342,23 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
     await store.saveSetting(ITEMS_KEY, items.map((i) => (i.id === id ? { ...i, costMethod: method, standardCost: cost ?? i.standardCost } : i)));
     await onChange();
   }
+  // 매입 기록이 있는 품목의 기준단가를 모두 다시 계산 (부가세 뺀 공급가, 최근 12달) — 2026-10-26 공급가 기준으로 바꾸며 추가
+  const [recalcNote, setRecalcNote] = useState<string | null>(null);
+  async function recalcAll() {
+    const purchases: Purchase[] = [];
+    let m = new Date().toISOString().slice(0, 7);
+    for (let k = 0; k < 12; k++, m = prevMonth(m)) purchases.push(...((await store.getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + m)) ?? []));
+    const changed: string[] = [];
+    const next = items.map((i) => {
+      const cost = costFromPurchases(i.id, i.costMethod ?? "latest", purchases);
+      if (cost === null || cost === i.standardCost) return i;
+      changed.push(`${i.name} ${Math.round(i.standardCost).toLocaleString()}→${Math.round(cost).toLocaleString()}`);
+      return { ...i, standardCost: cost };
+    });
+    if (changed.length) await store.saveSetting(ITEMS_KEY, next);
+    setRecalcNote(changed.length ? `${changed.length}개 품목을 다시 계산했어요: ${changed.join(", ")}` : "바뀐 기준단가가 없어요.");
+    await onChange();
+  }
   // 차림표 제값. 넣어 두면 "서비스·할인으로 나간 몫"이 나온다
   async function setListPriceOf(id: string, price: number) {
     await store.saveSetting(MENUS_KEY, menus.map((m) => (m.id === id ? { ...m, listPrice: price > 0 ? price : null } : m)));
@@ -435,7 +452,13 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
       </section>
 
       <section className="card space-y-3">
-        <h2 className="text-base font-bold">품목과 기준단가 <span className="text-xs font-normal text-stone-500">대략값이면 돼요</span></h2>
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-base font-bold">품목과 기준단가 <span className="text-xs font-normal text-stone-500">대략값이면 돼요 · 부가세 뺀 공급가</span></h2>
+          <button className="btn-ghost shrink-0 px-2 py-1 text-xs" onClick={() => void recalcAll()}>
+            매입 기록으로 다시 계산
+          </button>
+        </div>
+        {recalcNote && <Notice tone="ok">{recalcNote}</Notice>}
         <ul className="divide-y divide-stone-100 text-sm">
           {items.map((i) => (
             <li key={i.id} className={`grid grid-cols-[1fr_8rem_3rem] items-center gap-2 py-1.5 ${!i.standardCost ? "bg-amber-50" : ""}`}>

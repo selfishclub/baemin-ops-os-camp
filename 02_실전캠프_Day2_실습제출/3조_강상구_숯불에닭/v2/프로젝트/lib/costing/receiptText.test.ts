@@ -83,3 +83,16 @@ describe("품목 자동 연결", () => {
     expect(matchItem("휴지", items)).toBeNull();
   });
 });
+
+describe("영수증 텍스트 — 부가세·면세", () => {
+  it("부가세 줄과 (면세) 표시를 읽는다, 과세·면세 물품 합계 줄은 상품이 아니다", () => {
+    const r = parseReceiptText(`거래처: 가짜마트\n날짜: 2026-10-22\n판계란 30구 (면세) | 5980 | 10 | 59800\n과자 | 3980 | 2 | 7960\n면세물품: 59,800\n과세물품: 7,236\n부가세: 724\n합계: 67760`);
+    expect(r.vat).toBe(724);
+    expect(r.lines.map((l) => [l.name, !!l.taxFree])).toEqual([["판계란 30구", true], ["과자", false]]);
+    expect(r.notes).toEqual([]);
+  });
+  it("마트 영수증처럼 금액 뒤 #도 면세로 본다, 부가세가 없으면 모름(null)", () => {
+    const r = parseReceiptText(`백오이 3 | 990 | 1 | 990 #\n합계: 990`);
+    expect([r.lines[0].taxFree, r.vat]).toEqual([true, null]);
+  });
+});

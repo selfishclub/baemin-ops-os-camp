@@ -1,5 +1,5 @@
 import { DEFAULT_CHANNELS, type Channel } from "./categories";
-import { PURCHASES_KEY_PREFIX, type Purchase } from "./costing/purchases";
+import { PURCHASES_KEY_PREFIX, materialPaidBasis, type Purchase } from "./costing/purchases";
 import { monthSummary } from "./daily";
 import { effectiveChannelSales } from "./effective";
 import { fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "./fixedCosts";
@@ -67,7 +67,7 @@ export async function loadMonthPnls(store: Store, months: Month[]): Promise<Mont
       const results = monthSettlements(month, rules ?? [], channels, daily, [...txs, ...nextTxs], lastBankDate, holidays ?? [], adjustments ?? []);
       const sales = effectiveChannelSales(month, saved, daily, channels, results);
       const summary = monthSummary(month, daily, shifts, staff);
-      const material = (purchases ?? []).reduce((a, p) => a + (p.lines ?? []).filter((l) => l.category === "원재료비" || l.category === "기타재료비").reduce((x, l) => x + l.amount, 0), 0);
+      const material = materialPaidBasis(purchases ?? []);
       const pnl = computePnl(txs, sales, { hourly: summary.labor, salary: labor.salary, insurance: labor.insurance }, material, fixedCostGaps(fixedCosts ?? [], txs, month));
       return { month, pnl, empty: txs.length === 0 && sales.length === 0, closed: !!closing?.closedAt };
     }),

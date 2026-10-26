@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useDaily } from "@/components/useDaily";
 import { useLedger } from "@/components/useLedger";
 import { useSettlement } from "@/components/useSettlement";
-import { PURCHASES_KEY_PREFIX, type Purchase } from "@/lib/costing/purchases";
+import { PURCHASES_KEY_PREFIX, materialPaidBasis, type Purchase } from "@/lib/costing/purchases";
 import { monthSummary, todayStr } from "@/lib/daily";
 import { fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "@/lib/fixedCosts";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
@@ -39,7 +39,7 @@ export function useMonthPnl(month: Month) {
     getStore()
       .getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + month)
       .then((ps) => {
-        const sum = (ps ?? []).reduce((a, p) => a + (p.lines ?? []).filter((l) => l.category === "원재료비" || l.category === "기타재료비").reduce((x, l) => x + l.amount, 0), 0);
+        const sum = materialPaidBasis(ps ?? []);
         setMaterialPurchases(sum);
         setPurchaseCount((ps ?? []).length);
       })

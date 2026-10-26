@@ -13,6 +13,7 @@ import {
   applyPurchaseToItems,
   guessItemQty,
   lineUnitCost,
+  purchaseSupply,
   purchaseTotal,
   summarizePurchases,
   unitLabel,
@@ -497,7 +498,7 @@ function PurchaseEditor({ purchase, items, onChange, onSave, onCancel }: { purch
                   ✕
                 </button>
               </div>
-              <div className="grid grid-cols-[6.5rem_1fr_7rem] items-center gap-1 text-xs">
+              <div className="grid grid-cols-[6.5rem_1fr_7rem_3.2rem] items-center gap-1 text-xs">
                 <select aria-label={`분류 ${i + 1}`} className="field px-2 py-1.5 text-xs" value={l.category} onChange={(e) => setLine(i, { category: e.target.value as PurchaseCategory })}>
                   {PURCHASE_CATEGORIES.map((c) => (
                     <option key={c}>{c}</option>
@@ -519,10 +520,14 @@ function PurchaseEditor({ purchase, items, onChange, onSave, onCancel }: { purch
                 ) : (
                   <span />
                 )}
+                <label className="flex items-center justify-end gap-1 text-xs text-stone-600" title="닭고기·채소·계란처럼 부가세가 없는 품목">
+                  <input type="checkbox" aria-label={`면세 ${i + 1}`} checked={!!l.taxFree} onChange={(e) => setLine(i, { taxFree: e.target.checked || undefined })} />
+                  면세
+                </label>
               </div>
               {l.itemId && l.itemQty > 0 && (
                 <p className="num text-right text-xs text-stone-500">
-                  → {num(lineUnitCost(p, l) ?? 0)}원/{unitLabel(itemUnitOf(items, l.itemId))} (할인 반영)
+                  → {num(lineUnitCost(p, l) ?? 0)}원/{unitLabel(itemUnitOf(items, l.itemId))} (할인 반영 · 부가세 뺀 공급가)
                 </p>
               )}
             </div>
@@ -539,6 +544,34 @@ function PurchaseEditor({ purchase, items, onChange, onSave, onCancel }: { purch
           </label>
           <p className="num text-right text-sm">
             합계 <b>{won(purchaseTotal(p))}</b>
+          </p>
+        </div>
+
+        {/* 부가세 — 원가율은 공급가로, 미지급금은 부가세 포함으로 센다 */}
+        <div className="space-y-2 rounded-xl bg-stone-50 p-2">
+          <div className="grid grid-cols-2 items-end gap-2">
+            <label className="space-y-1 text-xs text-stone-500">
+              부가세 (영수증에 찍힌 금액, 면세만 샀으면 0)
+              <MoneyInput label="부가세" allowEmpty placeholder="모름" value={p.vat ?? null} onChange={(n) => onChange({ ...p, vat: n ?? undefined })} />
+            </label>
+            <label className="space-y-1 text-xs text-stone-500">
+              보증금 순액 (주류 병·상자, 낸 것 − 돌려받은 것)
+              <MoneyInput label="보증금 순액" allowEmpty placeholder="없음" value={p.deposit ?? null} onChange={(n) => onChange({ ...p, deposit: n ?? undefined })} />
+            </label>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-stone-600">
+            <input type="checkbox" aria-label="줄 금액이 공급가" checked={!!p.vatExcluded} onChange={(e) => onChange({ ...p, vatExcluded: e.target.checked || undefined })} />
+            줄 금액이 공급가예요 (본사 거래명세표·세금계산서처럼 부가세가 따로 적힌 경우)
+          </label>
+          <p className="num text-right text-xs text-stone-600">
+            {p.vat === undefined ? (
+              <span className="text-amber-700">부가세를 모르면 원가율은 금액 그대로(부가세 포함)로 계산돼요.</span>
+            ) : (
+              <>
+                공급가 {won(purchaseSupply(p))} + 부가세 {won(p.vat)} = <b>{won(purchaseTotal(p))}</b>
+              </>
+            )}
+            {p.deposit ? <span className="ml-2 text-stone-500">· 미지급금엔 보증금 {won(p.deposit)}까지 {won(purchaseTotal(p) + p.deposit)}</span> : null}
           </p>
         </div>
 
@@ -592,7 +625,7 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
     const r = liquor?.ok;
     if (!r) return;
     const p = liquorDayToPurchase(r.day, r.vendor || "주류", items);
-    onUse({ date: r.day.date || undefined, vendor: p.vendor, lines: p.lines, discount: p.discount, memo: (p.memo ?? "").replace("주류 원장에서 읽음", "주류 영수증에서 읽음") }, r.balance !== null && r.day.date ? { date: r.day.date, amount: r.balance } : null);
+    onUse({ date: r.day.date || undefined, vendor: p.vendor, lines: p.lines, discount: p.discount, vat: p.vat, ...(p.deposit !== undefined ? { deposit: p.deposit } : {}), memo: (p.memo ?? "").replace("주류 원장에서 읽음", "주류 영수증에서 읽음") }, r.balance !== null && r.day.date ? { date: r.day.date, amount: r.balance } : null);
   };
 
   const build = () => {
@@ -606,7 +639,7 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
       }
       return line;
     });
-    onUse({ date: parsed.date || undefined, vendor: parsed.vendor || "", lines, discount: parsed.discount });
+    onUse({ date: parsed.date || undefined, vendor: parsed.vendor || "", lines, discount: parsed.discount, ...(parsed.vat !== null ? { vat: parsed.vat } : {}) });
   };
 
   const linked = parsed ? parsed.lines.filter((l) => matchItem(l.name, items)).length : 0;

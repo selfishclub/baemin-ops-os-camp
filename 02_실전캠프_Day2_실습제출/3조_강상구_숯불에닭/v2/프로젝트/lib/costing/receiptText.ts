@@ -7,8 +7,9 @@ import type { PurchaseLine } from "./purchases";
 export const RECEIPT_PROMPT = `영수증 사진을 읽어 아래 형식의 텍스트만 출력해. 설명 없이.
 거래처: (상호)
 날짜: YYYY-MM-DD
-상품명 | 단가 | 수량 | 금액   (한 줄에 하나)
+상품명 | 단가 | 수량 | 금액   (한 줄에 하나. 면세 품목이면 상품명 뒤에 (면세))
 할인: (총 할인액, 없으면 0)
+부가세: (영수증의 부가세, 없으면 0)
 합계: (영수증 합계)`;
 
 export interface ParsedReceiptLine {
@@ -18,6 +19,7 @@ export interface ParsedReceiptLine {
   amount: number;
   /** 숫자를 어떻게 읽었는지 (화면에 보여 주고 사장님이 확인) */
   read: string;
+  taxFree?: boolean; // 상품명 뒤 (면세) 또는 영수증의 # 표시
 }
 
 export interface ParsedReceipt {
@@ -25,6 +27,7 @@ export interface ParsedReceipt {
   date: string; // 못 읽으면 ""
   discount: number;
   total: number | null; // 영수증에 적힌 합계 (대조용)
+  vat: number | null; // 영수증의 부가세 (없으면 null = 모름)
   lines: ParsedReceiptLine[];
   notes: string[]; // 사장님에게 보여 줄 알림
 }
@@ -34,6 +37,7 @@ const KEYS = {
   date: ["날짜", "일자", "거래일", "거래일자", "구매일", "결제일"],
   discount: ["할인", "할인액", "할인금액", "에누리"],
   total: ["합계", "총액", "총합계", "결제금액", "총결제금액", "판매합계", "받을금액"],
+  vat: ["부가세", "부가가치세", "VAT", "세액"],
 };
 
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -97,7 +101,7 @@ function matchKey(line: string, keys: string[]): string | null {
 }
 
 export function parseReceiptText(text: string, monthHint?: string): ParsedReceipt {
-  const out: ParsedReceipt = { vendor: "", date: "", discount: 0, total: null, lines: [], notes: [] };
+  const out: ParsedReceipt = { vendor: "", date: "", discount: 0, total: null, vat: null, lines: [], notes: [] };
   const rows = text.split(/\r?\n/);
 
   for (const row of rows) {
@@ -123,6 +127,13 @@ export function parseReceiptText(text: string, monthHint?: string): ParsedReceip
       out.discount += Math.abs(toNumber(discount) ?? 0);
       continue;
     }
+    // 영수증 아래쪽의 과세·면세 물품 합계 줄은 상품이 아니다
+    if (/^(과세|면세)\s*(물품|금액|합계|매출)/.test(line)) continue;
+    const vat = matchKey(line, KEYS.vat);
+    if (vat !== null) {
+      out.vat = toNumber(vat) ?? 0;
+      continue;
+    }
     const total = matchKey(line, KEYS.total);
     if (total !== null) {
       out.total = toNumber(total);
@@ -133,7 +144,9 @@ export function parseReceiptText(text: string, monthHint?: string): ParsedReceip
     if (cells.length === 0) continue;
     // 맨 앞이 번호면 뗀다 ("1 특란 30구 5800 2 11600")
     if (cells.length > 2 && isNumericCell(cells[0]) && !isNumericCell(cells[1])) cells.shift();
-    const name = cells[0];
+    // 면세 표시: 상품명 뒤 "(면세)", 또는 마트 영수증처럼 금액 뒤 "#"
+    const taxFree = /\(면세\)|면세\s*$/.test(cells[0]) || /#\s*$/.test(line);
+    const name = cells[0].replace(/\s*\(면세\)\s*|\s*면세\s*$/g, "").trim();
     if (!name || isNumericCell(name)) continue; // 이름 없는 줄(합계만 있는 줄 등)은 건너뜀
     let nums = cells.slice(1).map((c) => toNumber(c)).filter((n): n is number => n !== null);
     if (nums.length === 0) continue; // 숫자가 없으면 줄이 아니다
@@ -166,7 +179,7 @@ export function parseReceiptText(text: string, monthHint?: string): ParsedReceip
     if (unitPrice > 0 && Math.abs(unitPrice * qty - amount) > Math.max(10, amount * 0.02)) {
       out.notes.push(`"${name}" 단가×수량과 금액이 달라요 (${unitPrice}×${qty} ≠ ${amount}). 금액을 그대로 썼어요.`);
     }
-    out.lines.push({ name, unitPrice, qty, amount, read });
+    out.lines.push({ name, unitPrice, qty, amount, read, ...(taxFree ? { taxFree: true } : {}) });
   }
 
   if (out.lines.length === 0) out.notes.push("상품 줄을 하나도 못 읽었어요. 한 줄에 하나씩, 상품명 | 단가 | 수량 | 금액 형태로 붙여 주세요.");
@@ -210,5 +223,5 @@ export function matchItem(name: string, items: Item[]): Item | null {
 
 /** 읽은 줄을 매입 영수증 줄로 (품목 연결·품목 수량은 화면에서 채운다) */
 export function toPurchaseLine(l: ParsedReceiptLine): PurchaseLine {
-  return { name: l.name, unitPrice: l.unitPrice, qty: l.qty, amount: l.amount, category: "원재료비", itemId: null, itemQty: 0 };
+  return { name: l.name, unitPrice: l.unitPrice, qty: l.qty, amount: l.amount, category: "원재료비", itemId: null, itemQty: 0, ...(l.taxFree ? { taxFree: true } : {}) };
 }
