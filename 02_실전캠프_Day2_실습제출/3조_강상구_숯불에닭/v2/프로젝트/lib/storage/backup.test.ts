@@ -262,6 +262,11 @@ describe("12. JSON 복원 후 사진 연결 위험", () => {
   it("영수증·고정비 id 를 사진 주인으로 본다", () => {
     expect([...photoOwnerIds(fakeData())].sort()).toEqual(["f1", "p1", "p2"]);
   });
+  it("세금 고지서 id 도 사진 주인으로 본다", () => {
+    const d = fakeData();
+    d.settings.push({ key: "tax_notices_v1", value: [{ id: "tn1" }] });
+    expect(photoOwnerIds(d).has("tn1")).toBe(true);
+  });
   it("백업에 없는 영수증의 사진은 '연결 끊김'으로 센다 (사진은 지우지 않음)", () => {
     const current = fakeData();
     const backup = fakeData();

@@ -246,12 +246,12 @@ export function diffBackup(current: BackupSummary, backup: BackupSummary): Backu
 }
 
 // ── 영수증 사진 연결 ────────────────────────────────────────────────
-// 사진은 IndexedDB 에 따로 있고 ownerId(영수증 id 또는 고정비 id)로만 연결된다.
+// 사진은 IndexedDB 에 따로 있고 ownerId(영수증 id·고정비 id·세금 고지서 id)로만 연결된다.
 // JSON 복원은 사진을 건드리지 않지만, 설정 안의 영수증·고정비 목록이 바뀌면 연결이 끊긴 사진(고아)이 생길 수 있다.
 export function photoOwnerIds(d: LocalData): Set<string> {
   const ids = new Set<string>();
   for (const s of d.settings) {
-    if (!(s.key.startsWith("purchases_") || s.key === "fixed_costs") || !Array.isArray(s.value)) continue;
+    if (!(s.key.startsWith("purchases_") || s.key === "fixed_costs" || s.key === "tax_notices_v1") || !Array.isArray(s.value)) continue;
     for (const row of s.value as unknown[]) {
       const id = (row as { id?: unknown })?.id;
       if (typeof id === "string") ids.add(id);
@@ -331,6 +331,7 @@ export const SETTING_LABEL: Record<string, string> = {
   neighborhood_parking_deleted_v1: "지운 자동 주차 기록 (다시 안 받기)",
   pos_hourly_v1: "포스 시간대별 주문 (최초주문시각)",
   gas_bills_v1: "가스 요금안내 (사용량·단가)",
+  tax_notices_v1: "세금 고지서 (금액·납부기한)",
   neighborhood_visitors_v1: "관광 데이터랩 율량·사천동 방문자",
   neighborhood_bus_v1: "청주 버스 정류소 일별 승하차",
 };

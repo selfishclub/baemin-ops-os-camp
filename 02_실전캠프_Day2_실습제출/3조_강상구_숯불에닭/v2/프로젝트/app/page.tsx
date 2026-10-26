@@ -6,6 +6,7 @@ import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, Notice } from "@/components/ui";
 import { BreakevenCard } from "@/components/BreakevenCard";
 import { GasBillCard } from "@/components/GasBillCard";
+import { TaxNoticeCard } from "@/components/TaxNoticeCard";
 import { ReviewSummaryCard } from "@/components/ReviewSummaryCard";
 import { WeekdayCard } from "@/components/WeekdayCard";
 import { FindingsCard } from "@/components/FindingsCard";
@@ -253,6 +254,8 @@ export default function PnlPage() {
       <WeekdayCard month={month} sales={daily.sales} channels={daily.channels} />
 
       <BreakevenCard month={month} pnl={pnl} openDays={openDays} />
+
+      <TaxNoticeCard />
 
       <GasBillCard month={month} />
 
