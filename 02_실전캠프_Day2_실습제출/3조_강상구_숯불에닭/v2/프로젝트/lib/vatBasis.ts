@@ -11,6 +11,13 @@ export const VAT_RATE = 0.1;
 // 의제매입세액 공제율 — 개인 음식점, 과세표준 2억 원 초과(우리 가게 연 매출 기준) 8/108. 2억 이하면 9/109 (세무사 확인 필요)
 export const DEEMED_RATE = 8 / 108;
 
+// 신용카드 매출전표 등 발행세액공제 — 개인사업자(직전 연도 공급가액 10억 이하), 카드·현금영수증·배달앱 결제 매출의 1.3%, 1년 한도 1,000만 원
+export const CARD_CREDIT_RATE = 0.013;
+export const CARD_CREDIT_YEAR_CAP = 10_000_000;
+
+/** 카드 매출 세액공제 대상 채널: 카드, 현금영수증, 배달앱(앱 결제). 영수증 없는 현금·계좌이체는 아니다 */
+export const cardCreditEligible = (channelId: string, kind: string) => kind === "card" || kind === "delivery" || channelId === "hall_cash_receipt";
+
 /** 이 비용 줄에 공제받는 부가세가 들어 있나 (들어 있으면 ÷1.1) */
 export function hasInputVat(major: string, minor: string): boolean {
   if (major === "가맹수수료" || major === "임대료") return true;
@@ -47,7 +54,7 @@ export function vatBasisFrom(purchases: Purchase[], deemedRate = DEEMED_RATE, hm
       // 홈택스 계산서가 있으면 계산서 받는 거래처 몫은 계산서 금액으로 센다 (아래)
       if ((l.taxFree || p.vat === 0) && !(hm?.freeCount && hm.vendors.some((v) => v.free && sameVendor(p.vendor, v.vendor)))) taxFree += g;
     }
-  if (hm?.freeCount) taxFree += hm.freeSupply;
+  if (hm?.freeCount) taxFree += hm.freeGoods;
   return {
     materialSupplyRatio: gross > 0 ? supply / gross : 1,
     deemedInput: Math.round(taxFree * deemedRate),

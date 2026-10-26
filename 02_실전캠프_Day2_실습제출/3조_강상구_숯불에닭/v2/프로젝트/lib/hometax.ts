@@ -21,7 +21,8 @@ export interface HometaxRow {
 
 // 물건값이 아닌 품목 (본사 세금계산서에 소스와 같이 들어오는 로열티·배송비 등)
 // 배달앱(쿠팡이츠 등) 세금계산서는 수수료·광고라 같은 이름의 쿠팡 쇼핑 영수증과 견주면 안 된다
-const NOT_GOODS = /로열티|프로그램|사용료|배송비|택배비|수수료|이용료|기장료|광고|ad|coupangeats|coueats|영중소|정산|중개/i;
+// 계산서(면세)로 오는 상하수도·해충방제도 재료가 아니다 (의제매입세액은 면세 "재료"만)
+const NOT_GOODS = /로열티|프로그램|사용료|배송비|택배비|수수료|이용료|기장료|광고|ad|coupangeats|coueats|영중소|정산|중개|상하수도|수도요금|해충|방제|방역|소독/i;
 
 export interface HometaxStore {
   rows: HometaxRow[];
@@ -126,7 +127,8 @@ export interface HometaxMonth {
   freeCount: number;
   supply: number;
   vat: number; // 세금계산서 세액 합 = 돌려받는 부가세 (세금계산서 분)
-  freeSupply: number; // 계산서(면세) 공급가 합 — 의제매입세액 기준
+  freeSupply: number; // 계산서(면세) 공급가 합
+  freeGoods: number; // 그중 재료 몫 (상하수도·해충방제 등 뺀 것) — 의제매입세액 기준
   vendors: HometaxVendorRow[];
 }
 
@@ -162,6 +164,7 @@ export function hometaxMonth(store: HometaxStore | null, month: string, purchase
     supply: rows.reduce((a, r) => a + r.supply, 0),
     vat: rows.reduce((a, r) => a + r.vat, 0),
     freeSupply: rows.filter((r) => r.free).reduce((a, r) => a + r.supply, 0),
+    freeGoods: rows.filter((r) => r.free).reduce((a, r) => a + (r.goods ?? r.supply), 0),
     vendors,
   };
 }

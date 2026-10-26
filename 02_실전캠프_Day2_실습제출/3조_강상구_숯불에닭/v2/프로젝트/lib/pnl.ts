@@ -1,10 +1,10 @@
-import { EXCLUDED_MAJOR, EXPENSE_MAJORS, OWNER_DRAW, isHall, type Major } from "./categories";
+import { EXCLUDED_MAJOR, EXPENSE_MAJORS, OWNER_DRAW, channelKind, isHall, type Major } from "./categories";
 import { feeOf, round1 } from "./channels";
 import type { ChannelSale, Transaction } from "./types";
 import type { LaborEstimate } from "./labor";
 import { totalFixedGap, type FixedCostGap } from "./fixedCosts";
 import { expandSplits } from "./txSplit";
-import { VAT_RATE, hasInputVat, isVatPayment, type VatBasis } from "./vatBasis";
+import { CARD_CREDIT_RATE, CARD_CREDIT_YEAR_CAP, VAT_RATE, cardCreditEligible, hasInputVat, isVatPayment, type VatBasis } from "./vatBasis";
 
 export interface PnlLine {
   label: string;
@@ -48,7 +48,8 @@ export interface Pnl {
     input: number; // 비용에 들어 있던 부가세 (돌려받는 돈)
     inputSource: "홈택스" | "어림"; // 홈택스 세금계산서 세액이면 실제, 아니면 비용 ÷1.1 어림
     deemed: number; // 의제매입세액공제 (면세 재료)
-    due: number; // 이 달 몫 부가세 어림 = output − input − deemed (나중에 예정고지·확정신고로 낸다)
+    cardCredit: number; // 신용카드 매출 세액공제 (카드·현금영수증·배달앱 매출 × 1.3%, 한 달 몫은 1년 한도 ÷ 12까지)
+    due: number; // 이 달 몫 부가세 어림 = output − input − deemed − cardCredit (나중에 예정고지·확정신고로 낸다)
     paid: number; // 이 달 통장에서 낸 부가세 (손익에서 뺌)
   } | null;
 }
@@ -228,8 +229,10 @@ export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: 
     vat: vat
       ? (() => {
           const output = salesGross - salesNet;
+          const cardBase = sales.filter((x) => cardCreditEligible(x.channel, channelKind(x.channel))).reduce((a, x) => a + x.orders, 0);
+          const cardCredit = Math.min(Math.round(cardBase * CARD_CREDIT_RATE), Math.round(CARD_CREDIT_YEAR_CAP / 12));
           const input = vat.inputActual ?? Math.round(inputVat);
-          return { output, input, inputSource: vat.inputActual !== undefined ? ("홈택스" as const) : ("어림" as const), deemed: vat.deemedInput, due: output - input - vat.deemedInput, paid: vatPaid };
+          return { output, input, inputSource: vat.inputActual !== undefined ? ("홈택스" as const) : ("어림" as const), deemed: vat.deemedInput, cardCredit, due: output - input - vat.deemedInput - cardCredit, paid: vatPaid };
         })()
       : null,
   };

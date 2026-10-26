@@ -345,14 +345,14 @@ function VatBox({ vat, month }: { vat: NonNullable<Pnl["vat"]>; month: string })
       </p>
       <p className="num">
         매출에 든 부가세 {num(vat.output)} − 비용에 든 부가세 {num(vat.input)}
-        <span className="text-sky-700">{vat.inputSource === "홈택스" ? " (홈택스 세금계산서 + 카드 영수증, 실제)" : " (비용 ÷1.1 어림 — 홈택스 자료를 올리면 실제로 바뀌어요)"}</span> − 의제매입세액공제 {num(vat.deemed)} = <b>{num(vat.due)}</b>
+        <span className="text-sky-700">{vat.inputSource === "홈택스" ? " (홈택스 세금계산서 + 카드 영수증, 실제)" : " (비용 ÷1.1 어림 — 홈택스 자료를 올리면 실제로 바뀌어요)"}</span> − 의제매입세액공제 {num(vat.deemed)} − 카드 매출 세액공제 {num(vat.cardCredit)} = <b>{num(vat.due)}</b>
       </p>
       <p className="text-sky-900">
         영업이익에는 안 들어가요. 예정고지(4월·10월 무렵)와 확정신고(1월·7월) 때 모아서 나가요.
         {vat.paid > 0 && <> 이 달 통장에서 낸 부가세 <b className="num">{won(vat.paid)}</b>는 비용이 아니라서 손익에서 뺐어요.</>}
       </p>
       <p className="text-[11px] text-sky-800">
-        어림이에요: 신용카드 매출 세액공제(카드 매출의 1.3%)는 안 뺐고, 의제매입세액은 면세 재료 × 8/108(연 매출 2억 원 넘는 개인 음식점)로 셌어요. 정확한 금액은 세무사님 신고서가 기준이에요.
+        어림이에요: 카드 매출 세액공제는 카드·현금영수증·배달앱 매출 × 1.3%(1년 한도 1,000만 원 → 한 달 83만 원까지), 의제매입세액은 면세 재료 × 8/108(연 매출 2억 원 넘는 개인 음식점)로 셌어요. 정확한 금액은 세무사님 신고서가 기준이에요.
       </p>
     </div>
   );
