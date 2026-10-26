@@ -144,7 +144,7 @@ describe("공급가 손익 (부가세 뺀 금액) — 2026-10-26", () => {
     expect(line("노무관리비")).toBe(3_000_000);
     expect(line("세금과공과")).toBe(0);
     expect(line("매출원가")).toBe(950_000 - 50_000); // 공급가 비율 × − 의제매입
-    expect(p.vat).toEqual({ output: 1_000_000, input: 200_000 + 50_000, deemed: 50_000, due: 700_000, paid: 1_450_660 });
+    expect(p.vat).toEqual({ output: 1_000_000, input: 200_000 + 50_000, inputSource: "어림", deemed: 50_000, due: 700_000, paid: 1_450_660 });
   });
   it("vat 없이 부르면 예전과 같다 (부가세 포함, 낸 부가세는 세금과공과)", () => {
     const p = computePnl(txs, sales);

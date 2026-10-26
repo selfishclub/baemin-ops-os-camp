@@ -11,6 +11,10 @@ import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor
 import { computePnl } from "@/lib/pnl";
 import { getStore } from "@/lib/storage";
 import { vatBasisFrom, type VatBasis } from "@/lib/vatBasis";
+import { HOMETAX_KEY, hometaxMonth, type HometaxStore } from "@/lib/hometax";
+
+/** 홈택스 매입 자료를 새로 올리면 손익을 다시 계산하라는 신호 (components/HometaxCard.tsx) */
+export const HOMETAX_CHANGED = "hometax-changed";
 import type { Month } from "@/lib/types";
 
 // 한 달 손익을 손익 탭과 똑같은 방식으로 계산한다.
@@ -39,19 +43,22 @@ export function useMonthPnl(month: Month) {
       .catch(() => {});
   }, []);
   useEffect(() => {
-    getStore()
-      .getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + month)
-      .then((ps) => {
-        const sum = materialPaidBasis(ps ?? []);
-        setMaterialPurchases(sum);
-        setPurchaseCount((ps ?? []).length);
-        setVat(vatBasisFrom(ps ?? []));
-      })
-      .catch(() => {
-        setMaterialPurchases(0);
-        setPurchaseCount(0);
-        setVat(vatBasisFrom([]));
-      });
+    const load = () =>
+      Promise.all([getStore().getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + month), getStore().getSetting<HometaxStore>(HOMETAX_KEY)])
+        .then(([ps, ht]) => {
+          const sum = materialPaidBasis(ps ?? []);
+          setMaterialPurchases(sum);
+          setPurchaseCount((ps ?? []).length);
+          setVat(vatBasisFrom(ps ?? [], undefined, hometaxMonth(ht, month, ps ?? [])));
+        })
+        .catch(() => {
+          setMaterialPurchases(0);
+          setPurchaseCount(0);
+          setVat(vatBasisFrom([]));
+        });
+    void load();
+    window.addEventListener(HOMETAX_CHANGED, load);
+    return () => window.removeEventListener(HOMETAX_CHANGED, load);
   }, [month]);
 
   const loading = ledger.loading || daily.loading || !settlement.loaded;

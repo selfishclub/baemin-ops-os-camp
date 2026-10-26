@@ -8,6 +8,7 @@ import { BreakevenCard } from "@/components/BreakevenCard";
 import { GasBillCard } from "@/components/GasBillCard";
 import { TaxNoticeCard } from "@/components/TaxNoticeCard";
 import { PayablesCard } from "@/components/PayablesCard";
+import { HometaxCard } from "@/components/HometaxCard";
 import { ReviewSummaryCard } from "@/components/ReviewSummaryCard";
 import { WeekdayCard } from "@/components/WeekdayCard";
 import { FindingsCard } from "@/components/FindingsCard";
@@ -265,6 +266,8 @@ export default function PnlPage() {
 
       <PayablesCard />
 
+      <HometaxCard month={month} />
+
       <TaxNoticeCard />
 
       <GasBillCard month={month} />
@@ -341,7 +344,8 @@ function VatBox({ vat, month }: { vat: NonNullable<Pnl["vat"]>; month: string })
         부가세 (맡아 둔 돈) — {monthLabel(month).slice(6)} 몫 어림 <span className="num">{won(vat.due)}</span>
       </p>
       <p className="num">
-        매출에 든 부가세 {num(vat.output)} − 비용에 든 부가세 {num(vat.input)} − 의제매입세액공제 {num(vat.deemed)} = <b>{num(vat.due)}</b>
+        매출에 든 부가세 {num(vat.output)} − 비용에 든 부가세 {num(vat.input)}
+        <span className="text-sky-700">{vat.inputSource === "홈택스" ? " (홈택스 세금계산서 + 카드 영수증, 실제)" : " (비용 ÷1.1 어림 — 홈택스 자료를 올리면 실제로 바뀌어요)"}</span> − 의제매입세액공제 {num(vat.deemed)} = <b>{num(vat.due)}</b>
       </p>
       <p className="text-sky-900">
         영업이익에는 안 들어가요. 예정고지(4월·10월 무렵)와 확정신고(1월·7월) 때 모아서 나가요.

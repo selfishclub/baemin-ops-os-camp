@@ -1,6 +1,7 @@
 import { DEFAULT_CHANNELS, type Channel } from "./categories";
 import { PURCHASES_KEY_PREFIX, materialPaidBasis, type Purchase } from "./costing/purchases";
 import { vatBasisFrom } from "./vatBasis";
+import { HOMETAX_KEY, hometaxMonth, type HometaxStore } from "./hometax";
 import { monthSummary } from "./daily";
 import { effectiveChannelSales } from "./effective";
 import { fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "./fixedCosts";
@@ -50,6 +51,7 @@ export async function loadMonthPnls(store: Store, months: Month[]): Promise<Mont
     store.getSetting<FixedCost[]>(FIXED_COSTS_KEY),
     store.listUploads(),
   ]);
+  const hometax = await store.getSetting<HometaxStore>(HOMETAX_KEY);
   const channels = mergeChannels(channelsSaved);
   const lastBankDate = uploads.reduce((a, u) => (u.to > a ? u.to : a), "");
   const labor = fixedLabor ?? EMPTY_FIXED_LABOR;
@@ -69,7 +71,7 @@ export async function loadMonthPnls(store: Store, months: Month[]): Promise<Mont
       const sales = effectiveChannelSales(month, saved, daily, channels, results);
       const summary = monthSummary(month, daily, shifts, staff);
       const material = materialPaidBasis(purchases ?? []);
-      const pnl = computePnl(txs, sales, { hourly: summary.labor, salary: labor.salary, insurance: labor.insurance }, material, fixedCostGaps(fixedCosts ?? [], txs, month), vatBasisFrom(purchases ?? []));
+      const pnl = computePnl(txs, sales, { hourly: summary.labor, salary: labor.salary, insurance: labor.insurance }, material, fixedCostGaps(fixedCosts ?? [], txs, month), vatBasisFrom(purchases ?? [], undefined, hometaxMonth(hometax, month, purchases ?? [])));
       return { month, pnl, empty: txs.length === 0 && sales.length === 0, closed: !!closing?.closedAt };
     }),
   );

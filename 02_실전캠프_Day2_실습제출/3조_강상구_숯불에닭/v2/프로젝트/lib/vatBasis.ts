@@ -4,6 +4,7 @@
 //  - 재료비: 그 달 매입 영수증의 공급가 비율을 곱하고, 면세 재료(닭고기·채소 등)의 의제매입세액공제를 뺀다 (사장님: 공제 받고 있음)
 //  - 통장에서 낸 부가세는 비용이 아니다 (손님에게 받아 맡아 둔 돈). 손익에서 빼고 따로 보여 준다
 import { lineGrossPaid, lineSupply, type Purchase } from "@/lib/costing/purchases";
+import { cardReceiptVat, sameVendor, type HometaxMonth } from "@/lib/hometax";
 
 export const VAT_RATE = 0.1;
 
@@ -25,12 +26,14 @@ export interface VatBasis {
   materialSupplyRatio: number; // 재료비(부가세 포함) × 이 비율 = 공급가
   deemedInput: number; // 의제매입세액공제 (면세 재료 × 8/108)
   taxFreeMaterial: number; // 면세 재료 매입액
+  inputActual?: number; // 홈택스 세금계산서 세액 + 카드 영수증 부가세 (홈택스 자료를 올린 달만)
 }
 
 const isMaterial = (category: string) => category === "원재료비" || category === "기타재료비";
 
-/** 그 달 매입 영수증으로 재료비 공급가 비율과 의제매입세액을 구한다 */
-export function vatBasisFrom(purchases: Purchase[], deemedRate = DEEMED_RATE): VatBasis {
+/** 그 달 매입 영수증으로 재료비 공급가 비율과 의제매입세액을 구한다.
+ *  홈택스 자료(hm)가 있으면 비용에 든 부가세는 실제 세액으로, 의제매입은 전자계산서 공급가 + 카드로 산 면세 재료로 */
+export function vatBasisFrom(purchases: Purchase[], deemedRate = DEEMED_RATE, hm: HometaxMonth | null = null): VatBasis {
   let gross = 0;
   let supply = 0;
   let taxFree = 0;
@@ -41,11 +44,14 @@ export function vatBasisFrom(purchases: Purchase[], deemedRate = DEEMED_RATE): V
       gross += g;
       supply += lineSupply(p, l);
       // 면세 재료: 줄에 면세 표시, 또는 부가세 0원인 영수증(으뜸 닭고기처럼 계산서로 받는 곳)
-      if (l.taxFree || p.vat === 0) taxFree += g;
+      // 홈택스 계산서가 있으면 계산서 받는 거래처 몫은 계산서 금액으로 센다 (아래)
+      if ((l.taxFree || p.vat === 0) && !(hm?.freeCount && hm.vendors.some((v) => v.free && sameVendor(p.vendor, v.vendor)))) taxFree += g;
     }
+  if (hm?.freeCount) taxFree += hm.freeSupply;
   return {
     materialSupplyRatio: gross > 0 ? supply / gross : 1,
     deemedInput: Math.round(taxFree * deemedRate),
     taxFreeMaterial: taxFree,
+    ...(hm && hm.taxCount ? { inputActual: hm.vat + cardReceiptVat(purchases, hm) } : {}),
   };
 }

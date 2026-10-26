@@ -46,6 +46,7 @@ export interface Pnl {
   vat: {
     output: number; // 매출에 들어 있던 부가세 (손님에게 받아 둔 돈)
     input: number; // 비용에 들어 있던 부가세 (돌려받는 돈)
+    inputSource: "홈택스" | "어림"; // 홈택스 세금계산서 세액이면 실제, 아니면 비용 ÷1.1 어림
     deemed: number; // 의제매입세액공제 (면세 재료)
     due: number; // 이 달 몫 부가세 어림 = output − input − deemed (나중에 예정고지·확정신고로 낸다)
     paid: number; // 이 달 통장에서 낸 부가세 (손익에서 뺌)
@@ -227,8 +228,8 @@ export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: 
     vat: vat
       ? (() => {
           const output = salesGross - salesNet;
-          const input = Math.round(inputVat);
-          return { output, input, deemed: vat.deemedInput, due: output - input - vat.deemedInput, paid: vatPaid };
+          const input = vat.inputActual ?? Math.round(inputVat);
+          return { output, input, inputSource: vat.inputActual !== undefined ? ("홈택스" as const) : ("어림" as const), deemed: vat.deemedInput, due: output - input - vat.deemedInput, paid: vatPaid };
         })()
       : null,
   };
