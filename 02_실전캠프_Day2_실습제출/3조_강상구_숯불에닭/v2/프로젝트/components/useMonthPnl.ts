@@ -78,5 +78,5 @@ export function useMonthPnl(month: Month) {
   );
   const empty = ledger.txs.length === 0 && settlement.effectiveSales.length === 0;
 
-  return { loading, ledger, daily, settlement, summary, pnl, empty, purchaseCount, fixedCosts, today };
+  return { loading, ledger, daily, settlement, summary, pnl, empty, purchaseCount, fixedCosts, today, vat };
 }

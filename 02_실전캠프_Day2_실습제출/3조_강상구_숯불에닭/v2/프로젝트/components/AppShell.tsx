@@ -45,6 +45,7 @@ const ALL_TABS = [
   { href: "/today", label: "오늘" },
   { href: "/upload", label: "올리기" },
   { href: "/channels", label: "정산" },
+  { href: "/books", label: "복식장부", fullOnly: true },
   { href: "/costing", label: "원가율" },
   { href: "/reviews", label: "리뷰", fullOnly: true },
   { href: "/market", label: "상권", fullOnly: true },
@@ -54,7 +55,7 @@ const ALL_TABS = [
 // PC 사이드바에서 메뉴를 세 묶음으로 (매일 쓰는 것 / 들여다보는 것 / 설정)
 const GROUPS: { title: string; hrefs: string[] }[] = [
   { title: "매일", hrefs: ["/", "/today", "/upload"] },
-  { title: "분석", hrefs: ["/channels", "/costing", "/reviews", "/market", "/smartplace"] },
+  { title: "분석", hrefs: ["/channels", "/books", "/costing", "/reviews", "/market", "/smartplace"] },
   { title: "설정", hrefs: ["/rules"] },
 ];
 
