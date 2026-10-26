@@ -10,6 +10,7 @@ import { fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "@/lib/fixedCosts
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
 import { computePnl } from "@/lib/pnl";
 import { getStore } from "@/lib/storage";
+import { vatBasisFrom, type VatBasis } from "@/lib/vatBasis";
 import type { Month } from "@/lib/types";
 
 // 한 달 손익을 손익 탭과 똑같은 방식으로 계산한다.
@@ -23,6 +24,8 @@ export function useMonthPnl(month: Month) {
   // 그 달 매입 영수증의 재료비 합계 — 통장에서 아직 안 나간 몫을 원가에 더하려고
   const [materialPurchases, setMaterialPurchases] = useState(0);
   const [purchaseCount, setPurchaseCount] = useState(0); // 그 달 매입 영수증 수 — "자료 다 들어왔나" 체크용
+  // 손익은 부가세 뺀 공급가로 본다 (2026-10-26) — 재료비 공급가 비율·의제매입세액은 그 달 영수증에서
+  const [vat, setVat] = useState<VatBasis>(vatBasisFrom([]));
   const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
 
   useEffect(() => {
@@ -42,10 +45,12 @@ export function useMonthPnl(month: Month) {
         const sum = materialPaidBasis(ps ?? []);
         setMaterialPurchases(sum);
         setPurchaseCount((ps ?? []).length);
+        setVat(vatBasisFrom(ps ?? []));
       })
       .catch(() => {
         setMaterialPurchases(0);
         setPurchaseCount(0);
+        setVat(vatBasisFrom([]));
       });
   }, [month]);
 
@@ -60,8 +65,9 @@ export function useMonthPnl(month: Month) {
         { hourly: summary.labor, salary: fixedLabor.salary, insurance: fixedLabor.insurance },
         materialPurchases,
         fixedCostGaps(fixedCosts, ledger.txs, month),
+        vat,
       ),
-    [ledger.txs, settlement.effectiveSales, summary.labor, fixedLabor, materialPurchases, fixedCosts, month],
+    [ledger.txs, settlement.effectiveSales, summary.labor, fixedLabor, materialPurchases, fixedCosts, month, vat],
   );
   const empty = ledger.txs.length === 0 && settlement.effectiveSales.length === 0;
 

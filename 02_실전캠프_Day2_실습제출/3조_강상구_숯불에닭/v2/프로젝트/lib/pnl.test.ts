@@ -120,3 +120,34 @@ describe("어림값 목록 (확정 아님)", () => {
     expect(computePnl([tx("가나식품", 1_000_000, "매출원가", "원재료비")], sales).estimates).toEqual([]);
   });
 });
+
+describe("공급가 손익 (부가세 뺀 금액) — 2026-10-26", () => {
+  const tx = (payee: string, out: number, major: Major, minor: string): Transaction => ({
+    id: payee, month: "2026-10", date: "2026-10-10", payee, out, in: 0, source: "bank", major, minor, channel: null, review: null,
+  });
+  const sales: ChannelSale[] = [{ month: "2026-10", channel: "hall_card", name: "홀", orders: 11_000_000, deposit: 10_900_000, count: 100 }];
+  const txs = [
+    tx("임대인", 2_200_000, "임대료", "임대료"), // 부가세 있음 → 2,000,000
+    tx("알바", 3_000_000, "노무관리비", "노무관리비급여"), // 부가세 없음
+    tx("주유소", 110_000, "영업비", "차량유지관리비"), // 공제 안 됨 → 그대로
+    tx("세무서", 1_450_660, "세금과공과", "부가세"), // 낸 부가세 → 손익에서 뺌
+    tx("으뜸", 1_000_000, "매출원가", "원재료비"),
+  ];
+  const vat = { materialSupplyRatio: 0.95, deemedInput: 50_000, taxFreeMaterial: 729_000 };
+
+  it("매출 ÷1.1, 공제되는 비용만 ÷1.1, 낸 부가세는 빼고 따로", () => {
+    const p = computePnl(txs, sales, undefined, 0, [], vat);
+    expect(p.vatBasis).toBe("공급가");
+    expect(p.revenue).toBe(10_000_000);
+    const line = (l: string) => p.lines.find((x) => x.label === l)!.amount;
+    expect(line("임대료")).toBe(2_000_000);
+    expect(line("노무관리비")).toBe(3_000_000);
+    expect(line("세금과공과")).toBe(0);
+    expect(line("매출원가")).toBe(950_000 - 50_000); // 공급가 비율 × − 의제매입
+    expect(p.vat).toEqual({ output: 1_000_000, input: 200_000 + 50_000, deemed: 50_000, due: 700_000, paid: 1_450_660 });
+  });
+  it("vat 없이 부르면 예전과 같다 (부가세 포함, 낸 부가세는 세금과공과)", () => {
+    const p = computePnl(txs, sales);
+    expect([p.revenue, p.vat, p.lines.find((x) => x.label === "세금과공과")!.amount]).toEqual([11_000_000, null, 1_450_660]);
+  });
+});

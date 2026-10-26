@@ -167,7 +167,7 @@ export default function PnlPage() {
           )}
         </div>
         <div className="card">
-          <p className="text-xs font-semibold text-stone-500">총매출</p>
+          <p className="text-xs font-semibold text-stone-500">총매출{pnl.vatBasis === "공급가" && " (부가세 뺀 공급가)"}</p>
           <p className="num mt-1 text-lg font-bold">{won(pnl.revenue)}</p>
           {pnl.revenueBasis === "실매출" && (
             <p className="num mt-1 text-xs text-stone-500">
@@ -199,6 +199,12 @@ export default function PnlPage() {
         </div>
         <p className="mb-1 rounded-lg bg-stone-50 px-2 py-1.5 text-xs text-stone-600">
           기준 — <b>매출·배달앱 수수료</b>: 주문이 발생한 달 · <b>비용</b>: 통장에서 돈이 나간 날. 다른 달에 결제한 비용은 지출추가 탭에서 날짜를 맞춰 넣을 수 있어요.
+          {pnl.vatBasis === "공급가" && (
+            <>
+              {" "}
+              <b>금액은 모두 부가세를 뺀 공급가</b>예요 (세무사 장부와 같은 방식). 인건비·카드수수료·세금처럼 부가세가 없는 비용과 차량유지비·접대비처럼 공제가 안 되는 비용은 그대로예요.
+            </>
+          )}
         </p>
         {pnl.estimates.length > 0 && (
           <details className="mb-1 rounded-lg bg-violet-50 px-2 py-1.5 text-xs text-violet-900">
@@ -240,6 +246,7 @@ export default function PnlPage() {
             />
           ))}
         </ul>
+        {pnl.vat && <VatBox vat={pnl.vat} month={month} />}
       </section>
 
       <RatioCard pnl={pnl} />
@@ -326,12 +333,33 @@ export default function PnlPage() {
   );
 }
 
+// 부가세 — 손님에게 받아 맡아 둔 돈. 영업이익에는 안 들어가고, 예정고지·확정신고 때 낸다
+function VatBox({ vat, month }: { vat: NonNullable<Pnl["vat"]>; month: string }) {
+  return (
+    <div className="mt-2 space-y-1 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-950 ring-1 ring-sky-100">
+      <p className="text-sm font-bold">
+        부가세 (맡아 둔 돈) — {monthLabel(month).slice(6)} 몫 어림 <span className="num">{won(vat.due)}</span>
+      </p>
+      <p className="num">
+        매출에 든 부가세 {num(vat.output)} − 비용에 든 부가세 {num(vat.input)} − 의제매입세액공제 {num(vat.deemed)} = <b>{num(vat.due)}</b>
+      </p>
+      <p className="text-sky-900">
+        영업이익에는 안 들어가요. 예정고지(4월·10월 무렵)와 확정신고(1월·7월) 때 모아서 나가요.
+        {vat.paid > 0 && <> 이 달 통장에서 낸 부가세 <b className="num">{won(vat.paid)}</b>는 비용이 아니라서 손익에서 뺐어요.</>}
+      </p>
+      <p className="text-[11px] text-sky-800">
+        어림이에요: 신용카드 매출 세액공제(카드 매출의 1.3%)는 안 뺐고, 의제매입세액은 면세 재료 × 8/108(연 매출 2억 원 넘는 개인 음식점)로 셌어요. 정확한 금액은 세무사님 신고서가 기준이에요.
+      </p>
+    </div>
+  );
+}
+
 // 영업이익이 어떻게 나왔는지 금액으로 풀어 쓴 식 (해모닉에서 따옴) — 숫자를 믿고 볼 수 있게
 function Formula({ pnl }: { pnl: Pnl }) {
   const costs = pnl.lines.filter((l) => l.kind === "cost" && l.amount !== 0);
   return (
     <p className="num mt-2 rounded-lg bg-stone-50 px-2 py-1.5 text-[11px] leading-5 text-stone-600">
-      총매출 {num(pnl.revenue)}
+      총매출{pnl.vatBasis === "공급가" ? "(공급가)" : ""} {num(pnl.revenue)}
       {costs.map((l) => (
         <span key={l.label}>
           {" "}

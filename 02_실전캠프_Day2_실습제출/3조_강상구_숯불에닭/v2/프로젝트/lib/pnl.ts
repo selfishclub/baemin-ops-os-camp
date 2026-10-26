@@ -4,6 +4,7 @@ import type { ChannelSale, Transaction } from "./types";
 import type { LaborEstimate } from "./labor";
 import { totalFixedGap, type FixedCostGap } from "./fixedCosts";
 import { expandSplits } from "./txSplit";
+import { VAT_RATE, hasInputVat, isVatPayment, type VatBasis } from "./vatBasis";
 
 export interface PnlLine {
   label: string;
@@ -40,6 +41,15 @@ export interface Pnl {
   estimates: PnlEstimate[];
   unclassified: number; // 아직 분류 안 된 줄 수
   needsReview: number; // 확인 필요 표시가 남은 줄 수
+  // 부가세 — vat를 넘기면 매출·비용을 공급가로 보고, 이 달 부가세(맡아 둔 돈)를 따로 센다
+  vatBasis: "공급가" | "부가세 포함";
+  vat: {
+    output: number; // 매출에 들어 있던 부가세 (손님에게 받아 둔 돈)
+    input: number; // 비용에 들어 있던 부가세 (돌려받는 돈)
+    deemed: number; // 의제매입세액공제 (면세 재료)
+    due: number; // 이 달 몫 부가세 어림 = output − input − deemed (나중에 예정고지·확정신고로 낸다)
+    paid: number; // 이 달 통장에서 낸 부가세 (손익에서 뺌)
+  } | null;
 }
 
 const pct = (amount: number, revenue: number) => (revenue > 0 ? round1((amount / revenue) * 100) : null);
@@ -50,7 +60,17 @@ const pct = (amount: number, revenue: number) => (revenue > 0 ? round1((amount /
 //    통장에서 나간 재료비보다 많으면 그 차이를 "아직 안 낸 재료비"로 매출원가에 더한다.
 //    9월에 받은 재료값을 10월에 내더라도 그 재료비는 9월 원가여서 그렇다 (인건비를 어림으로 채우는 것과 같은 이치).
 //  fixedGaps: 매달 나가는 고정비 중 아직 통장에서 안 나간 몫 (lib/fixedCosts.ts)
-export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: LaborEstimate, materialPurchases = 0, fixedGaps: FixedCostGap[] = []): Pnl {
+//  vat: 넘기면 공급가 손익 (lib/vatBasis.ts). 안 넘기면 예전처럼 전부 부가세 포함, 낸 부가세는 세금과공과
+export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: LaborEstimate, materialPurchases = 0, fixedGaps: FixedCostGap[] = [], vat?: VatBasis): Pnl {
+  const supplyOf = (n: number) => n / (1 + VAT_RATE);
+  let inputVat = 0;
+  let vatPaid = 0;
+  // 비용 한 줄을 손익에 넣을 금액 (공급가 손익이면 공제받는 부가세를 뺀다)
+  const costAmount = (major: string, minor: string, amount: number) => {
+    if (!vat || !hasInputVat(major, minor)) return amount;
+    inputVat += amount - supplyOf(amount);
+    return supplyOf(amount);
+  };
   // 나눠 분류한 줄은 몫마다 한 줄로 펴서 센다
   const txs = expandSplits(all);
   const hasSales = sales.some((s) => s.orders > 0);
@@ -71,10 +91,16 @@ export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: 
     else otherIncome += t.in;
   }
 
-  const hallRevenue = sales.filter((s) => isHall(s.channel)).reduce((a, s) => a + s.orders, 0);
-  const deliveryRevenue = sales.filter((s) => !isHall(s.channel)).reduce((a, s) => a + s.orders, 0);
-  const revenue = hasSales ? hallRevenue + deliveryRevenue + otherIncome : bankChannelIn + otherIncome;
-  const deliveryFee = hasSales ? sales.reduce((a, s) => a + feeOf(s), 0) : 0;
+  const hallGross = sales.filter((s) => isHall(s.channel)).reduce((a, s) => a + s.orders, 0);
+  const deliveryGross = sales.filter((s) => !isHall(s.channel)).reduce((a, s) => a + s.orders, 0);
+  const salesGross = hasSales ? hallGross + deliveryGross : bankChannelIn;
+  // 공급가 손익: 음식 매출은 모두 과세라 ÷1.1 (기타 수입은 그대로)
+  const hallRevenue = vat ? Math.round(supplyOf(hallGross)) : hallGross;
+  const deliveryRevenue = vat ? Math.round(supplyOf(deliveryGross)) : deliveryGross;
+  const salesNet = vat ? (hasSales ? hallRevenue + deliveryRevenue : Math.round(supplyOf(bankChannelIn))) : salesGross;
+  const revenue = salesNet + otherIncome;
+  const deliveryFeeGross = hasSales ? sales.reduce((a, s) => a + feeOf(s), 0) : 0;
+  const deliveryFee = Math.round(costAmount("영업비", "배달앱 수수료", deliveryFeeGross));
 
   // 대분류·소분류별 비용 = 출금 − 같은 항목으로 분류한 입금(환급·결제 취소). 환급은 매출이 아니라 원래 비용에서 빠진다.
   const byMajor = new Map<Major, Map<string, number>>();
@@ -88,8 +114,13 @@ export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: 
       ownerDraw += amount;
       continue;
     }
+    // 공급가 손익에서 낸 부가세는 비용이 아니다 (맡아 둔 돈을 낸 것)
+    if (vat && isVatPayment(t.major, minor)) {
+      vatPaid += amount;
+      continue;
+    }
     const m = byMajor.get(t.major) ?? new Map<string, number>();
-    m.set(minor, (m.get(minor) ?? 0) + amount);
+    m.set(minor, (m.get(minor) ?? 0) + costAmount(t.major, minor, amount));
     byMajor.set(t.major, m);
   }
   // 급여가 아직 통장에서 안 나갔으면(다음 달 10일 지급) 어림 인건비로 임시 채운다.
@@ -115,12 +146,23 @@ export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: 
     m.set("아직 안 낸 재료비 (외상)", (m.get("아직 안 낸 재료비 (외상)") ?? 0) + materialUnpaid);
     byMajor.set("매출원가", m);
   }
+  // 공급가 손익: 재료비는 영수증의 공급가 비율로, 면세 재료는 의제매입세액공제만큼 덜 든 것으로
+  const ratio = vat?.materialSupplyRatio ?? 1;
+  if (vat) {
+    const m = byMajor.get("매출원가") ?? new Map<string, number>();
+    for (const [k, v] of m) {
+      inputVat += v * (1 - ratio);
+      m.set(k, v * ratio);
+    }
+    if (vat.deemedInput > 0) m.set("의제매입세액공제 (면세 재료)", -vat.deemedInput);
+    byMajor.set("매출원가", m);
+  }
 
   // 청구서는 왔는데 아직 안 낸 고정비 (다음 달 초에 나가는 석쇠 대여비·가스요금 등)
   for (const g of fixedGaps) {
     if (g.gap <= 0) continue;
     const m = byMajor.get(g.cost.major) ?? new Map<string, number>();
-    m.set(g.cost.minor, (m.get(g.cost.minor) ?? 0) + g.gap);
+    m.set(g.cost.minor, (m.get(g.cost.minor) ?? 0) + costAmount(g.cost.major, g.cost.minor, g.gap));
     byMajor.set(g.cost.major, m);
   }
 
@@ -130,6 +172,8 @@ export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: 
     byMajor.set("영업비", m);
   }
 
+  // 공급가로 나눈 몫은 소수가 생기니 줄마다 원 단위로 맞춘다
+  for (const m of byMajor.values()) for (const [k, v] of m) m.set(k, Math.round(v));
   const total = (major: Major) => [...(byMajor.get(major)?.values() ?? [])].reduce((a, b) => a + b, 0);
   const costLine = (major: Major): PnlLine => ({
     label: major,
@@ -173,12 +217,20 @@ export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: 
     laborUnpaid: laborGap,
     estimates: [
       ...(laborGap > 0 ? [{ kind: "labor" as const, major: "노무관리비" as Major, what: "아직 안 나간 인건비", amount: laborGap }] : []),
-      ...(materialUnpaid > 0 ? [{ kind: "material" as const, major: "매출원가" as Major, what: "아직 안 낸 재료비 (외상)", amount: materialUnpaid }] : []),
-      ...fixedGaps.filter((g) => g.gap > 0).map((g) => ({ kind: "fixed" as const, major: g.cost.major, what: g.cost.name || g.cost.minor, amount: g.gap })),
+      ...(materialUnpaid > 0 ? [{ kind: "material" as const, major: "매출원가" as Major, what: "아직 안 낸 재료비 (외상)", amount: Math.round(materialUnpaid * ratio) }] : []),
+      ...fixedGaps.filter((g) => g.gap > 0).map((g) => ({ kind: "fixed" as const, major: g.cost.major, what: g.cost.name || g.cost.minor, amount: vat && hasInputVat(g.cost.major, g.cost.minor) ? Math.round(supplyOf(g.gap)) : g.gap })),
     ],
     deliveryFee,
     unclassified: all.filter((t) => !t.major).length,
     needsReview: all.filter((t) => t.review).length,
+    vatBasis: vat ? "공급가" : "부가세 포함",
+    vat: vat
+      ? (() => {
+          const output = salesGross - salesNet;
+          const input = Math.round(inputVat);
+          return { output, input, deemed: vat.deemedInput, due: output - input - vat.deemedInput, paid: vatPaid };
+        })()
+      : null,
   };
 }
 
