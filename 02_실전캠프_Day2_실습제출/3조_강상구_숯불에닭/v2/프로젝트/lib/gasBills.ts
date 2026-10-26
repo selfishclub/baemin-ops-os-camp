@@ -48,7 +48,7 @@ export function parseGasSms(text: string): GasParse {
     }
     const prev = num(p.match(/전월지침\s*:\s*([\d,]+)/)?.[1]);
     const now = num(p.match(/당월지침\s*:\s*([\d,]+)/)?.[1]);
-    const note = p.match(/\d{1,2}\s*월\s*단가\s*([^\n.~]*?)\s*입니다/)?.[1]?.trim() ?? null;
+    const note = p.match(/\d{1,2}\s*월\s*단가(?:는|은)?\s*([^\n.~]*?)\s*입니다/)?.[1]?.trim() ?? null;
     const due = p.match(/납부마감일\s*:\s*(\d{4})\.(\d{1,2})\.(\d{1,2})/);
     if (Number.isFinite(prev) && Number.isFinite(now) && now - prev !== m3) errors.push(`${mm[1]}년 ${mm[2]}월: 지침 차이(${now - prev}㎥)와 사용량(${m3}㎥)이 달라요 — 문자 숫자를 확인해 주세요.`);
     bills.push({
@@ -67,6 +67,9 @@ export function parseGasSms(text: string): GasParse {
   if (!parts.length) errors.push("가스 요금안내 문자가 아니에요 (\"○○○○년 ○○월 요금안내\"가 있어야 해요).");
   return { bills, errors };
 }
+
+/** 단가 안내 보여 주기 — 고치기 전에 "1월 단가는 동결"을 "는 동결"로 저장한 것도 바로잡는다 */
+export const priceNoteText = (b: GasBill) => b.priceNote?.replace(/^(는|은)\s*/, "") || null;
 
 /** 같은 청구월은 새 문자로 바꾼다 (두 번 붙여도 한 번만) */
 export function upsertGasBills(list: GasBill[], add: GasBill[]): { list: GasBill[]; added: number; replaced: number } {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gasBizDays, gasRows, parseGasSms, upsertGasBills, yearAgo, type DayBiz } from "./gasBills";
+import { gasBizDays, gasRows, parseGasSms, priceNoteText, upsertGasBills, yearAgo, type DayBiz } from "./gasBills";
 
 // 평화가스 요금안내 문자 모양 (2026-10 실제 문자와 같은 줄 모양, 고객 정보는 뺌)
 const sms = (o: { ym: string; from: string; to: string; now: number; prev: number; m3: number; fee: string; amount?: string; note?: string }) => `[Web발신]
@@ -45,6 +45,11 @@ describe("가스 요금안내 문자 읽기", () => {
   it("지침 차이와 사용량이 다르면 알려 준다, 가스 문자가 아니면 거른다", () => {
     expect(parseGasSms(oct.replace("46㎥", "40㎥")).errors[0]).toMatch(/지침 차이/);
     expect(parseGasSms("안녕하세요").errors[0]).toMatch(/요금안내/);
+  });
+  it("\"1월 단가는 동결\"도 동결로 읽는다, 예전에 \"는 동결\"로 저장된 것도 바로 보인다", () => {
+    const b = parseGasSms(oct.replace("10월 단가 Kg당 80원 인상", "10월 단가는 동결")).bills[0];
+    expect(b.priceNote).toBe("동결");
+    expect(priceNoteText({ ...b, priceNote: "는 동결" })).toBe("동결");
   });
   it("같은 청구월은 바꾼다", () => {
     const a = parseGasSms(oct).bills;

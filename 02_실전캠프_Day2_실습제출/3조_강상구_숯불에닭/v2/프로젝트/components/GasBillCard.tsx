@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CHANNELS_KEY } from "@/components/useDaily";
 import { Notice } from "@/components/ui";
 import { num, won } from "@/lib/format";
-import { GAS_BILLS_KEY, gasBizDays, gasRows, parseGasSms, upsertGasBills, yearAgo, type GasBill, type GasRow } from "@/lib/gasBills";
+import { GAS_BILLS_KEY, gasBizDays, gasRows, parseGasSms, priceNoteText, upsertGasBills, yearAgo, type GasBill, type GasRow } from "@/lib/gasBills";
 import { HISTORY_KEY, type HistoryDay } from "@/lib/history";
 import { mergeChannels } from "@/lib/monthPnl";
 import { getStore } from "@/lib/storage";
@@ -114,7 +114,7 @@ export function GasBillCard({ month }: { month: string }) {
                   <td className="text-right">{r.per100Teams === null ? "–" : r.per100Teams.toFixed(1)}</td>
                   <td className="text-right">{r.costPct === null ? "–" : `${r.costPct.toFixed(2)}%`}</td>
                   <td className="text-right">{num(r.bill.amount)}</td>
-                  <td className="pl-2 text-stone-600">{r.bill.priceNote ?? "–"}</td>
+                  <td className="pl-2 text-stone-600">{priceNoteText(r.bill) ?? "–"}</td>
                 </tr>
               ))}
             </tbody>
@@ -157,7 +157,7 @@ function Focus({ row, rows }: { row: GasRow; rows: GasRow[] }) {
     <div className="space-y-1 rounded-lg bg-stone-50 px-3 py-2 text-sm">
       <p>
         <b>{Number(m.slice(5))}월 청구</b> ({md(row.bill.from)}~{md(row.bill.to)}, {row.days}일) — <b className="num">{row.bill.m3}㎥</b> · <b className="num">{won(row.bill.amount)}</b>
-        {row.bill.priceNote && <span className="text-stone-500"> · 단가 {row.bill.priceNote}</span>}
+        {priceNoteText(row.bill) && <span className="text-stone-500"> · 단가 {priceNoteText(row.bill)}</span>}
       </p>
       <p className="num text-xs text-stone-600">
         하루 {row.perDay.toFixed(2)}㎥ · ㎥당 {num(row.unitPrice)}원 · 홀 100만 원당 {row.perHall === null ? "–" : `${row.perHall.toFixed(2)}㎥`}
