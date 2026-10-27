@@ -73,8 +73,9 @@ export function useMonthPnl(month: Month) {
   const loading = ledger.loading || daily.loading || !settlement.loaded;
   const today = todayStr();
   const summary = useMemo(() => monthSummary(month, daily.sales, daily.shifts, daily.staff, today), [month, daily.sales, daily.shifts, daily.staff, today]);
+  // 손익에 넣는 매출 (장부 일별 매출 / 「지난 매출」 / 없으면 통장 입금) — 복식장부도 같은 매출로 분개한다
+  const ps = useMemo(() => pnlSales(month, daily.sales, settlement.effectiveSales, history, ledger.txs), [month, daily.sales, settlement.effectiveSales, history, ledger.txs]);
   const pnl = useMemo(() => {
-    const ps = pnlSales(month, daily.sales, settlement.effectiveSales, history, ledger.txs);
     const p = computePnl(
         ledger.txs,
         ps.sales,
@@ -84,9 +85,9 @@ export function useMonthPnl(month: Month) {
         vat,
       );
     return ps.fromHistory ? { ...p, revenueBasis: "지난 매출" as const } : p;
-  }, [ledger.txs, settlement.effectiveSales, daily.sales, history, summary.labor, fixedLabor, materialPurchases, fixedCosts, month, vat],
+  }, [ledger.txs, ps, summary.labor, fixedLabor, materialPurchases, fixedCosts, month, vat],
   );
   const empty = ledger.txs.length === 0 && settlement.effectiveSales.length === 0;
 
-  return { loading, ledger, daily, settlement, summary, pnl, empty, purchaseCount, fixedCosts, today, vat };
+  return { loading, ledger, daily, settlement, summary, pnl, pnlSales: ps.sales, empty, purchaseCount, fixedCosts, today, vat };
 }

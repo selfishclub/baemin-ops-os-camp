@@ -79,7 +79,7 @@ export async function loadMonthPnls(store: Store, months: Month[]): Promise<Mont
       const ps = pnlSales(month, daily, sales, history, txs);
       const pnl0 = computePnl(txs, ps.sales, { hourly: summary.labor, salary: labor.salary, insurance: labor.insurance }, material, fixedCostGaps(fixedCosts ?? [], txs, month), vat);
       const pnl = ps.fromHistory ? { ...pnl0, revenueBasis: "지난 매출" as const } : pnl0;
-      const journal = buildJournal({ month, txs, sales, channels, purchases: purchases ?? [], pnl, vat });
+      const journal = buildJournal({ month, txs, sales: ps.sales, channels, purchases: purchases ?? [], pnl, vat });
       return { month, pnl, empty: txs.length === 0 && sales.length === 0, closed: !!closing?.closedAt, journal };
     }),
   );

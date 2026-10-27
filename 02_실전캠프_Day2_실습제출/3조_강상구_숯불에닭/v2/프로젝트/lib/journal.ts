@@ -136,8 +136,12 @@ export function buildJournal(inp: JournalInput): JournalEntry[] {
       continue;
     }
     if (t.major === "매출원가") {
-      // 재료 대금은 매입 영수증(외상매입금)을 갚는 것으로 본다
-      entry([dr(PAYABLE, amount), cr(BANK, amount)]);
+      // 재료 대금은 매입 영수증(외상매입금)을 갚는 것으로 본다.
+      // 영수증을 안 넣은 달(장부 쓰기 전 2024-09~2026-08)은 손익표처럼 통장에서 나간 재료 대금을 바로 재료비로
+      if (!inp.purchases.length) {
+        const s = r0(amount * inp.vat.materialSupplyRatio);
+        entry([dr(minor, s), dr(VAT_IN, amount - s), cr(BANK, amount)]);
+      } else entry([dr(PAYABLE, amount), cr(BANK, amount)]);
       continue;
     }
     if (hasInputVat(t.major, minor)) {

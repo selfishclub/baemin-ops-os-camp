@@ -72,3 +72,15 @@ describe("비품 구입", () => {
     expect(computePnl([t], []).operatingProfit).toBe(0);
   });
 });
+
+describe("영수증 안 넣은 달", () => {
+  it("통장에서 나간 재료 대금을 바로 재료비로 — 분개 이익이 손익표와 같다", () => {
+    const t1 = tx("으뜸", 2_000_000, 0, "매출원가", "원재료비");
+    const s: ChannelSale[] = [{ month: "2026-10", channel: "hall_cash", name: "홀 현금", orders: 5_500_000, deposit: 5_500_000, count: 1 }];
+    const v = vatBasisFrom([]);
+    const p = computePnl([t1], s, undefined, 0, [], v);
+    const tb = trialBalance(buildJournal({ month: "2026-10", txs: [t1], sales: s, channels: DEFAULT_CHANNELS, purchases: [], pnl: p, vat: v }));
+    expect(tb.rows.find((r) => r.account === "원재료비")?.balance).toBe(2_000_000);
+    expect(journalProfit(tb.rows)).toBe(p.operatingProfit);
+  });
+});

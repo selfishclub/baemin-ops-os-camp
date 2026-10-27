@@ -63,8 +63,8 @@ export default function BooksPage() {
 
   const depreciation = month >= opening.start ? opening.monthlyDepreciation : 0;
   const entries = useMemo(
-    () => (cur.loading ? [] : [...buildJournal({ month, txs: cur.ledger.txs, sales: cur.settlement.effectiveSales, channels: cur.daily.channels, purchases, pnl: cur.pnl, vat: cur.vat }), ...depreciationEntry(month, depreciation)]),
-    [cur.loading, cur.ledger.txs, cur.settlement.effectiveSales, cur.daily.channels, purchases, cur.pnl, cur.vat, month, depreciation],
+    () => (cur.loading ? [] : [...buildJournal({ month, txs: cur.ledger.txs, sales: cur.pnlSales, channels: cur.daily.channels, purchases, pnl: cur.pnl, vat: cur.vat }), ...depreciationEntry(month, depreciation)]),
+    [cur.loading, cur.ledger.txs, cur.pnlSales, cur.daily.channels, purchases, cur.pnl, cur.vat, month, depreciation],
   );
   const tb = useMemo(() => trialBalance(entries), [entries]);
   const profit = journalProfit(tb.rows) + depreciation; // 손익표에는 감가상각이 없어서 더해 놓고 견준다
@@ -81,7 +81,7 @@ export default function BooksPage() {
   const bankGap = chk.start !== undefined && chk.end !== undefined ? chk.end - chk.start - (bankIn - bankOut) : null;
   const materialGap = (() => {
     const p = cur.pnl.lines.find((l) => l.label === "매출원가")?.amount ?? 0;
-    const j = tb.rows.filter((r) => r.account === "원재료비").reduce((a, r) => a + r.balance, 0);
+    const j = tb.rows.filter((r) => r.account === "원재료비" || r.account === "기타재료비").reduce((a, r) => a + r.balance, 0);
     return p - j;
   })();
 
@@ -124,7 +124,7 @@ export default function BooksPage() {
           </li>
           <li className={Math.abs(profit - cur.pnl.operatingProfit) <= Math.abs(materialGap) + 1 ? "text-stone-700" : "text-amber-700"}>
             분개로 본 이익{depreciation > 0 && " (감가상각 전)"} <b className="num">{won(profit)}</b> · 손익표 영업이익 <b className="num">{won(cur.pnl.operatingProfit)}</b>
-            {profit !== cur.pnl.operatingProfit && (
+            {Math.abs(profit - cur.pnl.operatingProfit) > 1 && (
               <span className="block text-xs text-stone-500">
                 차이 {won(profit - cur.pnl.operatingProfit)} — 재료비를 분개는 매입 영수증 기준({won(cur.pnl.lines.find((l) => l.label === "매출원가")!.amount - materialGap)}), 손익표는 통장과 영수증 중 큰 쪽({won(cur.pnl.lines.find((l) => l.label === "매출원가")!.amount)})으로 봐서 생겨요.
                 {Math.abs(profit - cur.pnl.operatingProfit - materialGap) > 1 && ` 그 밖의 차이 ${won(profit - cur.pnl.operatingProfit - materialGap)}는 확인 필요예요.`}
