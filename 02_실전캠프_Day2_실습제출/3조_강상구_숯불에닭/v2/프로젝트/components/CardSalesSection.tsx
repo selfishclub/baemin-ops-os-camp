@@ -171,7 +171,7 @@ export function CardSalesSection({ month, txs, lastBankDate }: { month: string; 
               <div className="num text-base font-bold text-emerald-900">{won(view.totals.pending)}</div>
             </div>
             <div className={`rounded-xl p-2.5 ${view.totals.missing ? "bg-red-50" : "bg-stone-50"}`}>
-              <div className="text-[11px] text-stone-500">미입금 (날짜 지났는데 없음)</div>
+              <div className="text-[11px] text-stone-500">미입금 (입금이상)</div>
               <div className={`num text-base font-bold ${view.totals.missing ? "text-red-600" : ""}`}>{won(view.totals.missing)}</div>
             </div>
           </div>
