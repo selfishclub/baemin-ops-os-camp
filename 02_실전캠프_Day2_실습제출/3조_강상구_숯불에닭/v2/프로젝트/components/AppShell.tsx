@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { AutoExportSync } from "@/components/AutoExportSync";
 import { CollectStatusBanner } from "@/components/CollectStatusBanner";
-import { monthLabel, nextMonth, prevMonth } from "@/lib/month";
+import { MonthJump } from "@/components/MonthJump";
+import { nextMonth, prevMonth } from "@/lib/month";
 import { storageMode } from "@/lib/storage";
 import { isBasic } from "@/lib/edition";
 import { appTitle, loadStoreProfile, STORE_PROFILE_EVENT } from "@/lib/storeProfile";
@@ -124,7 +125,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <button aria-label="이전 달" className="rounded-full px-2 py-1 text-xs hover:bg-stone-100" onClick={() => setMonth(prevMonth(month))}>
         ◀
       </button>
-      <span className="num min-w-[5.5rem] whitespace-nowrap text-center text-sm font-bold">{monthLabel(month)}</span>
+      <MonthJump month={month} onPick={setMonth} />
       <button aria-label="다음 달" className="rounded-full px-2 py-1 text-xs hover:bg-stone-100" onClick={() => setMonth(nextMonth(month))}>
         ▶
       </button>
