@@ -122,6 +122,8 @@ export function CardSalesSection({ month, txs, lastBankDate }: { month: string; 
 
   const problems = view.checks.filter((c) => c.status === "미입금" || c.status === "차이");
   const list = showAll ? view.checks : problems;
+  // 앞으로 들어올 돈 — 지급예정일이 아직 안 온 것을 날짜별로 (10/27 사장님 "입금예정금액이 안 보여")
+  const pendingByDate = [...view.checks.filter((c) => c.status === "예정").reduce((m, c) => m.set(c.payDate, [...(m.get(c.payDate) ?? []), c]), new Map<string, typeof view.checks>())].sort(([a], [b]) => a.localeCompare(b));
   // 예정 돈이 하나도 통장에서 안 보이는 카드사 — 다른 통장으로 들어오는 것일 수 있다
   const otherAccount = view.issuers.filter((s) => s.expected > 0 && !s.matchedAny && s.missing > 0);
 
@@ -149,7 +151,7 @@ export function CardSalesSection({ month, txs, lastBankDate }: { month: string; 
 
       {hasMonth && (
         <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <div className="rounded-xl bg-stone-50 p-2.5">
               <div className="text-[11px] text-stone-500">{monthLabel(month)} 카드 매입</div>
               <div className="num text-base font-bold">{won(view.totals.amount)}</div>
@@ -164,11 +166,13 @@ export function CardSalesSection({ month, txs, lastBankDate }: { month: string; 
               <div className="text-[11px] text-stone-500">통장 확인된 입금</div>
               <div className="num text-base font-bold">{won(view.totals.deposited)}</div>
             </div>
+            <div className="rounded-xl bg-emerald-50 p-2.5">
+              <div className="text-[11px] text-emerald-800">들어올 돈 (입금 예정)</div>
+              <div className="num text-base font-bold text-emerald-900">{won(view.totals.pending)}</div>
+            </div>
             <div className={`rounded-xl p-2.5 ${view.totals.missing ? "bg-red-50" : "bg-stone-50"}`}>
-              <div className="text-[11px] text-stone-500">미입금 · 예정</div>
-              <div className="num text-base font-bold">
-                <span className={view.totals.missing ? "text-red-600" : ""}>{won(view.totals.missing)}</span> <span className="text-xs text-stone-500">· {won(view.totals.pending)}</span>
-              </div>
+              <div className="text-[11px] text-stone-500">미입금 (날짜 지났는데 없음)</div>
+              <div className={`num text-base font-bold ${view.totals.missing ? "text-red-600" : ""}`}>{won(view.totals.missing)}</div>
             </div>
           </div>
 
@@ -188,6 +192,7 @@ export function CardSalesSection({ month, txs, lastBankDate }: { month: string; 
                   <th className="text-right">수수료율</th>
                   <th className="text-right">이 달 지급예정</th>
                   <th className="text-right">통장 확인</th>
+                  <th className="text-right">입금 예정</th>
                   <th className="text-right">미입금</th>
                 </tr>
               </thead>
@@ -199,12 +204,30 @@ export function CardSalesSection({ month, txs, lastBankDate }: { month: string; 
                     <td className="text-right">{s.amount ? `${s.feeRate}%` : "-"}</td>
                     <td className="text-right">{num(s.expected)}</td>
                     <td className="text-right">{num(s.deposited)}</td>
+                    <td className={`text-right ${s.pending ? "text-emerald-800" : "text-stone-400"}`}>{s.pending ? num(s.pending) : "-"}</td>
                     <td className={`text-right ${s.missing ? "font-bold text-red-600" : "text-stone-400"}`}>{s.missing ? num(s.missing) : "-"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          {pendingByDate.length > 0 && (
+            <div className="space-y-1 rounded-xl bg-emerald-50/60 p-2.5">
+              <h3 className="text-sm font-bold text-emerald-900">앞으로 들어올 돈 · 날짜별</h3>
+              <ul className="divide-y divide-emerald-100 text-sm">
+                {pendingByDate.map(([date, cs]) => (
+                  <li key={date} className="flex flex-wrap items-baseline justify-between gap-x-3 py-1">
+                    <span>
+                      <span className="num font-semibold">{md(date)}</span> <span className="text-xs text-stone-500">{cs.map((c) => c.issuer.replace(/카드$/, "")).join("·")}</span>
+                    </span>
+                    <span className="num font-bold text-emerald-900">{num(cs.reduce((a, c) => a + c.expected, 0))}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[11px] text-stone-500">여신협회에서 받은 거래일까지의 카드 매출만 들어 있어요. 그 뒤 매출은 "바로 가져오기"를 다시 누르면 더해져요.</p>
+            </div>
+          )}
 
           <div className="space-y-1">
             <div className="flex items-baseline justify-between">
