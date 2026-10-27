@@ -82,3 +82,17 @@ describe("예전 자료를 고칠 때", () => {
     expect(amountFor(oct, "2026-10")).toBe(400_000);
   });
 });
+
+describe("같은 거래처로 성격이 다른 돈이 나갈 때", () => {
+  it("거래처 + 항목이 맞아야 낸 것으로 본다 (월세를 보내도 관리비는 아직)", () => {
+    const fc = (name: string, major: FixedCost["major"], minor: string, amount: number): FixedCost => ({ id: name, name, payeeKeyword: "황란영", major, minor, amount, active: true });
+    const t = (id: string, out: number, major: Transaction["major"], minor: string, splits?: Transaction["splits"]): Transaction => ({ id, date: "2026-10-06", month: "2026-10", payee: "NH콕송금 황란영", out, in: 0, source: "bank", major, minor, channel: null, review: null, ...(splits ? { splits } : {}) });
+    const costs = [fc("관리비", "임대료", "관리비", 264_000), fc("수도", "영업비", "수도광열비", 230_440)];
+    expect(fixedCostGaps(costs, [t("rent", 2_640_000, "임대료", "임대료")], "2026-10").map((g) => g.gap)).toEqual([264_000, 230_440]);
+    const bill = t("bill", 494_440, "임대료", "관리비", [
+      { major: "임대료", minor: "관리비", amount: 264_000 },
+      { major: "영업비", minor: "수도광열비", amount: 230_440 },
+    ]);
+    expect(fixedCostGaps(costs, [bill], "2026-10").map((g) => g.gap)).toEqual([0, 0]);
+  });
+});

@@ -1,4 +1,5 @@
 import type { Major } from "./categories";
+import { expandSplits } from "./txSplit";
 import type { Month, Transaction } from "./types";
 
 // 매달 나가는데 다음 달에 내는 돈 (석쇠 대여비, 가스요금 같은 것).
@@ -61,15 +62,18 @@ export function setAmountFor(c: FixedCost, month: Month, amount: number): FixedC
   return { ...c, amount, amounts };
 }
 
-/** 이 달 통장에서 그 거래처로 나간 돈과 견줘, 아직 안 나간 몫을 낸다 */
+/** 이 달 통장에서 그 거래처로 그 항목(대분류·소분류)으로 나간 돈과 견줘, 아직 안 나간 몫을 낸다.
+ *  거래처만 보면 안 된다 — 황란영에게 월세를 보내면 관리비도 낸 걸로, 그루온에 재료값을 보내면 로열티도 낸 걸로 봤다 (2026-10-27).
+ *  나눠 분류한 줄(관리비 고지서 = 관리비 + 수도요금)은 몫마다 본다 */
 export function fixedCostGaps(costs: FixedCost[], txs: Transaction[], month: Month): FixedCostGap[] {
+  const lines = expandSplits(txs);
   return costs
     .filter((c) => c.active && c.payeeKeyword.trim())
     .map((cost) => ({ cost, amount: amountFor(cost, month) }))
     .filter((x) => x.amount > 0)
     .map(({ cost, amount }) => {
       const key = cost.payeeKeyword.trim();
-      const paid = txs.filter((t) => t.payee.includes(key)).reduce((a, t) => a + t.out - t.in, 0);
+      const paid = lines.filter((t) => t.payee.includes(key) && t.major === cost.major && t.minor === cost.minor).reduce((a, t) => a + t.out - t.in, 0);
       return { cost, amount, paid, gap: Math.max(0, Math.round(amount - paid)) };
     });
 }

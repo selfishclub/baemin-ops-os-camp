@@ -198,6 +198,12 @@ export default function PnlPage() {
           <h2 className="text-base font-bold">{monthLabel(month)} 손익</h2>
           <span className="text-xs text-stone-500">금액 · 매출 대비 %{hasPrev && " · 지난달 대비"}</span>
         </div>
+        {/* 진행 중인 달을 한 달 전체인 지난달과 견주면 늘 ▼ 로 보인다 (10/27 사장님 "임대료가 내려간 건 아니잖아") */}
+        {hasPrev && month === today.slice(0, 7) && (
+          <p className="mb-1 rounded-lg bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+            이번 달은 아직 {Number(today.slice(8, 10))}일까지라 매출·재료비·인건비가 지난달(한 달 전체)보다 적게 보여요. 월말·다음 달 10일에 나갈 관리비·원천세·석쇠·가스·로열티는 &quot;어림&quot;으로 채워 두었어요.
+          </p>
+        )}
         <p className="mb-1 rounded-lg bg-stone-50 px-2 py-1.5 text-xs text-stone-600">
           기준 — <b>매출·배달앱 수수료</b>: 주문이 발생한 달 · <b>비용</b>: 통장에서 돈이 나간 날. 다른 달에 결제한 비용은 지출추가 탭에서 날짜를 맞춰 넣을 수 있어요.
           {pnl.vatBasis === "공급가" && (
