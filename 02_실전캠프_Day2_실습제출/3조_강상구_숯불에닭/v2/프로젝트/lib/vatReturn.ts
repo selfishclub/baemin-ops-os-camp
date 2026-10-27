@@ -1,7 +1,9 @@
 // 부가세 신고 미리보기 (2026-10-27, 복식장부 4단계)
 //  - 세무사님 신고서(일반과세자 부가가치세 신고서)와 같은 칸 번호로, 과세기간(1기 1~6월, 2기 7~12월) 달마다 손익의 부가세 계산을 모은다
 //  - 신고는 세무사님이 한다. 이건 "얼마쯤 나올지" 미리 보는 것 — 칸 이름·계산은 26년 1기 신고서에 맞췄다
-import { CARD_CREDIT_RATE, CARD_CREDIT_YEAR_CAP } from "./vatBasis";
+import { dayTotal, type HistoryDay } from "./history";
+import type { HometaxMonth } from "./hometax";
+import { CARD_CREDIT_RATE, CARD_CREDIT_YEAR_CAP, DEEMED_RATE } from "./vatBasis";
 import type { Pnl } from "./pnl";
 import type { TaxNotice } from "./taxNotices";
 import type { Month } from "./types";
@@ -52,11 +54,12 @@ export interface VatReturnMonthInput {
   month: Month;
   vat: Pnl["vat"];
   empty: boolean;
+  fromHistory?: boolean; // 장부 대신 「지난 매출」 + 홈택스로 채운 달
 }
 
 export interface VatReturnPreview {
   period: VatPeriod;
-  covered: { month: Month; sales: boolean; hometax: boolean }[]; // 이 기수에서 지금까지 본 달
+  covered: { month: Month; sales: boolean; hometax: boolean; fromHistory: boolean }[]; // 이 기수에서 지금까지 본 달
   cardSales: [number, number];
   otherSales: [number, number];
   output: [number, number]; // (9) 합계 ㉮
@@ -77,6 +80,43 @@ export interface VatReturnPreview {
 const add = (a: [number, number], s: number, t: number): [number, number] => [a[0] + s, a[1] + t];
 const supplyOf = (gross: number) => Math.round(gross / 1.1);
 
+/** 바로 앞 기수 세무사님 신고서 (있으면) */
+export function previousReturn(period: Pick<VatPeriod, "year" | "half">): { label: string; actual: VatReturnActual } | null {
+  const prev = period.half === 2 ? { year: period.year, half: 1 as const } : { year: period.year - 1, half: 2 as const };
+  const actual = ACTUAL_RETURNS[periodKey(prev)];
+  return actual ? { label: `${prev.year}년 ${prev.half}기`, actual } : null;
+}
+
+/** 장부(통장)를 쓰기 전 달을 「지난 매출」(포스 홀 + 배민·쿠팡 주문)과 홈택스 매입으로 채운다 (2026-10-27).
+ *  26년 1기로 검산: 지난 매출 1~6월 합 260,600,750 vs 신고서 매출(부가세 포함) 261,563,882 — 0.4% 차이
+ *  - 매출은 부가세 포함. 영수증 없는 현금·이체(신고서 (4)) 몫은 지난 신고서 비율로 (1기 0.9%)
+ *  - 매입: 세금계산서·계산서는 홈택스 실제. 카드로 산 것은 통장이 없어서 지난 신고서 한 달 평균으로 어림 */
+export function historyMonthVat(month: Month, days: HistoryDay[], hm: HometaxMonth | null, prev: VatReturnActual | null): Pnl["vat"] {
+  const salesGross = days.filter((d) => d.date.startsWith(month)).reduce((a, d) => a + dayTotal(d), 0);
+  if (!salesGross) return null;
+  const otherRatio = prev ? prev.otherSales[0] / (prev.cardSales[0] + prev.otherSales[0]) : 0;
+  const card = prev ? Math.round(prev.cardPurchase[1] / 6) : 0;
+  const output = salesGross - supplyOf(salesGross);
+  const invoiceVat = hm?.vat ?? (prev ? Math.round(prev.invoice[1] / 6) : 0);
+  const taxFreeMaterial = hm ? hm.freeGoods : prev ? Math.round(prev.deemed[0] / 6) : 0;
+  const deemed = Math.round(taxFreeMaterial * DEEMED_RATE);
+  const input = invoiceVat + card;
+  return {
+    output,
+    input,
+    inputSource: hm ? "홈택스" : "어림",
+    inputCard: hm ? card : null,
+    invoiceSupply: hm ? hm.supply - hm.freeSupply : null,
+    salesGross,
+    cardBase: Math.round(salesGross * (1 - otherRatio)),
+    taxFreeMaterial,
+    deemed,
+    cardCredit: 0,
+    due: output - input - deemed,
+    paid: 0,
+  };
+}
+
 /** 그 기수의 예정고지세액 — 세금 고지서 칸에 넣은 부가세 예정고지 중 납부기한이 이 기수 안인 것 */
 export function prepaidOf(period: VatPeriod, notices: TaxNotice[]): number {
   return notices.filter((n) => n.kind === "부가세" && /예정/.test(n.title) && n.due >= period.start && n.due <= period.end).reduce((a, n) => a + n.amount, 0);
@@ -94,7 +134,7 @@ export function vatReturnPreview(period: VatPeriod, rows: VatReturnMonthInput[],
   for (const r of rows) {
     if (!period.months.includes(r.month) || r.empty || !r.vat) continue;
     const v = r.vat;
-    covered.push({ month: r.month, sales: v.salesGross > 0, hometax: v.inputSource === "홈택스" });
+    covered.push({ month: r.month, sales: v.salesGross > 0, hometax: v.inputSource === "홈택스", fromHistory: !!r.fromHistory });
     // 매출: 카드·현금영수증·배달앱 결제는 (3), 나머지(영수증 없는 현금·계좌이체)는 (4). 세액은 달 매출 부가세를 나눈다
     const cardTax = v.cardBase - supplyOf(v.cardBase);
     cardSales = add(cardSales, supplyOf(v.cardBase), cardTax);
@@ -132,10 +172,6 @@ export function vatReturnPreview(period: VatPeriod, rows: VatReturnMonthInput[],
     prepaid,
     due: payable - credit - prepaid,
     actual: ACTUAL_RETURNS[periodKey(period)] ?? null,
-    previous: (() => {
-      const prev = period.half === 2 ? { year: period.year, half: 1 as const } : { year: period.year - 1, half: 2 as const };
-      const actual = ACTUAL_RETURNS[periodKey(prev)];
-      return actual ? { label: `${prev.year}년 ${prev.half}기`, actual } : null;
-    })(),
+    previous: previousReturn(period),
   };
 }

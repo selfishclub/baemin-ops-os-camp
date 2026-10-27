@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Pnl } from "./pnl";
 import type { TaxNotice } from "./taxNotices";
-import { prepaidOf, vatPeriodOf, vatReturnPreview } from "./vatReturn";
+import { historyMonthVat, prepaidOf, previousReturn, vatPeriodOf, vatReturnPreview } from "./vatReturn";
 
 const vat = (o: Partial<NonNullable<Pnl["vat"]>>): Pnl["vat"] => ({
   output: 0, input: 0, inputSource: "어림", inputCard: null, invoiceSupply: null, salesGross: 0, cardBase: 0, taxFreeMaterial: 0, deemed: 0, cardCredit: 0, due: 0, paid: 0, ...o,
@@ -44,5 +44,23 @@ describe("부가세 신고 미리보기", () => {
   it("예정고지는 그 기수 안에 기한이 있는 부가세 예정고지만", () => {
     const n = (title: string, due: string, kind: TaxNotice["kind"] = "부가세"): TaxNotice => ({ id: due, kind, title, amount: 100, due, addedAt: due });
     expect(prepaidOf(vatPeriodOf("2026-10"), [n("2기 예정고지", "2026-11-02"), n("1기 예정고지", "2026-04-25"), n("확정", "2026-07-25"), n("중간예납 예정", "2026-11-30", "종합소득세")])).toBe(100);
+  });
+});
+
+describe("장부 쓰기 전 달 — 지난 매출 + 홈택스", () => {
+  it("매출은 홀+배달 합(부가세 포함), 카드 몫은 지난 신고 비율, 매입은 홈택스 + 카드 평균 어림", () => {
+    const days = [
+      { date: "2026-07-01", hall: 1_000_000, receipts: 10, customers: 10, baemin: 100_000, coupang: 0 },
+      { date: "2026-07-02", hall: 0, receipts: 0, customers: 0, baemin: 0, coupang: 0 },
+      { date: "2026-08-01", hall: 999_999, receipts: 1, customers: 1 },
+    ];
+    const hm = { month: "2026-07", taxCount: 2, freeCount: 1, supply: 15_000_000, vat: 1_000_000, freeSupply: 5_000_000, freeGoods: 5_400_000, vendors: [] };
+    const prev = previousReturn(vatPeriodOf("2026-07"))!.actual;
+    const v = historyMonthVat("2026-07", days, hm, prev)!;
+    expect(v).toMatchObject({ salesGross: 1_100_000, output: 100_000, inputSource: "홈택스", invoiceSupply: 10_000_000, taxFreeMaterial: 5_400_000, deemed: 400_000 });
+    expect(v.inputCard).toBe(Math.round(1_651_337 / 6));
+    expect(v.input).toBe(1_000_000 + Math.round(1_651_337 / 6));
+    expect(v.cardBase).toBeGreaterThan(1_085_000);
+    expect(historyMonthVat("2026-09", days, null, prev)).toBeNull();
   });
 });

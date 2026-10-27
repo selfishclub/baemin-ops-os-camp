@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { num, won } from "@/lib/format";
+import { todayStr } from "@/lib/daily";
+import { HISTORY_KEY, type HistoryDay } from "@/lib/history";
+import { HOMETAX_KEY, hometaxMonth, hometaxSettled, type HometaxStore } from "@/lib/hometax";
 import { loadMonthPnls } from "@/lib/monthPnl";
 import { monthLabel } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 import { TAX_NOTICES_KEY, type TaxNotice } from "@/lib/taxNotices";
-import { vatPeriodOf, vatReturnPreview, type VatReturnActual, type VatReturnPreview } from "@/lib/vatReturn";
+import { historyMonthVat, previousReturn, vatPeriodOf, vatReturnPreview, type VatReturnActual, type VatReturnMonthInput, type VatReturnPreview } from "@/lib/vatReturn";
 import type { Month } from "@/lib/types";
 
 // 부가세 신고 미리보기 — 세무사님 신고서와 같은 칸 번호로, 이 기수(1~6월 / 7~12월)에서 지금 달까지 모은다 (lib/vatReturn.ts)
@@ -17,10 +20,19 @@ export function VatReturnCard({ month }: { month: Month }) {
     setPreview(null);
     const period = vatPeriodOf(month);
     const months = period.months.filter((m) => m <= month);
-    // 그 달 날짜의 통장 줄이 없는 달(장부 시작 전)은 뺀다 — 다음 달 통장에서 돌린 비용·며칠 매출만 있어도 매입만 들어가 부가세가 쏠린다
-    void Promise.all([loadMonthPnls(getStore(), months), getStore().getSetting<TaxNotice[]>(TAX_NOTICES_KEY)]).then(([rows, notices]) =>
-      setPreview(vatReturnPreview(period, rows.map((r) => ({ month: r.month, vat: r.pnl.vat, empty: r.empty || !r.journal.some((e) => e.source === "통장" && e.date.startsWith(r.month)) })), notices ?? [])),
-    );
+    const store = getStore();
+    void Promise.all([loadMonthPnls(store, months), store.getSetting<TaxNotice[]>(TAX_NOTICES_KEY), store.getSetting<HistoryDay[]>(HISTORY_KEY), store.getSetting<HometaxStore>(HOMETAX_KEY)]).then(([rows, notices, history, ht]) => {
+      const prev = previousReturn(period)?.actual ?? null;
+      const today = todayStr();
+      const inputs: VatReturnMonthInput[] = rows.map((r) => {
+        // 그 달 날짜의 통장 줄이 있어야 장부 달로 본다. 없으면(장부 시작 전) 「지난 매출」 + 홈택스로 채운다
+        //  — 다음 달 통장에서 돌린 비용·며칠 매출만 있는 달을 장부로 보면 매입만 들어가 부가세가 쏠린다
+        if (!r.empty && r.journal.some((e) => e.source === "통장" && e.date.startsWith(r.month))) return { month: r.month, vat: r.pnl.vat, empty: false };
+        const vat = historyMonthVat(r.month, history ?? [], hometaxSettled(r.month, today) ? hometaxMonth(ht, r.month, []) : null, prev);
+        return { month: r.month, vat, empty: !vat, fromHistory: true };
+      });
+      setPreview(vatReturnPreview(period, inputs, notices ?? []));
+    });
   }, [month]);
 
   if (!preview) return <section className="card text-sm text-stone-500">부가세 신고 미리보기 모으는 중…</section>;
@@ -28,6 +40,7 @@ export function VatReturnCard({ month }: { month: Month }) {
   const prev = p.previous;
   const missing = p.period.months.filter((m) => m <= month && !p.covered.some((c) => c.month === m));
   const noHometax = p.covered.filter((c) => !c.hometax).map((c) => monthLabel(c.month).slice(6));
+  const fromHistory = p.covered.filter((c) => c.fromHistory).map((c) => monthLabel(c.month).slice(6));
 
   const a: VatReturnActual | undefined = prev?.actual;
   const aOutput = a ? a.cardSales[1] + a.otherSales[1] : null;
@@ -73,6 +86,11 @@ export function VatReturnCard({ month }: { month: Month }) {
       </p>
       <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-stone-500">
         {missing.length > 0 && <li className="text-amber-700">장부(통장) 자료가 없는 달: {missing.map((m) => monthLabel(m).slice(6)).join("·")} — 이 달들은 빠져 있어요. 홈택스 매입 자료만 있고 매출이 없으면 부가세가 틀리게 나와서요.</li>}
+        {fromHistory.length > 0 && (
+          <li>
+            {fromHistory.join("·")}은 장부(통장)를 쓰기 전이라 매출은 「지난 매출」(포스 홀 + 배민·쿠팡), 매입은 홈택스 세금계산서·계산서로 채웠어요. 카드로 산 것만 {prev?.label ?? "지난 기수"} 한 달 평균으로 어림했어요.
+          </li>
+        )}
         {noHometax.length > 0 && <li className="text-amber-700">매입세액이 어림인 달: {noHometax.join("·")} — 홈택스 자료가 없거나 아직 다 안 들어온 달이에요(세금계산서는 다음 달 10일까지 들어와요). 11일 이후 손익 탭 &quot;홈택스 매입 자료&quot;에 다시 올리면 실제로 바뀌어요.</li>}
         <li>남은 달이 지나야 6달이 다 차요. 확정신고는 다음 해 1월 25일(1기는 7월 25일)까지 세무사님이 해요.</li>
         <li>
