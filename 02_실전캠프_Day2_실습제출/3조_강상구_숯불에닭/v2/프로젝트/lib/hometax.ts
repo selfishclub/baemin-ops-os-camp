@@ -7,6 +7,7 @@ import { cardPayee, matchCardReceipts } from "@/lib/costing/receiptMatch";
 import type { Transaction } from "@/lib/types";
 import { expandSplits } from "@/lib/txSplit";
 import { hasInputVat } from "@/lib/vatBasis";
+import { nextMonth } from "@/lib/month";
 
 export const HOMETAX_KEY = "hometax_purchases_v1";
 
@@ -172,6 +173,10 @@ export function hometaxMonth(store: HometaxStore | null, month: string, purchase
     vendors,
   };
 }
+
+/** 그 달 세금계산서가 다 들어왔다고 볼 수 있나 — 본사·주류 등은 월말 날짜로 다음 달 10일까지 끊는다.
+ *  그 전에는 몇 건만 있어서, 부가세를 "실제"로 바꾸면 매입세액이 적게 잡힌다 (10/27 10월 자료 3건뿐이었음) */
+export const hometaxSettled = (month: string, today: string) => today >= `${nextMonth(month)}-11`;
 
 /** 세금계산서를 안 끊는 곳(마트·쿠팡 등 카드 결제)의 부가세 — 홈택스 세액에 더해 "비용에 든 부가세"를 만든다.
  *  세무사 신고서의 "신용카드매출전표등 수령명세서" 몫 (26년 1기: 한 달 평균 공급가 약 300만 원, 세액 약 27만 원)

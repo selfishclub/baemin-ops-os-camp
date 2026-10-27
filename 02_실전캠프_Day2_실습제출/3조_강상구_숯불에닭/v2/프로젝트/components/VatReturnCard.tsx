@@ -17,8 +17,9 @@ export function VatReturnCard({ month }: { month: Month }) {
     setPreview(null);
     const period = vatPeriodOf(month);
     const months = period.months.filter((m) => m <= month);
+    // 그 달 날짜의 통장 줄이 없는 달(장부 시작 전)은 뺀다 — 다음 달 통장에서 돌린 비용·며칠 매출만 있어도 매입만 들어가 부가세가 쏠린다
     void Promise.all([loadMonthPnls(getStore(), months), getStore().getSetting<TaxNotice[]>(TAX_NOTICES_KEY)]).then(([rows, notices]) =>
-      setPreview(vatReturnPreview(period, rows.map((r) => ({ month: r.month, vat: r.pnl.vat, empty: r.empty })), notices ?? [])),
+      setPreview(vatReturnPreview(period, rows.map((r) => ({ month: r.month, vat: r.pnl.vat, empty: r.empty || !r.journal.some((e) => e.source === "통장" && e.date.startsWith(r.month)) })), notices ?? [])),
     );
   }, [month]);
 
@@ -71,8 +72,8 @@ export function VatReturnCard({ month }: { month: Month }) {
         지금까지 {p.covered.length}달 몫 부가세 <b className="num">{won(p.payable - p.cardCredit[1])}</b> 중 예정고지로 <b className="num">{won(p.prepaid)}</b> 내고, 확정신고 때 <b className="num">{won(p.due)}</b>쯤 더 낼 것 같아요.
       </p>
       <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-stone-500">
-        {missing.length > 0 && <li className="text-amber-700">장부 자료가 없는 달: {missing.map((m) => monthLabel(m).slice(6)).join("·")} — 이 달들은 빠져 있어요.</li>}
-        {noHometax.length > 0 && <li className="text-amber-700">홈택스 매입 자료를 안 올린 달: {noHometax.join("·")} — 매입세액이 어림이에요. 손익 탭 &quot;홈택스 매입 자료&quot;에 올리면 정확해져요.</li>}
+        {missing.length > 0 && <li className="text-amber-700">장부(통장) 자료가 없는 달: {missing.map((m) => monthLabel(m).slice(6)).join("·")} — 이 달들은 빠져 있어요. 홈택스 매입 자료만 있고 매출이 없으면 부가세가 틀리게 나와서요.</li>}
+        {noHometax.length > 0 && <li className="text-amber-700">매입세액이 어림인 달: {noHometax.join("·")} — 홈택스 자료가 없거나 아직 다 안 들어온 달이에요(세금계산서는 다음 달 10일까지 들어와요). 11일 이후 손익 탭 &quot;홈택스 매입 자료&quot;에 다시 올리면 실제로 바뀌어요.</li>}
         <li>남은 달이 지나야 6달이 다 차요. 확정신고는 다음 해 1월 25일(1기는 7월 25일)까지 세무사님이 해요.</li>
         <li>
           카드 매출 세액공제는 1년 1,000만 원 한도에서 1기에 쓴 만큼 빼고, 납부세액을 넘지 않게 셌어요. 의제매입 한도·전자신고 세액공제 같은 작은 칸은 빠져 있어요.

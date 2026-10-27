@@ -11,7 +11,7 @@ import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor
 import { computePnl } from "@/lib/pnl";
 import { getStore } from "@/lib/storage";
 import { vatBasisFrom, type VatBasis } from "@/lib/vatBasis";
-import { HOMETAX_KEY, hometaxMonth, type HometaxMonth, type HometaxStore } from "@/lib/hometax";
+import { HOMETAX_KEY, hometaxMonth, hometaxSettled, type HometaxMonth, type HometaxStore } from "@/lib/hometax";
 
 /** 홈택스 매입 자료를 새로 올리면 손익을 다시 계산하라는 신호 (components/HometaxCard.tsx) */
 export const HOMETAX_CHANGED = "hometax-changed";
@@ -50,7 +50,8 @@ export function useMonthPnl(month: Month) {
           const sum = materialPaidBasis(ps ?? []);
           setMaterialPurchases(sum);
           setPurchaseCount((ps ?? []).length);
-          setVatSrc({ ps: ps ?? [], hm: hometaxMonth(ht, month, ps ?? []) });
+          // 다음 달 11일 전에는 세금계산서가 덜 들어와서 어림으로 본다
+          setVatSrc({ ps: ps ?? [], hm: hometaxSettled(month, todayStr()) ? hometaxMonth(ht, month, ps ?? []) : null });
         })
         .catch(() => {
           setMaterialPurchases(0);

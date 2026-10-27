@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Purchase } from "./costing/purchases";
 import type { Transaction } from "./types";
-import { cardReceiptVat, hometaxMonth, mergeHometax, parseHometaxSheet, sameVendor } from "./hometax";
+import { cardReceiptVat, hometaxMonth, hometaxSettled, mergeHometax, parseHometaxSheet, sameVendor } from "./hometax";
 import { vatBasisFrom } from "./vatBasis";
 
 // 홈택스 "매입 전자(수정) 세금계산서 목록조회" 엑셀 첫 시트 모양 (2026-10 실제 파일과 같은 머리줄, 거래처·숫자는 가짜)
@@ -106,5 +106,11 @@ describe("카드로 산 것의 부가세", () => {
     expect(cardReceiptVat(ps, hm, txs)).toBe(1_000 + 2_000);
     expect(vatBasisFrom(ps, undefined, hm, txs)).toMatchObject({ inputActual: 983_432 + 3_000, inputCard: 3_000 });
     expect(cardReceiptVat(ps, hm)).toBe(0); // 통장 줄이 없으면 짝을 모르니 어림하지 않는다
+  });
+});
+
+describe("그 달 세금계산서가 다 들어왔나", () => {
+  it("다음 달 11일부터 실제로 본다", () => {
+    expect([hometaxSettled("2026-10", "2026-10-27"), hometaxSettled("2026-10", "2026-11-10"), hometaxSettled("2026-10", "2026-11-11"), hometaxSettled("2026-12", "2027-01-11")]).toEqual([false, false, true, true]);
   });
 });

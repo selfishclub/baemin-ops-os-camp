@@ -1,8 +1,8 @@
 import { DEFAULT_CHANNELS, type Channel } from "./categories";
 import { PURCHASES_KEY_PREFIX, materialPaidBasis, type Purchase } from "./costing/purchases";
 import { vatBasisFrom } from "./vatBasis";
-import { HOMETAX_KEY, hometaxMonth, type HometaxStore } from "./hometax";
-import { monthSummary } from "./daily";
+import { HOMETAX_KEY, hometaxMonth, hometaxSettled, type HometaxStore } from "./hometax";
+import { monthSummary, todayStr } from "./daily";
 import { effectiveChannelSales } from "./effective";
 import { fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "./fixedCosts";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "./labor";
@@ -73,7 +73,7 @@ export async function loadMonthPnls(store: Store, months: Month[]): Promise<Mont
       const sales = effectiveChannelSales(month, saved, daily, channels, results);
       const summary = monthSummary(month, daily, shifts, staff);
       const material = materialPaidBasis(purchases ?? []);
-      const vat = vatBasisFrom(purchases ?? [], undefined, hometaxMonth(hometax, month, purchases ?? []), txs);
+      const vat = vatBasisFrom(purchases ?? [], undefined, hometaxSettled(month, todayStr()) ? hometaxMonth(hometax, month, purchases ?? []) : null, txs);
       const pnl = computePnl(txs, sales, { hourly: summary.labor, salary: labor.salary, insurance: labor.insurance }, material, fixedCostGaps(fixedCosts ?? [], txs, month), vat);
       const journal = buildJournal({ month, txs, sales, channels, purchases: purchases ?? [], pnl, vat });
       return { month, pnl, empty: txs.length === 0 && sales.length === 0, closed: !!closing?.closedAt, journal };

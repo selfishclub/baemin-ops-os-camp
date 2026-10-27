@@ -6,7 +6,8 @@ import { Notice } from "@/components/ui";
 import { HOMETAX_CHANGED } from "@/components/useMonthPnl";
 import { PURCHASES_KEY_PREFIX, type Purchase } from "@/lib/costing/purchases";
 import { num, won } from "@/lib/format";
-import { HOMETAX_KEY, hometaxMonth, mergeHometax, parseHometaxSheet, type HometaxStore } from "@/lib/hometax";
+import { todayStr } from "@/lib/daily";
+import { HOMETAX_KEY, hometaxMonth, hometaxSettled, mergeHometax, parseHometaxSheet, type HometaxStore } from "@/lib/hometax";
 import { monthLabel } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 
@@ -93,6 +94,9 @@ export function HometaxCard({ month }: { month: string }) {
               </>
             )}
           </p>
+          {!hometaxSettled(month, todayStr()) && (
+            <Notice tone="info">{monthLabel(month).slice(6)} 세금계산서는 다음 달 10일까지 더 들어와요. 그때까지 부가세 칸은 어림으로 보고, 11일 이후에 다시 받아 올리면 실제로 바뀌어요.</Notice>
+          )}
           <div className="overflow-x-auto">
             <table className="num w-full min-w-[30rem] text-xs">
               <thead>
