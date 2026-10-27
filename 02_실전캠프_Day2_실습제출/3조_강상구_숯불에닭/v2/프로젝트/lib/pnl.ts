@@ -49,6 +49,10 @@ export interface Pnl {
     input: number; // 비용에 들어 있던 부가세 (돌려받는 돈)
     inputSource: "홈택스" | "어림"; // 홈택스 세금계산서 세액이면 실제, 아니면 비용 ÷1.1 어림
     inputCard: number | null; // 그중 카드로 산 것의 부가세 (홈택스 자료가 있을 때)
+    invoiceSupply: number | null; // 홈택스 세금계산서 공급가 (홈택스 자료가 있을 때)
+    salesGross: number; // 부가세 포함 매출 (신고서 매출 칸)
+    cardBase: number; // 그중 카드·현금영수증·배달앱 결제 (부가세 포함, 카드 매출 세액공제 바탕)
+    taxFreeMaterial: number; // 의제매입 바탕이 된 면세 재료 금액
     deemed: number; // 의제매입세액공제 (면세 재료)
     cardCredit: number; // 신용카드 매출 세액공제 (카드·현금영수증·배달앱 매출 × 1.3%, 한 달 몫은 1년 한도 ÷ 12까지)
     due: number; // 이 달 몫 부가세 어림 = output − input − deemed − cardCredit (나중에 예정고지·확정신고로 낸다)
@@ -234,7 +238,7 @@ export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: 
           const cardBase = sales.filter((x) => cardCreditEligible(x.channel, channelKind(x.channel))).reduce((a, x) => a + x.orders, 0);
           const cardCredit = Math.min(Math.round(cardBase * CARD_CREDIT_RATE), Math.round(CARD_CREDIT_YEAR_CAP / 12));
           const input = vat.inputActual ?? Math.round(inputVat);
-          return { output, input, inputSource: vat.inputActual !== undefined ? ("홈택스" as const) : ("어림" as const), inputCard: vat.inputCard ?? null, deemed: vat.deemedInput, cardCredit, due: output - input - vat.deemedInput - cardCredit, paid: vatPaid };
+          return { output, input, inputSource: vat.inputActual !== undefined ? ("홈택스" as const) : ("어림" as const), inputCard: vat.inputCard ?? null, invoiceSupply: vat.invoiceSupply ?? null, salesGross, cardBase, taxFreeMaterial: vat.taxFreeMaterial, deemed: vat.deemedInput, cardCredit, due: output - input - vat.deemedInput - cardCredit, paid: vatPaid };
         })()
       : null,
   };

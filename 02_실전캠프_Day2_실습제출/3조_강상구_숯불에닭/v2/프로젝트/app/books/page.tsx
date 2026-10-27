@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { MoneyInput, Notice } from "@/components/ui";
+import { VatReturnCard } from "@/components/VatReturnCard";
 import { useMonthPnl } from "@/components/useMonthPnl";
 import { PURCHASES_KEY_PREFIX, type Purchase } from "@/lib/costing/purchases";
 import { num, won } from "@/lib/format";
@@ -16,6 +17,7 @@ import type { Transaction } from "@/lib/types";
 
 // 복식장부 — 장부 자료를 자동 분개해 시산표·점검을 보여 준다 (lib/journal.ts).
 // 3단계: 세무사 계정으로 보기(lib/taxAccounts.ts), 시작 잔액·감가상각·재무상태표(lib/books.ts).
+// 4단계: 부가세 신고 미리보기(components/VatReturnCard.tsx, lib/vatReturn.ts).
 // 사장님이 적는 건 통장 월초·월말 잔액(점검용)과 시작 잔액뿐이다.
 const BANK_CHECK_KEY = "bank_balance_checks_v1";
 type BankChecks = Record<string, { start?: number; end?: number }>;
@@ -204,6 +206,8 @@ export default function BooksPage() {
           &quot;확인 필요&quot;는 2025년 금액만으로는 짝이 확실하지 않은 것이에요. 세무사님께 물어보고 골라 주면 그대로 기억해요. 2025년 평균과 크게 다르면 짝이 틀렸을 수 있어요.
         </p>
       </section>
+
+      <VatReturnCard month={month} />
 
       <section className="card space-y-2">
         <h2 className="text-sm font-bold">

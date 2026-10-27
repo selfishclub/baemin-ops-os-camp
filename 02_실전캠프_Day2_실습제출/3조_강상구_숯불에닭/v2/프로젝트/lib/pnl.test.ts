@@ -145,7 +145,8 @@ describe("공급가 손익 (부가세 뺀 금액) — 2026-10-26", () => {
     expect(line("세금과공과")).toBe(0);
     expect(line("매출원가")).toBe(950_000 - 50_000); // 공급가 비율 × − 의제매입
     // 카드 매출 11,000,000 × 1.3% = 143,000 (한 달 한도 833,333 안)
-    expect(p.vat).toEqual({ output: 1_000_000, input: 200_000 + 50_000, inputSource: "어림", inputCard: null, deemed: 50_000, cardCredit: 143_000, due: 700_000 - 143_000, paid: 1_450_660 });
+    expect(p.vat).toMatchObject({ output: 1_000_000, input: 200_000 + 50_000, inputSource: "어림", inputCard: null, deemed: 50_000, cardCredit: 143_000, due: 700_000 - 143_000, paid: 1_450_660 });
+    expect(p.vat).toMatchObject({ salesGross: 11_000_000, cardBase: 11_000_000, invoiceSupply: null });
   });
   it("vat 없이 부르면 예전과 같다 (부가세 포함, 낸 부가세는 세금과공과)", () => {
     const p = computePnl(txs, sales);

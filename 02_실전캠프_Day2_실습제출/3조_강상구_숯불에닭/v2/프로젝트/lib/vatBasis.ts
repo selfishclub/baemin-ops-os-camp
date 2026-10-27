@@ -36,6 +36,7 @@ export interface VatBasis {
   taxFreeMaterial: number; // 면세 재료 매입액
   inputActual?: number; // 홈택스 세금계산서 세액 + 카드로 산 것의 부가세 (홈택스 자료를 올린 달만)
   inputCard?: number; // 그중 카드로 산 것의 부가세 (영수증·체크카드 결제)
+  invoiceSupply?: number; // 홈택스 세금계산서 공급가 (신고서 (10) 일반매입)
 }
 
 const isMaterial = (category: string) => category === "원재료비" || category === "기타재료비";
@@ -62,6 +63,6 @@ export function vatBasisFrom(purchases: Purchase[], deemedRate = DEEMED_RATE, hm
     materialSupplyRatio: gross > 0 ? supply / gross : 1,
     deemedInput: Math.round(taxFree * deemedRate),
     taxFreeMaterial: taxFree,
-    ...(hm && hm.taxCount ? { inputActual: hm.vat + card, inputCard: card } : {}),
+    ...(hm && hm.taxCount ? { inputActual: hm.vat + card, inputCard: card, invoiceSupply: hm.supply - hm.freeSupply } : {}),
   };
 }
