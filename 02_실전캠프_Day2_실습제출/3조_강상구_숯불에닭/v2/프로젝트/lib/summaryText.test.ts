@@ -20,8 +20,8 @@ describe("카톡용 월 요약", () => {
     const lines = text.split("\n");
     expect(lines[0]).toBe("[9월 손익 요약] 마감 전");
     expect(lines[1]).toBe("매출 10,000,000원 (홀 4,000,000 · 배달 6,000,000)");
-    expect(lines[2]).toContain("영업이익 4,300,000원");
-    expect(lines[2]).toContain("8월보다 ▲1,300,000");
+    expect(lines[2]).toContain("영업이익 4,264,400원"); // 홀 카드 수수료 4,000,000 × 0.89% = 35,600
+    expect(lines[2]).toContain("8월보다 ▲1,264,400");
   });
 
   it("기준 넘은 비율, 가져간 돈, 어림·미입력을 알린다", () => {

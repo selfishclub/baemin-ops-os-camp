@@ -38,7 +38,7 @@ describe("아직 안 낸 재료비", () => {
 });
 
 describe("아직 안 낸 고정비", () => {
-  const sales2: ChannelSale[] = [{ month: "2026-09", channel: "hall_card", name: "홀", orders: 10_000_000, deposit: 9_900_000, count: 100 }];
+  const sales2: ChannelSale[] = [{ month: "2026-09", channel: "hall_cash", name: "홀", orders: 10_000_000, deposit: 9_900_000, count: 100 }];
   const gap = (name: string, minor: string, amount: number, paid = 0) => ({
     cost: { id: name, name, payeeKeyword: name, major: "영업비" as Major, minor, amount, active: true },
     amount,
@@ -69,7 +69,7 @@ describe("아직 안 낸 고정비", () => {
 });
 
 describe("나눠 분류한 줄로 손익 내기", () => {
-  const sales3: ChannelSale[] = [{ month: "2026-09", channel: "hall_card", name: "홀", orders: 10_000_000, deposit: 9_900_000, count: 100 }];
+  const sales3: ChannelSale[] = [{ month: "2026-09", channel: "hall_cash", name: "홀", orders: 10_000_000, deposit: 9_900_000, count: 100 }];
   const bill: Transaction = {
     id: "b1", month: "2026-09", date: "2026-09-30", payee: "가짜관리사무소", out: 494_440, in: 0,
     source: "bank", major: "임대료", minor: "관리비", channel: null, review: null,
@@ -142,7 +142,8 @@ describe("공급가 손익 (부가세 뺀 금액) — 2026-10-26", () => {
     const line = (l: string) => p.lines.find((x) => x.label === l)!.amount;
     expect(line("임대료")).toBe(2_000_000);
     expect(line("노무관리비")).toBe(3_000_000);
-    expect(line("세금과공과")).toBe(0);
+    expect(line("세금과공과")).toBe(-143_000); // 카드 매출 세액공제 (부가세에서 깎아 줌)는 이익에 더한다
+    expect(p.lines.find((x) => x.label === "영업비")!.minors?.find((m) => m.label === "카드수수료")?.amount).toBe(97_900); // 11,000,000 × 0.89%
     expect(line("매출원가")).toBe(950_000 - 50_000); // 공급가 비율 × − 의제매입
     // 카드 매출 11,000,000 × 1.3% = 143,000 (한 달 한도 833,333 안)
     expect(p.vat).toMatchObject({ output: 1_000_000, input: 200_000 + 50_000, inputSource: "어림", inputCard: null, deemed: 50_000, cardCredit: 143_000, due: 700_000 - 143_000, paid: 1_450_660 });

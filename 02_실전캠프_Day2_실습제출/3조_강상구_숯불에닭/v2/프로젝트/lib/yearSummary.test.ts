@@ -7,7 +7,7 @@ import type { ChannelSale, Transaction } from "./types";
 const tx = (month: string, payee: string, out: number, major: Major, minor: string): Transaction => ({
   id: month + payee, month, date: `${month}-10`, payee, out, in: 0, source: "bank", major, minor, channel: null, review: null,
 });
-const sale = (month: string, orders: number): ChannelSale[] => [{ month, channel: "hall_card", name: "홀", orders, deposit: orders, count: 1 }];
+const sale = (month: string, orders: number): ChannelSale[] => [{ month, channel: "hall_cash", name: "홀 현금", orders, deposit: orders, count: 1 }];
 
 describe("1년 화면 숫자", () => {
   const aug = computePnl([tx("2026-08", "가나식품", 3_000_000, "매출원가", "원재료비"), tx("2026-08", "월세", 1_000_000, "임대료", "임대료")], sale("2026-08", 10_000_000));

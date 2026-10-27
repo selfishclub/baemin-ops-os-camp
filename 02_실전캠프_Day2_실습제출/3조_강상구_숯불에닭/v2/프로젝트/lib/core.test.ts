@@ -1,3 +1,4 @@
+import { cardFeeOf } from "./channels";
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
 import fs from "node:fs";
@@ -97,7 +98,8 @@ describe("손익", () => {
     expect(rent.amount).toBe(2_000_000);
     const fee = 1_350_000 + 900_000 + 280_000 + 70_000;
     expect(pnl.deliveryFee).toBe(fee);
-    expect(pnl.operatingProfit).toBe(31_000_000 - 8_000_000 - 1_000_000 - 2_000_000 - fee);
+    const cardFee = sales.reduce((a, s) => a + cardFeeOf(s), 0); // 카드 매출 × 0.89%
+    expect(pnl.operatingProfit).toBe(31_000_000 - 8_000_000 - 1_000_000 - 2_000_000 - fee - cardFee);
   });
   it("생활비는 비용이 아니라 내가 가져간 돈", () => {
     expect(pnl.ownerDraw).toBe(2_500_000);

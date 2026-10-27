@@ -3,9 +3,9 @@
 //  - 금액은 손익과 같이 부가세 뺀 공급가로, 부가세는 부가세예수금(매출)·부가세대급금(매입) 계정에 따로 쌓는다
 //  - 3단계(2026-10-27): 계정 이름을 세무사 장부(2025 재무제표)에 맞추고, 시작 잔액·감가상각·재무상태표는 lib/books.ts
 import { EXCLUDED_MAJOR, OWNER_DRAW, channelKind, type Channel } from "./categories";
-import { feeOf } from "./channels";
+import { cardFeeOf, feeOf } from "./channels";
 import { lineGrossPaid, lineSupply, type Purchase } from "./costing/purchases";
-import type { Pnl } from "./pnl";
+import { CARD_CREDIT_LABEL, type Pnl } from "./pnl";
 import { expandSplits } from "./txSplit";
 import type { ChannelSale, Transaction } from "./types";
 import { hasInputVat, isVatPayment, type VatBasis } from "./vatBasis";
@@ -102,6 +102,9 @@ export function buildJournal(inp: JournalInput): JournalEntry[] {
       const [fs, fv] = splitVat(fee);
       out.push({ date: end, memo: `${nameOf(s.channel)} 수수료`, source: "수수료", lines: [dr("배달앱 수수료", fs), dr(VAT_IN, fv), cr(receivable(nameOf(s.channel)), fee)] });
     }
+    // 카드 수수료 (카드 매출 × 0.89% 어림, 부가세 없음) — 카드사 미수금이 그만큼 덜 들어온다
+    const cf = cardFeeOf(s);
+    if (cf) out.push({ date: end, memo: `${nameOf(s.channel)} 카드 수수료 (어림)`, source: "수수료", lines: [dr("카드수수료", cf), cr(receivable(nameOf(s.channel)), cf)] });
   }
 
   // ② 통장 — 나눠 분류한 줄은 몫마다
@@ -155,6 +158,9 @@ export function buildJournal(inp: JournalInput): JournalEntry[] {
     if (!gross) continue;
     out.push({ date: p.date, memo: p.vendor, source: "매입", lines: [dr(MATERIAL, supply), dr(VAT_IN, gross - supply), cr(PAYABLE, gross)] });
   }
+  // 카드 매출 세액공제 — 낼 부가세가 줄어든 만큼 이익 (손익표 세금과공과의 마이너스 줄과 같다)
+  const credit = inp.pnl.vat && inp.pnl.lines.find((l) => l.label === "세금과공과")?.minors?.some((m) => m.label === CARD_CREDIT_LABEL) ? inp.pnl.vat.cardCredit : 0;
+  if (credit) out.push({ date: end, memo: "카드 매출 세액공제 (부가세에서 깎아 줌)", source: "부가세", lines: [dr(VAT_OUT, credit), cr(CARD_CREDIT_LABEL, credit)] });
   if (inp.vat.deemedInput) {
     out.push({ date: end, memo: "의제매입세액공제 (면세 재료)", source: "부가세", lines: [dr(VAT_IN, inp.vat.deemedInput), cr(MATERIAL, inp.vat.deemedInput)] });
   }

@@ -1,4 +1,4 @@
-import { isHall, type ChannelId } from "./categories";
+import { channelKind, isHall, type ChannelId } from "./categories";
 import type { ChannelSale, Transaction } from "./types";
 
 // 기준: 매출·수수료는 "주문이 발생한 달"로 본다.
@@ -37,6 +37,15 @@ export function bankDepositsByChannel(txs: Transaction[]): Partial<Record<Channe
 
 // 수수료는 배달앱만 계산한다. 홀의 카드수수료는 통장 출금(영업비 > 카드수수료)으로 잡힌다.
 // 정산금액을 아직 안 넣은 채널은 수수료를 0으로 둔다(주문금액 전체가 수수료로 잡히는 걸 막음).
+// 카드 수수료율 — 여신협회 매입 상세 실측 (2026-09-22~10-24 카드 매출 41,925,600원에 수수료 374,668원 = 0.89%, 영세 우대)
+export const CARD_FEE_RATE = 0.0089;
+
+/** 카드사가 떼는 수수료 어림 (카드 매출 × 0.89%). 제로페이는 소상공인 수수료 0%라 뺀다 (2026-10-27 사장님 "넣어줘") */
+export function cardFeeOf(s: Pick<ChannelSale, "channel" | "orders">): number {
+  if (channelKind(s.channel) !== "card" || s.channel === "card_zeropay") return 0;
+  return Math.round(s.orders * CARD_FEE_RATE);
+}
+
 export function feeOf(s: Pick<ChannelSale, "channel" | "orders" | "deposit">): number {
   if (isHall(s.channel) || s.deposit <= 0) return 0;
   return s.orders - s.deposit;

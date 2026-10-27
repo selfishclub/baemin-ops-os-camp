@@ -1,5 +1,5 @@
 import { EXCLUDED_MAJOR, EXPENSE_MAJORS, OWNER_DRAW, channelKind, isHall, type Major } from "./categories";
-import { feeOf, round1 } from "./channels";
+import { cardFeeOf, feeOf, round1 } from "./channels";
 import type { ChannelSale, Transaction } from "./types";
 import type { LaborEstimate } from "./labor";
 import { totalFixedGap, type FixedCostGap } from "./fixedCosts";
@@ -66,6 +66,9 @@ export function salesStartLate(month: string, daily: { date: string }[]): boolea
   const first = daily.filter((d) => d.date.startsWith(month)).map((d) => d.date).sort()[0];
   return !!first && first > `${month}-03`;
 }
+
+/** 손익표 세금과공과 안의 카드 매출 세액공제 줄 이름 (복식장부 계정 이름과 같다) */
+export const CARD_CREDIT_LABEL = "카드 매출 세액공제";
 
 const pct = (amount: number, revenue: number) => (revenue > 0 ? round1((amount / revenue) * 100) : null);
 
@@ -186,6 +189,21 @@ export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: 
     m.set("배달앱 수수료", (m.get("배달앱 수수료") ?? 0) + deliveryFee);
     byMajor.set("영업비", m);
   }
+  // 카드 수수료 — 카드사가 정산 때 떼는 돈 (카드 매출 × 0.89%). 통장 입금 기준 달은 이미 빠진 채 들어와서 안 넣는다
+  const cardFee = hasSales ? sales.reduce((a, s) => a + cardFeeOf(s), 0) : 0;
+  if (cardFee !== 0) {
+    const m = byMajor.get("영업비") ?? new Map<string, number>();
+    m.set("카드수수료", (m.get("카드수수료") ?? 0) + cardFee);
+    byMajor.set("영업비", m);
+  }
+  // 카드 매출 세액공제 — 부가세에서 깎아 주는 돈(카드·현금영수증·배달앱 매출 × 1.3%)은 사장님 몫이라 이익에 더한다 (세금과공과에서 뺀다)
+  const cardBase = sales.filter((x) => cardCreditEligible(x.channel, channelKind(x.channel))).reduce((a, x) => a + x.orders, 0);
+  const cardCredit = Math.min(Math.round(cardBase * CARD_CREDIT_RATE), Math.round(CARD_CREDIT_YEAR_CAP / 12));
+  if (vat && cardCredit > 0) {
+    const m = byMajor.get("세금과공과") ?? new Map<string, number>();
+    m.set(CARD_CREDIT_LABEL, -cardCredit);
+    byMajor.set("세금과공과", m);
+  }
 
   // 공급가로 나눈 몫은 소수가 생기니 줄마다 원 단위로 맞춘다
   for (const m of byMajor.values()) for (const [k, v] of m) m.set(k, Math.round(v));
@@ -242,8 +260,6 @@ export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: 
     vat: vat
       ? (() => {
           const output = salesGross - salesNet;
-          const cardBase = sales.filter((x) => cardCreditEligible(x.channel, channelKind(x.channel))).reduce((a, x) => a + x.orders, 0);
-          const cardCredit = Math.min(Math.round(cardBase * CARD_CREDIT_RATE), Math.round(CARD_CREDIT_YEAR_CAP / 12));
           const input = vat.inputActual ?? Math.round(inputVat);
           return { output, input, inputSource: vat.inputActual !== undefined ? ("홈택스" as const) : ("어림" as const), inputCard: vat.inputCard ?? null, invoiceSupply: vat.invoiceSupply ?? null, salesGross, cardBase, taxFreeMaterial: vat.taxFreeMaterial, deemed: vat.deemedInput, cardCredit, due: output - input - vat.deemedInput - cardCredit, paid: vatPaid };
         })()
