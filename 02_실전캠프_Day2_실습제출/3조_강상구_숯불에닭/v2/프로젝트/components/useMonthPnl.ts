@@ -8,7 +8,7 @@ import { PURCHASES_KEY_PREFIX, materialPaidBasis, type Purchase } from "@/lib/co
 import { monthSummary, todayStr } from "@/lib/daily";
 import { fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "@/lib/fixedCosts";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
-import { computePnl } from "@/lib/pnl";
+import { computePnl, salesStartLate } from "@/lib/pnl";
 import { getStore } from "@/lib/storage";
 import { vatBasisFrom, type VatBasis } from "@/lib/vatBasis";
 import { HOMETAX_KEY, hometaxMonth, hometaxSettled, type HometaxMonth, type HometaxStore } from "@/lib/hometax";
@@ -71,13 +71,13 @@ export function useMonthPnl(month: Month) {
     () =>
       computePnl(
         ledger.txs,
-        settlement.effectiveSales,
+        salesStartLate(month, daily.sales) ? [] : settlement.effectiveSales,
         { hourly: summary.labor, salary: fixedLabor.salary, insurance: fixedLabor.insurance },
         materialPurchases,
         fixedCostGaps(fixedCosts, ledger.txs, month),
         vat,
       ),
-    [ledger.txs, settlement.effectiveSales, summary.labor, fixedLabor, materialPurchases, fixedCosts, month, vat],
+    [ledger.txs, settlement.effectiveSales, daily.sales, summary.labor, fixedLabor, materialPurchases, fixedCosts, month, vat],
   );
   const empty = ledger.txs.length === 0 && settlement.effectiveSales.length === 0;
 

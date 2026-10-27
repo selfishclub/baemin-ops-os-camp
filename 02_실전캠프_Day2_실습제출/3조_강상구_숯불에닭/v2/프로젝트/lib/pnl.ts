@@ -60,6 +60,13 @@ export interface Pnl {
   } | null;
 }
 
+/** 장부를 그 달 중간에 시작해 일별 매출이 며칠치만 있는 달인가 (2026-08: 8/27부터).
+ *  이런 달은 매출을 통장 입금액으로 본다 — 며칠치 매출에서 한 달 비용을 빼면 큰 적자로 찍힌다 (10/27 사장님 "8월 적자 맞아?") */
+export function salesStartLate(month: string, daily: { date: string }[]): boolean {
+  const first = daily.filter((d) => d.date.startsWith(month)).map((d) => d.date).sort()[0];
+  return !!first && first > `${month}-03`;
+}
+
 const pct = (amount: number, revenue: number) => (revenue > 0 ? round1((amount / revenue) * 100) : null);
 
 // 손익 순서는 사장님 엑셀의 손익계산서 그대로, 단 임대료를 빠뜨리지 않는다.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computePnl } from "./pnl";
+import { computePnl, salesStartLate } from "./pnl";
 import type { Major } from "./categories";
 import type { ChannelSale, Transaction } from "./types";
 
@@ -151,5 +151,13 @@ describe("공급가 손익 (부가세 뺀 금액) — 2026-10-26", () => {
   it("vat 없이 부르면 예전과 같다 (부가세 포함, 낸 부가세는 세금과공과)", () => {
     const p = computePnl(txs, sales);
     expect([p.revenue, p.vat, p.lines.find((x) => x.label === "세금과공과")!.amount]).toEqual([11_000_000, null, 1_450_660]);
+  });
+});
+
+describe("장부를 달 중간에 시작한 달", () => {
+  it("일별 매출이 4일 이후부터만 있으면 통장 입금액으로 본다", () => {
+    expect(salesStartLate("2026-08", [{ date: "2026-08-27" }, { date: "2026-08-31" }])).toBe(true);
+    expect(salesStartLate("2026-11", [{ date: "2026-11-01" }])).toBe(false);
+    expect(salesStartLate("2026-07", [])).toBe(false);
   });
 });
