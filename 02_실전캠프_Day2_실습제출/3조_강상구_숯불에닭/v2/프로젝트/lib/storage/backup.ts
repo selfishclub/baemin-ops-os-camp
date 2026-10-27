@@ -335,6 +335,8 @@ export const SETTING_LABEL: Record<string, string> = {
   payables_v1: "미지급금 (시작일·거래처 잔액)",
   hometax_purchases_v1: "홈택스 매입 세금계산서·계산서",
   bank_balance_checks_v1: "통장 월초·월말 잔액 (복식장부 점검)",
+  books_opening_v1: "복식장부 시작 잔액·감가상각",
+  tax_account_map_v1: "세무사 계정 짝 (복식장부)",
   neighborhood_visitors_v1: "관광 데이터랩 율량·사천동 방문자",
   neighborhood_bus_v1: "청주 버스 정류소 일별 승하차",
 };

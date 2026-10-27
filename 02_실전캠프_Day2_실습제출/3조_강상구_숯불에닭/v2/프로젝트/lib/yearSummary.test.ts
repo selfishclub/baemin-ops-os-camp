@@ -14,9 +14,9 @@ describe("1년 화면 숫자", () => {
   const sep = computePnl([tx("2026-09", "가나식품", 4_000_000, "매출원가", "원재료비"), tx("2026-09", "월세", 1_000_000, "임대료", "임대료")], sale("2026-09", 10_000_000));
   const empty = computePnl([], []);
   const y = summarizeYear([
-    { month: "2026-09", pnl: sep, empty: false, closed: false },
-    { month: "2026-07", pnl: empty, empty: true, closed: false },
-    { month: "2026-08", pnl: aug, empty: false, closed: true },
+    { month: "2026-09", pnl: sep, empty: false, closed: false, journal: [] },
+    { month: "2026-07", pnl: empty, empty: true, closed: false, journal: [] },
+    { month: "2026-08", pnl: aug, empty: false, closed: true, journal: [] },
   ]);
 
   it("자료 있는 달만 1월부터 순서대로", () => {

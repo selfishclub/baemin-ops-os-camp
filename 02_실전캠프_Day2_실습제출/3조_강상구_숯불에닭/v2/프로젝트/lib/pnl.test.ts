@@ -111,7 +111,7 @@ describe("어림값 목록 (확정 아님)", () => {
     expect(p.estimates).toEqual([
       { kind: "labor", major: "노무관리비", what: "아직 안 나간 인건비", amount: 1_500_000 },
       { kind: "material", major: "매출원가", what: "아직 안 낸 재료비 (외상)", amount: 200_000 },
-      { kind: "fixed", major: "영업비", what: "도시가스", amount: 300_000 },
+      { kind: "fixed", major: "영업비", what: "도시가스", minor: "수도광열비", amount: 300_000 },
     ]);
     expect(p.laborUnpaid).toBe(1_500_000);
   });

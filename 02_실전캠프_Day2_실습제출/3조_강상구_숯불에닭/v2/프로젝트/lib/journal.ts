@@ -1,7 +1,7 @@
 // 복식장부 1~2단계 (2026-10-27) — 지금 장부 자료를 자동으로 분개(차변·대변)하고 시산표를 만든다.
 //  - 사장님이 따로 입력하는 건 없다. 통장 거래·채널 매출·매입 영수증·손익의 어림값을 그대로 분개한다
 //  - 금액은 손익과 같이 부가세 뺀 공급가로, 부가세는 부가세예수금(매출)·부가세대급금(매입) 계정에 따로 쌓는다
-//  - 시작 잔액(보증금·설비·대출 등)과 감가상각은 아직 없다 — 세무사 재무제표를 받으면 넣는다 (3~4단계)
+//  - 3단계(2026-10-27): 계정 이름을 세무사 장부(2025 재무제표)에 맞추고, 시작 잔액·감가상각·재무상태표는 lib/books.ts
 import { EXCLUDED_MAJOR, OWNER_DRAW, channelKind, type Channel } from "./categories";
 import { feeOf } from "./channels";
 import { lineGrossPaid, lineSupply, type Purchase } from "./costing/purchases";
@@ -21,7 +21,7 @@ export interface JournalLine {
 export interface JournalEntry {
   date: string;
   memo: string;
-  source: "매출" | "수수료" | "통장" | "매입" | "어림" | "부가세";
+  source: "매출" | "수수료" | "통장" | "매입" | "어림" | "부가세" | "감가상각" | "시작";
   lines: JournalLine[];
 }
 
@@ -37,14 +37,22 @@ export const SALES = "매출";
 export const OTHER_INCOME = "기타수입";
 export const MATERIAL = "원재료비";
 export const SUSPENSE = "미분류(가지급금)";
+export const LOAN = "장기차입금";
+export const DEPOSIT = "임차보증금";
+export const EQUIPMENT = "비품";
+export const ACC_DEPRECIATION = "감가상각누계액";
+export const DEPRECIATION = "감가상각비";
+export const WITHHELD = "예수금";
+export const CAPITAL = "자본금";
 export const receivable = (channelName: string) => `미수금-${channelName}`;
 
-const EXCLUDED_ACCOUNT: Record<string, string> = { "내 계좌 이체": DRAW, "손익에 안 넣음": DRAW, "대출·상환": "차입금", "보증금·예치금": "보증금" };
+const EXCLUDED_ACCOUNT: Record<string, string> = { "내 계좌 이체": DRAW, "손익에 안 넣음": DRAW, "대출·상환": LOAN, "보증금·예치금": "보증금" };
 
 export function accountType(account: string): AccountType {
-  if (account === BANK || account === CASH || account === VAT_IN || account === "보증금" || account === SUSPENSE || account.startsWith("미수금-")) return "자산";
-  if (account === VAT_OUT || account === PAYABLE || account === ACCRUED || account === "차입금") return "부채";
-  if (account === DRAW) return "자본";
+  // 감가상각누계액은 비품을 깎는 자산(잔액이 음수로 보인다)
+  if ([BANK, CASH, VAT_IN, "보증금", DEPOSIT, EQUIPMENT, ACC_DEPRECIATION, SUSPENSE, "미수금"].includes(account) || account.startsWith("미수금-")) return "자산";
+  if ([VAT_OUT, PAYABLE, ACCRUED, LOAN, WITHHELD].includes(account)) return "부채";
+  if (account === DRAW || account === CAPITAL) return "자본";
   if (account === SALES || account === OTHER_INCOME) return "수익";
   return "비용";
 }
@@ -154,9 +162,15 @@ export function buildJournal(inp: JournalInput): JournalEntry[] {
   // ④ 어림 — 아직 통장에서 안 나간 인건비·고정비 (손익과 같은 금액)
   for (const e of inp.pnl.estimates) {
     if (e.kind === "material" || !e.amount) continue;
-    out.push({ date: end, memo: `${e.what} (어림)`, source: "어림", lines: [dr(e.kind === "labor" ? "노무관리비급여" : e.what.replace(/\s*\(.*$/, ""), e.amount), cr(ACCRUED, e.amount)] });
+    out.push({ date: end, memo: `${e.what} (어림)`, source: "어림", lines: [dr(e.kind === "labor" ? "노무관리비급여" : (e.minor ?? e.what.replace(/\s*\(.*$/, "")), e.amount), cr(ACCRUED, e.amount)] });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** 비품 감가상각 한 달 몫 — 돈은 안 나가지만 비품 값이 줄어드는 비용 */
+export function depreciationEntry(month: string, amount: number): JournalEntry[] {
+  if (amount <= 0) return [];
+  return [{ date: monthEnd(month), memo: "비품 감가상각 (한 달 몫)", source: "감가상각", lines: [dr(DEPRECIATION, amount), cr(ACC_DEPRECIATION, amount)] }];
 }
 
 export interface TrialRow {

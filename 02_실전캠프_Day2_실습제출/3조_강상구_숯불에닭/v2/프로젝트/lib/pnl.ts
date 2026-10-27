@@ -18,6 +18,7 @@ export interface PnlEstimate {
   kind: "labor" | "material" | "fixed";
   major: Major; // 손익표 어느 줄에 들어갔나
   what: string; // "아직 안 나간 인건비", "아직 안 낸 재료비 (외상)", 고정비 이름
+  minor?: string; // 고정비의 소분류 (복식장부 계정)
   amount: number;
 }
 
@@ -221,7 +222,7 @@ export function computePnl(all: Transaction[], sales: ChannelSale[], estimate?: 
     estimates: [
       ...(laborGap > 0 ? [{ kind: "labor" as const, major: "노무관리비" as Major, what: "아직 안 나간 인건비", amount: laborGap }] : []),
       ...(materialUnpaid > 0 ? [{ kind: "material" as const, major: "매출원가" as Major, what: "아직 안 낸 재료비 (외상)", amount: Math.round(materialUnpaid * ratio) }] : []),
-      ...fixedGaps.filter((g) => g.gap > 0).map((g) => ({ kind: "fixed" as const, major: g.cost.major, what: g.cost.name || g.cost.minor, amount: vat && hasInputVat(g.cost.major, g.cost.minor) ? Math.round(supplyOf(g.gap)) : g.gap })),
+      ...fixedGaps.filter((g) => g.gap > 0).map((g) => ({ kind: "fixed" as const, major: g.cost.major, what: g.cost.name || g.cost.minor, minor: g.cost.minor, amount: vat && hasInputVat(g.cost.major, g.cost.minor) ? Math.round(supplyOf(g.gap)) : g.gap })),
     ],
     deliveryFee,
     unclassified: all.filter((t) => !t.major).length,
