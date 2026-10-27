@@ -2,11 +2,12 @@
 //  - 세무사님 신고서(일반과세자 부가가치세 신고서)와 같은 칸 번호로, 과세기간(1기 1~6월, 2기 7~12월) 달마다 손익의 부가세 계산을 모은다
 //  - 신고는 세무사님이 한다. 이건 "얼마쯤 나올지" 미리 보는 것 — 칸 이름·계산은 26년 1기 신고서에 맞췄다
 import { dayTotal, type HistoryDay } from "./history";
+import { isCardTx } from "./costing/receiptMatch";
 import type { HometaxMonth } from "./hometax";
 import { CARD_CREDIT_RATE, CARD_CREDIT_YEAR_CAP, DEEMED_RATE } from "./vatBasis";
 import type { Pnl } from "./pnl";
 import type { TaxNotice } from "./taxNotices";
-import type { Month } from "./types";
+import type { Month, Transaction } from "./types";
 
 export interface VatPeriod {
   year: number;
@@ -90,22 +91,24 @@ export function previousReturn(period: Pick<VatPeriod, "year" | "half">): { labe
 /** 장부(통장)를 쓰기 전 달을 「지난 매출」(포스 홀 + 배민·쿠팡 주문)과 홈택스 매입으로 채운다 (2026-10-27).
  *  26년 1기로 검산: 지난 매출 1~6월 합 260,600,750 vs 신고서 매출(부가세 포함) 261,563,882 — 0.4% 차이
  *  - 매출은 부가세 포함. 영수증 없는 현금·이체(신고서 (4)) 몫은 지난 신고서 비율로 (1기 0.9%)
- *  - 매입: 세금계산서·계산서는 홈택스 실제. 카드로 산 것은 통장이 없어서 지난 신고서 한 달 평균으로 어림 */
-export function historyMonthVat(month: Month, days: HistoryDay[], hm: HometaxMonth | null, prev: VatReturnActual | null): Pnl["vat"] {
+ *  - 매입: 세금계산서·계산서는 홈택스 실제. 카드로 산 것은 그 달 체크카드 결제 합계 × 지난 기수 공제 비율(cardRatio),
+ *    통장이 없으면 지난 신고서 한 달 평균으로 어림 */
+export function historyMonthVat(month: Month, days: HistoryDay[], hm: HometaxMonth | null, prev: VatReturnActual | null, card?: { spend: number; ratio: number } | null): Pnl["vat"] {
   const salesGross = days.filter((d) => d.date.startsWith(month)).reduce((a, d) => a + dayTotal(d), 0);
   if (!salesGross) return null;
   const otherRatio = prev ? prev.otherSales[0] / (prev.cardSales[0] + prev.otherSales[0]) : 0;
-  const card = prev ? Math.round(prev.cardPurchase[1] / 6) : 0;
+  const cardGross = card ? Math.round(card.spend * card.ratio) : 0;
+  const cardVat = card ? cardGross - supplyOf(cardGross) : prev ? Math.round(prev.cardPurchase[1] / 6) : 0;
   const output = salesGross - supplyOf(salesGross);
   const invoiceVat = hm?.vat ?? (prev ? Math.round(prev.invoice[1] / 6) : 0);
   const taxFreeMaterial = hm ? hm.freeGoods : prev ? Math.round(prev.deemed[0] / 6) : 0;
   const deemed = Math.round(taxFreeMaterial * DEEMED_RATE);
-  const input = invoiceVat + card;
+  const input = invoiceVat + cardVat;
   return {
     output,
     input,
     inputSource: hm ? "홈택스" : "어림",
-    inputCard: hm ? card : null,
+    inputCard: hm ? cardVat : null,
     invoiceSupply: hm ? hm.supply - hm.freeSupply : null,
     salesGross,
     cardBase: Math.round(salesGross * (1 - otherRatio)),
@@ -115,6 +118,15 @@ export function historyMonthVat(month: Month, days: HistoryDay[], hm: HometaxMon
     due: output - input - deemed,
     paid: 0,
   };
+}
+
+/** 그 달 체크카드 결제 합계 (취소는 빼서) — 개인 결제·면세 채소도 섞여 있어서 지난 기수 공제 비율을 곱해 쓴다 */
+export const cardSpendOf = (txs: Transaction[], month: Month) => txs.filter((t) => isCardTx(t) && t.date.startsWith(month)).reduce((a, t) => a + t.out, 0);
+
+/** 지난 기수에 체크카드 결제 중 몇 %가 "카드로 산 것"으로 공제받았나 (26년 1기: 1,959만 ÷ 2,331만 = 84%) */
+export function cardDeductRatio(prev: VatReturnActual | null, prevSpend: number): number | null {
+  if (!prev || prevSpend <= 0) return null;
+  return Math.min(1, (prev.cardPurchase[0] + prev.cardPurchase[1]) / prevSpend);
 }
 
 /** 그 기수의 예정고지세액 — 세금 고지서 칸에 넣은 부가세 예정고지 중 납부기한이 이 기수 안인 것 */

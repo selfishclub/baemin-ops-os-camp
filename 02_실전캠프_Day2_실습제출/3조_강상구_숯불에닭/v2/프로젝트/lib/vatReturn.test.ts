@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Pnl } from "./pnl";
 import type { TaxNotice } from "./taxNotices";
-import { historyMonthVat, prepaidOf, previousReturn, vatPeriodOf, vatReturnPreview } from "./vatReturn";
+import type { Transaction } from "./types";
+import { cardDeductRatio, cardSpendOf, historyMonthVat, prepaidOf, previousReturn, vatPeriodOf, vatReturnPreview } from "./vatReturn";
 
 const vat = (o: Partial<NonNullable<Pnl["vat"]>>): Pnl["vat"] => ({
   output: 0, input: 0, inputSource: "어림", inputCard: null, invoiceSupply: null, salesGross: 0, cardBase: 0, taxFreeMaterial: 0, deemed: 0, cardCredit: 0, due: 0, paid: 0, ...o,
@@ -62,5 +63,18 @@ describe("장부 쓰기 전 달 — 지난 매출 + 홈택스", () => {
     expect(v.input).toBe(1_000_000 + Math.round(1_651_337 / 6));
     expect(v.cardBase).toBeGreaterThan(1_085_000);
     expect(historyMonthVat("2026-09", days, null, prev)).toBeNull();
+  });
+});
+
+describe("통장만 있는 달의 카드로 산 것", () => {
+  it("체크카드 결제 합계 × 지난 기수 공제 비율", () => {
+    const prev = previousReturn(vatPeriodOf("2026-07"))!.actual;
+    const t = (id: string, payee: string, out: number, date = "2026-07-10") => ({ id, date, payee, out, in: 0, source: "bank", month: date.slice(0, 7), major: null, minor: null, channel: null, review: null }) as Transaction;
+    const txs = [t("a", "NH체크 홈마트", 110_000), t("b", "NH체크 홈마트", -10_000), t("c", "NH콕송금 누구", 50_000), t("d", "NH체크 다이소", 30_000, "2026-08-01")];
+    expect(cardSpendOf(txs, "2026-07")).toBe(100_000);
+    const ratio = cardDeductRatio(prev, 23_307_889)!;
+    expect(ratio).toBeCloseTo(0.8404, 3);
+    const v = historyMonthVat("2026-07", [{ date: "2026-07-01", hall: 1_100_000, receipts: 1, customers: 1 }], null, prev, { spend: 1_100_000, ratio: 1 })!;
+    expect(v.input).toBe(Math.round(prev.invoice[1] / 6) + 100_000);
   });
 });
