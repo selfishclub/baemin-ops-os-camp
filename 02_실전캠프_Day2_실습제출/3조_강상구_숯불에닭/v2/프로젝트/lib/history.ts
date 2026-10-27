@@ -115,8 +115,14 @@ export function historyByMonth(days: HistoryDay[]): Map<string, { total: number;
 // ── 손익에 「지난 매출」 쓰기 (2026-10-27 사장님 "지난 매출 기준으로 바꿔 줘") ──
 // 장부에 일별 매출이 없는 달(장부 쓰기 전 2024-09 ~ 2026-08)은 통장 입금액 대신 포스 홀 매출 + 배민·쿠팡 주문 금액을 매출로 본다.
 // 통장 입금액 기준은 설 연휴처럼 카드 입금이 다음 달로 밀리면 그 달이 적자로 보인다 (2025-01).
-// 배달앱 수수료 = 주문 금액 − 그 달 그 배달앱 입금액 (9·10월 손익과 같은 방식). 입금이 없거나 이상하면 주문의 80%를 입금으로 본다.
-export const HISTORY_DELIVERY_DEPOSIT_RATE = 0.8;
+// 배달앱 수수료 = 주문 금액 × (1 − 입금 비율). 입금 비율은 2년 치(2024-10~2026-07) 통장 입금 ÷ 주문으로 잰 값.
+//  (처음엔 그 달 입금으로 셌는데, 설 연휴처럼 입금이 다음 달로 밀리면 그 달 수수료가 30~40%로 부풀었다 — 2025-01)
+// 요기요·땡겨요는 주문 자료가 없어서 그 달 통장 입금을 매출로 넣는다 (수수료는 안 보임).
+export const HISTORY_DEPOSIT_RATE: Record<string, number> = { baemin: 0.815, coupang: 0.767 };
+const BANK_ONLY_DELIVERY: [string, string][] = [
+  ["yogiyo", "요기요"],
+  ["etc", "땡겨요·기타"],
+];
 
 export function historyChannelSales(month: string, days: HistoryDay[], txs: Pick<Transaction, "date" | "in" | "channel">[]): ChannelSale[] {
   const mine = days.filter((d) => d.date.startsWith(month));
@@ -124,16 +130,17 @@ export function historyChannelSales(month: string, days: HistoryDay[], txs: Pick
   const hall = sum((d) => d.hall);
   if (!mine.length || hall + sum((d) => d.baemin) + sum((d) => d.coupang) <= 0) return [];
   const bankIn = (ch: string) => txs.filter((t) => t.channel === ch && t.in > 0 && t.date.startsWith(month)).reduce((a, t) => a + t.in, 0);
-  const delivery = (channel: string, name: string, orders: number): ChannelSale | null => {
-    if (orders <= 0) return null;
+  const delivery = (channel: string, name: string, orders: number): ChannelSale | null =>
+    orders > 0 ? { month, channel, name, orders, deposit: Math.round(orders * HISTORY_DEPOSIT_RATE[channel]), count: 0 } : null;
+  const bankOnly = BANK_ONLY_DELIVERY.map(([channel, name]): ChannelSale | null => {
     const got = bankIn(channel);
-    const deposit = got >= orders * 0.5 && got <= orders ? got : Math.round(orders * HISTORY_DELIVERY_DEPOSIT_RATE);
-    return { month, channel, name, orders, deposit, count: 0 };
-  };
+    return got > 0 ? { month, channel, name, orders: got, deposit: got, count: 0 } : null;
+  });
   return [
     { month, channel: "hall_card", name: "홀 (포스 매출)", orders: hall, deposit: hall, count: sum((d) => d.receipts) },
     delivery("baemin", "배달의민족", sum((d) => d.baemin)),
     delivery("coupang", "쿠팡이츠", sum((d) => d.coupang)),
+    ...bankOnly,
   ].filter((s): s is ChannelSale => !!s);
 }
 

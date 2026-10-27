@@ -97,9 +97,9 @@ describe("손익에 지난 매출 쓰기", () => {
     { date: "2025-01-11", hall: 500_000, receipts: 5, customers: 5 },
   ];
   const tx = (date: string, inn: number, channel: string | null) => ({ date, in: inn, channel });
-  it("홀은 포스 매출, 배달은 주문 금액 − 그 달 입금액이 수수료", () => {
-    const s = historyChannelSales("2025-01", days, [tx("2025-01-15", 160_000, "baemin"), tx("2025-01-20", 1_400_000, "card_kb")]);
-    expect(s.map((x) => [x.channel, x.orders, x.deposit])).toEqual([["hall_card", 1_500_000, 1_500_000], ["baemin", 200_000, 160_000], ["coupang", 100_000, 80_000]]);
+  it("홀은 포스 매출, 배달 수수료는 2년 치 입금 비율로 (그 달 입금이 밀려도 그대로), 요기요는 통장 입금", () => {
+    const s = historyChannelSales("2025-01", days, [tx("2025-01-15", 100_000, "baemin"), tx("2025-01-20", 1_400_000, "card_kb"), tx("2025-01-21", 30_000, "yogiyo")]);
+    expect(s.map((x) => [x.channel, x.orders, x.deposit])).toEqual([["hall_card", 1_500_000, 1_500_000], ["baemin", 200_000, 163_000], ["coupang", 100_000, 76_700], ["yogiyo", 30_000, 30_000]]);
   });
   it("장부 일별 매출이 한 달 치면 그것, 없거나 달 중간부터면 지난 매출, 통장이 없으면 안 씀", () => {
     const eff = [{ month: "2025-01", channel: "hall_card", name: "x", orders: 9, deposit: 9, count: 1 }];
