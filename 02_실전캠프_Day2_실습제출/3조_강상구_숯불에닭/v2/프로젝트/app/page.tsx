@@ -348,7 +348,7 @@ function VatBox({ vat, month }: { vat: NonNullable<Pnl["vat"]>; month: string })
         <span className="text-sky-700">{vat.inputSource === "홈택스" ? ` (홈택스 세금계산서 ${num(vat.input - (vat.inputCard ?? 0))} + 카드로 산 것 ${num(vat.inputCard ?? 0)})` : " (비용 ÷1.1 어림 — 홈택스 자료를 올리면 실제로 바뀌어요)"}</span> − 의제매입세액공제 {num(vat.deemed)} − 카드 매출 세액공제 {num(vat.cardCredit)} = <b>{num(vat.due)}</b>
       </p>
       <p className="text-sky-900">
-        영업이익에는 안 들어가요. 예정고지(4월·10월 무렵)와 확정신고(1월·7월) 때 모아서 나가요.
+        부가세는 영업이익에 안 들어가요. 예정고지(4월·10월 무렵)와 확정신고(1월·7월) 때 모아서 나가요. 다만 카드 매출 세액공제 <span className="num">{num(vat.cardCredit)}</span>원은 덜 내는 돈이라 사장님 몫이어서, 세금과공과에서 빼 영업이익에 더했어요 (카드 수수료 0.89%는 영업비에 넣었어요).
         {vat.paid > 0 && <> 이 달 통장에서 낸 부가세 <b className="num">{won(vat.paid)}</b>는 비용이 아니라서 손익에서 뺐어요.</>}
       </p>
       <p className="text-[11px] text-sky-800">
