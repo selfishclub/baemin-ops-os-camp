@@ -291,3 +291,17 @@ describe("금액 조건이 붙은 규칙 (본사 원재료 대금 vs 로열티 �
     expect(findRule(row(731_390), rules)?.id).toBe("a");
   });
 });
+
+describe("날짜(일) 조건 규칙", () => {
+  it("같은 세무서라도 10일쯤은 원천세, 말일쯤은 부가세 분납", () => {
+    const base = { keyword: "E-국세 동청주세무서", direction: "out" as const, major: "세금과공과" as const, channel: null };
+    const rules = [
+      { ...base, id: "a", minor: "원천세", prev_month: true },
+      { ...base, id: "b", minor: "원천세", prev_month: true, days: [1, 20] as [number, number] },
+      { ...base, id: "c", minor: "부가세", days: [21, 31] as [number, number] },
+    ];
+    expect(findRule({ date: "2026-08-10", payee: "E-국세 동청주세무서콕뱅크", out: 60_000, in: 0 }, rules)?.minor).toBe("원천세");
+    expect(findRule({ date: "2026-08-31", payee: "E-국세 동청주세무서콕뱅크", out: 2_035_250, in: 0 }, rules)?.minor).toBe("부가세");
+    expect(findRule({ date: "", payee: "E-국세 동청주세무서콕뱅크", out: 1, in: 0 }, rules)?.id).toBe("a");
+  });
+});

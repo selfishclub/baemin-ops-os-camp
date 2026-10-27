@@ -366,6 +366,7 @@ export default function RulesPage() {
                       {r.ambiguous && <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-900">매번 확인</span>}
                       {r.prev_month && <span className="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-bold text-violet-900">지난달 비용</span>}
                       {r.amount ? <span className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-bold text-sky-900">{num(r.amount)}원일 때만</span> : null}
+                      {r.days ? <span className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-bold text-sky-900">매달 {r.days[0]}~{r.days[1]}일</span> : null}
                     </p>
                     <p className="text-xs text-stone-500">
                       {r.major} › {r.minor}
