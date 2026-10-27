@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Purchase } from "./costing/purchases";
+import type { Transaction } from "./types";
 import { cardReceiptVat, hometaxMonth, mergeHometax, parseHometaxSheet, sameVendor } from "./hometax";
 import { vatBasisFrom } from "./vatBasis";
 
@@ -85,5 +86,25 @@ describe("계산서(면세) 재료 몫", () => {
     const r = parseHometaxSheet([["매입 전자(수정) 계산서 목록조회"], head, ["2026-09-30", "F1", "", "", "444-44-44444", "", "가짜식품", "권닭", "5,475,000", "5,475,000", "계육외"], ["2026-09-19", "F2", "", "", "666-66-66666", "", " ", "박임대", "212,597", "212,597", "상하수도"], ["2026-09-05", "F3", "", "", "777-77-77777", "", "가짜방역", "최벌레", "33,000", "33,000", "9월 해충방제 정기관리"]]);
     const hm = hometaxMonth(mergeHometax(null, r.rows).store, "2026-09", [])!;
     expect([hm.freeSupply, hm.freeGoods, hm.vendors.length]).toEqual([5_720_597, 5_475_000, 3]);
+  });
+});
+
+describe("카드로 산 것의 부가세", () => {
+  it("부가세 안 적은 영수증은 체크카드와 짝이면 면세 아닌 줄 ÷ 11, 영수증 없는 카드 결제는 공제 항목만 ÷ 11, 세금계산서 거래처는 뺀다", () => {
+    const store = mergeHometax(null, parseHometaxSheet(sheet()).rows).store;
+    const l = (amount: number, taxFree = false) => ({ name: "x", unitPrice: amount, qty: 1, amount, category: "원재료비" as const, itemId: null, itemQty: 0, ...(taxFree ? { taxFree } : {}) });
+    const ps: Purchase[] = [{ id: "m", date: "2026-09-10", vendor: "홈마트", discount: 0, lines: [l(11_000), l(5_000, true)] }];
+    const tx = (id: string, payee: string, out: number, major: string, minor: string) => ({ id, source: "bank", date: "2026-09-10", payee, in: 0, out, major, minor }) as unknown as Transaction;
+    const txs = [
+      tx("1", "NH체크 홈마트", 16_000, "매출원가", "원재료비"),
+      tx("2", "NH체크 다이소", 22_000, "영업비", "소모품비"),
+      tx("3", "NH체크 주유소", 55_000, "영업비", "차량유지관리비"),
+      tx("4", "NH체크 가짜주류", 33_000, "영업비", "소모품비"),
+      tx("5", "NH콕송금 누구", 11_000, "영업비", "소모품비"),
+    ];
+    const hm = hometaxMonth(store, "2026-09", ps)!;
+    expect(cardReceiptVat(ps, hm, txs)).toBe(1_000 + 2_000);
+    expect(vatBasisFrom(ps, undefined, hm, txs)).toMatchObject({ inputActual: 983_432 + 3_000, inputCard: 3_000 });
+    expect(cardReceiptVat(ps, hm)).toBe(0); // 통장 줄이 없으면 짝을 모르니 어림하지 않는다
   });
 });

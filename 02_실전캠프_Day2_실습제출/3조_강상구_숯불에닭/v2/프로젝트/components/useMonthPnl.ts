@@ -11,7 +11,7 @@ import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor
 import { computePnl } from "@/lib/pnl";
 import { getStore } from "@/lib/storage";
 import { vatBasisFrom, type VatBasis } from "@/lib/vatBasis";
-import { HOMETAX_KEY, hometaxMonth, type HometaxStore } from "@/lib/hometax";
+import { HOMETAX_KEY, hometaxMonth, type HometaxMonth, type HometaxStore } from "@/lib/hometax";
 
 /** 홈택스 매입 자료를 새로 올리면 손익을 다시 계산하라는 신호 (components/HometaxCard.tsx) */
 export const HOMETAX_CHANGED = "hometax-changed";
@@ -29,7 +29,8 @@ export function useMonthPnl(month: Month) {
   const [materialPurchases, setMaterialPurchases] = useState(0);
   const [purchaseCount, setPurchaseCount] = useState(0); // 그 달 매입 영수증 수 — "자료 다 들어왔나" 체크용
   // 손익은 부가세 뺀 공급가로 본다 (2026-10-26) — 재료비 공급가 비율·의제매입세액은 그 달 영수증에서
-  const [vat, setVat] = useState<VatBasis>(vatBasisFrom([]));
+  // 홈택스 자료가 있는 달은 카드로 산 것의 부가세를 그 달 통장 줄(체크카드 결제)에서 센다
+  const [vatSrc, setVatSrc] = useState<{ ps: Purchase[]; hm: HometaxMonth | null }>({ ps: [], hm: null });
   const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
 
   useEffect(() => {
@@ -49,18 +50,19 @@ export function useMonthPnl(month: Month) {
           const sum = materialPaidBasis(ps ?? []);
           setMaterialPurchases(sum);
           setPurchaseCount((ps ?? []).length);
-          setVat(vatBasisFrom(ps ?? [], undefined, hometaxMonth(ht, month, ps ?? [])));
+          setVatSrc({ ps: ps ?? [], hm: hometaxMonth(ht, month, ps ?? []) });
         })
         .catch(() => {
           setMaterialPurchases(0);
           setPurchaseCount(0);
-          setVat(vatBasisFrom([]));
+          setVatSrc({ ps: [], hm: null });
         });
     void load();
     window.addEventListener(HOMETAX_CHANGED, load);
     return () => window.removeEventListener(HOMETAX_CHANGED, load);
   }, [month]);
 
+  const vat = useMemo<VatBasis>(() => vatBasisFrom(vatSrc.ps, undefined, vatSrc.hm, ledger.txs), [vatSrc, ledger.txs]);
   const loading = ledger.loading || daily.loading || !settlement.loaded;
   const today = todayStr();
   const summary = useMemo(() => monthSummary(month, daily.sales, daily.shifts, daily.staff, today), [month, daily.sales, daily.shifts, daily.staff, today]);

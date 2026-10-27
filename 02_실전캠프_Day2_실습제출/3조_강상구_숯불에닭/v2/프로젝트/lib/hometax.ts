@@ -2,7 +2,11 @@
 //  - 전자세금계산서(부가세 있음)와 전자계산서(면세, 으뜸 닭고기 등) 둘 다 받는다. 같은 승인번호는 한 번만
 //  - 쓰는 곳: ① 부가세 칸의 "비용에 든 부가세"를 어림 대신 실제 세액으로 ② 거래처마다 세금계산서와 매입 영수증 합계 대조
 //  - 홈택스에 로그인·조회·내려받기는 사장님이 한다 (장부는 파일만 읽는다)
-import { purchaseSupply, type Purchase } from "@/lib/costing/purchases";
+import { lineNet, purchaseSupply, type Purchase } from "@/lib/costing/purchases";
+import { cardPayee, matchCardReceipts } from "@/lib/costing/receiptMatch";
+import type { Transaction } from "@/lib/types";
+import { expandSplits } from "@/lib/txSplit";
+import { hasInputVat } from "@/lib/vatBasis";
 
 export const HOMETAX_KEY = "hometax_purchases_v1";
 
@@ -169,9 +173,26 @@ export function hometaxMonth(store: HometaxStore | null, month: string, purchase
   };
 }
 
-/** 세금계산서를 안 끊는 곳(마트·쿠팡 등 카드 결제)의 영수증 부가세 — 홈택스 세액에 더해 "비용에 든 부가세"를 만든다 */
-export function cardReceiptVat(purchases: Purchase[], hm: HometaxMonth): number {
-  return purchases
-    .filter((p) => p.date.startsWith(hm.month) && !hm.vendors.some((v) => v.goods > 0 && sameVendor(p.vendor, v.vendor)))
-    .reduce((a, p) => a + (p.vat ?? 0), 0);
+/** 세금계산서를 안 끊는 곳(마트·쿠팡 등 카드 결제)의 부가세 — 홈택스 세액에 더해 "비용에 든 부가세"를 만든다.
+ *  세무사 신고서의 "신용카드매출전표등 수령명세서" 몫 (26년 1기: 한 달 평균 공급가 약 300만 원, 세액 약 27만 원)
+ *  - 매입 영수증: 영수증에 적은 부가세. 안 적었으면 체크카드 결제와 짝이 된 영수증만 면세 아닌 줄 ÷ 11로 어림
+ *  - 영수증 없는 체크카드 결제(소모품·통신·복리후생 등): 부가세 공제 항목만 ÷ 11
+ *  - 세금계산서를 받는 거래처는 홈택스 세액에 이미 있으니 뺀다 */
+export function cardReceiptVat(purchases: Purchase[], hm: HometaxMonth, txs: Transaction[] = []): number {
+  const mine = purchases.filter((p) => p.date.startsWith(hm.month));
+  const match = matchCardReceipts(txs, mine);
+  const cardPaid = new Set(match.matched.flatMap((m) => m.purchases.map((p) => p.id)));
+  const fromReceipts = mine
+    .filter((p) => !hm.vendors.some((v) => v.goods > 0 && sameVendor(p.vendor, v.vendor)))
+    .reduce((a, p) => {
+      if (p.vat !== undefined) return a + p.vat;
+      if (!cardPaid.has(p.id) || p.vatExcluded) return a;
+      const taxable = (p.lines ?? []).filter((l) => !l.taxFree).reduce((x, l) => x + lineNet(p, l), 0);
+      return a + taxable - Math.round(taxable / 1.1);
+    }, 0);
+  const invoiced = (payee: string) => hm.vendors.some((v) => !v.free && sameVendor(cardPayee(payee), v.vendor));
+  const fromCards = expandSplits([...match.missing, ...match.exempt.map((e) => e.tx)])
+    .filter((t) => t.out > 0 && t.major && hasInputVat(t.major, t.minor ?? "") && !invoiced(t.payee))
+    .reduce((a, t) => a + t.out - Math.round(t.out / 1.1), 0);
+  return fromReceipts + fromCards;
 }

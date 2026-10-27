@@ -71,7 +71,7 @@ export async function loadMonthPnls(store: Store, months: Month[]): Promise<Mont
       const sales = effectiveChannelSales(month, saved, daily, channels, results);
       const summary = monthSummary(month, daily, shifts, staff);
       const material = materialPaidBasis(purchases ?? []);
-      const pnl = computePnl(txs, sales, { hourly: summary.labor, salary: labor.salary, insurance: labor.insurance }, material, fixedCostGaps(fixedCosts ?? [], txs, month), vatBasisFrom(purchases ?? [], undefined, hometaxMonth(hometax, month, purchases ?? [])));
+      const pnl = computePnl(txs, sales, { hourly: summary.labor, salary: labor.salary, insurance: labor.insurance }, material, fixedCostGaps(fixedCosts ?? [], txs, month), vatBasisFrom(purchases ?? [], undefined, hometaxMonth(hometax, month, purchases ?? []), txs));
       return { month, pnl, empty: txs.length === 0 && sales.length === 0, closed: !!closing?.closedAt };
     }),
   );

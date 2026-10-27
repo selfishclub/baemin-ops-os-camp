@@ -5,6 +5,7 @@
 //  - 통장에서 낸 부가세는 비용이 아니다 (손님에게 받아 맡아 둔 돈). 손익에서 빼고 따로 보여 준다
 import { lineGrossPaid, lineSupply, type Purchase } from "@/lib/costing/purchases";
 import { cardReceiptVat, sameVendor, type HometaxMonth } from "@/lib/hometax";
+import type { Transaction } from "@/lib/types";
 
 export const VAT_RATE = 0.1;
 
@@ -33,14 +34,15 @@ export interface VatBasis {
   materialSupplyRatio: number; // 재료비(부가세 포함) × 이 비율 = 공급가
   deemedInput: number; // 의제매입세액공제 (면세 재료 × 8/108)
   taxFreeMaterial: number; // 면세 재료 매입액
-  inputActual?: number; // 홈택스 세금계산서 세액 + 카드 영수증 부가세 (홈택스 자료를 올린 달만)
+  inputActual?: number; // 홈택스 세금계산서 세액 + 카드로 산 것의 부가세 (홈택스 자료를 올린 달만)
+  inputCard?: number; // 그중 카드로 산 것의 부가세 (영수증·체크카드 결제)
 }
 
 const isMaterial = (category: string) => category === "원재료비" || category === "기타재료비";
 
 /** 그 달 매입 영수증으로 재료비 공급가 비율과 의제매입세액을 구한다.
- *  홈택스 자료(hm)가 있으면 비용에 든 부가세는 실제 세액으로, 의제매입은 전자계산서 공급가 + 카드로 산 면세 재료로 */
-export function vatBasisFrom(purchases: Purchase[], deemedRate = DEEMED_RATE, hm: HometaxMonth | null = null): VatBasis {
+ *  홈택스 자료(hm)가 있으면 비용에 든 부가세는 실제 세액 + 카드로 산 것(txs: 그 달 통장 줄)의 부가세로, 의제매입은 전자계산서 공급가 + 카드로 산 면세 재료로 */
+export function vatBasisFrom(purchases: Purchase[], deemedRate = DEEMED_RATE, hm: HometaxMonth | null = null, txs: Transaction[] = []): VatBasis {
   let gross = 0;
   let supply = 0;
   let taxFree = 0;
@@ -55,10 +57,11 @@ export function vatBasisFrom(purchases: Purchase[], deemedRate = DEEMED_RATE, hm
       if ((l.taxFree || p.vat === 0) && !(hm?.freeCount && hm.vendors.some((v) => v.free && sameVendor(p.vendor, v.vendor)))) taxFree += g;
     }
   if (hm?.freeCount) taxFree += hm.freeGoods;
+  const card = hm && hm.taxCount ? cardReceiptVat(purchases, hm, txs) : 0;
   return {
     materialSupplyRatio: gross > 0 ? supply / gross : 1,
     deemedInput: Math.round(taxFree * deemedRate),
     taxFreeMaterial: taxFree,
-    ...(hm && hm.taxCount ? { inputActual: hm.vat + cardReceiptVat(purchases, hm) } : {}),
+    ...(hm && hm.taxCount ? { inputActual: hm.vat + card, inputCard: card } : {}),
   };
 }
