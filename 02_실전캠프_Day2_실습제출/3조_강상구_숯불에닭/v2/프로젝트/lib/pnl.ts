@@ -24,7 +24,7 @@ export interface PnlEstimate {
 
 export interface Pnl {
   revenue: number;
-  revenueBasis: "실매출" | "입금액"; // 채널 입력이 없으면 통장 입금액 기준
+  revenueBasis: "실매출" | "입금액" | "지난 매출"; // 채널 입력이 없으면 통장 입금액 기준, 장부 쓰기 전 달은 「지난 매출」(lib/history.ts pnlSales)
   hallRevenue: number;
   deliveryRevenue: number;
   otherIncome: number;

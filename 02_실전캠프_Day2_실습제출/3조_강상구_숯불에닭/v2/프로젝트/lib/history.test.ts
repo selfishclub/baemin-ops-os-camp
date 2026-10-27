@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DELIVERY_FILE_KIND, historyByMonth, mergeHistory, parseDeliveryHistory, parseOkposDaily } from "./history";
+import { DELIVERY_FILE_KIND, historyByMonth, historyChannelSales, mergeHistory, parseDeliveryHistory, parseOkposDaily, pnlSales } from "./history";
 import { buildInsights, ownOutlook, withHistory, type DaySales } from "./market/insight";
 
 // 오케이포스 「일별종합」 엑셀 첫 시트를 header:1 로 읽은 모양 (2026-10-10~16 실제 파일과 같은 머리줄)
@@ -88,5 +88,25 @@ describe("우리 가게 지난 기록으로 앞으로 석 달", () => {
     const ids = buildInsights(null, ledger, [], [], "2026-11-10", hist).map((x) => x.id);
     expect(ids).toContain("ownSeason");
     expect(buildInsights(null, ledger, [], [], "2026-11-10").map((x) => x.id)).not.toContain("ownSeason");
+  });
+});
+
+describe("손익에 지난 매출 쓰기", () => {
+  const days = [
+    { date: "2025-01-10", hall: 1_000_000, receipts: 10, customers: 10, baemin: 200_000, coupang: 100_000 },
+    { date: "2025-01-11", hall: 500_000, receipts: 5, customers: 5 },
+  ];
+  const tx = (date: string, inn: number, channel: string | null) => ({ date, in: inn, channel });
+  it("홀은 포스 매출, 배달은 주문 금액 − 그 달 입금액이 수수료", () => {
+    const s = historyChannelSales("2025-01", days, [tx("2025-01-15", 160_000, "baemin"), tx("2025-01-20", 1_400_000, "card_kb")]);
+    expect(s.map((x) => [x.channel, x.orders, x.deposit])).toEqual([["hall_card", 1_500_000, 1_500_000], ["baemin", 200_000, 160_000], ["coupang", 100_000, 80_000]]);
+  });
+  it("장부 일별 매출이 한 달 치면 그것, 없거나 달 중간부터면 지난 매출, 통장이 없으면 안 씀", () => {
+    const eff = [{ month: "2025-01", channel: "hall_card", name: "x", orders: 9, deposit: 9, count: 1 }];
+    const bank = [tx("2025-01-05", 1, null)];
+    expect(pnlSales("2025-01", [{ date: "2025-01-01" }], eff, days, bank)).toEqual({ sales: eff, fromHistory: false });
+    expect(pnlSales("2025-01", [{ date: "2025-01-27" }], eff, days, bank).fromHistory).toBe(true);
+    expect(pnlSales("2025-01", [], [], days, bank).fromHistory).toBe(true);
+    expect(pnlSales("2025-01", [], [], days, []).fromHistory).toBe(false);
   });
 });

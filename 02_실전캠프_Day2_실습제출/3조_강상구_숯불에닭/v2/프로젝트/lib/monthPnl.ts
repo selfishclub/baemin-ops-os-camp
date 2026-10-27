@@ -8,7 +8,8 @@ import { fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "./fixedCosts";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "./labor";
 import { nextMonth } from "./month";
 import { buildJournal, type JournalEntry } from "./journal";
-import { computePnl, salesStartLate, type Pnl } from "./pnl";
+import { HISTORY_KEY, pnlSales, type HistoryDay } from "./history";
+import { computePnl, type Pnl } from "./pnl";
 import { HOLIDAYS_KEY, SETTLEMENT_ADJUSTMENTS_KEY, SETTLEMENT_RULES_KEY, settleChannel, type ChannelSettlementSummary, type SettlementAdjustment, type SettlementRule } from "./settlement";
 import type { Store } from "./storage";
 import type { DailySale, Month, Transaction } from "./types";
@@ -54,6 +55,7 @@ export async function loadMonthPnls(store: Store, months: Month[]): Promise<Mont
     store.listUploads(),
   ]);
   const hometax = await store.getSetting<HometaxStore>(HOMETAX_KEY);
+  const history = (await store.getSetting<HistoryDay[]>(HISTORY_KEY)) ?? [];
   const channels = mergeChannels(channelsSaved);
   const lastBankDate = uploads.reduce((a, u) => (u.to > a ? u.to : a), "");
   const labor = fixedLabor ?? EMPTY_FIXED_LABOR;
@@ -74,7 +76,9 @@ export async function loadMonthPnls(store: Store, months: Month[]): Promise<Mont
       const summary = monthSummary(month, daily, shifts, staff);
       const material = materialPaidBasis(purchases ?? []);
       const vat = vatBasisFrom(purchases ?? [], undefined, hometaxSettled(month, todayStr()) ? hometaxMonth(hometax, month, purchases ?? []) : null, txs);
-      const pnl = computePnl(txs, salesStartLate(month, daily) ? [] : sales, { hourly: summary.labor, salary: labor.salary, insurance: labor.insurance }, material, fixedCostGaps(fixedCosts ?? [], txs, month), vat);
+      const ps = pnlSales(month, daily, sales, history, txs);
+      const pnl0 = computePnl(txs, ps.sales, { hourly: summary.labor, salary: labor.salary, insurance: labor.insurance }, material, fixedCostGaps(fixedCosts ?? [], txs, month), vat);
+      const pnl = ps.fromHistory ? { ...pnl0, revenueBasis: "지난 매출" as const } : pnl0;
       const journal = buildJournal({ month, txs, sales, channels, purchases: purchases ?? [], pnl, vat });
       return { month, pnl, empty: txs.length === 0 && sales.length === 0, closed: !!closing?.closedAt, journal };
     }),

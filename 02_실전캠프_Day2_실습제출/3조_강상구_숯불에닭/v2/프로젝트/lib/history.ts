@@ -1,5 +1,7 @@
+import { salesStartLate } from "./pnl";
+import type { ChannelSale, Transaction } from "./types";
 // 지난 매출 (참고용) — 장부를 쓰기 전(2024-09 ~) 포스 매출을 따로 보관한다.
-// 손익·정산·오늘 탭에는 넣지 않는다(비용 없는 달이 흑자로 찍히니까). 상권 읽어 주기·해마다 견줘 보기·예측에만 쓴다.
+// 정산·오늘 탭에는 넣지 않는다. 손익에는 통장 자료가 있는 달만 쓴다(비용 없는 달이 흑자로 찍히니까 — 아래 pnlSales). 상권 읽어 주기·해마다 견줘 보기·예측에도 쓴다.
 // 포스에는 배달이 안 찍혀서 홀 매출(포스)과 배달(배민·쿠팡 주문 수집)을 따로 받아 같은 날에 합친다.
 
 export const HISTORY_KEY = "history_sales_v1";
@@ -108,4 +110,38 @@ export function historyByMonth(days: HistoryDay[]): Map<string, { total: number;
     m.set(k, { total: cur.total + t, delivery: cur.delivery + t - d.hall, days: cur.days + 1 });
   }
   return m;
+}
+
+// ── 손익에 「지난 매출」 쓰기 (2026-10-27 사장님 "지난 매출 기준으로 바꿔 줘") ──
+// 장부에 일별 매출이 없는 달(장부 쓰기 전 2024-09 ~ 2026-08)은 통장 입금액 대신 포스 홀 매출 + 배민·쿠팡 주문 금액을 매출로 본다.
+// 통장 입금액 기준은 설 연휴처럼 카드 입금이 다음 달로 밀리면 그 달이 적자로 보인다 (2025-01).
+// 배달앱 수수료 = 주문 금액 − 그 달 그 배달앱 입금액 (9·10월 손익과 같은 방식). 입금이 없거나 이상하면 주문의 80%를 입금으로 본다.
+export const HISTORY_DELIVERY_DEPOSIT_RATE = 0.8;
+
+export function historyChannelSales(month: string, days: HistoryDay[], txs: Pick<Transaction, "date" | "in" | "channel">[]): ChannelSale[] {
+  const mine = days.filter((d) => d.date.startsWith(month));
+  const sum = (f: (d: HistoryDay) => number | null | undefined) => mine.reduce((a, d) => a + (f(d) ?? 0), 0);
+  const hall = sum((d) => d.hall);
+  if (!mine.length || hall + sum((d) => d.baemin) + sum((d) => d.coupang) <= 0) return [];
+  const bankIn = (ch: string) => txs.filter((t) => t.channel === ch && t.in > 0 && t.date.startsWith(month)).reduce((a, t) => a + t.in, 0);
+  const delivery = (channel: string, name: string, orders: number): ChannelSale | null => {
+    if (orders <= 0) return null;
+    const got = bankIn(channel);
+    const deposit = got >= orders * 0.5 && got <= orders ? got : Math.round(orders * HISTORY_DELIVERY_DEPOSIT_RATE);
+    return { month, channel, name, orders, deposit, count: 0 };
+  };
+  return [
+    { month, channel: "hall_card", name: "홀 (포스 매출)", orders: hall, deposit: hall, count: sum((d) => d.receipts) },
+    delivery("baemin", "배달의민족", sum((d) => d.baemin)),
+    delivery("coupang", "쿠팡이츠", sum((d) => d.coupang)),
+  ].filter((s): s is ChannelSale => !!s);
+}
+
+/** 손익에 넣을 매출: 장부 일별 매출이 한 달 치 있으면 그것, 없거나 달 중간부터면 「지난 매출」, 그것도 없으면 통장 입금액(빈 목록) */
+export function pnlSales(month: string, daily: { date: string }[], effective: ChannelSale[], history: HistoryDay[], txs: Pick<Transaction, "date" | "in" | "channel">[]): { sales: ChannelSale[]; fromHistory: boolean } {
+  const hasDaily = daily.some((d) => d.date.startsWith(month));
+  if (hasDaily && !salesStartLate(month, daily)) return { sales: effective, fromHistory: false };
+  // 통장 자료가 없는 달은 비용이 없으니 지난 매출을 넣지 않는다
+  const hist = txs.some((t) => t.date.startsWith(month)) ? historyChannelSales(month, history, txs) : [];
+  return hist.length ? { sales: hist, fromHistory: true } : { sales: hasDaily ? [] : effective, fromHistory: false };
 }

@@ -27,7 +27,7 @@ export interface FindingsInput {
   lastBankDate: string; // 올린 통장의 마지막 날짜 ("" = 아직 없음)
   needsReview: number;
   unclassified: number;
-  revenueBasis: "실매출" | "입금액";
+  revenueBasis: "실매출" | "입금액" | "지난 매출";
   missingDays: string[]; // 오늘까지 중 매출을 안 넣은 날
   enteredDays: number;
   settlements: ChannelSettlementSummary[];

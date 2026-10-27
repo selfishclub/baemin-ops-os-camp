@@ -21,7 +21,7 @@ export function monthSummaryText(i: SummaryTextInput): string {
   const { pnl } = i;
   const out: string[] = [];
   out.push(`[${i.monthName} 손익 요약] ${i.closed ? "마감" : "마감 전"}`);
-  out.push(`매출 ${n(pnl.revenue)}원` + (pnl.revenueBasis === "실매출" ? ` (홀 ${n(pnl.hallRevenue)} · 배달 ${n(pnl.deliveryRevenue)})` : " (통장 입금액 기준)"));
+  out.push(`매출 ${n(pnl.revenue)}원` + (pnl.revenueBasis === "입금액" ? " (통장 입금액 기준)" : ` (홀 ${n(pnl.hallRevenue)} · 배달 ${n(pnl.deliveryRevenue)}${pnl.revenueBasis === "지난 매출" ? " · 지난 매출 기준" : ""})`));
   let profit = `영업이익 ${n(pnl.operatingProfit)}원 (이익률 ${p(pnl.operatingMargin)})`;
   if (i.prevProfit !== null && i.prevProfit !== undefined && i.prevName) {
     const d = pnl.operatingProfit - i.prevProfit;

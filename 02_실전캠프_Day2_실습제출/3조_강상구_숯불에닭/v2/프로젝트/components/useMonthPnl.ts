@@ -8,7 +8,8 @@ import { PURCHASES_KEY_PREFIX, materialPaidBasis, type Purchase } from "@/lib/co
 import { monthSummary, todayStr } from "@/lib/daily";
 import { fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "@/lib/fixedCosts";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
-import { computePnl, salesStartLate } from "@/lib/pnl";
+import { HISTORY_KEY, pnlSales, type HistoryDay } from "@/lib/history";
+import { computePnl } from "@/lib/pnl";
 import { getStore } from "@/lib/storage";
 import { vatBasisFrom, type VatBasis } from "@/lib/vatBasis";
 import { HOMETAX_KEY, hometaxMonth, hometaxSettled, type HometaxMonth, type HometaxStore } from "@/lib/hometax";
@@ -32,11 +33,16 @@ export function useMonthPnl(month: Month) {
   // 홈택스 자료가 있는 달은 카드로 산 것의 부가세를 그 달 통장 줄(체크카드 결제)에서 센다
   const [vatSrc, setVatSrc] = useState<{ ps: Purchase[]; hm: HometaxMonth | null }>({ ps: [], hm: null });
   const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
+  const [history, setHistory] = useState<HistoryDay[]>([]); // 「지난 매출」 — 장부 쓰기 전 달의 매출
 
   useEffect(() => {
     getStore()
       .getSetting<FixedLabor>(FIXED_LABOR_KEY)
       .then((v) => v && setFixedLabor(v))
+      .catch(() => {});
+    getStore()
+      .getSetting<HistoryDay[]>(HISTORY_KEY)
+      .then((v) => setHistory(v ?? []))
       .catch(() => {});
     getStore()
       .getSetting<FixedCost[]>(FIXED_COSTS_KEY)
@@ -67,17 +73,18 @@ export function useMonthPnl(month: Month) {
   const loading = ledger.loading || daily.loading || !settlement.loaded;
   const today = todayStr();
   const summary = useMemo(() => monthSummary(month, daily.sales, daily.shifts, daily.staff, today), [month, daily.sales, daily.shifts, daily.staff, today]);
-  const pnl = useMemo(
-    () =>
-      computePnl(
+  const pnl = useMemo(() => {
+    const ps = pnlSales(month, daily.sales, settlement.effectiveSales, history, ledger.txs);
+    const p = computePnl(
         ledger.txs,
-        salesStartLate(month, daily.sales) ? [] : settlement.effectiveSales,
+        ps.sales,
         { hourly: summary.labor, salary: fixedLabor.salary, insurance: fixedLabor.insurance },
         materialPurchases,
         fixedCostGaps(fixedCosts, ledger.txs, month),
         vat,
-      ),
-    [ledger.txs, settlement.effectiveSales, daily.sales, summary.labor, fixedLabor, materialPurchases, fixedCosts, month, vat],
+      );
+    return ps.fromHistory ? { ...p, revenueBasis: "지난 매출" as const } : p;
+  }, [ledger.txs, settlement.effectiveSales, daily.sales, history, summary.labor, fixedLabor, materialPurchases, fixedCosts, month, vat],
   );
   const empty = ledger.txs.length === 0 && settlement.effectiveSales.length === 0;
 
