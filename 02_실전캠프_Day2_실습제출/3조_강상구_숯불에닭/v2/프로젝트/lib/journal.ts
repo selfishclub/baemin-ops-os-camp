@@ -46,7 +46,7 @@ export const WITHHELD = "예수금";
 export const CAPITAL = "자본금";
 export const receivable = (channelName: string) => `미수금-${channelName}`;
 
-const EXCLUDED_ACCOUNT: Record<string, string> = { "내 계좌 이체": DRAW, "손익에 안 넣음": DRAW, "대출·상환": LOAN, "보증금·예치금": "보증금" };
+const EXCLUDED_ACCOUNT: Record<string, string> = { "내 계좌 이체": DRAW, "손익에 안 넣음": DRAW, "대출·상환": LOAN, "보증금·예치금": "보증금", "비품 구입": EQUIPMENT };
 
 export function accountType(account: string): AccountType {
   // 감가상각누계액은 비품을 깎는 자산(잔액이 음수로 보인다)

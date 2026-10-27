@@ -63,3 +63,12 @@ describe("복식장부 자동 분개", () => {
     expect(journalProfit(tb.rows) - pnl.operatingProfit).toBe(pnlMaterial - material);
   });
 });
+
+describe("비품 구입", () => {
+  it("에어컨처럼 몇 년 쓰는 물건은 비용이 아니라 비품(자산)", () => {
+    const t: Transaction = { id: "a", date: "2025-06-11", payee: "에어컨구매비용", out: 1_980_000, in: 0, month: "2025-06", source: "bank", major: "제외", minor: "비품 구입", channel: null, review: null };
+    const e = buildJournal({ month: "2025-06", txs: [t], sales: [], channels: DEFAULT_CHANNELS, purchases: [], pnl: computePnl([t], []), vat: vatBasisFrom([]) });
+    expect(e[0].lines).toEqual([{ account: "비품", debit: 1_980_000, credit: 0 }, { account: BANK, debit: 0, credit: 1_980_000 }]);
+    expect(computePnl([t], []).operatingProfit).toBe(0);
+  });
+});
