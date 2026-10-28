@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { MoneyInput, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
-import { useDaily } from "@/components/useDaily";
+import { useMonthPnl } from "@/components/useMonthPnl";
 import PurchaseSection from "@/components/PurchaseSection";
 import { PriceTrendCard } from "@/components/PriceTrendCard";
 import { PriceSimCard } from "@/components/PriceSimCard";
@@ -25,7 +25,6 @@ const UNITS: BaseUnit[] = ["g", "kg", "ml", "L", "ea"];
 export default function CostingPage() {
   const { month, setMonth } = useMonth();
   const ledger = useLedger(month);
-  const daily = useDaily(month);
   const [items, setItems] = useState<Item[]>([]);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -57,13 +56,15 @@ export default function CostingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month]);
 
-  // 통장의 실제 재료비 = 매출원가 대분류 출금 합계
-  const actualCost = useMemo(() => ledger.txs.filter((t) => t.major === "매출원가").reduce((a, t) => a + t.out - t.in, 0), [ledger.txs]); // 환급 입금은 뺀다
-  // 그 달 총매출 (모든 채널). 통장 재료비는 배달앱 음식까지 만든 값이라 분모에 같이 넣는다
-  const totalRevenue = useMemo(() => daily.sales.reduce((a, s) => a + s.amount, 0), [daily.sales]);
+  // 실제 재료비·총매출은 손익 탭과 같은 숫자 (2026-10-28 사장님 — 전엔 통장 출금 ÷ 부가세 포함 매출이라 손익 원가율과 달랐다):
+  //  재료비 = 이 달에 받은 재료(매입 영수증, 아직 안 낸 외상 포함)·공급가·의제매입 뺀 것, 매출 = 모든 채널 공급가
+  const cur = useMonthPnl(month);
+  const supplyBasis = cur.pnl.vatBasis === "공급가";
+  const actualCost = cur.pnl.lines.find((l) => l.label === "매출원가")?.amount ?? 0;
+  const totalRevenue = cur.pnl.revenue - cur.pnl.otherIncome;
   const report = useMemo(
-    () => (pos && menus.length ? buildCostRateReport(pos, menus, recipes, items, actualCost, totalRevenue) : null),
-    [pos, menus, recipes, items, actualCost, totalRevenue],
+    () => (pos && menus.length && !cur.loading ? buildCostRateReport(pos, menus, recipes, items, actualCost, totalRevenue, supplyBasis ? 1.1 : 1) : null),
+    [pos, menus, recipes, items, actualCost, totalRevenue, supplyBasis, cur.loading],
   );
 
   async function handleFile(file: Blob, name: string) {
@@ -176,7 +177,7 @@ export default function CostingPage() {
         <>
           <section className="grid grid-cols-3 gap-2">
             <Stat label="이론 원가율 (레시피)" value={pctText(report.theoreticalRate)} sub={`이론 재료비 ${num(report.theoreticalCost)}`} />
-            <Stat label="실제 원가율 (통장)" value={pctText(report.actualRate)} sub={`재료비 출금 ${num(report.actualCost)}`} />
+            <Stat label="실제 원가율 (손익과 같음)" value={pctText(report.actualRate)} sub={`재료비 ${num(report.actualCost)}`} />
             <Stat
               label="차이"
               value={report.gapRate === null ? "–" : `${report.gapRate > 0 ? "+" : ""}${report.gapRate.toFixed(1)}%p`}
@@ -186,8 +187,8 @@ export default function CostingPage() {
           </section>
           {report.offPos > 0 && (
             <Notice tone="info">
-              실제 원가율은 <b>그 달 총매출 {won(report.revenueAmount)}</b> 기준이에요. 포스에 안 찍히는 매출(배달앱·손님 계좌이체·실물 현금·제로페이) <b>{won(report.offPos)}</b>도
-              그 음식을 만든 재료가 통장에서 나갔으니 같이 넣습니다. 포스 매출({won(report.salesAmount)})로만 나누면 원가율이 실제보다 높아 보여요.
+              실제 원가율은 손익 탭과 같은 숫자예요: <b>재료비 {won(report.actualCost)}</b>(이 달에 받은 재료, 아직 안 낸 외상 포함, 의제매입 뺀 공급가) ÷ <b>그 달 총매출 {won(report.revenueAmount)}</b>(부가세 뺀 공급가). 포스에 안 찍히는 매출(배달앱·손님 계좌이체·실물 현금·제로페이) <b>{won(report.offPos)}</b>도
+              그 음식을 만든 재료가 들어갔으니 같이 넣습니다. 이론 원가율도 포스 매출을 부가세 뺀 금액으로 나눠서 같은 잣대로 견줘요.
             </Notice>
           )}
           {report.coverage !== null && report.coverage < 100 && (

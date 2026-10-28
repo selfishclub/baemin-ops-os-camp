@@ -101,7 +101,10 @@ const pct = (a: number, b: number) => (b > 0 ? r1((a / b) * 100) : null);
 
 //  totalRevenue: 그 달 총매출(모든 채널). 통장 재료비는 배달앱 음식까지 만든 값이라
 //    포스 매출만 분모로 쓰면 실제 원가율이 부풀어 보인다. 안 넘기면 포스 매출을 쓴다.
-export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes: Recipe[], items: Item[], actualCost: number, totalRevenue?: number): CostRateReport {
+//  salesDivisor: 원가율을 공급가 매출로 낼 때 1.1 (2026-10-28 사장님 — 레시피 재료비·손익 재료비는 공급가인데
+//    포스 매출은 부가세 포함이라 이론 원가율이 약 10% 낮게 나왔다). 금액 칸은 포스 금액 그대로 보여 주고 비율·마진만 공급가로
+export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes: Recipe[], items: Item[], actualCost: number, totalRevenue?: number, salesDivisor = 1): CostRateReport {
+  const net = (n: number) => n / salesDivisor;
   const byCode = new Map(menus.filter((m) => m.posCode).map((m) => [m.posCode!, m]));
   const byName = new Map(menus.map((m) => [m.name.replace(/\s+/g, ""), m]));
   const recipeBy = pickRecipes(recipes, pos.periodEnd);
@@ -124,17 +127,17 @@ export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes:
       usage.set(item.id, u);
     }
     const theoretical = cost * l.quantity;
-    const unitPrice = l.quantity > 0 ? l.amount / l.quantity : 0;
-    return { code: l.code, name: l.name, menuId: menu.id, quantity: l.quantity, amount: l.amount, unitCost: cost, theoreticalCost: theoretical, costRate: pct(theoretical, l.amount), marginPerUnit: l.quantity > 0 ? Math.round(unitPrice - cost) : null, ...giveawayOf(menu, l.quantity, l.amount) };
+    const unitPrice = l.quantity > 0 ? net(l.amount) / l.quantity : 0;
+    return { code: l.code, name: l.name, menuId: menu.id, quantity: l.quantity, amount: l.amount, unitCost: cost, theoreticalCost: theoretical, costRate: pct(theoretical, net(l.amount)), marginPerUnit: l.quantity > 0 ? Math.round(unitPrice - cost) : null, ...giveawayOf(menu, l.quantity, l.amount) };
   });
 
   const covered = rows.filter((r) => r.unitCost !== null);
   const unmapped = rows.filter((r) => r.unitCost === null && r.amount > 0);
   const coveredAmount = covered.reduce((a, r) => a + r.amount, 0);
   const theoreticalCost = Math.round(covered.reduce((a, r) => a + r.theoreticalCost, 0));
-  const theoreticalRate = pct(theoreticalCost, coveredAmount);
+  const theoreticalRate = pct(theoreticalCost, net(coveredAmount));
   // 실제 재료비는 포스에 안 찍히는 매출(배달앱 등)의 음식까지 만든 값이라 그 매출도 분모에 넣는다
-  const revenueAmount = totalRevenue && totalRevenue > pos.totalAmount ? totalRevenue : pos.totalAmount;
+  const revenueAmount = totalRevenue && totalRevenue > net(pos.totalAmount) ? totalRevenue : Math.round(net(pos.totalAmount));
   const estimatedTotalCost = theoreticalRate === null ? theoreticalCost : Math.round((revenueAmount * theoreticalRate) / 100);
   const actualRate = pct(actualCost, revenueAmount);
   const priced = rows.filter((r) => r.listPrice !== null);
@@ -145,7 +148,7 @@ export function buildCostRateReport(pos: PosSalesReport, menus: Menu[], recipes:
     month: pos.month,
     salesAmount: pos.totalAmount,
     revenueAmount,
-    offPos: revenueAmount - pos.totalAmount,
+    offPos: Math.max(0, Math.round(revenueAmount - net(pos.totalAmount))),
     coveredAmount,
     coverage: pct(coveredAmount, pos.totalAmount),
     theoreticalCost,
