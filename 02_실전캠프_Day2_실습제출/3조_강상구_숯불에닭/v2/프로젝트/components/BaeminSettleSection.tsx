@@ -12,7 +12,7 @@ import { monthLabel } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 import type { ChannelSale, Month, Transaction } from "@/lib/types";
 
-const STATE_TONE: Record<DepositState, string> = { "입금 확인": "bg-emerald-100 text-emerald-800", "입금 대기": "bg-red-100 text-red-800", 예정: "bg-stone-100 text-stone-600", "입금 안 맞음": "bg-amber-100 text-amber-900" };
+const STATE_TONE: Record<DepositState, string> = { "출금 확인 필요": "bg-amber-100 text-amber-900", "입금 확인": "bg-emerald-100 text-emerald-800", "입금 대기": "bg-red-100 text-red-800", 예정: "bg-stone-100 text-stone-600", "입금 안 맞음": "bg-amber-100 text-amber-900" };
 
 // 정산 탭 — 배민 정산 명세(자동 수집): 정산 건별 입금 확인 · 주문 1건당 쪼개기 · 광고 효율.
 // 유승균 사장님 배달이익노트 방식. 자료는 리뷰 수집기의 npm run collect:baemin-settle → export:ledger 로 온다.
@@ -88,8 +88,8 @@ export function BaeminSettleSection({ platform = "baemin", month, txs, nextTxs, 
           <>
             {platform === "coupang" && (b.balance || (b.expected ?? []).length > 0) && (
               <p className="num rounded-lg bg-stone-50 px-3 py-2 text-sm">
-                {b.balance && <>정산 예정 금액 <b>{won(b.balance.expected)}</b> · 출금 가능 <b>{won(b.balance.withdrawable)}</b></>}
-                {(b.expected ?? []).length > 0 && <span className="text-xs text-stone-500"> · 다음 입금 {b.expected!.map((e) => `${e.date.slice(5)} ${num(e.amount)}`).join(", ")}</span>}
+                {b.balance && <>정산 예정 금액 <b>{won(b.balance.expected)}</b> · 출금 가능 <b>{won(b.balance.withdrawable)}</b> · 출금 신청 여부 확인 필요</>}
+                {(b.expected ?? []).length > 0 && <span className="text-xs text-stone-500"> · 다음 정산 예정 {b.expected!.map((e) => `${e.date.slice(5)} ${num(e.amount)}`).join(", ")}</span>}
               </p>
             )}
             {/* 정산 건별 입금 */}
@@ -147,7 +147,7 @@ export function BaeminSettleSection({ platform = "baemin", month, txs, nextTxs, 
                 </div>
               )}
               <p className="mt-1 text-xs text-stone-500">
-                <b className="text-red-700">입금 대기</b>는 예정일이 지났는데 같은 금액의 {P.short} 입금이 통장(이 달·다음 달 초)에 없는 것. 올리기 탭에서 그 기간 통장 내역을 올렸는지 먼저 보고, 그래도 없으면 {P.short} 정산 화면에서 확인하세요.{platform === "coupang" && " 쿠팡이츠는 주문별 정산 예정일로 묶은 것이라, 실제 입금은 며칠치가 합쳐질 수 있어요 (직접 출금 신청 뒤 입금)."}
+                {platform === "coupang" ? <>“출금 확인 필요”는 정산일이 지났지만 통장 입금이 확인되지 않은 건이에요. 출금 가능액은 위 수집 시점 기준이며 출금 신청 여부는 수집하지 않았어요. 쿠팡이츠에서 출금·처리 내역을 확인하세요. 실제 입금은 여러 날 정산금이 합쳐질 수 있어요.</> : <><b className="text-red-700">입금 대기</b>는 예정일이 지났는데 같은 금액의 {P.short} 입금이 통장(이 달·다음 달 초)에 없는 것. 올리기 탭에서 그 기간 통장 내역을 올렸는지 먼저 보고, 그래도 없으면 {P.short} 정산 화면에서 확인하세요.</>}
               </p>
             </div>
 

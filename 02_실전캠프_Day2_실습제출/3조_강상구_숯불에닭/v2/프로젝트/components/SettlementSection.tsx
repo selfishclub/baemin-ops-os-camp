@@ -263,7 +263,7 @@ export default function SettlementSection({
                       <th className="text-right">확인된 입금</th>
                       <th className="text-right">수수료</th>
                       <th className="text-right">수수료율</th>
-                      <th className="text-right">미입금(예정)</th>
+                      <th className="text-right">예정·출금 확인</th>
                       <th className="text-right">미입금(지남)</th>
                     </tr>
                   </thead>
@@ -445,7 +445,7 @@ export default function SettlementSection({
                 </Notice>
               )}
               <p className="text-xs text-stone-500">
-                수수료 = 매출 − 그 매출분의 통장 입금. “차이”는 입금이 매출의 70%(배달앱은 50%) 미만이거나 매출보다 많을 때(추가 공제·누락·다른 돈이 섞임). “예정”은 입금일이 아직 안 온 것, “미입금”은 입금일이 지났는데 통장에 없는 것. 직접 출금 앱의 “미입금”은 아직 출금 신청을 안 한 것일 수 있어요. 입금이 매출보다 많은 “차이” 줄은 “환급 포함?”을 눌러 섞인 돈을 적어 두면 “일치”로 바뀌고, 그 환급은 그 달 수수료에서 빠져요. 하루 이틀 늦게 몰아 들어온 카드 입금은 앞 묶음과 자동으로 합쳐요.
+                수수료 = 매출 − 그 매출분의 통장 입금. “차이”는 입금이 매출의 70%(배달앱은 50%) 미만이거나 매출보다 많을 때(추가 공제·누락·다른 돈이 섞임). “예정”은 입금일이 아직 안 온 것, “미입금”은 입금일이 지났는데 통장에 없는 것. 직접 출금 앱은 “출금 확인 필요”로 따로 표시해요. 정산일만으로 입금 지연을 판단하지 않으며, 출금 신청 여부와 처리 내역은 앱에서 확인해야 해요. 입금이 매출보다 많은 “차이” 줄은 “환급 포함?”을 눌러 섞인 돈을 적어 두면 “일치”로 바뀌고, 그 환급은 그 달 수수료에서 빠져요. 하루 이틀 늦게 몰아 들어온 카드 입금은 앞 묶음과 자동으로 합쳐요.
               </p>
             </>
           )}
@@ -459,6 +459,6 @@ export default function SettlementSection({
 
 function StatusChip({ status }: { status: string }) {
   const style =
-    { 일치: "bg-emerald-100 text-emerald-800", 차이: "bg-red-100 text-red-700", 미입금: "bg-red-100 text-red-700", 예정: "bg-stone-200 text-stone-600", 매출없음: "bg-stone-100 text-stone-400" }[status] ?? "";
+    { "출금 확인 필요": "bg-amber-100 text-amber-900", 일치: "bg-emerald-100 text-emerald-800", 차이: "bg-red-100 text-red-700", 미입금: "bg-red-100 text-red-700", 예정: "bg-stone-200 text-stone-600", 매출없음: "bg-stone-100 text-stone-400" }[status] ?? "";
   return <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${style}`}>{status}</span>;
 }

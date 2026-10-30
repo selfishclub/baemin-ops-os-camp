@@ -158,10 +158,10 @@ describe("직접 출금 신청하는 앱 (쿠팡이츠)", () => {
     expect(merged.payout).toBe("2026-09-15");
     expect(merged.status).toBe("일치");
     expect(r.unmatchedDeposits).toEqual([]); // 9/3 입금은 지난달 주문분 — 이 달 목록에 띄우지 않는다
-    expect(r.settlements.find((s) => s.from === "2026-09-14")!.status).toBe("미입금"); // 9/18 정산인데 아직 출금 안 함
+    expect(r.settlements.find((s) => s.from === "2026-09-14")!.status).toBe("출금 확인 필요"); // 신청 여부를 모르면 입금 지연으로 단정하지 않음
     expect(r.settlements.find((s) => s.from === "2026-09-16")!.status).toBe("예정");
-    expect(r.missing).toBe(79_000);
-    expect(r.pending).toBe(20_000);
+    expect(r.missing).toBe(0);
+    expect(r.pending).toBe(99_000); // 출금 확인분도 미수로 보존
   });
   it("일반 규칙이라도 하루 늦게 두 날치가 같이 들어오면 앞 묶음과 합친다", () => {
     const txs = [tx("2026-09-15", "coupang", 89_662)];

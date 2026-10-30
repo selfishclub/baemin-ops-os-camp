@@ -105,7 +105,7 @@ export interface Settlement {
   deposit: number; // 그날 통장에 실제로 들어온 돈 (같은 채널)
   fee: number; // sales − deposit (입금이 있을 때만)
   feeRate: number | null; // %
-  status: "일치" | "차이" | "미입금" | "예정" | "매출없음";
+  status: "일치" | "차이" | "미입금" | "예정" | "매출없음" | "출금 확인 필요";
   extra?: number; // 입금에 섞인 환급 등 (표시용). fee·status는 이걸 뺀 입금으로 계산
   note?: string;
 }
@@ -123,7 +123,7 @@ export interface ChannelSettlementSummary {
   deposited: number; // 그중 실제 입금 확인된 정산금액
   fee: number;
   feeRate: number | null; // 입금 확인된 분에 대한 수수료율
-  pending: number; // 아직 입금일이 안 온 매출 (월말 미입금액에 해당)
+  pending: number; // 입금 예정 또는 직접 출금 확인이 필요한 매출 (월말 미입금액에 해당)
   missing: number; // 입금일이 지났는데 안 들어온 매출
   settlements: Settlement[];
   unmatchedDeposits: { date: string; amount: number }[]; // 매출 묶음과 짝이 안 맞는 입금
@@ -343,7 +343,7 @@ function splitSameDayDeposits(
 // 직접 출금 신청하는 앱: 입금을 날짜순으로 보며, 그 입금일까지 정산 예정일이 지난(아직 안 붙은) 매출 묶음을 한꺼번에 그 입금에 붙인다.
 //  - 하루 늦게 출금해도, 이틀치를 한 번에 출금해도 짝이 맞는다.
 //  - 붙일 묶음이 없는 입금(지난달 주문분 등)은 "짝이 안 맞는 입금"으로 남긴다.
-//  - 예정일이 지났는데 아직 입금이 없는 묶음은 "미입금" — 출금 신청을 아직 안 한 것일 수 있다.
+//  - 정산일이 지나도 출금 신청·처리 여부는 알 수 없다. 입금 지연 대신 "출금 확인 필요"로 남긴다.
 function settleManual(
   channel: ChannelId,
   month: Month,
@@ -381,7 +381,7 @@ function settleManual(
   }
   for (const b of bundles) {
     if (b.claimed) continue;
-    settlements.push({ channel, from: b.from, to: b.to, sales: b.sales, payout: b.payout, deposit: 0, fee: 0, feeRate: null, status: b.sales === 0 ? "매출없음" : b.payout > lastBankDate ? "예정" : "미입금" });
+    settlements.push({ channel, from: b.from, to: b.to, sales: b.sales, payout: b.payout, deposit: 0, fee: 0, feeRate: null, status: b.sales === 0 ? "매출없음" : b.payout > lastBankDate ? "예정" : "출금 확인 필요" });
   }
   settlements.sort((a, b) => a.from.localeCompare(b.from));
   const deposited = settlements.filter((s) => s.status === "일치" || s.status === "차이");
@@ -394,7 +394,7 @@ function settleManual(
     deposited: deposited.reduce((a, s) => a + s.deposit, 0) + refunds,
     fee,
     feeRate: salesDeposited > 0 ? round1((fee / salesDeposited) * 100) : null,
-    pending: settlements.filter((s) => s.status === "예정").reduce((a, s) => a + s.sales, 0),
+    pending: settlements.filter((s) => s.status === "예정" || s.status === "출금 확인 필요").reduce((a, s) => a + s.sales, 0),
     missing: settlements.filter((s) => s.status === "미입금").reduce((a, s) => a + s.sales, 0),
     settlements,
     unmatchedDeposits,

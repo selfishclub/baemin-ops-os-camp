@@ -6,7 +6,7 @@
 import type { BaeminExport, BaeminOrderDay, BaeminSettlement } from "../export/types";
 import type { Transaction } from "../types";
 
-export type DepositState = "입금 확인" | "입금 대기" | "예정" | "입금 안 맞음";
+export type DepositState = "입금 확인" | "입금 대기" | "예정" | "입금 안 맞음" | "출금 확인 필요";
 
 export interface SettlementRow extends BaeminSettlement {
   state: DepositState;
@@ -90,7 +90,7 @@ export function matchSettlements(settlements: BaeminSettlement[], txs: Transacti
     if (due && lastBankDate && lastBankDate < s.depositDueDate) {
       return { ...s, state: "예정" as const, bankDate: null, bankAmount: null, bankGap: null, daysLate: null, note: `통장 자료가 ${lastBankDate.slice(5)}까지라 아직 확인 전이에요` };
     }
-    return { ...s, state: due ? ("입금 대기" as const) : ("예정" as const), bankDate: null, bankAmount: null, bankGap: null, daysLate: null };
+    return { ...s, state: due ? (channelId === "coupang" ? ("출금 확인 필요" as const) : ("입금 대기" as const)) : ("예정" as const), bankDate: null, bankAmount: null, bankGap: null, daysLate: null };
   });
 }
 

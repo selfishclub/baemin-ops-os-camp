@@ -100,12 +100,24 @@ describe("확인 기록 (자동으로 못 맞춘 정산 건)", () => {
   const base = { giveId: "coupang-2026-10-01", depositDueDate: "2026-10-01", status: "정산완료", periodStart: "2026-09-24", periodEnd: "2026-09-26", depositAmount: 114_323, adCost: 0, adDaily: [], adjustment: 0, orders: 3 };
   it("입금 대기 건에 기록이 있으면 입금 확인으로, 메모와 실제 입금일을 단다", () => {
     const rows = matchSettlements([base], [], "2026-10-19", "coupang");
-    expect(rows[0].state).toBe("입금 대기");
+    expect(rows[0].state).toBe("출금 확인 필요");
     const out = applyConfirms(rows, [{ channel: "coupang", giveId: "coupang-2026-10-01", bankDate: "2026-10-01", note: "9/23~26분 합쳐 214,289원" }], "coupang");
     expect(out[0]).toMatchObject({ state: "입금 확인", bankDate: "2026-10-01", daysLate: 0, note: "9/23~26분 합쳐 214,289원" });
   });
   it("다른 채널 기록이나 없는 건은 그대로", () => {
     const rows = matchSettlements([base], [], "2026-10-19", "coupang");
-    expect(applyConfirms(rows, [{ channel: "baemin", giveId: "coupang-2026-10-01", bankDate: null, note: "" }], "coupang")[0].state).toBe("입금 대기");
+    expect(applyConfirms(rows, [{ channel: "baemin", giveId: "coupang-2026-10-01", bankDate: null, note: "" }], "coupang")[0].state).toBe("출금 확인 필요");
+  });
+});
+
+describe("쿠팡이츠 직접 출금 확인", () => {
+  it("정산일이 지나도 입금 지연으로 단정하지 않고 실제 통장 입금만 확인 처리한다", () => {
+    const source = [st("due", "2026-10-29", 123000), st("future", "2026-11-03", 45000)];
+    const pending = matchSettlements(source, [], "2026-10-30", "coupang");
+    expect(pending.map(r => r.state)).toEqual(["출금 확인 필요", "예정"]);
+    expect(pending[0].bankAmount).toBeNull();
+    const paid = matchSettlements(source, [tx("2026-10-30", 123000, "coupang")], "2026-10-30", "coupang");
+    expect(paid[0]).toMatchObject({state: "입금 확인", bankAmount: 123000});
+    expect(matchSettlements(source, [], "2026-10-30", "baemin")[0].state).toBe("입금 대기");
   });
 });
