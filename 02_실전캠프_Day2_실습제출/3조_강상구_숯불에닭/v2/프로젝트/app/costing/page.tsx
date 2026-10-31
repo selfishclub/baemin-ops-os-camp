@@ -14,8 +14,10 @@ import { PURCHASES_KEY_PREFIX, costFromPurchases, type Purchase } from "@/lib/co
 import { defaultFeeRatePct } from "@/lib/costing/priceSim";
 import { mergePosReports, parsePosAbcGrid, PosParseError } from "@/lib/costing/okpos";
 import sample from "@/lib/costing/sample.json";
-import { ITEMS_KEY, MENUS_KEY, POS_KEY_PREFIX, RECIPES_KEY, type BaseUnit, type Item, type Menu, type PosSalesReport, type Recipe } from "@/lib/costing/types";
-import { num, pctText, won, parseNum, fileDate } from "@/lib/format";
+import StockCountSection from "@/components/StockCountSection";
+import { guessPackSizes, stockAdjustedCost, valueStock } from "@/lib/costing/stock";
+import { ITEMS_KEY, MENUS_KEY, POS_KEY_PREFIX, RECIPES_KEY, STOCK_KEY_PREFIX, type BaseUnit, type Item, type Menu, type PosSalesReport, type Recipe, type StockCount } from "@/lib/costing/types";
+import { num, pctText, signed, won, parseNum, fileDate } from "@/lib/format";
 import { monthLabel, prevMonth } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 
@@ -32,22 +34,33 @@ export default function CostingPage() {
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "warn"; text: string } | null>(null);
-  const [view, setView] = useState<"report" | "purchases" | "setup">("report");
+  const [stock, setStock] = useState<StockCount | null>(null);
+  const [prevStock, setPrevStock] = useState<StockCount | null>(null);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [view, setView] = useState<"report" | "purchases" | "stock" | "setup">("report");
   const [help, setHelp] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function load() {
     const store = getStore();
-    const [i, m, r, p] = await Promise.all([
+    // 매입 영수증은 박스 환산("1박스 = 10kg")을 뽑는 데 쓴다 — 석 달이면 넉넉하다
+    const back = [month, prevMonth(month), prevMonth(prevMonth(month))];
+    const [i, m, r, p, s, ps] = await Promise.all([
       store.getSetting<Item[]>(ITEMS_KEY),
       store.getSetting<Menu[]>(MENUS_KEY),
       store.getSetting<Recipe[]>(RECIPES_KEY),
       store.getSetting<PosSalesReport>(POS_KEY_PREFIX + month),
+      store.getSetting<StockCount>(STOCK_KEY_PREFIX + month),
+      store.getSetting<StockCount>(STOCK_KEY_PREFIX + prevMonth(month)),
     ]);
+    const purs = await Promise.all(back.map((mm) => store.getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + mm)));
     setItems(i ?? []);
     setMenus(m ?? []);
     setRecipes(r ?? []);
     setPos(p ?? null);
+    setStock(s ?? null);
+    setPrevStock(ps ?? null);
+    setPurchases(purs.flatMap((x) => x ?? []));
     setLoaded(true);
   }
   useEffect(() => {
@@ -65,6 +78,24 @@ export default function CostingPage() {
   const report = useMemo(
     () => (pos && menus.length && !cur.loading ? buildCostRateReport(pos, menus, recipes, items, actualCost, totalRevenue, supplyBasis ? 1.1 : 1) : null),
     [pos, menus, recipes, items, actualCost, totalRevenue, supplyBasis, cur.loading],
+  );
+
+  // 재고 반영 원가 — 매입 + 지난달 말 재고 − 이번 달 말 재고. 손익은 그대로 두고 여기서만 보여 준다
+  const packSizes = useMemo(() => guessPackSizes(purchases), [purchases]);
+  const stockValue = useMemo(() => valueStock(stock, items, packSizes), [stock, items, packSizes]);
+  const prevStockValue = useMemo(() => valueStock(prevStock, items, packSizes), [prevStock, items, packSizes]);
+  const stockCost = useMemo(
+    () =>
+      report
+        ? stockAdjustedCost({
+            purchased: report.actualCost,
+            opening: prevStockValue?.total ?? null,
+            closing: stockValue?.total ?? null,
+            revenue: report.revenueAmount,
+            theoretical: report.estimatedTotalCost,
+          })
+        : null,
+    [report, prevStockValue, stockValue],
   );
 
   async function handleFile(file: Blob, name: string) {
@@ -126,6 +157,9 @@ export default function CostingPage() {
             <button className={`rounded-lg px-3 py-1.5 ${view === "purchases" ? "bg-orange-100 font-bold text-orange-800" : "font-semibold text-stone-600 hover:bg-stone-100"}`} onClick={() => setView("purchases")}>
               매입 영수증
             </button>
+            <button className={`rounded-lg px-3 py-1.5 ${view === "stock" ? "bg-orange-100 font-bold text-orange-800" : "font-semibold text-stone-600 hover:bg-stone-100"}`} onClick={() => setView("stock")}>
+              월말 재고
+            </button>
             <button className={`rounded-lg px-3 py-1.5 ${view === "setup" ? "bg-orange-100 font-bold text-orange-800" : "font-semibold text-stone-600 hover:bg-stone-100"}`} onClick={() => setView("setup")}>
               품목·레시피 설정
             </button>
@@ -146,7 +180,9 @@ export default function CostingPage() {
               <li>
                 <b>나오는 것</b> 메뉴별 판매량 × 레시피 원가 = <b>이론 재료비·이론 원가율</b>. 올리기 탭의 통장 재료비(매출원가)와 나란히 놓고 차이를 보여 줘요
               </li>
-              <li>차이가 크면 “시세가 올랐나, 로스가 늘었나”를 봐야 해요. 그 분해는 입고 단가·실사 재고가 있어야 해서 다음 버전(매장관리자)에서 해요.</li>
+              <li>
+                <b>넣는 것 ③</b> (달마다 한 번) <b>월말 재고</b> — 냉장고·창고에 남은 것을 박스 + 낱개로 적으면, 매입이 아니라 실제로 쓴 재료로 원가율이 나와요. 차이가 “시세가 올랐나, 많이 버렸나, 사뒀을 뿐인가”로 갈립니다
+              </li>
             </ul>
           </div>
         )}
@@ -198,9 +234,46 @@ export default function CostingPage() {
           )}
           {report.gapRate !== null && report.gapRate > 3 && (
             <Notice tone="warn">
-              통장 재료비가 레시피 기준보다 <b>{report.gapRate.toFixed(1)}%p</b>({won(report.gap)}) 많아요. 원인은 셋 중 하나예요: ① 재료값이 올랐다(시세) ② 레시피보다 많이 쓰거나 버렸다(로스) ③ 이달에 산 재료가 아직 냉장고에 있다(재고). 다음 버전에서 입고·실사를 붙이면 셋을 나눠 보여 드려요.
+              통장 재료비가 레시피 기준보다 <b>{report.gapRate.toFixed(1)}%p</b>({won(report.gap)}) 많아요. 원인은 셋 중 하나예요: ① 재료값이 올랐다(시세) ② 레시피보다 많이 쓰거나 버렸다(로스) ③ 이달에 산 재료가 아직 냉장고에 있다(재고). <b>③은 “월말 재고” 탭에서 재고를 세면 갈라집니다.</b>
             </Notice>
           )}
+
+          {stockCost &&
+            (stockCost.adjusted === null ? (
+              <Notice tone="info">
+                <b>월말 재고</b> 탭에서 냉장고·창고를 세어 두면, 매입이 아니라 <b>실제로 쓴 재료</b>로 원가율이 나와요 (매입 + 지난달 말 재고 − 이번 달 말 재고). 그래야 “이달에 많이 사뒀을 뿐”인지 “정말 많이 쓴 것”인지 갈립니다.
+                {stockValue && !prevStockValue && ` 지금은 ${monthLabel(prevMonth(month))} 말 재고가 없어서 이번 달은 못 내요 — 이번 달 것을 세어 두면 다음 달부터 나와요.`}
+              </Notice>
+            ) : (
+              <section className="card space-y-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="text-base font-bold">
+                    재고 반영 원가율 <span className="text-xs font-normal text-stone-500">실제로 쓴 재료 기준</span>
+                  </h2>
+                  <span className="text-xs text-stone-500">
+                    {monthLabel(prevMonth(month)).slice(6)} 말 {num(stockCost.opening!)} → {monthLabel(month).slice(6)} 말 {num(stockCost.closing!)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Stat label="재고 반영 원가율" value={pctText(stockCost.rate)} sub={`쓴 재료 ${num(stockCost.adjusted)}`} />
+                  <Stat
+                    label="재고 늘고 줄은 것"
+                    value={signed(stockCost.change!)}
+                    sub={stockCost.change! > 0 ? "사서 쌓아 둔 몫" : stockCost.change! < 0 ? "쌓아 둔 걸 꺼내 쓴 몫" : "그대로"}
+                  />
+                  <Stat
+                    label="시세·로스"
+                    value={stockCost.lossRate === null ? "–" : `${stockCost.lossRate > 0 ? "+" : ""}${stockCost.lossRate.toFixed(1)}%p`}
+                    sub={`${stockCost.loss! > 0 ? "+" : ""}${num(stockCost.loss!)}원`}
+                    tone={stockCost.lossRate === null ? undefined : stockCost.lossRate > 3 ? "bad" : stockCost.lossRate < -3 ? "good" : undefined}
+                  />
+                </div>
+                <p className="rounded-lg bg-stone-50 px-2 py-1.5 text-xs text-stone-600">
+                  <b>쓴 재료 {won(stockCost.adjusted)}</b> = 매입 {num(stockCost.purchased)} + 지난달 말 재고 {num(stockCost.opening!)} − 이번 달 말 재고 {num(stockCost.closing!)}. 여기서 레시피 이론 사용량 {num(stockCost.theoretical)}을 빼면 재고가 아닌 차이(시세가 올랐거나 레시피보다 많이 쓴 몫)만 남아요.
+                  {" "}손익 탭의 매출원가는 세무사 장부와 같게 <b>매입 기준 {num(stockCost.purchased)}</b> 그대로예요.
+                </p>
+              </section>
+            ))}
 
           {report.pricedMenus > 0 && (
             <section className="card">
@@ -296,7 +369,8 @@ export default function CostingPage() {
 
       {view === "purchases" && <PurchaseSection month={month} items={items} onItemsChange={load} />}
       {view === "purchases" && <PriceTrendCard month={month} items={items} />}
-      {view === "setup" && <Setup items={items} menus={menus} recipes={recipes} onChange={load} />}
+      {view === "stock" && <StockCountSection month={month} items={items} onItemsChange={load} />}
+      {view === "setup" && <Setup items={items} menus={menus} recipes={recipes} packSizes={packSizes} onChange={load} />}
     </>
   );
 }
@@ -312,7 +386,7 @@ function Stat({ label, value, sub, tone }: { label: string; value: string; sub: 
 }
 
 // 품목·메뉴·레시피 설정. 실제 레시피와 단가는 내 PC 모드에서만 넣는다.
-function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu[]; recipes: Recipe[]; onChange: () => Promise<void> }) {
+function Setup({ items, menus, recipes, packSizes, onChange }: { items: Item[]; menus: Menu[]; recipes: Recipe[]; packSizes: Map<string, number>; onChange: () => Promise<void> }) {
   const importRef = useRef<HTMLInputElement>(null);
   const [ioNote, setIoNote] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [itemName, setItemName] = useState("");
@@ -374,6 +448,11 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
 
   async function setItemCostOf(id: string, cost: number) {
     await store.saveSetting(ITEMS_KEY, items.map((i) => (i.id === id ? { ...i, standardCost: cost } : i)));
+    await onChange();
+  }
+  // 월말 재고 실사에 올릴 품목과 박스 환산 (lib/costing/stock.ts)
+  async function patchItem(id: string, patch: Partial<Item>) {
+    await store.saveSetting(ITEMS_KEY, items.map((i) => (i.id === id ? { ...i, ...patch } : i)));
     await onChange();
   }
   async function addMenu() {
@@ -488,6 +567,40 @@ function Setup({ items, menus, recipes, onChange }: { items: Item[]; menus: Menu
                 />
                 % — 뼈·껍질처럼 버리는 몫이 있으면 넣으세요
                 {i.yieldRate ? <b className="num text-stone-700">쓰는 단가 {num(Math.round(i.standardCost / i.yieldRate))}원/{i.baseUnit}</b> : null}
+              </label>
+              <label className="col-span-3 -mt-1 flex flex-wrap items-center gap-1 text-xs text-stone-500">
+                <input type="checkbox" className="h-3.5 w-3.5 accent-orange-600" checked={!!i.countable} onChange={(e) => void patchItem(i.id, { countable: e.target.checked })} />
+                월말에 세는 품목
+                {i.countable && (
+                  <>
+                    <span className="text-stone-400">· 1</span>
+                    <input
+                      aria-label={`${i.name} 박스 이름`}
+                      className="field w-12 px-1.5 py-0.5 text-center text-xs"
+                      placeholder="박스"
+                      defaultValue={i.packName ?? ""}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        if (v !== (i.packName ?? "")) void patchItem(i.id, { packName: v || undefined });
+                      }}
+                    />
+                    =
+                    <input
+                      aria-label={`${i.name} 박스 환산`}
+                      inputMode="decimal"
+                      className="field num w-14 px-1.5 py-0.5 text-right text-xs"
+                      placeholder={num(packSizes.get(i.id) ?? 1)}
+                      defaultValue={i.packSize ? String(i.packSize) : ""}
+                      onBlur={(e) => {
+                        const t = e.target.value.replace(/[^\d.]/g, "");
+                        const v = t ? Number(t) : undefined;
+                        if (v !== i.packSize) void patchItem(i.id, { packSize: Number.isFinite(v) && v! > 1 ? v : undefined });
+                      }}
+                    />
+                    {i.baseUnit}
+                    {!i.packSize && packSizes.has(i.id) && <span className="text-stone-400">(최근 매입에서: {num(packSizes.get(i.id)!)})</span>}
+                  </>
+                )}
               </label>
             </li>
           ))}

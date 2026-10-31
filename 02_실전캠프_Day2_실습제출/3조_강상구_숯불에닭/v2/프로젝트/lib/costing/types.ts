@@ -16,6 +16,10 @@ export interface Item {
   //  매입 단가(standardCost)는 산 값 그대로 두고, 레시피 원가를 낼 때만 수율로 나눠 쓴다.
   //  예: 원육 8,676원/kg · 수율 85% → 실제로 쓰는 1kg은 10,207원
   yieldRate?: number;
+  // 월말 재고 실사 (lib/costing/stock.ts)
+  countable?: boolean; // 월말에 세는 품목인가 — 냉동 원육·소스·주류·숯처럼 쌓이는 것만 켠다
+  packSize?: number; // 1박스가 baseUnit 몇 개인가. 비워 두면 최근 매입 영수증에서 짐작한다
+  packName?: string; // 박스를 부르는 말. 비우면 "박스" (품목에 따라 팩·포·판)
 }
 
 export interface Menu {
@@ -57,7 +61,23 @@ export interface PosSalesReport {
   totalQuantity: number;
 }
 
+// 월말 재고 실사 한 줄. packs·units가 둘 다 null이면 "안 센 품목"이다 (0은 "세 봤는데 없다")
+export interface StockCountLine {
+  itemId: string;
+  packs: number | null; // 박스 수
+  units: number | null; // 낱개 (baseUnit 기준)
+}
+
+// 그 달 말 재고 — 달마다 한 장
+export interface StockCount {
+  month: string; // "2026-10" (= 10월 말 재고)
+  countedOn: string; // 실제로 센 날 "2026-11-01"
+  lines: StockCountLine[];
+  note?: string;
+}
+
 export const ITEMS_KEY = "costing_items";
 export const MENUS_KEY = "costing_menus";
 export const RECIPES_KEY = "costing_recipes";
 export const POS_KEY_PREFIX = "pos_sales_"; // + month
+export const STOCK_KEY_PREFIX = "stock_count_"; // + month
