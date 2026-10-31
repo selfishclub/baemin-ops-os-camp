@@ -13,8 +13,8 @@ const RECURRING_MINORS: Record<string, string[]> = { 영업비: ["지급수수�
 const GRACE_DAYS = 3;
 
 export interface MissingFixed {
-  key: string; // 거래처를 알아보는 글자 (규칙 키워드, 없으면 거래처 이름)
-  label: string; // 화면에 보일 이름
+  key: string; // 거래처를 알아보는 글자 (숫자·공백을 뗀 것 — 이름에 달이 박혀도 같은 거래처로 본다)
+  label: string; // 화면에 보일 이름 (지난달 통장에 찍힌 그대로)
   prevAmount: number;
   prevDate: string;
   expectedBy: string; // 이 날까지 통장을 올렸는데 없으면 알린다
@@ -23,6 +23,11 @@ export interface MissingFixed {
 const isRecurring = (t: Transaction) =>
   !!t.major && (RECURRING_MAJORS.includes(t.major) || (RECURRING_MINORS[t.major]?.includes(t.minor ?? "") ?? false));
 
+// 거래처를 맞출 때 쓰는 글자 — 숫자·공백·괄호를 뗀다.
+// 통장에 "전기료 전기요금09월", "통신료 KT0213399709"처럼 달이 박혀 찍히는 곳이 있어서,
+// 글자 그대로 맞추면 매달 다른 거래처로 보여 "안 나갔다"고 잘못 알린다.
+// 규칙 탭에도 달마다 따로 만들어진 키워드("…09월", "…10월")가 남아 있어서 규칙 쪽도 같이 뗀다.
+// (2026-11-01 10월 손익에서 전기요금·KT가 나갔는데도 빠졌다고 떴다.)
 const normalize = (s: string) => s.replace(/[\s\d\-_.()/]+/g, "");
 
 function addDays(date: string, days: number): string {
@@ -39,16 +44,21 @@ function nextMonthSameDay(date: string): string {
 }
 
 export function missingFixedCosts(prevTxs: Transaction[], txs: Transaction[], rules: Rule[], lastBankDate: string, fixedCosts: FixedCost[] = []): MissingFixed[] {
-  const keyOf = (t: Transaction) => rules.find((r) => r.direction === "out" && t.payee.includes(r.keyword))?.keyword ?? normalize(t.payee);
-  const covered = (key: string) => fixedCosts.some((c) => c.active && c.payeeKeyword.trim() && (key.includes(c.payeeKeyword.trim()) || c.payeeKeyword.includes(key)));
+  const nameOf = (t: Transaction) => rules.find((r) => r.direction === "out" && t.payee.includes(r.keyword))?.keyword ?? t.payee;
+  const keyOf = (t: Transaction) => normalize(nameOf(t));
+  const covered = (key: string) =>
+    fixedCosts.some((c) => {
+      const k = normalize(c.payeeKeyword.trim());
+      return c.active && !!k && (key.includes(k) || k.includes(key));
+    });
 
-  const prev = new Map<string, { amount: number; date: string }>();
+  const prev = new Map<string, { amount: number; date: string; label: string }>();
   for (const t of prevTxs) {
     if (t.out <= 0 || !isRecurring(t)) continue;
     const key = keyOf(t);
     if (!key) continue;
     const p = prev.get(key);
-    prev.set(key, { amount: (p?.amount ?? 0) + t.out - t.in, date: p && p.date > t.date ? p.date : t.date });
+    prev.set(key, { amount: (p?.amount ?? 0) + t.out - t.in, date: p && p.date > t.date ? p.date : t.date, label: p?.label ?? nameOf(t) });
   }
   const nowKeys = new Set(txs.filter((t) => t.out > 0).map(keyOf));
 
@@ -57,7 +67,7 @@ export function missingFixedCosts(prevTxs: Transaction[], txs: Transaction[], ru
     if (p.amount <= 0 || nowKeys.has(key) || covered(key)) continue;
     const expectedBy = addDays(nextMonthSameDay(p.date), GRACE_DAYS);
     if (!lastBankDate || lastBankDate < expectedBy) continue;
-    out.push({ key, label: key, prevAmount: p.amount, prevDate: p.date, expectedBy });
+    out.push({ key, label: p.label, prevAmount: p.amount, prevDate: p.date, expectedBy });
   }
   return out.sort((a, b) => b.prevAmount - a.prevAmount);
 }

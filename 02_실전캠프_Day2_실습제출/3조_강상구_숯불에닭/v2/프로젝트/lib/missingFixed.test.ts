@@ -39,6 +39,23 @@ describe("지난달엔 있었는데 이번 달엔 없는 고정비", () => {
     expect(missingFixedCosts(prev, [], rules, "2026-10-31", fc).map((x) => x.key)).toEqual(["통신요금"]);
   });
 
+  it("이름에 달이 박힌 거래처는 규칙이 달마다 따로 있어도 같은 곳으로 본다", () => {
+    // 통장에 "전기료 전기요금09월" → "전기료 전기요금10월"로 찍히고, 규칙도 달마다 따로 만들어져 있다.
+    const monthRules: Rule[] = [
+      { id: "e9", keyword: "전기료 전기요금09월", direction: "out", major: "영업비", minor: "수도광열비", channel: null },
+      { id: "e10", keyword: "전기료 전기요금10월", direction: "out", major: "영업비", minor: "수도광열비", channel: null },
+    ];
+    const p = [tx("2026-09", "2026-09-28", "전기료 전기요금09월", 1_029_510, "영업비", "수도광열비")];
+    const n = [tx("2026-10", "2026-10-26", "전기료 전기요금10월", 500_360, "영업비", "수도광열비")];
+    expect(missingFixedCosts(p, n, monthRules, "2026-10-31")).toHaveLength(0);
+  });
+
+  it("정말 빠진 건 통장에 찍힌 이름으로 보여 준다", () => {
+    const p = [tx("2026-09", "2026-09-17", "자동납부 청주대학교", 10_000, "영업비", "지급수수료")];
+    const m = missingFixedCosts(p, [], rules, "2026-10-31");
+    expect(m.map((x) => x.label)).toEqual(["자동납부 청주대학교"]);
+  });
+
   it("31일에 낸 돈은 다음 달 말일 기준", () => {
     const p = [tx("2026-08", "2026-08-31", "월세", 900_000, "임대료", "임대료")];
     expect(missingFixedCosts(p, [], rules, "2026-10-02")).toHaveLength(0);
