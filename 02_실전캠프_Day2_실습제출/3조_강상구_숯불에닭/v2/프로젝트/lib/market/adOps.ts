@@ -9,7 +9,8 @@
 import { channelKind, type Channel } from "../categories";
 import { shiftDate } from "../daily";
 import type { DailySale } from "../types";
-import { totals, type NaverAdExport, type Totals, type AdAlert } from "./adStats";
+import { spendIds, totals, type NaverAdExport, type Totals, type AdAlert } from "./adStats";
+export { spendIds };
 
 export const AD_WEEK_NOTES_KEY = "ad_week_notes_v1"; // { "2026-10-19": "랜드마크 입찰가 70→300" } 주(월요일)별 한 줄
 export const AD_BUDGET_KEY = "ad_budget_v1"; // { monthCap, ticket, visitsPerYear, marginPct }
@@ -17,13 +18,6 @@ export const AD_OPS_KEY = "ad_ops_checks_v1"; // { 항목id: "했어요" 누른 
 
 export const VAT = 1.1;
 const won = (n: number) => Math.round(n).toLocaleString("ko-KR");
-
-/** 광고비 전체를 셀 id — 캠페인 줄(파워링크·플레이스 다 들어감). 캠페인 성적이 없으면 키워드 줄로 */
-export function spendIds(d: NaverAdExport): Set<string> {
-  const camp = new Set(d.campaigns.map((c) => c.id));
-  if (d.stats.some((r) => camp.has(r.id))) return camp;
-  return new Set(d.keywords.map((k) => k.id));
-}
 
 /** 플레이스 캠페인의 광고그룹 — 키워드가 없고, 광고 문구 수(adCount)를 API 가 0 으로 돌려준다 */
 export function placeGroupIds(d: NaverAdExport): Set<string> {

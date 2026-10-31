@@ -39,6 +39,13 @@ export function totals(stats: AdStatRow[], ids: Set<string>, from: string, to: s
 
 export const keywordIds = (d: NaverAdExport) => new Set(d.keywords.map((k) => k.id));
 
+/** 광고비 전체를 셀 id — 캠페인 줄(파워링크·플레이스 다 들어감). 캠페인 성적이 없으면 키워드 줄로 */
+export function spendIds(d: NaverAdExport): Set<string> {
+  const camp = new Set(d.campaigns.map((c) => c.id));
+  if (d.stats.some((r) => camp.has(r.id))) return camp;
+  return keywordIds(d);
+}
+
 /** 지난 7일 vs 그 앞 4주의 주 평균 */
 export interface WeekCompare { thisWeek: Totals; usual: Totals; from: string; to: string; usualWeeks: number }
 export function compareWeek(d: NaverAdExport, today: string, ids: Set<string> = keywordIds(d)): WeekCompare {
@@ -107,7 +114,7 @@ export interface AdAlert { level: "위험" | "주의" | "제안"; text: string; 
 
 export function adAlerts(d: NaverAdExport, today: string): AdAlert[] {
   const out: AdAlert[] = [];
-  const ids = keywordIds(d);
+  const ids = spendIds(d); // 플레이스 광고는 키워드가 없어서 키워드만 더하면 광고비·클릭 비교에서 빠진다
   const cmp = compareWeek(d, today, ids);
   const from = cmp.from, to = cmp.to;
   const campaign = d.campaigns.find((c) => c.type === "WEB_SITE") ?? d.campaigns[0];
@@ -160,7 +167,7 @@ export function adAlerts(d: NaverAdExport, today: string): AdAlert[] {
 
 /** 광고비 → 장부에 적을 달별 합계 (VAT 포함 추정: 네이버는 광고비에 10% 부가세를 더해 청구) */
 export function monthlyCost(d: NaverAdExport, month: string, vat = true): number {
-  const ids = keywordIds(d);
+  const ids = spendIds(d); // 플레이스 광고비까지 (2026-10-31: 키워드만 세서 10월이 1,408원으로 나왔음)
   const t = totals(d.stats, ids, `${month}-01`, `${month}-31`);
   return Math.round(t.cost * (vat ? 1.1 : 1));
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adAlerts, byGroup, byKeyword, compareWeek, inspectText, monthlyCost, totals, weeklySeries, type NaverAdExport } from "./adStats";
+import { adAlerts, byGroup, byKeyword, compareWeek, inspectText, monthlyCost, spendIds, totals, weeklySeries, type NaverAdExport } from "./adStats";
 
 const day = (n: number) => `2026-10-${String(n).padStart(2, "0")}`;
 const row = (id: string, date: string, imp: number, clk: number, cost: number, avgRank: number | null = 2) => ({ id: `k${id}`, date, imp, clk, cost, ctr: imp ? (clk / imp) * 100 : null, cpc: clk ? cost / clk : null, avgRank });
@@ -105,5 +105,25 @@ describe("달별 광고비", () => {
   it("VAT 10% 더한 값", () => {
     expect(monthlyCost(d, "2026-10")).toBe(Math.round((22 * 700 + 11900) * 1.1));
     expect(monthlyCost(d, "2026-10", false)).toBe(22 * 700 + 11900);
+  });
+});
+
+describe("플레이스 광고 (키워드 없는 캠페인)", () => {
+  // 성적이 캠페인 줄로 오면 캠페인 합계로 센다 — 플레이스는 키워드가 없어 키워드만 더하면 빠진다
+  const camp = (id: string, n: number, cost: number, clk: number) => ({ id, date: day(n), imp: 100, clk, cost, ctr: null, cpc: null, avgRank: 5 });
+  const p: NaverAdExport = {
+    ...d,
+    campaigns: [...d.campaigns, { id: "c2", name: "숯불에닭 플레이스 회식", type: "PLACE", dailyBudget: 7000, status: "ELIGIBLE", on: true }],
+    stats: [
+      ...d.stats,
+      ...Array.from({ length: 29 }, (_, i) => camp("c1", 2 + i, i < 22 ? 700 : 1700, 2)), // 키워드 줄과 같은 합
+      ...Array.from({ length: 7 }, (_, i) => camp("c2", 24 + i, 1000, 10)),
+    ],
+  };
+  it("달별 광고비에 플레이스가 들어간다", () => {
+    expect(monthlyCost(p, "2026-10", false)).toBe(22 * 700 + 11900 + 7000);
+  });
+  it("경고의 이번 주 비교도 플레이스까지 센다", () => {
+    expect(compareWeek(p, today, spendIds(p)).thisWeek.clk).toBe(14 + 70);
   });
 });
