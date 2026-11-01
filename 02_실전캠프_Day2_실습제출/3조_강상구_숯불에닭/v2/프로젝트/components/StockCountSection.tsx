@@ -21,6 +21,8 @@ function parseQty(s: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 const show = (n: number | null) => (n === null ? "" : String(n));
+/** 수량은 소수를 그대로 보여 준다 — num() 은 반올림해서 7.5kg 을 "8kg" 으로 보여 준다 (2026-11-01) */
+const qty = (n: number) => (Number.isInteger(n) ? num(n) : (Math.round(n * 100) / 100).toLocaleString("ko-KR"));
 
 export default function StockCountSection({ month, items, onItemsChange }: { month: string; items: Item[]; onItemsChange: () => Promise<void> }) {
   const [count, setCount] = useState<StockCount | null>(null);
@@ -166,12 +168,12 @@ export default function StockCountSection({ month, items, onItemsChange }: { mon
                     <span>{u}</span>
                     {row && (
                       <b className="num text-stone-700">
-                        = {num(row.quantity)}
+                        = {qty(row.quantity)}
                         {u}
                       </b>
                     )}
                     <span className="text-stone-400">
-                      {size ? `1${packLabel(it)} = ${num(size)}${u} · ` : ""}
+                      {size ? `1${packLabel(it)} = ${qty(size)}${u} · ` : ""}
                       {num(it.standardCost)}원/{u}
                     </span>
                   </div>

@@ -589,7 +589,7 @@ function Setup({ items, menus, recipes, packSizes, onChange }: { items: Item[]; 
                       aria-label={`${i.name} 박스 환산`}
                       inputMode="decimal"
                       className="field num w-14 px-1.5 py-0.5 text-right text-xs"
-                      placeholder={num(packSizes.get(i.id) ?? 1)}
+                      placeholder={String(packSizes.get(i.id) ?? 1)}
                       defaultValue={i.packSize ? String(i.packSize) : ""}
                       onBlur={(e) => {
                         const t = e.target.value.replace(/[^\d.]/g, "");
@@ -598,7 +598,7 @@ function Setup({ items, menus, recipes, packSizes, onChange }: { items: Item[]; 
                       }}
                     />
                     {i.baseUnit}
-                    {!i.packSize && packSizes.has(i.id) && <span className="text-stone-400">(최근 매입에서: {num(packSizes.get(i.id)!)})</span>}
+                    {!i.packSize && packSizes.has(i.id) && <span className="text-stone-400">(최근 매입에서: {String(packSizes.get(i.id)!)})</span>}
                   </>
                 )}
               </label>
