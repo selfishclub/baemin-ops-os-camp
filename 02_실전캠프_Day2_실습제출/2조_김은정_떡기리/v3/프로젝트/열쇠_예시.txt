@@ -1,0 +1,6 @@
+# 이 내용을 .env.local 이라는 파일로 만들고 값을 채웁니다. .env.local 은 git에 올라가지 않습니다.
+# Supabase 대시보드 → Project Settings → API 에서 복사
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+# 사장 점검표 여는 숫자 4자리 (원하는 숫자로)
+OWNER_PIN=0000

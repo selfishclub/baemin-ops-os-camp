@@ -1,0 +1,8 @@
+.env
+.env.*
+
+config.js
+.vercel/
+node_modules/
+_shot.html
+_frame.html
