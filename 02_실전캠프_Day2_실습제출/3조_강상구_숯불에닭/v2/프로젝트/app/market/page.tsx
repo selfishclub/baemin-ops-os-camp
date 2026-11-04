@@ -271,6 +271,19 @@ export default function MarketPage() {
       <section className="card flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-base font-bold">
+            플레이스 관리
+            <SourceTag from="두더지" />
+          </h2>
+          <p className="text-xs text-stone-500">최근 14일 점검 · 상위 가게 대표 키워드 · 소개글과 리뷰에 그 말이 있는지 · 작업 전후 비교 · 세팅과 주기 루틴</p>
+        </div>
+        <Link href="/market/place" className="btn-primary shrink-0">
+          열기 →
+        </Link>
+      </section>
+
+      <section className="card flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-base font-bold">
             광고 노트 — 시작안
             <SourceTag from="카페스이" />
           </h2>

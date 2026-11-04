@@ -45,7 +45,7 @@ export function parseLedgerExport(text: string): LedgerExport {
     exportedAt: String(raw.exportedAt ?? ""),
     shop: raw.shop ?? undefined,
     reviews,
-    rank: raw.rank && Array.isArray(raw.rank.history) ? { shop: String(raw.rank.shop ?? ""), shopId: str(raw.rank.shopId), keywords: Array.isArray(raw.rank.keywords) ? raw.rank.keywords.map(String) : [], history: raw.rank.history, latest: raw.rank.latest ?? null } : null,
+    rank: raw.rank && Array.isArray(raw.rank.history) ? { shop: String(raw.rank.shop ?? ""), shopId: str(raw.rank.shopId), keywords: Array.isArray(raw.rank.keywords) ? raw.rank.keywords.map(String) : [], history: raw.rank.history, latest: raw.rank.latest ?? null, placeInfo: raw.rank.placeInfo ?? null } : null,
     baemin: raw.baemin && Array.isArray(raw.baemin.settlements) ? raw.baemin : null,
     coupang: raw.coupang && Array.isArray(raw.coupang.settlements) ? raw.coupang : null,
     naverAd: raw.naverAd && Array.isArray(raw.naverAd.keywords) ? raw.naverAd : null,

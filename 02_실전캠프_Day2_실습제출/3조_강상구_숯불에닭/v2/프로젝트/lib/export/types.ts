@@ -48,12 +48,22 @@ export interface RankDay {
   results: { keyword: string; total: number | null; mine: RankTop | null; top: RankTop[]; adNames: string[] }[];
 }
 
+/** 플레이스 공개 페이지에서 읽은 대표 키워드 (리뷰 수집기 scripts/place-info.ts). 다른 가게 소개글 본문은 받지 않는다 */
+export interface PlaceInfoExport {
+  date: string;
+  placesDate: string | null;
+  stopped: boolean;
+  mine: { id: string; name: string; keywords: string[] | null; description: string | null; road: string | null; note?: string };
+  places: { id: string; name: string; from: { keyword: string; rank: number | null }[]; keywords: string[] | null; descriptionLength: number | null; note?: string }[];
+}
+
 export interface RankExport {
   shop: string;
   shopId: string | null;
   keywords: string[];
   history: RankPoint[];
   latest: RankDay | null; // 가장 최근에 제대로 읽은 날 (경쟁 가게 목록)
+  placeInfo?: PlaceInfoExport | null;
 }
 
 export interface BaeminSettlement {
