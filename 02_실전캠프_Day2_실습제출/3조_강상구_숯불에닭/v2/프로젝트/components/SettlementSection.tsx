@@ -462,7 +462,16 @@ export default function SettlementSection({
               )}
               {unmatchedShown.length > 0 && (
                 <Notice tone="warn">
-                  매출 묶음과 짝이 안 맞는 입금 {unmatchedShown.length}건: {unmatchedShown.map((d) => `${d.date.slice(5)} ${name(d.channel)} ${num(d.amount)}`).join(" · ")} — 지난달 말 주문분이거나 정산 규칙이 실제와 다를 수 있어요.
+                  매출 묶음과 짝이 안 맞는 입금 {unmatchedShown.length}건:{" "}
+                  {unmatchedShown.map((d, i) => (
+                    <span key={d.channel + d.date}>
+                      {i > 0 && " · "}
+                      <button className="font-semibold underline decoration-dotted" title="다른 채널 매출이 이 카드사로 들어온 것이면 눌러서 표시하세요 (간편결제·배민 만나서 카드결제)" onClick={() => markExtra(d.channel, d.date, undefined, "other", d.amount)}>
+                        {d.date.slice(5)} {name(d.channel)} {num(d.amount)}
+                      </button>
+                    </span>
+                  ))}{" "}
+                  — 지난달 말 주문분이거나 정산 규칙이 실제와 다를 수 있어요. <b>간편결제·배민 만나서 카드결제</b>처럼 다른 채널 매출이 그 카드사로 들어온 것이면 눌러서 표시해 두세요.
                 </Notice>
               )}
               <p className="text-xs text-stone-500">
