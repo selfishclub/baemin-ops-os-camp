@@ -8,7 +8,7 @@ import type { SettlementState } from "@/components/useSettlement";
 import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
 import { explainStrays, strayDatesText } from "@/lib/salesGap";
-import { DEFAULT_RULES, RULE_NOTES, type SettlementRule } from "@/lib/settlement";
+import { DEFAULT_RULES, RULE_NOTES, type AdjustmentKind, type SettlementRule } from "@/lib/settlement";
 import { explainOverdue } from "@/lib/overdue";
 
 const DOW = ["월", "화", "수", "목", "금", "토", "일"];
@@ -28,13 +28,17 @@ export default function SettlementSection({
   show?: "all" | "rules" | "results"; // 정산 탭은 결과를 위에, 규칙은 맨 아래에 따로 그린다
 }) {
   const { rules, results, loaded, saveRules, saveAdjustment } = settlement;
-  // "차이" 줄에 환급 등 다른 돈이 섞였을 때: 얼마인지 물어 표시로 저장 (0이면 지움)
-  async function markExtra(channel: string, date: string, current?: number) {
-    const raw = window.prompt("이 입금 중 정산금이 아닌 돈(환급·지원금 등)은 얼마인가요? 지우려면 0", current ? String(current) : "");
+  // "차이" 줄에 이 채널 정산금이 아닌 돈이 섞였을 때: 얼마인지 물어 표시로 저장 (0이면 지움)
+  //  kind "refund" 환급·지원금은 수수료에서도 빼고, "other" 다른 채널 매출 몫(배민 만나서 카드결제 등)은 빼지 않는다
+  async function markExtra(channel: string, date: string, current?: number, kind: AdjustmentKind = "refund", suggest?: number) {
+    const what = kind === "other" ? "다른 채널 매출 몫(배민 만나서 카드결제 등)은" : "정산금이 아닌 돈(환급·지원금 등)은";
+    const def = current ? String(current) : suggest ? String(suggest) : "";
+    const raw = window.prompt(`이 입금 중 ${what} 얼마인가요? 지우려면 0`, def);
     if (raw === null) return;
     const amount = Number(raw.replace(/[^\d]/g, "")) || 0;
-    const note = amount > 0 ? window.prompt("무슨 돈인가요? (예: 상생 요금제 월 환급)", "환급") ?? "환급" : "";
-    await saveAdjustment({ channel, date, amount, note });
+    const hint = kind === "other" ? "배민 만나서 카드결제분" : "환급";
+    const note = amount > 0 ? window.prompt(`무슨 돈인가요? (예: ${kind === "other" ? "배민 만나서 카드결제분" : "상생 요금제 월 환급"})`, hint) ?? hint : "";
+    await saveAdjustment({ channel, date, amount, note, kind });
   }
   const [holidayText, setHolidayText] = useState(settlement.holidays.join(", "));
   const [editing, setEditing] = useState(false);
@@ -413,13 +417,18 @@ export default function SettlementSection({
                             <td className="whitespace-nowrap">
                               <StatusChip status={s.status} />
                               {s.extra ? (
-                                <button className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-bold text-sky-900" title="눌러서 고치기" onClick={() => markExtra(s.channel, s.payout, s.extra)}>
+                                <button className="ml-1 rounded bg-sky-100 px-1.5 py-0.5 text-[11px] font-bold text-sky-900" title="눌러서 고치기" onClick={() => markExtra(s.channel, s.payout, s.extra, s.extraKind)}>
                                   {s.note || "환급"} +{num(s.extra)}
                                 </button>
                               ) : s.status === "차이" && s.deposit > s.sales ? (
-                                <button className="ml-1 text-[11px] font-semibold text-orange-700 underline" onClick={() => markExtra(s.channel, s.payout)}>
-                                  환급 포함?
-                                </button>
+                                <span className="ml-1 whitespace-nowrap">
+                                  <button className="text-[11px] font-semibold text-orange-700 underline" onClick={() => markExtra(s.channel, s.payout, undefined, "refund", s.deposit - s.sales)}>
+                                    환급 포함?
+                                  </button>
+                                  <button className="ml-1.5 text-[11px] font-semibold text-sky-800 underline" title="배민 만나서 카드결제처럼 다른 채널 매출이 이 카드사 입금에 섞여 들어온 경우" onClick={() => markExtra(s.channel, s.payout, undefined, "other", s.deposit - s.sales)}>
+                                    다른 채널 몫?
+                                  </button>
+                                </span>
                               ) : null}
                             </td>
                           </tr>

@@ -35,25 +35,36 @@ export interface SettlementRule {
 export const SETTLEMENT_RULES_KEY = "settlement_rules";
 export const SETTLEMENT_ADJUSTMENTS_KEY = "settlement_adjustments";
 
-// 입금에 정산금이 아닌 돈이 섞였을 때(쿠팡이츠 상생 요금제 월 환급 등) 그만큼을 빼고 짝을 맞추기 위한 표시.
-// 환급은 수수료를 돌려받은 것이니 그 달 수수료 합계에서 뺀다.
+// 입금에 이 채널 정산금이 아닌 돈이 섞였을 때 그만큼을 빼고 짝을 맞추기 위한 표시. 두 가지가 있다.
+//  - kind "refund"(기본): 환급·지원금 (쿠팡이츠 상생 요금제 월 환급 등).
+//    수수료를 돌려받은 것이니 그 달 수수료 합계에서도 뺀다.
+//  - kind "other": 다른 채널 매출 몫. 배민 만나서 카드결제는 손님 카드로 받아서 그 카드사 입금에 섞여 들어오는데,
+//    포스에는 "배민 후불카드"로 찍혀 카드 채널 매출에는 없다 (2026-11-04 BC카드: 배민 후불카드 32,400원분이 섞였다).
+//    환급이 아니라 그냥 다른 채널 돈이므로 수수료에서 빼지 않는다 — 빼면 그 카드사 수수료가 음수로 보인다.
+export type AdjustmentKind = "refund" | "other";
 export interface SettlementAdjustment {
   channel: ChannelId;
   date: string; // 통장 입금일
-  amount: number; // 입금 중 정산금이 아닌 부분
-  note: string; // "상생 요금제 월 환급" 등
+  amount: number; // 입금 중 이 채널 정산금이 아닌 부분
+  note: string; // "상생 요금제 월 환급", "배민 만나서 카드결제분" 등
+  kind?: AdjustmentKind; // 없으면 "refund" (전에 저장해 둔 것은 다 환급이었다)
 }
-// 매출 정산이 아니라 환급만 들어온 입금(쿠팡이츠 상생 요금제 월 환급 등)은 "짝이 안 맞는 입금"으로 띄우지 않는다
-const fullyRefund = (a: SettlementAdjustment | undefined, amount: number) => !!a && a.amount >= amount;
+export const adjustmentKind = (a: SettlementAdjustment | undefined): AdjustmentKind => a?.kind ?? "refund";
+// 입금이 통째로 이 채널 정산금이 아니면(환급만 들어온 입금 등) 매출 묶음을 가져가지 않고, "짝이 안 맞는 입금"으로도 띄우지 않는다
+const fullyOutside = (a: SettlementAdjustment | undefined, amount: number) => !!a && a.amount >= amount;
 
 // 이 달 수수료에서 뺄 환급 — 한 환급은 한 달에서만 뺀다.
 //  - 정산 입금에 섞인 환급: 그 입금이 붙은 이 달 묶음(extra)에서
 //  - 환급만 따로 들어온 입금: 들어온 달에서
 // (2026-10-19 전에는 그 채널의 환급을 달 구분 없이 다 빼서, 9월·10월 쿠팡이츠 수수료에서 두 환급이 두 번씩 빠졌다)
 function refundsOf(month: Month, settlements: Settlement[], adj: Map<string, SettlementAdjustment>, deposits: Map<string, number>): number {
+  // 다른 채널 매출 몫("other")은 환급이 아니라 그냥 남의 돈이므로 수수료에서 빼지 않는다
+  const refundOnly = (payout: string) => adjustmentKind(adj.get(payout)) === "refund";
   // 묶음에 섞인 환급도 그 달 몫만 (달 경계 묶음·다른 달 묶음의 환급을 이 달에서 빼면 수수료가 음수로 보인다)
-  const mixed = settlements.reduce((a, s) => a + Math.round((s.extra ?? 0) * monthShare(s)), 0);
-  const alone = [...adj.values()].filter((a) => a.date.startsWith(month) && fullyRefund(a, deposits.get(a.date) ?? 0)).reduce((a, x) => a + x.amount, 0);
+  const mixed = settlements.reduce((a, s) => a + (refundOnly(s.payout) ? Math.round((s.extra ?? 0) * monthShare(s)) : 0), 0);
+  const alone = [...adj.values()]
+    .filter((a) => a.date.startsWith(month) && adjustmentKind(a) === "refund" && fullyOutside(a, deposits.get(a.date) ?? 0))
+    .reduce((a, x) => a + x.amount, 0);
   return mixed + alone;
 }
 
@@ -108,7 +119,8 @@ export interface Settlement {
   fee: number; // sales − deposit (입금이 있을 때만)
   feeRate: number | null; // %
   status: "일치" | "차이" | "미입금" | "예정" | "매출없음" | "출금 확인 필요";
-  extra?: number; // 입금에 섞인 환급 등 (표시용). fee·status는 이걸 뺀 입금으로 계산
+  extra?: number; // 입금에 섞인 환급·다른 채널 몫 (표시용). fee·status는 이걸 뺀 입금으로 계산
+  extraKind?: AdjustmentKind; // 그게 환급인가 다른 채널 매출 몫인가
   note?: string;
 }
 
@@ -221,7 +233,7 @@ export function settleChannel(
         fee,
         feeRate: raw > 0 && g.sales > 0 ? round1((fee / g.sales) * 100) : null,
         status,
-        ...(a ? { extra: a.amount, note: a.note } : {}),
+        ...(a ? { extra: a.amount, extraKind: adjustmentKind(a), note: a.note } : {}),
       };
     });
 
@@ -314,7 +326,7 @@ export function settleChannel(
   const monthStart = month + "-01";
   const groupPayouts = [...groups.keys()];
   const unmatchedDeposits = [...deposits.entries()]
-    .filter(([date, amount]) => date >= monthStart && date <= lastBankDate && !used.has(date) && !fullyRefund(adj.get(date), amount) && !outsideMonthWindow(date, month, groupPayouts, holidays, rule))
+    .filter(([date, amount]) => date >= monthStart && date <= lastBankDate && !used.has(date) && !fullyOutside(adj.get(date), amount) && !outsideMonthWindow(date, month, groupPayouts, holidays, rule))
     .map(([date, amount]) => ({ date, amount }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -383,10 +395,10 @@ function settleManual(
   const payouts = bundles.map((b) => b.payout);
   for (const [date, raw] of [...deposits.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     if (raw <= 0) continue;
-    if (fullyRefund(adj.get(date), raw)) continue; // 환급만 들어온 입금은 매출 묶음을 가져가지 않는다
+    if (fullyOutside(adj.get(date), raw)) continue; // 환급만 들어온 입금은 매출 묶음을 가져가지 않는다
     const eligible = bundles.filter((b) => !b.claimed && b.payout <= date);
     if (eligible.length === 0) {
-      if (date >= monthStart && date <= lastBankDate && !fullyRefund(adj.get(date), raw) && !(rule && outsideMonthWindow(date, month, payouts, holidays, rule))) unmatchedDeposits.push({ date, amount: raw });
+      if (date >= monthStart && date <= lastBankDate && !fullyOutside(adj.get(date), raw) && !(rule && outsideMonthWindow(date, month, payouts, holidays, rule))) unmatchedDeposits.push({ date, amount: raw });
       continue;
     }
     for (const b of eligible) b.claimed = true;
@@ -398,7 +410,7 @@ function settleManual(
     const amount = a ? raw - a.amount : raw;
     const fee = sales - amount;
     const status: Settlement["status"] = sales === 0 ? "매출없음" : judge(sales, amount, floor);
-    settlements.push({ channel, from, to, sales, monthSales, payout: date, deposit: amount, fee, feeRate: sales > 0 ? round1((fee / sales) * 100) : null, status, ...(a ? { extra: a.amount, note: a.note } : {}) });
+    settlements.push({ channel, from, to, sales, monthSales, payout: date, deposit: amount, fee, feeRate: sales > 0 ? round1((fee / sales) * 100) : null, status, ...(a ? { extra: a.amount, extraKind: adjustmentKind(a), note: a.note } : {}) });
   }
   for (const b of bundles) {
     if (b.claimed) continue;

@@ -369,3 +369,42 @@ describe("달 경계: 한 입금에 두 달 주문분이 섞여 들어올 때 (2
     expect(r.settlements.some((x) => x.payout === "2026-11-02")).toBe(false);
   });
 });
+
+describe("다른 채널 매출 몫이 섞인 입금 (2026-11-04 BC카드 · 배민 만나서 카드결제)", () => {
+  const bc: SettlementRule = { channel: "card_bc", mode: "days", days: 2, weekday: 0 };
+  // 11/2 BC 매출 83,000 + 같은 날 배민 후불카드 32,400 이 11/4 에 114,535 로 함께 들어왔다.
+  // 배민 후불카드는 손님 카드로 받아 그 카드사가 보내므로 포스 BC 매출에는 없다.
+  const daily: DailySale[] = [{ date: "2026-11-02", channel: "card_bc", amount: 83_000 }];
+  const txs = [tx("2026-11-04", "card_bc", 114_535)];
+  const date = "2026-11-04";
+
+  it("표시 전에는 입금 과다로 보인다", () => {
+    const r = settleChannel("card_bc", "2026-11", bc, daily, txs, "2026-11-05");
+    expect(r.settlements[0].status).toBe("차이");
+    expect(r.feeRate!).toBeLessThan(0);
+  });
+
+  it("'다른 채널 몫'으로 표시하면 수수료에서 빼지 않는다 — 수수료율이 음수가 아니다", () => {
+    const adj = [{ channel: "card_bc" as const, date, amount: 32_112, note: "배민 만나서 카드결제분", kind: "other" as const }];
+    const r = settleChannel("card_bc", "2026-11", bc, daily, txs, "2026-11-05", [], adj);
+    const s = r.settlements[0];
+    expect(s.deposit).toBe(114_535 - 32_112); // 82,423
+    expect(s.extraKind).toBe("other");
+    expect(s.status).toBe("일치");
+    expect(r.fee).toBe(83_000 - 82_423); // 577원, 환급처럼 빼지 않는다
+    expect(r.feeRate).toBe(0.7);
+  });
+
+  it("'환급'으로 표시하면 예전처럼 수수료에서 뺀다", () => {
+    const adj = [{ channel: "card_bc" as const, date, amount: 32_112, note: "환급", kind: "refund" as const }];
+    const r = settleChannel("card_bc", "2026-11", bc, daily, txs, "2026-11-05", [], adj);
+    expect(r.fee).toBe(83_000 - 82_423 - 32_112); // 환급은 수수료를 돌려받은 것이라 뺀다
+  });
+
+  it("kind 를 안 적어 둔 옛 자료는 환급으로 본다", () => {
+    const adj = [{ channel: "card_bc" as const, date, amount: 32_112, note: "환급" }];
+    const r = settleChannel("card_bc", "2026-11", bc, daily, txs, "2026-11-05", [], adj);
+    expect(r.settlements[0].extraKind).toBe("refund");
+    expect(r.fee).toBe(83_000 - 82_423 - 32_112);
+  });
+});
