@@ -1,6 +1,6 @@
 import { channelKind, type ChannelId } from "./categories";
 import { shiftDate } from "./daily";
-import { nextMonth } from "./month";
+import { nextMonth, prevMonth } from "./month";
 import type { DailySale, Month, Transaction } from "./types";
 
 // 이 달 묶음이 받을 수 있는 입금의 범위. 그 밖의 입금은 다른 달 주문분이라 "짝이 안 맞는 입금"으로 띄우지 않는다.
@@ -51,7 +51,8 @@ const fullyRefund = (a: SettlementAdjustment | undefined, amount: number) => !!a
 //  - 환급만 따로 들어온 입금: 들어온 달에서
 // (2026-10-19 전에는 그 채널의 환급을 달 구분 없이 다 빼서, 9월·10월 쿠팡이츠 수수료에서 두 환급이 두 번씩 빠졌다)
 function refundsOf(month: Month, settlements: Settlement[], adj: Map<string, SettlementAdjustment>, deposits: Map<string, number>): number {
-  const mixed = settlements.reduce((a, s) => a + (s.extra ?? 0), 0);
+  // 묶음에 섞인 환급도 그 달 몫만 (달 경계 묶음·다른 달 묶음의 환급을 이 달에서 빼면 수수료가 음수로 보인다)
+  const mixed = settlements.reduce((a, s) => a + Math.round((s.extra ?? 0) * monthShare(s)), 0);
   const alone = [...adj.values()].filter((a) => a.date.startsWith(month) && fullyRefund(a, deposits.get(a.date) ?? 0)).reduce((a, x) => a + x.amount, 0);
   return mixed + alone;
 }
@@ -100,7 +101,8 @@ export interface Settlement {
   channel: ChannelId;
   from: string; // 매출 기간
   to: string;
-  sales: number; // 그 기간 매출(주문금액)
+  sales: number; // 그 묶음 전체 매출(주문금액). 달 경계에선 지난달 말·다음 달 초 몫이 섞인다
+  monthSales: number; // 그중 이 달 주문분 — 달별 합계는 이 몫만 가져간다
   payout: string; // 들어와야 할 날
   deposit: number; // 그날 통장에 실제로 들어온 돈 (같은 채널)
   fee: number; // sales − deposit (입금이 있을 때만)
@@ -116,6 +118,9 @@ export const floorOf = (channel: ChannelId) => (channelKind(channel) === "delive
 function judge(sales: number, deposit: number, floor = 0.7): Settlement["status"] {
   return deposit < sales * floor || deposit > sales * (1 + MISMATCH_TOLERANCE) ? "차이" : "일치";
 }
+
+/** 이 묶음에서 이 달이 가져갈 몫 (달 경계가 아니면 1) */
+const monthShare = (s: Settlement) => (s.sales > 0 ? s.monthSales / s.sales : 1);
 
 export interface ChannelSettlementSummary {
   channel: ChannelId;
@@ -165,16 +170,28 @@ export function settleChannel(
   const deposits = depositsByDate(txs, channel);
   const adj = new Map(adjustments.filter((a) => a.channel === channel).map((a) => [a.date, a]));
   const floor = floorOf(channel);
-  const daily = dailySales.filter((s) => s.channel === channel && s.date.startsWith(month));
+  const mine = dailySales.filter((s) => s.channel === channel && s.date.startsWith(month));
+  const daily = mine; // 달 합계(sales)는 이 달 주문분만
 
-  // 묶음 만들기
-  const groups = new Map<string, { from: string; to: string; sales: number }>();
-  for (const s of daily) {
+  // 묶음 만들기 — 입금일이 기준이다.
+  // 통장 입금 한 건에는 두 달 주문분이 섞여 들어온다 (2026-11-03 국민카드: 10/30·10/31분 712,000 + 11/1분 198,000 = 입금 901,724).
+  // 그 달 매출만 보고 묶으면 11월 묶음이 입금 전체를 가져가 수수료가 −703,724원(−355%)으로 찍혔다.
+  // 그래서 같은 입금일로 들어오는 다른 달 매출(지난달 말·다음 달 초)도 같은 묶음에 담고,
+  // 수수료·일치 판정은 묶음 전체로 하고 달별 합계는 monthSales 몫만 가져간다. (2026-11-06)
+  // 입금은 하루 이틀 밀려 들어오기도 해서(자정 넘어 받은 결제는 카드사가 다음 날 것으로 쳐서) 이웃 묶음끼리 합쳐야 맞는다.
+  // 그래서 지난달·다음 달 매출을 다 담아 묶고 짝을 맞춘 뒤, 이 달 몫이 없는 묶음은 마지막에 뺀다.
+  // (2026-11 신한카드: 10/29분 472,000 중 일부가 11/3에 밀려 들어와, 10/29 묶음이 없으면 11/3 입금이 과다로 보였다)
+  const near = new Set([prevMonth(month), month, nextMonth(month)]);
+  const others = dailySales.filter((s) => s.channel === channel && !s.date.startsWith(month) && near.has(s.date.slice(0, 7)));
+
+  const groups = new Map<string, { from: string; to: string; sales: number; monthSales: number }>();
+  for (const s of [...mine, ...others]) {
     const payout = payoutDate(s.date, rule, holidays);
-    const g = groups.get(payout) ?? { from: s.date, to: s.date, sales: 0 };
+    const g = groups.get(payout) ?? { from: s.date, to: s.date, sales: 0, monthSales: 0 };
     g.from = g.from < s.date ? g.from : s.date;
     g.to = g.to > s.date ? g.to : s.date;
     g.sales += s.amount;
+    if (s.date.startsWith(month)) g.monthSales += s.amount;
     groups.set(payout, g);
   }
 
@@ -198,6 +215,7 @@ export function settleChannel(
         from: g.from,
         to: g.to,
         sales: g.sales,
+        monthSales: g.monthSales,
         payout,
         deposit,
         fee,
@@ -214,7 +232,7 @@ export function settleChannel(
     const b = settlements[i + 1];
     if (!b || b.status !== "차이" || b.deposit <= b.sales || b.payout > addBusinessDays(a.payout, 3, holidays)) continue;
     const sales = a.sales + b.sales;
-    const merged: Settlement = { ...b, from: a.from, to: b.to, sales, fee: sales - b.deposit, feeRate: round1(((sales - b.deposit) / sales) * 100), status: judge(sales, b.deposit, floor) };
+    const merged: Settlement = { ...b, from: a.from, to: b.to, sales, monthSales: a.monthSales + b.monthSales, fee: sales - b.deposit, feeRate: round1(((sales - b.deposit) / sales) * 100), status: judge(sales, b.deposit, floor) };
     if (merged.status !== "일치") continue;
     settlements.splice(i, 2, merged);
   }
@@ -277,6 +295,7 @@ export function settleChannel(
       from: a.from,
       to: b.to,
       sales,
+      monthSales: a.monthSales + b.monthSales,
       deposit,
       fee: sales - deposit,
       feeRate: round1(((sales - deposit) / sales) * 100),
@@ -286,9 +305,10 @@ export function settleChannel(
   }
 
   const deposited = settlements.filter((s) => s.status === "일치" || s.status === "차이");
-  const salesDeposited = deposited.reduce((a, s) => a + s.sales, 0);
+  const salesDeposited = deposited.reduce((a, s) => a + s.monthSales, 0);
   const refunds = refundsOf(month, settlements, adj, deposits);
-  const fee = deposited.reduce((a, s) => a + s.fee, 0) - refunds; // 환급은 수수료를 돌려받은 것
+  // 달 경계 묶음은 그 달 몫(monthSales ÷ sales)만 가져간다. 두 달을 합치면 묶음 전체와 같아진다
+  const fee = deposited.reduce((a, s) => a + Math.round(s.fee * monthShare(s)), 0) - refunds; // 환급은 수수료를 돌려받은 것
 
   // 이 달 입금 중 어느 묶음에도 안 붙은 것. 지난달 말·다음 달 주문분 입금은 빼고 (outsideMonthWindow)
   const monthStart = month + "-01";
@@ -301,12 +321,12 @@ export function settleChannel(
   return {
     channel,
     sales: daily.reduce((a, s) => a + s.amount, 0),
-    deposited: deposited.reduce((a, s) => a + s.deposit, 0) + refunds,
+    deposited: deposited.reduce((a, s) => a + Math.round(s.deposit * monthShare(s)), 0) + refunds,
     fee,
     feeRate: salesDeposited > 0 ? round1((fee / salesDeposited) * 100) : null,
-    pending: settlements.filter((s) => s.status === "예정").reduce((a, s) => a + s.sales, 0),
-    missing: settlements.filter((s) => s.status === "미입금").reduce((a, s) => a + s.sales, 0),
-    settlements,
+    pending: settlements.filter((s) => s.status === "예정").reduce((a, s) => a + s.monthSales, 0),
+    missing: settlements.filter((s) => s.status === "미입금").reduce((a, s) => a + s.monthSales, 0),
+    settlements: settlements.filter((s) => s.monthSales > 0), // 다른 달 주문분만 든 묶음은 이 달 표에서 뺀다
     unmatchedDeposits,
   };
 }
@@ -347,7 +367,7 @@ function splitSameDayDeposits(
 function settleManual(
   channel: ChannelId,
   month: Month,
-  groups: Map<string, { from: string; to: string; sales: number }>,
+  groups: Map<string, { from: string; to: string; sales: number; monthSales: number }>,
   deposits: Map<string, number>,
   daily: DailySale[],
   lastBankDate: string,
@@ -371,32 +391,33 @@ function settleManual(
     }
     for (const b of eligible) b.claimed = true;
     const sales = eligible.reduce((a, b) => a + b.sales, 0);
+    const monthSales = eligible.reduce((a, b) => a + b.monthSales, 0);
     const from = eligible[0].from;
     const to = eligible[eligible.length - 1].to;
     const a = adj.get(date);
     const amount = a ? raw - a.amount : raw;
     const fee = sales - amount;
     const status: Settlement["status"] = sales === 0 ? "매출없음" : judge(sales, amount, floor);
-    settlements.push({ channel, from, to, sales, payout: date, deposit: amount, fee, feeRate: sales > 0 ? round1((fee / sales) * 100) : null, status, ...(a ? { extra: a.amount, note: a.note } : {}) });
+    settlements.push({ channel, from, to, sales, monthSales, payout: date, deposit: amount, fee, feeRate: sales > 0 ? round1((fee / sales) * 100) : null, status, ...(a ? { extra: a.amount, note: a.note } : {}) });
   }
   for (const b of bundles) {
     if (b.claimed) continue;
-    settlements.push({ channel, from: b.from, to: b.to, sales: b.sales, payout: b.payout, deposit: 0, fee: 0, feeRate: null, status: b.sales === 0 ? "매출없음" : b.payout > lastBankDate ? "예정" : "출금 확인 필요" });
+    settlements.push({ channel, from: b.from, to: b.to, sales: b.sales, monthSales: b.monthSales, payout: b.payout, deposit: 0, fee: 0, feeRate: null, status: b.sales === 0 ? "매출없음" : b.payout > lastBankDate ? "예정" : "출금 확인 필요" });
   }
   settlements.sort((a, b) => a.from.localeCompare(b.from));
   const deposited = settlements.filter((s) => s.status === "일치" || s.status === "차이");
-  const salesDeposited = deposited.reduce((a, s) => a + s.sales, 0);
+  const salesDeposited = deposited.reduce((a, s) => a + s.monthSales, 0);
   const refunds = refundsOf(month, settlements, adj, deposits);
-  const fee = deposited.reduce((a, s) => a + s.fee, 0) - refunds;
+  const fee = deposited.reduce((a, s) => a + Math.round(s.fee * monthShare(s)), 0) - refunds;
   return {
     channel,
     sales: daily.reduce((a, s) => a + s.amount, 0),
-    deposited: deposited.reduce((a, s) => a + s.deposit, 0) + refunds,
+    deposited: deposited.reduce((a, s) => a + Math.round(s.deposit * monthShare(s)), 0) + refunds,
     fee,
     feeRate: salesDeposited > 0 ? round1((fee / salesDeposited) * 100) : null,
-    pending: settlements.filter((s) => s.status === "예정" || s.status === "출금 확인 필요").reduce((a, s) => a + s.sales, 0),
-    missing: settlements.filter((s) => s.status === "미입금").reduce((a, s) => a + s.sales, 0),
-    settlements,
+    pending: settlements.filter((s) => s.status === "예정" || s.status === "출금 확인 필요").reduce((a, s) => a + s.monthSales, 0),
+    missing: settlements.filter((s) => s.status === "미입금").reduce((a, s) => a + s.monthSales, 0),
+    settlements: settlements.filter((s) => s.monthSales > 0),
     unmatchedDeposits,
   };
 }

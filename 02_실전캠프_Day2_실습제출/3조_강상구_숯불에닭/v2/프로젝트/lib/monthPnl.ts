@@ -6,7 +6,7 @@ import { monthSummary, todayStr } from "./daily";
 import { effectiveChannelSales } from "./effective";
 import { fixedCostGaps, FIXED_COSTS_KEY, type FixedCost } from "./fixedCosts";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "./labor";
-import { nextMonth } from "./month";
+import { nextMonth, prevMonth } from "./month";
 import { buildJournal, type JournalEntry } from "./journal";
 import { HISTORY_KEY, pnlSales, type HistoryDay } from "./history";
 import { computePnl, type Pnl } from "./pnl";
@@ -62,16 +62,19 @@ export async function loadMonthPnls(store: Store, months: Month[]): Promise<Mont
 
   return Promise.all(
     months.map(async (month): Promise<MonthPnlRow> => {
-      const [txs, nextTxs, saved, daily, shifts, purchases, closing] = await Promise.all([
+      const [txs, nextTxs, saved, daily, prevDaily, nextDaily, shifts, purchases, closing] = await Promise.all([
         store.listTransactions(month),
         store.listTransactions(nextMonth(month)),
         store.listChannelSales(month),
         store.listDailySales(month),
+        // 지난달 말·다음 달 초 매출도 넘긴다 — 통장 입금 한 건에 두 달 주문분이 섞여 들어온다 (lib/settlement.ts)
+        store.listDailySales(prevMonth(month)),
+        store.listDailySales(nextMonth(month)),
         store.listShifts(month),
         store.getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + month),
         store.getClosing(month),
       ]);
-      const results = monthSettlements(month, rules ?? [], channels, daily, [...txs, ...nextTxs], lastBankDate, holidays ?? [], adjustments ?? []);
+      const results = monthSettlements(month, rules ?? [], channels, [...daily, ...prevDaily, ...nextDaily], [...txs, ...nextTxs], lastBankDate, holidays ?? [], adjustments ?? []);
       const sales = effectiveChannelSales(month, saved, daily, channels, results);
       const summary = monthSummary(month, daily, shifts, staff);
       const material = materialPaidBasis(purchases ?? []);

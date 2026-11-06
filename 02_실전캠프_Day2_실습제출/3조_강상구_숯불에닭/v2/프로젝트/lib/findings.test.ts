@@ -3,7 +3,7 @@ import { monthEnd, monthFindings, monthSources, type FindingsInput } from "./fin
 import type { ChannelSettlementSummary, Settlement } from "./settlement";
 
 const batch = (status: Settlement["status"], sales: number): Settlement => ({
-  channel: "baemin", from: "2026-09-10", to: "2026-09-10", sales, payout: "2026-09-13", deposit: 0, fee: 0, feeRate: null, status,
+  channel: "baemin", from: "2026-09-10", to: "2026-09-10", sales, monthSales: sales, payout: "2026-09-13", deposit: 0, fee: 0, feeRate: null, status,
 });
 const summary = (channel: string, settlements: Settlement[]): ChannelSettlementSummary => ({
   channel, sales: 0, deposited: 0, fee: 0, feeRate: null, pending: 0,

@@ -93,7 +93,7 @@ export default function SettlementSection({
       fee: a.fee + r.fee,
       pending: a.pending + r.pending,
       missing: a.missing + r.missing,
-      salesDeposited: a.salesDeposited + r.settlements.filter((x) => x.deposit > 0).reduce((y, x) => y + x.sales, 0),
+      salesDeposited: a.salesDeposited + r.settlements.filter((x) => x.deposit > 0).reduce((y, x) => y + x.monthSales, 0),
     }),
     { sales: 0, deposited: 0, fee: 0, pending: 0, missing: 0, salesDeposited: 0 },
   );
@@ -397,7 +397,14 @@ export default function SettlementSection({
                         .find((r) => r.channel === open)!
                         .settlements.map((s) => (
                           <tr key={s.payout}>
-                            <td className="py-1">{s.from === s.to ? s.from.slice(5) : `${s.from.slice(5)}~${s.to.slice(5)}`}</td>
+                            <td className="py-1 whitespace-nowrap">
+                              {s.from === s.to ? s.from.slice(5) : `${s.from.slice(5)}~${s.to.slice(5)}`}
+                              {s.monthSales !== s.sales && (
+                                <span className="ml-1 rounded bg-sky-100 px-1 text-[10px] font-bold text-sky-900" title={`묶음 ${num(s.sales)}원 중 이 달 주문분 ${num(s.monthSales)}원 (나머지는 다른 달 주문분)`}>
+                                  이 달 {num(s.monthSales)}
+                                </span>
+                              )}
+                            </td>
                             <td>{s.payout.slice(5)}</td>
                             <td className="text-right">{num(s.sales)}</td>
                             <td className="text-right">{s.deposit ? num(s.deposit) : "–"}</td>
@@ -419,6 +426,11 @@ export default function SettlementSection({
                         ))}
                     </tbody>
                   </table>
+                  {(results.find((r) => r.channel === open)?.settlements ?? []).some((s) => s.monthSales !== s.sales) && (
+                    <p className="mt-1 text-[11px] text-stone-500">
+                      통장 입금 한 건에 두 달 주문분이 같이 들어오는 날이 있어요 (월말 매출이 다음 달 초에 입금돼서요). 그 줄은 <b>묶음 전체</b>로 수수료율을 내고, 달 합계에는 <b>이 달 몫</b>만 넣어요.
+                    </p>
+                  )}
                 </div>
               )}
               {overpaid.length > 0 && (

@@ -74,7 +74,7 @@ import { looksLikeSplitPayout } from "./salesGap";
 import type { Settlement } from "./settlement";
 
 const bundle = (p: Partial<Settlement>): Settlement =>
-  ({ channel: "card_kb", from: "2026-09-02", to: "2026-09-02", sales: 94000, payout: "2026-09-04", deposit: 44663, fee: 49337, feeRate: null, status: "차이", ...p });
+  ({ channel: "card_kb", from: "2026-09-02", to: "2026-09-02", sales: 94000, monthSales: 94000, payout: "2026-09-04", deposit: 44663, fee: 49337, feeRate: null, status: "차이", ...p });
 
 describe("카드사가 하루치를 두 번에 나눠 보낸 경우", () => {
   // 국민카드가 9/2 매출 94,000을 9/4에 44,663, 9/7에 48,633으로 나눠 보냄 (2026-09 실제)

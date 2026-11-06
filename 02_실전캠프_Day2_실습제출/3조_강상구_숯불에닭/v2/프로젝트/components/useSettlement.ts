@@ -5,9 +5,10 @@ import type { useDaily } from "@/components/useDaily";
 import type { useLedger } from "@/components/useLedger";
 import { effectiveChannelSales } from "@/lib/effective";
 import { monthSettlements } from "@/lib/monthPnl";
+import { nextMonth, prevMonth } from "@/lib/month";
 import { HOLIDAYS_KEY, SETTLEMENT_ADJUSTMENTS_KEY, SETTLEMENT_RULES_KEY, type ChannelSettlementSummary, type SettlementAdjustment, type SettlementRule } from "@/lib/settlement";
 import { getStore } from "@/lib/storage";
-import type { ChannelSale } from "@/lib/types";
+import type { ChannelSale, DailySale } from "@/lib/types";
 
 export interface SettlementState {
   loaded: boolean;
@@ -27,6 +28,20 @@ export function useSettlement(month: string, ledger: ReturnType<typeof useLedger
   const [holidays, setHolidays] = useState<string[]>([]);
   const [adjustments, setAdjustments] = useState<SettlementAdjustment[]>([]);
   const [loaded, setLoaded] = useState(false);
+  // 지난달 말·다음 달 초 매출 — 통장 입금 한 건에 두 달 주문분이 섞여 들어와서, 묶음을 만들 때 같이 봐야 한다
+  // (안 보면 그 달 묶음이 입금 전체를 가져가 수수료율이 음수로 찍힌다. lib/settlement.ts 참고)
+  const [neighborSales, setNeighborSales] = useState<DailySale[]>([]);
+
+  useEffect(() => {
+    const store = getStore();
+    let alive = true;
+    void Promise.all([store.listDailySales(prevMonth(month)), store.listDailySales(nextMonth(month))])
+      .then(([p, n]) => alive && setNeighborSales([...p, ...n]))
+      .catch(() => alive && setNeighborSales([]));
+    return () => {
+      alive = false;
+    };
+  }, [month]);
 
   useEffect(() => {
     (async () => {
@@ -89,9 +104,10 @@ export function useSettlement(month: string, ledger: ReturnType<typeof useLedger
   );
 
   const txsAll = useMemo(() => [...ledger.txs, ...ledger.nextTxs], [ledger.txs, ledger.nextTxs]);
+  const salesAll = useMemo(() => [...daily.sales, ...neighborSales], [daily.sales, neighborSales]);
   const results = useMemo(
-    () => monthSettlements(month, rules, daily.channels, daily.sales, txsAll, ledger.lastBankDate, holidays, adjustments),
-    [rules, daily.channels, daily.sales, month, txsAll, ledger.lastBankDate, holidays, adjustments],
+    () => monthSettlements(month, rules, daily.channels, salesAll, txsAll, ledger.lastBankDate, holidays, adjustments),
+    [rules, daily.channels, salesAll, month, txsAll, ledger.lastBankDate, holidays, adjustments],
   );
 
   const effectiveSales = useMemo(

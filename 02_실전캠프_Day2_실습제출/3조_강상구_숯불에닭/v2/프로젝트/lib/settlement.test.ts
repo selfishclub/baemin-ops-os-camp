@@ -312,3 +312,60 @@ describe("달력 N일 규칙 (삼성카드)", () => {
     expect(payoutDate("2026-09-22", cal, ["2026-09-24", "2026-09-25"])).toBe("2026-09-28"); // 화 → 목(추석) → 월
   });
 });
+
+describe("달 경계: 한 입금에 두 달 주문분이 섞여 들어올 때 (2026-11-03 국민카드 실제 숫자)", () => {
+  const kb: SettlementRule = { channel: "card_kb", mode: "days", days: 2, weekday: 0 };
+  // 10/30(금)·10/31(토)·11/1(일) 매출이 모두 11/3에 들어온다 (+2영업일). 입금 901,724 = 910,000 − 수수료 8,276(0.91%)
+  const daily: DailySale[] = [
+    { date: "2026-10-29", channel: "card_kb", amount: 283_000 }, // → 11/2
+    { date: "2026-10-30", channel: "card_kb", amount: 309_000 }, // → 11/3
+    { date: "2026-10-31", channel: "card_kb", amount: 403_000 }, // → 11/3
+    { date: "2026-11-01", channel: "card_kb", amount: 198_000 }, // → 11/3
+    { date: "2026-11-02", channel: "card_kb", amount: 229_000 }, // → 11/4
+  ];
+  const bank = [tx("2026-11-02", "card_kb", 280_613), { ...tx("2026-11-03", "card_kb", 901_724), id: "b3" }, { ...tx("2026-11-04", "card_kb", 226_895), id: "b4" }];
+
+  it("11월 화면: 11/1분 묶음이 입금 전체를 가져가지 않는다", () => {
+    const r = settleChannel("card_kb", "2026-11", kb, daily, bank, "2026-11-05");
+    const s = r.settlements.find((x) => x.payout === "2026-11-03")!;
+    expect(s.sales).toBe(910_000); // 묶음 전체 (10월분 712,000 포함)
+    expect(s.monthSales).toBe(198_000); // 그중 11월 주문분
+    expect(s.fee).toBe(8_276);
+    expect(s.feeRate).toBe(0.9);
+    expect(s.status).toBe("일치");
+  });
+
+  it("11월 합계는 그 달 몫만 가져간다 — 수수료율이 음수로 찍히지 않는다", () => {
+    const r = settleChannel("card_kb", "2026-11", kb, daily, bank, "2026-11-05");
+    expect(r.sales).toBe(427_000); // 11/1 + 11/2
+    expect(r.feeRate).not.toBeNull();
+    expect(r.feeRate!).toBeGreaterThan(0);
+    expect(r.feeRate!).toBeLessThan(2);
+    expect(r.deposited).toBeLessThan(r.sales); // 입금이 매출보다 많을 수 없다
+  });
+
+  it("10월 화면도 같은 입금을 다 가져가지 않는다 — '차이'로 뜨지 않는다", () => {
+    const r = settleChannel("card_kb", "2026-10", kb, daily, bank, "2026-11-05");
+    const s = r.settlements.find((x) => x.payout === "2026-11-03")!;
+    expect(s.monthSales).toBe(712_000); // 10/30 + 10/31
+    expect(s.status).toBe("일치");
+    expect(r.feeRate!).toBeGreaterThan(0);
+    expect(r.feeRate!).toBeLessThan(2);
+  });
+
+  it("두 달 몫을 합치면 묶음 전체와 같다", () => {
+    const nov = settleChannel("card_kb", "2026-11", kb, daily, bank, "2026-11-05");
+    const oct = settleChannel("card_kb", "2026-10", kb, daily, bank, "2026-11-05");
+    const g = (r: ReturnType<typeof settleChannel>) => r.settlements.find((x) => x.payout === "2026-11-03")!;
+    expect(g(nov).monthSales + g(oct).monthSales).toBe(910_000);
+    // 입금·수수료도 두 달을 합치면 그 묶음 전체 (1원 반올림 차이 허용)
+    const share = (r: ReturnType<typeof settleChannel>) => Math.round(g(r).deposit * (g(r).monthSales / g(r).sales));
+    expect(Math.abs(share(nov) + share(oct) - 901_724)).toBeLessThanOrEqual(1);
+  });
+
+  it("다른 달 매출만 있는 입금일은 묶음을 만들지 않는다", () => {
+    // 11월 화면에서 11/2 입금(10/29분)은 11월 묶음이 아니다
+    const r = settleChannel("card_kb", "2026-11", kb, daily, bank, "2026-11-05");
+    expect(r.settlements.some((x) => x.payout === "2026-11-02")).toBe(false);
+  });
+});
