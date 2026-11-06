@@ -515,7 +515,7 @@
   // 로그인 = 지점 코드(링크에 든 것) + PIN → 서버가 준 토큰(12시간)을 이 브라우저 탭에만 보관.
   // 점주 함수는 전부 토큰으로 "이 지점" 것만 읽고 쓴다. 다른 지점 데이터는 화면 어디에도 오지 않는다.
   var OWNER_ERR = [
-    ['wrong pin', '번호가 달라요.'], ['locked', '5번 틀려서 10분 동안 잠겼어요. 잠시 뒤 다시 해 주세요.'],
+    ['wrong pin', '번호가 달라요. 5번 틀리면 10분 동안 잠겨요.'], ['locked', '5번 틀려서 10분 동안 잠겼어요. 잠시 뒤 다시 해 주세요.'],
     ['session expired', '시간이 지나 번호를 다시 넣어야 해요.'], ['duplicate name', '같은 이름이 이미 있어요.'],
     ['name required', '이름을 적어 주세요.'], ['name too long', '이름이 너무 길어요 (20자까지).'], ['body required', '내용을 적어 주세요.'],
     ['pin must be 6 digits', '새 번호는 숫자 6자리여야 해요.'], ['name used by another store', '다른 지점에 같은 이름의 직원이 있어 교육 기록을 나눌 수 없어요. 본사에 알려 주세요.'],
@@ -575,6 +575,7 @@
       if (!/^\d{4,8}$/.test(pin)) { err.hidden = false; err.textContent = '숫자로 넣어 주세요.'; return; }
       btn.disabled = true; btn.textContent = '확인 중…'; err.hidden = true;
       rpc('owner_login', { p_code: CODE, p_pin: pin }).then(function (r) {
+        if (!r || r.error) throw new Error((r && r.error) || 'store not found');
         session.set('owner_token', r.token); session.set('owner_store', JSON.stringify(r.store || {})); ownerCache = null;
         viewOwner(sub, params);
       }).catch(function (e) { btn.disabled = false; btn.textContent = '열기'; err.hidden = false; err.textContent = ownerMsg(e); document.getElementById('pin').value = ''; });
@@ -760,8 +761,9 @@
   }
 
   // 직원용 링크 · QR · 안내문 (설정 탭 안)
-  function ownerLink(body) {
-    var name = singleStore(settingsCache || emptyBundle()) || '매장', link = staffLink();
+  function ownerLink(body, name) {
+    var link = staffLink();
+    if (!name) { var os0 = null; try { os0 = JSON.parse(session.get('owner_store') || 'null'); } catch (e) {} name = singleStore(settingsCache || emptyBundle()) || (os0 && os0.name) || '매장'; }
     body.className = ''; body.innerHTML = linkSectionHtml(name, link, 'lk');
     bindLinkSection(name, link, 'lk');
   }
@@ -780,7 +782,7 @@
     h += '<details class="card"><summary class="title">✅ 지점 체크 항목 · 떡 종류 (선택)</summary><div id="os-items" class="muted">불러오는 중…</div></details>';
     h += '<div class="card"><div class="title">이 기기에서 닫기</div><p class="muted small">다른 사람이 쓰는 폰·PC라면 다 쓰고 닫아 주세요. 번호를 다시 넣어야 열려요.</p><button type="button" class="btn wide" id="owner-logout">점주 화면 닫기</button></div>';
     body.className = ''; body.innerHTML = h;
-    ownerLink(document.getElementById('os-link'));
+    ownerLink(document.getElementById('os-link'), name);
     ownerItems(document.getElementById('os-items')).catch(function (e) { document.getElementById('os-items').innerHTML = '<div class="save-note">' + esc(ownerMsg(e)) + '</div>'; });
     document.getElementById('pin-save').addEventListener('click', function () {
       var p0 = document.getElementById('pin0').value.trim(), p1 = document.getElementById('pin1').value.trim(), p2 = document.getElementById('pin2').value.trim(), n = document.getElementById('pin-note'), btn = this;
@@ -944,6 +946,10 @@
         });
     });
   }
+  function hqPasswordLogin(email, pw) {
+    return fetch(authUrl('token?grant_type=password'), { method: 'POST', headers: { apikey: SB.anon, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: pw }) })
+      .then(function (r) { return r.text().then(function (t) { var j = {}; try { j = JSON.parse(t); } catch (e) {} if (!r.ok) throw new Error(r.status + ' ' + (j.error_code || j.msg || j.error_description || t)); hqKeep(j.access_token, j.refresh_token, j.expires_in); return true; }); });
+  }
   function hqSendLink(email) {
     var redirect = location.origin + location.pathname;
     return fetch(authUrl('otp?redirect_to=' + encodeURIComponent(redirect)), { method: 'POST', headers: { apikey: SB.anon, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, create_user: true }) })
@@ -962,7 +968,7 @@
     if (/Failed to fetch/.test(m)) return '인터넷 연결을 확인해 주세요.';
     return '안 됨 (' + m.slice(0, 120) + ')';
   }
-  function koDT(iso) { return iso ? koDate(iso.slice(0, 10)) + ' ' + hhmm(iso) : ''; }
+  function koDT(iso) { return iso ? koDate(dateStr(new Date(iso))) + ' ' + hhmm(iso) : ''; }
   function hqStatus(run) {
     if (!run) return { cls: 'none', label: '미완료' };
     if (run.completed_at) return { cls: 'done', label: '완료 ' + hhmm(run.completed_at) + ((run.total || 0) > (run.done_count || 0) ? ' (' + (run.total - run.done_count) + '개 빠짐)' : '') };
@@ -988,15 +994,24 @@
   }
   function viewHqLogin() {
     var err = session.get('hq_err'); session.del('hq_err');
-    app.innerHTML = '<div class="crumb">본사 관리자</div><h1>🏢 본사 관리자 로그인</h1><p class="muted">본사 이메일을 넣으면 <strong>로그인 링크</strong>를 메일로 보내요. 메일의 링크를 누르면 바로 열립니다. 비밀번호는 없어요.</p>' +
-      '<form id="hq-form"><input type="email" id="hq-email" class="text-input" placeholder="본사 이메일" autocomplete="email" required><button class="btn primary wide" type="submit" id="hq-go">로그인 링크 보내기</button></form><p id="hq-note" class="small' + (err ? ' warn">' + esc(err) : '">') + '</p>' +
-      '<p class="muted small">메일이 안 보이면 스팸함을 확인해 주세요. 링크는 1시간 안에 눌러야 하고, 등록된 본사 이메일이 아니면 로그인해도 "권한 없음"이 나와요.</p>';
+    app.innerHTML = '<div class="crumb">본사 관리자</div><h1>🏢 본사 관리자 로그인</h1><p class="muted">본사 이메일과 비밀번호를 넣어 주세요. 한 번 로그인하면 이 기기는 기억해요.</p>' +
+      '<form id="hq-form"><input type="email" id="hq-email" class="text-input" placeholder="본사 이메일" autocomplete="username" required><input type="password" id="hq-pw" class="text-input" placeholder="비밀번호" autocomplete="current-password"><button class="btn primary wide" type="submit" id="hq-go">로그인</button></form><p id="hq-note" class="small' + (err ? ' warn">' + esc(err) : '">') + '</p>' +
+      '<p class="muted small">비밀번호를 잊었으면 <a href="#" id="hq-link">메일로 로그인 링크 받기</a> (메일의 링크를 바로 눌러야 하고, 메일 앱이 링크를 미리 열어 버리면 안 될 수 있어요). 등록된 본사 이메일이 아니면 로그인해도 "권한 없음"이 나와요.</p>';
+    var em = function () { return document.getElementById('hq-email').value.trim().toLowerCase(); }, n = document.getElementById('hq-note');
     document.getElementById('hq-form').addEventListener('submit', function (e) {
       e.preventDefault();
-      var em = document.getElementById('hq-email').value.trim().toLowerCase(), n = document.getElementById('hq-note'), btn = document.getElementById('hq-go');
-      btn.disabled = true; n.className = 'small muted'; n.textContent = '보내는 중…';
-      hqSendLink(em).then(function () { n.className = 'small ok-text'; n.textContent = '✓ 메일을 보냈어요. 메일함에서 "Log In" 또는 "Magic Link" 링크를 눌러 주세요. 이 창은 닫아도 돼요.'; })
-        .catch(function (e2) { btn.disabled = false; n.className = 'small warn'; n.textContent = hqMsg(e2); });
+      var pw = document.getElementById('hq-pw').value, btn = document.getElementById('hq-go');
+      if (!em() || !pw) { n.className = 'small warn'; n.textContent = '이메일과 비밀번호를 넣어 주세요.'; return; }
+      btn.disabled = true; n.className = 'small muted'; n.textContent = '확인 중…';
+      hqPasswordLogin(em(), pw).then(function () { viewHq('', null, {}); })
+        .catch(function (e2) { btn.disabled = false; n.className = 'small warn'; n.textContent = /invalid_credentials|400/.test(e2.message) ? '이메일 또는 비밀번호가 달라요.' : hqMsg(e2); document.getElementById('hq-pw').value = ''; });
+    });
+    document.getElementById('hq-link').addEventListener('click', function (e) {
+      e.preventDefault();
+      if (!em()) { n.className = 'small warn'; n.textContent = '이메일을 먼저 넣어 주세요.'; return; }
+      n.className = 'small muted'; n.textContent = '보내는 중…';
+      hqSendLink(em()).then(function () { n.className = 'small ok-text'; n.textContent = '✓ 메일을 보냈어요. 메일의 "Sign in" 링크를 눌러 주세요.'; })
+        .catch(function (e2) { n.className = 'small warn'; n.textContent = hqMsg(e2); });
     });
   }
   // 전 지점 현황: 지점마다 오늘 오픈·마감 · 담당자 · 완료시간 · 특이사항 · 교육 진행
@@ -1028,7 +1043,7 @@
         var s = shapeBundle(b); if (!s.store) { s = emptyBundle(); s.stores = [st.name]; s.store_items = {}; s.store_items[st.name] = (d.settings && d.settings.extra_items) || { open: [], close: [] }; }
         if (s.manual && s.manual.length) setBook(s); else if (!book.chapters.length) setBook(null);
         var h = '<div class="crumb"><a href="#/hq?d=' + date + '">지점 현황</a> › ' + esc(st.name) + '</div>';
-        h += '<div class="card"><div class="title">' + esc(st.name) + (st.status === 'paused' ? ' <span class="pill none">사용 중지</span>' : ' <span class="pill done">사용 중</span>') + '</div><div class="muted small">점주 ' + esc(st.owner_name || '-') + ' · ' + esc(st.owner_phone || '연락처 없음') + ' · 코드 ' + esc(st.code) + ' · 등록 ' + koDate(String(st.created_at).slice(0, 10)) + (st.locked_until && new Date(st.locked_until) > new Date() ? ' · <span class="warn">PIN 잠김(10분)</span>' : '') + '</div>';
+        h += '<div class="card"><div class="title">' + esc(st.name) + (st.status === 'paused' ? ' <span class="pill none">사용 중지</span>' : ' <span class="pill done">사용 중</span>') + '</div><div class="muted small">점주 ' + esc(st.owner_name || '-') + ' · ' + esc(st.owner_phone || '연락처 없음') + ' · 코드 ' + esc(st.code) + ' · 등록 ' + koDate(dateStr(new Date(st.created_at))) + (st.locked_until && new Date(st.locked_until) > new Date() ? ' · <span class="warn">PIN 잠김(10분)</span>' : '') + '</div>';
         h += '<div class="chapter-tools"><button type="button" class="btn" id="hs-link">🔗 링크·QR·안내문</button><button type="button" class="btn" id="hs-pin">🔐 PIN 초기화</button><button type="button" class="btn" id="hs-status">' + (st.status === 'paused' ? '▶ 다시 사용' : '⏸ 사용 중지') + '</button><button type="button" class="btn danger" id="hs-del">지점 삭제</button></div><p id="hs-note" class="small"></p><div id="hs-extra"></div></div>';
         h += '<div class="date-nav"><a class="btn" href="#/hq/store/' + id + '?d=' + shiftDate(date, -1) + '">‹ 전날</a><strong>' + koDate(date) + (date === today() ? ' 오늘' : '') + '</strong>' + (date < today() ? '<a class="btn" href="#/hq/store/' + id + '?d=' + shiftDate(date, 1) + '">다음날 ›</a>' : '<a class="btn" href="#/hq/store/' + id + '">오늘</a>') + '</div>';
         var any = false;
