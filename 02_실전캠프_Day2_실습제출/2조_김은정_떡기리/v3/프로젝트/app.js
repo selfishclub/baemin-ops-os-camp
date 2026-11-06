@@ -2,7 +2,7 @@
  * v1 = 12장 매뉴얼·검색·체크리스트(폰 저장)·교육표·확인 필요
  * v2 = 체크리스트를 서버(Supabase)에 저장 + 사장 점검표
  * v3 = 지점 전용 링크(#/s/코드)로 들어와 이름만 고름. 앱은 표를 직접 읽지 않고 "지점 코드를 받는 서버 함수"만 부른다.
- *      매뉴얼 = 본사 공통(DB) + 우리 지점 추가사항(DB). 점주·본사 화면은 따로(3·4단계).
+ *      매뉴얼 = 본사 공통(DB) + 우리 지점 추가사항(DB). 점주 화면(#/owner) = 코드+PIN → 토큰 → 이 지점만. 본사 화면은 4단계.
  * - 서버 열쇠는 config.js (make-config.js 가 .env.local / 환경변수에서 만듦).
  * - 빌드 도구 없음.
  */
@@ -17,7 +17,8 @@
   };
   var session = {
     get: function (k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
-    set: function (k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
+    set: function (k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} },
+    del: function (k) { try { sessionStorage.removeItem(k); } catch (e) {} }
   };
   function pad(n) { return String(n).padStart(2, '0'); }
   function dateStr(d) { d = d || new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
@@ -238,7 +239,6 @@
     var notes = ((s && s.notes) || []).filter(function (n) { return n.chapter_no === ch.num; });
     if (!notes.length) return ch.lines;
     var out = ch.lines.slice(), tail = [];
-    function isHeading(l) { return /^\*\*[^*]+\*\*/.test(l) || /^#{1,6}\s/.test(l); }
     notes.forEach(function (n, k) {
       var mark = NOTE_MARK + JSON.stringify({ k: k, body: n.body_md || '' });
       var key = n.section_key ? plain(n.section_key) : '', idx = -1, i;
@@ -511,11 +511,286 @@
     });
   }
 
-  // 점주 화면 — 3단계에서 만든다. 지금은 안내만.
-  function viewOwner() {
-    var s = settingsCache || emptyBundle();
-    app.innerHTML = '<div class="crumb"><a href="#/">첫 화면</a> › 점주</div><h1>📋 점주 화면</h1>' +
-      '<div class="card"><div class="title">' + esc(singleStore(s) || '매장') + '</div><div class="sub">점주 화면(점검표·직원·우리 지점 추가사항·PIN)은 다음 단계에서 열려요. 지금은 기존 주소의 사장 점검표를 그대로 쓰시면 됩니다. 이 링크로 남긴 기록도 거기에 똑같이 보여요.</div></div>';
+  // ---------- 점주 화면 (3단계) ----------
+  // 로그인 = 지점 코드(링크에 든 것) + PIN → 서버가 준 토큰(12시간)을 이 브라우저 탭에만 보관.
+  // 점주 함수는 전부 토큰으로 "이 지점" 것만 읽고 쓴다. 다른 지점 데이터는 화면 어디에도 오지 않는다.
+  var OWNER_ERR = [
+    ['wrong pin', '번호가 달라요.'], ['locked', '5번 틀려서 10분 동안 잠겼어요. 잠시 뒤 다시 해 주세요.'],
+    ['session expired', '시간이 지나 번호를 다시 넣어야 해요.'], ['duplicate name', '같은 이름이 이미 있어요.'],
+    ['name required', '이름을 적어 주세요.'], ['name too long', '이름이 너무 길어요 (20자까지).'], ['body required', '내용을 적어 주세요.'],
+    ['pin must be 6 digits', '새 번호는 숫자 6자리여야 해요.'], ['name used by another store', '다른 지점에 같은 이름의 직원이 있어 교육 기록을 나눌 수 없어요. 본사에 알려 주세요.'],
+    ['store not found', '이 링크의 매장을 찾지 못했어요.'], ['Failed to fetch', '인터넷 연결을 확인해 주세요.']
+  ];
+  function ownerMsg(e) { var m = (e && e.message) || String(e); for (var i = 0; i < OWNER_ERR.length; i++) if (m.indexOf(OWNER_ERR[i][0]) >= 0) return OWNER_ERR[i][1]; return '저장 안 됨 (' + m.slice(0, 80) + ')'; }
+  function ownerToken() { return session.get('owner_token') || ''; }
+  function ownerOut() { session.del('owner_token'); session.del('owner_store'); ownerCache = null; }
+  function ownerRpc(name, args) {
+    args = args || {}; args.p_token = ownerToken();
+    return rpc(name, args).catch(function (e) { if (/session expired/.test(e.message || '')) ownerOut(); throw e; });
+  }
+  var ownerCache = null; // owner_bundle (이 지점: 직원·설정·추가사항·교육 진도)
+  function loadOwner(force) {
+    if (ownerCache && !force) return Promise.resolve(ownerCache);
+    return ownerRpc('owner_bundle').then(function (b) { ownerCache = b; return b; });
+  }
+  // 점주가 무언가 바꾸면 직원 화면용 묶음도 다시 받게 한다
+  function ownerChanged() { ownerCache = null; settingsCache = null; store.del('bundle:' + CODE); }
+  function isHeading(l) { return /^\*\*[^*]+\*\*/.test(l) || /^#{1,6}\s/.test(l); }
+  function sectionHeads(ch) { var out = []; (ch ? ch.lines : []).forEach(function (l) { if (isHeading(l)) { var p = plain(l); if (p && out.indexOf(p) < 0) out.push(p); } }); return out; }
+  function copyText(t, btn) {
+    function done() { var o = btn.textContent; btn.textContent = '✓ 복사됨'; setTimeout(function () { btn.textContent = o; }, 1500); }
+    function fallback() { var ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) { alert('복사가 안 돼요. 글자를 길게 눌러 복사해 주세요.'); } document.body.removeChild(ta); }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, fallback); else fallback();
+  }
+  function staffLink() { return location.origin + location.pathname + '#/s/' + CODE; }
+  var OWNER_TABS = [['', '📋 오늘 점검'], ['staff', '👥 직원관리'], ['notes', '📍 우리 지점 추가사항'], ['settings', '⚙️ 설정']];
+
+  function viewOwner(sub, params) {
+    sub = sub || ''; params = params || {};
+    if (sub === 'items' || sub === 'link') sub = 'settings';
+    var s = settingsCache || emptyBundle(), name = singleStore(s) || '매장';
+    if (!ownerToken()) return viewOwnerLogin(name, sub, params);
+    var h = '<div class="crumb"><a href="#/">첫 화면</a> › 점주</div><h1>' + esc(name) + ' <span class="muted" style="font-size:15px;font-weight:600">점주 화면</span></h1>';
+    h += '<nav class="owner-tabs">' + OWNER_TABS.map(function (t) { return '<a href="#/owner' + (t[0] ? '/' + t[0] : '') + '"' + (t[0] === sub ? ' class="on"' : '') + '>' + t[1] + '</a>'; }).join('') + '</nav>';
+    h += '<div id="owner-body" class="muted">불러오는 중…</div>';
+    app.innerHTML = h;
+    var body = document.getElementById('owner-body');
+    function fail(e) { body.className = ''; body.innerHTML = '<div class="save-note">' + esc(ownerMsg(e)) + '</div>' + (!ownerToken() ? '<a class="btn primary" href="#/owner">다시 열기</a>' : ''); }
+    try {
+      if (sub === 'staff') ownerStaff(body).catch(fail);
+      else if (sub === 'notes') ownerNotes(body).catch(fail);
+      else if (sub === 'items' || sub === 'link') { location.hash = '#/owner/settings'; return; }
+      else if (sub === 'settings') ownerSettings(body);
+      else ownerChecklist(body, params.d || today()).catch(fail);
+    } catch (e) { fail(e); }
+  }
+  function viewOwnerLogin(name, sub, params) {
+    app.innerHTML = '<div class="crumb"><a href="#/">첫 화면</a> › 점주</div><h1>📋 점주 화면</h1><p class="muted"><strong>' + esc(name) + '</strong> 점주님 번호(PIN)를 넣어 주세요.</p>' +
+      '<form id="pin-form" class="pin-form"><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="pin" autocomplete="off" aria-label="점주 번호"><button class="btn primary" type="submit" id="pin-go">열기</button></form><p id="pin-err" class="warn" hidden></p>' +
+      '<p class="muted small">직원분은 첫 화면에서 이름만 고르면 돼요. 이 화면은 점주님만 씁니다. 번호를 잊으셨으면 본사에 말씀해 주세요.</p>';
+    document.getElementById('pin').focus();
+    document.getElementById('pin-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var pin = document.getElementById('pin').value.trim(), err = document.getElementById('pin-err'), btn = document.getElementById('pin-go');
+      if (!/^\d{4,8}$/.test(pin)) { err.hidden = false; err.textContent = '숫자로 넣어 주세요.'; return; }
+      btn.disabled = true; btn.textContent = '확인 중…'; err.hidden = true;
+      rpc('owner_login', { p_code: CODE, p_pin: pin }).then(function (r) {
+        session.set('owner_token', r.token); session.set('owner_store', JSON.stringify(r.store || {})); ownerCache = null;
+        viewOwner(sub, params);
+      }).catch(function (e) { btn.disabled = false; btn.textContent = '열기'; err.hidden = false; err.textContent = ownerMsg(e); document.getElementById('pin').value = ''; });
+    });
+  }
+
+  // 점검표: 날짜별 오픈·마감 상태 · 담당자 · 완료시간 · 미완료 항목 · 특이사항 · 폐기
+  function ownerChecklist(body, date) {
+    var h = '<div class="date-nav"><a class="btn" href="#/owner?d=' + shiftDate(date, -1) + '">‹ 전날</a><strong>' + koDate(date) + (date === today() ? ' 오늘' : '') + '</strong>' + (date < today() ? '<a class="btn" href="#/owner?d=' + shiftDate(date, 1) + '">다음날 ›</a>' : '<a class="btn" href="#/owner">오늘</a>') + '</div><div id="oc-body" class="muted">불러오는 중…</div>';
+    body.className = ''; body.innerHTML = h;
+    return Promise.all([loadSettings(), fetchRunsForDate(date), loadOwner()]).then(function (r) {
+      var s = r[0], runs = r[1] || [], st = singleStore(s) || '';
+      function find(k) { return runs.filter(function (x) { return x.kind === k; })[0]; }
+      var b = '<div class="owner-grid two"><div class="og-head">☀️ 오픈</div><div class="og-head">🌙 마감</div>';
+      ['open', 'close'].forEach(function (k) {
+        var run = find(k), stt = runStatus(run, itemsFor(s, st, k, date).all.length), miss = stt.total - stt.done;
+        b += '<a class="og-cell ' + stt.cls + '" href="#d-' + k + '"><span class="og-label">' + stt.label + '</span>' +
+          (run ? '<span class="og-meta">' + esc(run.staff) + '</span><span class="og-meta">' + (run.completed_at ? hhmm(run.completed_at) : '완료 안 누름') + (miss ? ' · 미완료 ' + miss : ' · ' + stt.done + '/' + stt.total) + (run.note ? ' · 📝' : '') + '</span>' : '<span class="og-meta">기록 없음</span>') + '</a>';
+      });
+      b += '</div>';
+      var any = false;
+      ['open', 'close'].forEach(function (k) { var run = find(k); if (run) { any = true; b += ownerDetail(run, k, st, s, date); } });
+      if (!any) b += '<div class="empty"><strong>' + koDate(date) + ' 기록이 없어요.</strong>직원이 체크를 시작하면 여기에 바로 나타납니다.</div>';
+      if (s.offline) b += '<div class="save-note">서버에 연결되지 않아 마지막으로 받은 내용을 보여 줘요.</div>';
+      document.getElementById('oc-body').className = ''; document.getElementById('oc-body').innerHTML = b;
+      body.querySelectorAll('.og-cell').forEach(function (cell) {
+        cell.addEventListener('click', function (e) { e.preventDefault(); var el = document.getElementById(cell.getAttribute('href').slice(1)); if (el) { el.classList.add('hl'); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } });
+      });
+    });
+  }
+  function ownerDetail(run, k, st, s, dateS) {
+    var items = itemsFor(s, st, k, dateS).all, stt = runStatus(run, items.length), missing = [];
+    var wasteKeys = Object.keys(run.waste || {}).filter(function (x) { return x !== '_none' && run.waste[x] > 0; });
+    var wasteHtml = k !== 'close' ? null : (wasteKeys.length ? '<ul class="miss-list waste-list">' + wasteKeys.map(function (p) { return '<li>' + esc(p) + ' <strong>' + run.waste[p] + '</strong>개</li>'; }).join('') + '</ul>' : (run.waste && run.waste._none ? '<span class="ok-text">없음 (폐기 없음으로 입력)</span>' : '<span class="warn">미입력</span>'));
+    items.forEach(function (t, i) { if (!(run.items || {})[String(i)]) missing.push(t); });
+    var d = '<div class="card detail" id="d-' + k + '">';
+    d += '<div class="title">' + KIND_LABEL[k] + ' <span class="pill ' + stt.cls + '">' + stt.label + '</span></div>';
+    d += '<table class="kv"><tr><th>담당자</th><td>' + esc(run.staff) + '</td></tr>';
+    d += '<tr><th>완료시간</th><td>' + (run.completed_at ? hhmm(run.completed_at) + (run.first_completed_at && run.first_completed_at !== run.completed_at ? ' <span class="muted small">(처음 제출 ' + hhmm(run.first_completed_at) + ')</span>' : '') : '<span class="warn">완료 제출 안 함</span>') + '</td></tr>';
+    d += '<tr><th>체크</th><td>' + stt.done + '/' + stt.total + (run.updated_at ? ' <span class="muted small">(마지막 ' + hhmm(run.updated_at) + ')</span>' : '') + '</td></tr>';
+    d += '<tr><th>미완료 항목</th><td>' + (missing.length ? '<ul class="miss-list">' + missing.map(function (t) { return '<li>⬜ ' + esc(t) + '</li>'; }).join('') + '</ul>' : '<span class="ok-text">없음 — 모두 체크됨</span>') + '</td></tr>';
+    if (wasteHtml !== null) d += '<tr><th>오늘 폐기</th><td>' + wasteHtml + '</td></tr>';
+    d += '<tr><th>특이사항</th><td>' + (run.note ? esc(run.note).replace(/\n/g, '<br>') : '<span class="muted">없음</span>') + '</td></tr></table>';
+    d += '<details class="times"><summary>항목별 체크 시각</summary><ul class="detail-list">';
+    items.forEach(function (t, i) { var at = (run.items || {})[String(i)]; d += '<li class="' + (at ? 'ok' : 'miss') + '">' + (at ? '✅ ' + hhmm(at) : '⬜ 빠짐') + ' · ' + esc(t) + '</li>'; });
+    d += '</ul></details></div>';
+    return d;
+  }
+
+  // 직원: 추가 · 이름/입사일 수정 · 퇴사/복귀 · 교육 진도(사수 확인)
+  function ownerStaff(body) {
+    return loadOwner().then(function (o) {
+      var active = o.staff.filter(function (x) { return x.active; }), gone = o.staff.filter(function (x) { return !x.active; });
+      function rowsFor(sf) { return o.training.filter(function (t) { return t.staff_id === sf.id || (!t.staff_id && t.staff === sf.name); }); }
+      var h = '<div class="card"><div class="title">직원 추가</div><div class="staff-add"><input type="text" id="st-new" class="text-input" placeholder="이름 (예: 김하나)" maxlength="20"><input type="date" id="st-new-date" class="text-input" aria-label="입사일"><button type="button" class="btn primary" id="st-add">추가</button></div><p class="muted small">추가하면 직원 화면의 이름 목록에 바로 나와요. 입사일을 적으면 "입사 N일째"와 7일 배지가 보입니다.</p><p id="st-add-note" class="muted small"></p></div>';
+      var late = [];
+      h += '<p class="section-title">근무 중 ' + active.length + '명</p>';
+      if (!active.length) h += empty('등록된 직원이 없어요.', '위에서 이름을 추가해 주세요.');
+      active.forEach(function (sf) {
+        var days = daysSince(sf.hire_on), rows = rowsFor(sf), read = 0, confirmed = 0;
+        var steps = STEPS.map(function (stp) {
+          var p = rows.filter(function (x) { return x.step === stp.day; })[0], r = !!(p && p.read_at), c = !!(p && p.confirmed_at);
+          if (r) read++; if (c) confirmed++;
+          return '<div class="tr-step"><span class="tr-day">' + esc(stp.day) + '</span><span class="pill ' + (c ? 'done' : r ? 'partial' : 'none') + '">' + (c ? '사수 확인 ✓' : r ? '읽음 ' + koDate(p.read_at.slice(0, 10)) : '아직') + '</span>' + (!c ? '<button type="button" class="btn small-btn tr-confirm" data-id="' + sf.id + '" data-step="' + esc(stp.day) + '">사수 확인</button>' : '') + '</div>';
+        }).join('');
+        var isLate = days !== null && days > 7 && confirmed < STEPS.length, done = STEPS.length && confirmed === STEPS.length;
+        if (isLate) late.push(sf.name);
+        h += '<div class="card staff-card' + (isLate ? ' late' : '') + '" data-id="' + sf.id + '">';
+        h += '<div class="staff-row"><input type="text" class="text-input st-name" value="' + esc(sf.name) + '" maxlength="20" aria-label="이름"><input type="date" class="text-input st-date" value="' + esc(sf.hire_on || '') + '" aria-label="입사일"></div>';
+        h += '<div class="staff-meta"><span class="muted small">' + (days ? '입사 ' + days + '일째' : '입사일 미등록') + '</span>' + (done ? '<span class="pill done">교육 완료</span>' : isLate ? '<span class="pill none">7일 지남 · 미완료</span>' : '') + '<span class="staff-btns"><button type="button" class="btn small-btn st-save">저장</button><button type="button" class="btn small-btn danger st-off">퇴사</button></span></div>';
+        h += '<details class="staff-train"><summary>🎓 교육 진도 · 읽음 ' + read + '/' + STEPS.length + ' · 사수 확인 ' + confirmed + '/' + STEPS.length + '</summary>' + steps + '</details>';
+        h += '<p class="muted small st-note"></p></div>';
+      });
+      if (late.length) h = h.replace('<p class="section-title">근무 중', '<div class="save-note">⚠️ 입사 7일이 지났는데 교육을 못 끝낸 직원 <strong>' + late.length + '명</strong>: ' + late.map(esc).join(', ') + '</div><p class="section-title">근무 중');
+      if (gone.length) {
+        h += '<details class="gone"><summary class="section-title">퇴사·쉬는 직원 ' + gone.length + '명</summary>';
+        gone.forEach(function (sf) { h += '<div class="card staff-card off" data-id="' + sf.id + '"><div class="staff-meta"><strong>' + esc(sf.name) + '</strong><span class="muted small">' + (sf.hire_on ? '입사 ' + esc(sf.hire_on) : '') + '</span><span class="staff-btns"><button type="button" class="btn small-btn st-on">복귀</button></span></div><p class="muted small st-note"></p></div>'; });
+        h += '<p class="muted small">퇴사한 직원은 직원 화면 목록에서 빠지지만 과거 체크 기록은 그대로 남아요.</p></details>';
+      }
+      body.className = ''; body.innerHTML = h;
+      function note(card, msg, ok) { var n = card.querySelector('.st-note'); n.textContent = msg; n.className = 'small st-note ' + (ok ? 'ok-text' : 'warn'); }
+      function save(card, patch, okMsg) {
+        var id = card.dataset.id, sf = o.staff.filter(function (x) { return x.id === id; })[0];
+        var args = { p_id: id, p_name: patch.name !== undefined ? patch.name : sf.name, p_hire_on: patch.hire_on !== undefined ? (patch.hire_on || null) : (sf.hire_on || null), p_active: patch.active !== undefined ? patch.active : sf.active };
+        card.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+        return ownerRpc('owner_staff_save', args).then(function () { ownerChanged(); return loadOwner(true); }).then(function () { if (okMsg) alert(okMsg); viewOwner('staff'); })
+          .catch(function (e) { card.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); note(card, ownerMsg(e), false); });
+      }
+      document.getElementById('st-add').addEventListener('click', function () {
+        var nm = document.getElementById('st-new').value.trim(), dt = document.getElementById('st-new-date').value, n = document.getElementById('st-add-note'), btn = this;
+        if (!nm) { n.textContent = '이름을 적어 주세요.'; n.className = 'small warn'; return; }
+        btn.disabled = true;
+        ownerRpc('owner_staff_save', { p_id: null, p_name: nm, p_hire_on: dt || null, p_active: true }).then(function () { ownerChanged(); return loadOwner(true); }).then(function () { viewOwner('staff'); })
+          .catch(function (e) { btn.disabled = false; n.textContent = ownerMsg(e); n.className = 'small warn'; });
+      });
+      body.querySelectorAll('.staff-card').forEach(function (card) {
+        var sv = card.querySelector('.st-save'), off = card.querySelector('.st-off'), on = card.querySelector('.st-on');
+        if (sv) sv.addEventListener('click', function () { save(card, { name: card.querySelector('.st-name').value.trim(), hire_on: card.querySelector('.st-date').value }); });
+        if (off) off.addEventListener('click', function () { var nm = card.querySelector('.st-name').value.trim(); if (!confirm(nm + ' 님을 퇴사 처리할까요?\n직원 화면 목록에서 빠지고, 과거 기록은 그대로 남아요. 나중에 "복귀"로 되돌릴 수 있어요.')) return; save(card, { active: false }); });
+        if (on) on.addEventListener('click', function () { save(card, { active: true }); });
+        card.querySelectorAll('.tr-confirm').forEach(function (b) {
+          b.addEventListener('click', function () {
+            b.disabled = true; b.textContent = '저장 중…';
+            ownerRpc('owner_confirm_training', { p_staff_id: b.dataset.id, p_step: b.dataset.step }).then(function () { return loadOwner(true); }).then(function () { viewOwner('staff'); })
+              .catch(function (e) { b.disabled = false; b.textContent = '사수 확인'; note(card, ownerMsg(e), false); });
+          });
+        });
+      });
+    });
+  }
+
+  // 우리 지점 추가사항: 장 → 소제목 → 내용. 직원 화면에서 그 소제목 아래 📍 상자로 보인다.
+  function ownerNotes(body) {
+    return loadOwner().then(function (o) {
+      var notes = o.notes || [], editing = null;
+      var h = '<div class="card soft-card"><strong>공통 매뉴얼은 본사가 관리해요.</strong><div class="muted small">여기서는 우리 지점에서만 적용되는 내용을 덧붙입니다. 직원 화면에서는 고른 장의 소제목 바로 아래 <strong>📍 우리 지점 추가사항</strong> 상자로 이어서 보여요. 다른 지점에는 안 보입니다.</div></div>';
+      h += '<div class="card" id="note-form"><div class="title" id="nf-title">추가사항 새로 쓰기</div>';
+      h += '<label class="field">어느 장에<select id="nf-ch" class="text-input">' + book.chapters.map(function (c) { return '<option value="' + c.num + '">' + c.num + '장. ' + esc(c.name) + '</option>'; }).join('') + '</select></label>';
+      h += '<label class="field">어느 소제목 아래에<select id="nf-sec" class="text-input"></select></label>';
+      h += '<label class="field">내용 <span class="muted small">— 한 줄에 하나씩. 줄 앞에 "- "를 붙이면 목록, "- [ ] "를 붙이면 체크 칸</span><textarea id="nf-body" rows="5" placeholder="예:\n- 우리 지점은 테라스 의자를 먼저 펴요\n- [ ] 입간판은 입구 왼쪽에"></textarea></label>';
+      h += '<div class="chapter-tools"><button type="button" class="btn" id="nf-preview">미리보기</button><button type="button" class="btn primary" id="nf-save">저장</button><button type="button" class="btn" id="nf-cancel" hidden>취소</button></div><div id="nf-prev"></div><p id="nf-note" class="small"></p></div>';
+      h += '<p class="section-title">등록된 추가사항 ' + notes.length + '건</p>';
+      if (!notes.length) h += empty('아직 추가사항이 없어요.', '위에서 장과 소제목을 고르고 내용을 적어 보세요.');
+      notes.forEach(function (n) {
+        var ch = book.chapters.filter(function (c) { return c.num === n.chapter_no; })[0];
+        h += '<div class="card note-card' + (n.active ? '' : ' off') + '" data-id="' + n.id + '"><div class="where">' + n.chapter_no + '장 ' + esc(ch ? ch.name : '') + ' › ' + esc(n.section_key || '장 맨 끝') + (n.active ? '' : ' <span class="pill none">꺼짐</span>') + '</div>';
+        h += '<div class="store-note"><div class="store-note-title">📍 우리 지점 추가사항</div>' + renderBlocks(String(n.body_md || '').replace(/\r\n?/g, '\n').split('\n'), { num: 'o' + n.id }) + '</div>';
+        h += '<div class="chapter-tools"><button type="button" class="btn small-btn n-edit">수정</button><button type="button" class="btn small-btn n-toggle">' + (n.active ? '끄기' : '켜기') + '</button><button type="button" class="btn small-btn danger n-del">삭제</button></div><p class="small n-note"></p></div>';
+      });
+      body.className = ''; body.innerHTML = h;
+      var chSel = document.getElementById('nf-ch'), secSel = document.getElementById('nf-sec'), bodyTa = document.getElementById('nf-body'), nfNote = document.getElementById('nf-note');
+      function fillSec(num, chosen) {
+        var ch = book.chapters.filter(function (c) { return c.num === num; })[0], heads = sectionHeads(ch);
+        secSel.innerHTML = heads.map(function (x) { return '<option value="' + esc(x) + '"' + (chosen === x ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '<option value=""' + (chosen === '' || (chosen && heads.indexOf(chosen) < 0) ? ' selected' : '') + '>(장 맨 끝)</option>';
+      }
+      fillSec(parseInt(chSel.value, 10));
+      chSel.addEventListener('change', function () { fillSec(parseInt(chSel.value, 10)); });
+      function setForm(n) {
+        editing = n; document.getElementById('nf-title').textContent = n ? '추가사항 수정' : '추가사항 새로 쓰기';
+        document.getElementById('nf-cancel').hidden = !n; document.getElementById('nf-prev').innerHTML = ''; nfNote.textContent = '';
+        if (n) { chSel.value = String(n.chapter_no); fillSec(n.chapter_no, n.section_key || ''); bodyTa.value = n.body_md || ''; document.getElementById('note-form').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        else { bodyTa.value = ''; fillSec(parseInt(chSel.value, 10)); }
+      }
+      document.getElementById('nf-cancel').addEventListener('click', function () { setForm(null); });
+      document.getElementById('nf-preview').addEventListener('click', function () {
+        document.getElementById('nf-prev').innerHTML = bodyTa.value.trim() ? '<div class="store-note"><div class="store-note-title">📍 우리 지점 추가사항</div>' + renderBlocks(bodyTa.value.replace(/\r\n?/g, '\n').split('\n'), { num: 'prev' }) + '</div>' : '<p class="muted small">내용이 비어 있어요.</p>';
+      });
+      document.getElementById('nf-save').addEventListener('click', function () {
+        var btn = this; if (!bodyTa.value.trim()) { nfNote.textContent = '내용을 적어 주세요.'; nfNote.className = 'small warn'; return; }
+        btn.disabled = true;
+        ownerRpc('owner_note_save', { p_id: editing ? editing.id : null, p_chapter_no: parseInt(chSel.value, 10), p_section_key: secSel.value || null, p_body_md: bodyTa.value, p_active: editing ? editing.active : true })
+          .then(function () { ownerChanged(); return loadOwner(true); }).then(function () { viewOwner('notes'); })
+          .catch(function (e) { btn.disabled = false; nfNote.textContent = ownerMsg(e); nfNote.className = 'small warn'; });
+      });
+      body.querySelectorAll('.note-card').forEach(function (card) {
+        var n = notes.filter(function (x) { return x.id === card.dataset.id; })[0], nn = card.querySelector('.n-note');
+        function after(p) { return p.then(function () { ownerChanged(); return loadOwner(true); }).then(function () { viewOwner('notes'); }).catch(function (e) { nn.textContent = ownerMsg(e); nn.className = 'small warn'; }); }
+        card.querySelector('.n-edit').addEventListener('click', function () { setForm(n); });
+        card.querySelector('.n-toggle').addEventListener('click', function () { after(ownerRpc('owner_note_save', { p_id: n.id, p_chapter_no: n.chapter_no, p_section_key: n.section_key || null, p_body_md: n.body_md, p_active: !n.active })); });
+        card.querySelector('.n-del').addEventListener('click', function () { if (!confirm('이 추가사항을 지울까요? 되돌릴 수 없어요. (잠깐 숨기려면 "끄기")')) return; after(ownerRpc('owner_note_delete', { p_id: n.id })); });
+      });
+    });
+  }
+
+  // 체크 항목: 우리 지점 오픈·마감 추가 항목 + 떡 종류(폐기 입력용)
+  function ownerItems(body) {
+    return loadOwner().then(function (o) {
+      var ss = o.settings || {}, xi = ss.extra_items || {}, products = ss.products || [];
+      var h = '<div class="card soft-card"><strong>공통 항목(오픈 ' + LISTS.open.items.length + '·마감 ' + LISTS.close.items.length + ')은 본사 매뉴얼에서 와요.</strong><div class="muted small">아래 항목은 그 뒤에 "🏪 ' + esc(singleStore(settingsCache || emptyBundle()) || '매장') + ' 항목"으로 이어 붙어 우리 지점 직원에게만 보입니다. 한 줄에 하나.<br>매일이 아닌 항목은 끝에 주기를 적어요: <code>제빙기 내부 세척 (매주 월)</code> · <code>냉장고 전체 세척 (격주 월)</code> · <code>소화기 점검 (매월 1일)</code> — 그날에만 나옵니다.</div></div>';
+      h += '<label class="field">☀️ 오픈 추가 항목<textarea id="xi-open" rows="4" placeholder="예: 테라스 의자 펴기">' + esc((xi.open || []).join('\n')) + '</textarea></label>';
+      h += '<label class="field">🌙 마감 추가 항목<textarea id="xi-close" rows="4" placeholder="예: 테라스 의자 접고 묶기">' + esc((xi.close || []).join('\n')) + '</textarea></label>';
+      h += '<label class="field">🗑️ 떡 종류 (폐기 입력용) <span class="muted small">— 마감 때 직원이 폐기 있는 떡을 골라 개수를 적어요. 비우면 직원이 이름을 직접 적습니다</span><textarea id="xi-products" rows="5" placeholder="예:\n인절미\n흑임자 인절미\n꿀떡">' + esc(products.join('\n')) + '</textarea></label>';
+      h += '<button type="button" class="btn primary wide" id="xi-save">저장</button><p id="xi-note" class="small"></p>';
+      body.className = ''; body.innerHTML = h;
+      function linesNL(id) { var out = []; document.getElementById(id).value.split('\n').forEach(function (x) { x = x.trim(); if (x && out.indexOf(x) < 0) out.push(x); }); return out; }
+      document.getElementById('xi-save').addEventListener('click', function () {
+        var btn = this, n = document.getElementById('xi-note'); btn.disabled = true; n.textContent = '저장 중…'; n.className = 'small muted';
+        ownerRpc('owner_settings_save', { p_extra_items: { open: linesNL('xi-open'), close: linesNL('xi-close') }, p_products: linesNL('xi-products') })
+          .then(function () { ownerChanged(); return loadOwner(true); }).then(function () { btn.disabled = false; n.textContent = '✓ 저장됐어요. 직원 화면에 바로 반영됩니다.'; n.className = 'small ok-text'; })
+          .catch(function (e) { btn.disabled = false; n.textContent = ownerMsg(e); n.className = 'small warn'; });
+      });
+    });
+  }
+
+  // 직원용 링크 · QR · 안내문 (설정 탭 안)
+  function ownerLink(body) {
+    var name = singleStore(settingsCache || emptyBundle()) || '매장', link = staffLink();
+    body.className = ''; body.innerHTML = linkSectionHtml(name, link, 'lk');
+    bindLinkSection(name, link, 'lk');
+  }
+
+  // 설정: PIN 바꾸기(6자리) · 로그아웃
+  function ownerSettings(body) {
+    var os = null; try { os = JSON.parse(session.get('owner_store') || 'null'); } catch (e) {}
+    var name = singleStore(settingsCache || emptyBundle()) || (os && os.name) || '매장';
+    var h = '<div class="card"><div class="title">🏪 ' + esc(name) + '</div><div class="muted small">지점 코드 <strong>' + esc((os && os.code) || CODE) + '</strong> · 이 코드는 직원용 링크 안에 들어 있어요. 직원에게 코드나 번호를 따로 알려 줄 필요는 없습니다. 지점 이름 변경은 본사에 요청해 주세요.</div></div>';
+    h += '<div id="os-link"></div>';
+    h += '<div class="card"><div class="title">🔐 점주 번호(PIN) 바꾸기</div><p class="muted small">점주 화면을 여는 숫자 <strong>6자리</strong>예요. 직원과 공유하지 마세요. 바꾸면 다른 기기에서 열어 둔 점주 화면은 닫혀요.</p>';
+    h += '<label class="field">지금 번호<input type="password" inputmode="numeric" maxlength="8" id="pin0" class="text-input" autocomplete="current-password"></label>';
+    h += '<label class="field">새 번호 (숫자 6자리)<input type="password" inputmode="numeric" maxlength="6" id="pin1" class="text-input" autocomplete="new-password"></label>';
+    h += '<label class="field">새 번호 한 번 더<input type="password" inputmode="numeric" maxlength="6" id="pin2" class="text-input" autocomplete="new-password"></label>';
+    h += '<button type="button" class="btn primary wide" id="pin-save">번호 바꾸기</button><p id="pin-note" class="small"></p></div>';
+    h += '<details class="card"><summary class="title">✅ 지점 체크 항목 · 떡 종류 (선택)</summary><div id="os-items" class="muted">불러오는 중…</div></details>';
+    h += '<div class="card"><div class="title">이 기기에서 닫기</div><p class="muted small">다른 사람이 쓰는 폰·PC라면 다 쓰고 닫아 주세요. 번호를 다시 넣어야 열려요.</p><button type="button" class="btn wide" id="owner-logout">점주 화면 닫기</button></div>';
+    body.className = ''; body.innerHTML = h;
+    ownerLink(document.getElementById('os-link'));
+    ownerItems(document.getElementById('os-items')).catch(function (e) { document.getElementById('os-items').innerHTML = '<div class="save-note">' + esc(ownerMsg(e)) + '</div>'; });
+    document.getElementById('pin-save').addEventListener('click', function () {
+      var p0 = document.getElementById('pin0').value.trim(), p1 = document.getElementById('pin1').value.trim(), p2 = document.getElementById('pin2').value.trim(), n = document.getElementById('pin-note'), btn = this;
+      if (!/^\d{6}$/.test(p1)) { n.textContent = '새 번호는 숫자 6자리로 넣어 주세요.'; n.className = 'small warn'; return; }
+      if (p1 !== p2) { n.textContent = '두 번 넣은 새 번호가 달라요.'; n.className = 'small warn'; return; }
+      btn.disabled = true;
+      ownerRpc('owner_change_pin', { p_old_pin: p0, p_new_pin: p1 }).then(function () { btn.disabled = false; n.textContent = '✓ 바꿨어요. 다음부터 새 번호로 여세요.'; n.className = 'small ok-text'; ['pin0', 'pin1', 'pin2'].forEach(function (id) { document.getElementById(id).value = ''; }); })
+        .catch(function (e) { btn.disabled = false; n.textContent = ownerMsg(e); n.className = 'small warn'; });
+    });
+    document.getElementById('owner-logout').addEventListener('click', function () { var t = ownerToken(); ownerOut(); if (t) rpc('owner_logout', { p_token: t }).catch(function () {}); location.hash = '#/'; });
   }
 
   // v1 화면들 (장 상세·검색·교육표·확인 필요)
@@ -594,6 +869,299 @@
     app.innerHTML = h;
   }
 
+  // ---------- 링크·QR·안내문 (점주 설정 · 본사 지점 등록/상세에서 같이 씀) ----------
+  function storeLink(code) { return location.origin + location.pathname + '#/s/' + code; }
+  function staffGuideText(name, link) {
+    return '[' + name + ' 직원 온라인북]\n이 링크는 우리 지점 직원교육 온라인북이에요.\n링크를 열고 본인 이름을 고른 뒤 오픈·마감 체크와 업무 매뉴얼을 확인해 주세요.\n' + link + '\n(번호나 코드는 없어요. 홈 화면에 추가해 두면 앱처럼 쓸 수 있어요)';
+  }
+  function ownerGuideText(name, link, pin) {
+    return '[떡기리 직원 온라인북 · ' + name + ' 점주님 안내]\n\n' +
+      '1) 우리 지점 직원용 링크\n' + link + '\n\n' +
+      '2) 점주 화면 들어가기\n위 링크를 열고 → 맨 아래 "점주 화면" → 점주 번호(PIN) ' + (pin ? pin : '(본사에서 받은 6자리)') + ' 입력\n※ 처음 들어가면 설정 → "점주 번호 바꾸기"에서 번호를 꼭 바꿔 주세요 (숫자 6자리)\n\n' +
+      '3) 직원 이름 등록\n점주 화면 → 직원관리 → 이름 적고 "추가" (입사일은 선택)\n\n' +
+      '4) 직원에게 링크 보내기\n점주 화면 → 설정 → "직원용 안내문 복사" → 직원 단톡방에 붙여넣기 (QR 저장·인쇄도 가능)\n직원은 링크를 열고 본인 이름만 고르면 끝이에요. 번호·코드는 필요 없어요.\n\n' +
+      '5) 오픈·마감 확인\n점주 화면 → 오늘 점검: 담당자 · 완료시간 · 빠진 항목 · 특이사항\n\n' +
+      '6) 우리 지점만의 내용 덧붙이기\n점주 화면 → 우리 지점 추가사항 → 장과 소제목을 고르고 내용 저장. 직원 화면에 바로 보여요.\n\n' +
+      '문제가 생기면: 본사(떡기리)에 연락 주세요. 번호를 잊으면 본사에서 새로 받을 수 있어요.';
+  }
+  function qrBuild(link) {
+    if (typeof qrcode !== 'function') return null;
+    var q = qrcode(0, 'M'); q.addData(link); q.make();
+    var cnv = document.createElement('canvas'), mod = q.getModuleCount(), cell = 10, margin = 40; cnv.width = cnv.height = mod * cell + margin * 2;
+    var cx = cnv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cnv.width, cnv.height); cx.fillStyle = '#000';
+    for (var r = 0; r < mod; r++) for (var c = 0; c < mod; c++) if (q.isDark(r, c)) cx.fillRect(margin + c * cell, margin + r * cell, cell, cell);
+    return { img: q.createImgTag(6, 12), png: cnv.toDataURL('image/png') };
+  }
+  function linkSectionHtml(name, link, p) {
+    var h = '<div class="card"><div class="title">🔗 직원용 링크</div><p class="muted small">이 링크 안에 우리 지점 코드가 들어 있어요. 직원은 열고 이름만 고르면 됩니다. 다른 지점 직원에게는 보내지 마세요.</p><div class="link-row"><input type="text" class="text-input" id="' + p + '-url" readonly value="' + esc(link) + '"><button type="button" class="btn primary" id="' + p + '-copy">복사</button></div></div>';
+    h += '<div class="card qr-sheet" id="' + p + '-sheet"><div class="title">📱 직원용 QR</div><div class="qr-box" id="' + p + '-box"></div><div class="qr-caption"><strong>' + esc(name) + ' 직원 온라인북</strong><span class="muted small">카메라로 찍고 이름을 고르세요</span></div><div class="chapter-tools noprint"><a class="btn" id="' + p + '-save" download="' + esc(name) + '_직원QR.png" href="#">QR 이미지 저장</a><button type="button" class="btn" id="' + p + '-print">인쇄</button></div></div>';
+    h += '<div class="card"><div class="title">💬 직원용 안내문 (단톡방에 그대로)</div><textarea id="' + p + '-guide" rows="6" class="guide-ta">' + esc(staffGuideText(name, link)) + '</textarea><button type="button" class="btn wide" id="' + p + '-guide-copy">직원용 안내문 복사</button></div>';
+    return h;
+  }
+  function bindLinkSection(name, link, p) {
+    var g = function (id) { return document.getElementById(p + '-' + id); };
+    try {
+      var q = qrBuild(link); if (!q) throw new Error('qr');
+      g('box').innerHTML = q.img; var img = g('box').querySelector('img'); img.alt = name + ' 직원용 QR'; img.style.width = '220px'; img.style.height = '220px';
+      g('save').href = q.png;
+    } catch (e) { g('box').innerHTML = '<p class="muted small">QR을 만들지 못했어요. 링크를 복사해서 보내 주세요.</p>'; g('save').hidden = true; }
+    g('copy').addEventListener('click', function () { copyText(link, this); });
+    g('guide-copy').addEventListener('click', function () { copyText(g('guide').value, this); });
+    g('print').addEventListener('click', function () { g('sheet').classList.add('print-target'); document.body.classList.add('print-qr'); window.print(); setTimeout(function () { document.body.classList.remove('print-qr'); g('sheet').classList.remove('print-target'); }, 800); });
+  }
+
+  // ---------- 본사 관리자 화면 (#/hq) ----------
+  // 로그인 = 이메일 매직링크(Supabase Auth). 메일의 링크를 누르면 이 주소로 돌아오며 주소 뒤에 토큰이 붙는다 → 저장 → #/hq.
+  // 본사 함수는 로그인 토큰으로만 호출되고, 서버가 그 이메일이 hq_admins 에 있는지 확인한다. 익명은 호출 자체가 막혀 있다.
+  function hqSession() { try { return JSON.parse(store.get('hq_session') || 'null'); } catch (e) { return null; } }
+  function hqOut() { store.del('hq_session'); }
+  function hqKeep(at, rt, secs) { store.set('hq_session', JSON.stringify({ access_token: at, refresh_token: rt || '', expires_at: Date.now() + (secs || 3600) * 1000 })); }
+  function hqAuthFromHash() {
+    var h = location.hash || '';
+    if (h.indexOf('#access_token=') !== 0 && h.indexOf('#error') !== 0) return false;
+    var p = {}; h.slice(1).split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) p[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' ')); });
+    if (p.access_token) hqKeep(p.access_token, p.refresh_token, parseInt(p.expires_in, 10));
+    else session.set('hq_err', p.error_description || p.error || '로그인 링크가 올바르지 않아요.');
+    return true;
+  }
+  function authUrl(path) { return SB.url.replace(/\/$/, '') + '/auth/v1/' + path; }
+  function hqRefresh() {
+    var s = hqSession(); if (!s || !s.refresh_token) { hqOut(); return Promise.reject(new Error('not logged in')); }
+    return fetch(authUrl('token?grant_type=refresh_token'), { method: 'POST', headers: { apikey: SB.anon, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: s.refresh_token }) })
+      .then(function (r) { if (!r.ok) throw new Error('refresh failed'); return r.json(); })
+      .then(function (j) { hqKeep(j.access_token, j.refresh_token, j.expires_in); return j.access_token; })
+      .catch(function () { hqOut(); throw new Error('not logged in'); });
+  }
+  function hqRpc(name, args, retried) {
+    var s = hqSession(); if (!s) return Promise.reject(new Error('not logged in'));
+    var pre = (!retried && s.expires_at && s.expires_at - Date.now() < 60000) ? hqRefresh() : Promise.resolve(s.access_token);
+    return pre.then(function (tk) {
+      return fetch(SB.url.replace(/\/$/, '') + '/rest/v1/rpc/' + name, { method: 'POST', headers: { apikey: SB.anon, Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' }, body: JSON.stringify(args || {}) })
+        .then(function (r) {
+          if (r.status === 401 && !retried) return hqRefresh().then(function () { return hqRpc(name, args, true); });
+          if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + ' ' + t); });
+          return r.text().then(function (t) { return t ? JSON.parse(t) : null; });
+        });
+    });
+  }
+  function hqSendLink(email) {
+    var redirect = location.origin + location.pathname;
+    return fetch(authUrl('otp?redirect_to=' + encodeURIComponent(redirect)), { method: 'POST', headers: { apikey: SB.anon, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, create_user: true }) })
+      .then(function (r) { if (!r.ok) return r.text().then(function (t) { throw new Error(r.status + ' ' + t); }); return true; });
+  }
+  function hqMsg(e) {
+    var m = (e && e.message) || String(e);
+    if (/not hq/.test(m)) return '이 이메일은 본사 관리자로 등록되지 않았어요.';
+    if (/not logged in|refresh failed|^401/.test(m)) return '로그인이 풀렸어요. 다시 로그인해 주세요.';
+    if (/duplicate store/.test(m)) return '같은 이름의 지점이 이미 있어요.';
+    if (/name required/.test(m)) return '지점 이름을 적어 주세요.';
+    if (/title required/.test(m)) return '제목을 적어 주세요.';
+    if (/confirm name mismatch/.test(m)) return '지점 이름이 정확히 같지 않아요.';
+    if (/has old records/.test(m)) return '기록이 쌓인 지점은 지울 수 없어요. 대신 "사용 중지"를 쓰세요.';
+    if (/rate.?limit/i.test(m)) return '메일을 너무 자주 보냈어요. 잠시 뒤(약 1시간) 다시 해 주세요.';
+    if (/Failed to fetch/.test(m)) return '인터넷 연결을 확인해 주세요.';
+    return '안 됨 (' + m.slice(0, 120) + ')';
+  }
+  function koDT(iso) { return iso ? koDate(iso.slice(0, 10)) + ' ' + hhmm(iso) : ''; }
+  function hqStatus(run) {
+    if (!run) return { cls: 'none', label: '미완료' };
+    if (run.completed_at) return { cls: 'done', label: '완료 ' + hhmm(run.completed_at) + ((run.total || 0) > (run.done_count || 0) ? ' (' + (run.total - run.done_count) + '개 빠짐)' : '') };
+    return { cls: 'partial', label: '진행 중 ' + (run.done_count || 0) + '/' + (run.total || 0) };
+  }
+  var HQ_TABS = [['', '🏪 지점 현황'], ['manual', '📖 공통 매뉴얼'], ['new', '➕ 지점 등록']];
+  function viewHq(sub, id, params) {
+    sub = sub || ''; params = params || {};
+    if (sub === 'logout') { hqOut(); location.hash = '#/hq'; return; }
+    if (!hqSession()) return viewHqLogin();
+    var h = '<div class="crumb">본사 관리자</div><h1>🏢 떡기리 본사</h1>';
+    h += '<nav class="owner-tabs">' + HQ_TABS.map(function (t) { return '<a href="#/hq' + (t[0] ? '/' + t[0] : '') + '"' + (t[0] === sub || (sub === 'store' && !t[0]) ? ' class="on"' : '') + '>' + t[1] + '</a>'; }).join('') + '<a href="#/hq/logout" class="tab-right">나가기</a></nav>';
+    h += '<div id="hq-body" class="muted">불러오는 중…</div>';
+    app.innerHTML = h;
+    var body = document.getElementById('hq-body');
+    function fail(e) { body.className = ''; body.innerHTML = '<div class="save-note">' + esc(hqMsg(e)) + '</div>' + (!hqSession() ? '<a class="btn primary" href="#/hq">다시 로그인</a>' : ''); }
+    try {
+      if (sub === 'manual') (id ? hqManualPage(body, id) : hqManualList(body)).catch(fail);
+      else if (sub === 'new') hqNewStore(body);
+      else if (sub === 'store' && id) hqStore(body, id, params.d || today()).catch(fail);
+      else hqOverview(body, params.d || today()).catch(fail);
+    } catch (e) { fail(e); }
+  }
+  function viewHqLogin() {
+    var err = session.get('hq_err'); session.del('hq_err');
+    app.innerHTML = '<div class="crumb">본사 관리자</div><h1>🏢 본사 관리자 로그인</h1><p class="muted">본사 이메일을 넣으면 <strong>로그인 링크</strong>를 메일로 보내요. 메일의 링크를 누르면 바로 열립니다. 비밀번호는 없어요.</p>' +
+      '<form id="hq-form"><input type="email" id="hq-email" class="text-input" placeholder="본사 이메일" autocomplete="email" required><button class="btn primary wide" type="submit" id="hq-go">로그인 링크 보내기</button></form><p id="hq-note" class="small' + (err ? ' warn">' + esc(err) : '">') + '</p>' +
+      '<p class="muted small">메일이 안 보이면 스팸함을 확인해 주세요. 링크는 1시간 안에 눌러야 하고, 등록된 본사 이메일이 아니면 로그인해도 "권한 없음"이 나와요.</p>';
+    document.getElementById('hq-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var em = document.getElementById('hq-email').value.trim().toLowerCase(), n = document.getElementById('hq-note'), btn = document.getElementById('hq-go');
+      btn.disabled = true; n.className = 'small muted'; n.textContent = '보내는 중…';
+      hqSendLink(em).then(function () { n.className = 'small ok-text'; n.textContent = '✓ 메일을 보냈어요. 메일함에서 "Log In" 또는 "Magic Link" 링크를 눌러 주세요. 이 창은 닫아도 돼요.'; })
+        .catch(function (e2) { btn.disabled = false; n.className = 'small warn'; n.textContent = hqMsg(e2); });
+    });
+  }
+  // 전 지점 현황: 지점마다 오늘 오픈·마감 · 담당자 · 완료시간 · 특이사항 · 교육 진행
+  function hqOverview(body, date) {
+    return hqRpc('hq_overview', { p_date: date }).then(function (o) {
+      var stores = o.stores || [], stepsN = trainingRows(parseBook('## 12장. 교육\n' + (o.ch12 || ''))).length || 3;
+      var openDone = stores.filter(function (s) { return s.open && s.open.completed_at; }).length, closeDone = stores.filter(function (s) { return s.close && s.close.completed_at; }).length;
+      var h = '<div class="date-nav"><a class="btn" href="#/hq?d=' + shiftDate(date, -1) + '">‹ 전날</a><strong>' + koDate(date) + (date === today() ? ' 오늘' : '') + '</strong>' + (date < today() ? '<a class="btn" href="#/hq?d=' + shiftDate(date, 1) + '">다음날 ›</a>' : '<a class="btn" href="#/hq">오늘</a>') + '</div>';
+      h += '<div class="card status-card"><div class="sub">지점 <strong>' + stores.length + '</strong>곳 · 오픈 완료 <strong>' + openDone + '</strong>/' + stores.length + ' · 마감 완료 <strong>' + closeDone + '</strong>/' + stores.length + '</div><div class="muted small">로그인: ' + esc(o.admin || '') + '</div></div>';
+      if (!stores.length) h += empty('등록된 지점이 없어요.', '"지점 등록"에서 첫 지점을 만들어 주세요.');
+      stores.forEach(function (s) {
+        var so = hqStatus(s.open), sc = hqStatus(s.close), tr = s.training || [];
+        var done = tr.filter(function (t) { return t.confirmed >= stepsN; }).length, late = tr.filter(function (t) { var d = daysSince(t.hire_on); return d !== null && d > 7 && t.confirmed < stepsN; }).length;
+        h += '<a class="card link hq-store" href="#/hq/store/' + s.id + '?d=' + date + '"><div class="title">' + esc(s.name) + (s.status === 'paused' ? ' <span class="pill none">사용 중지</span>' : '') + ' <span class="muted small">' + esc(s.owner_name || '') + ' · 코드 ' + esc(s.code) + '</span></div>';
+        h += '<div class="today-row"><span class="pill ' + so.cls + '">오픈 ' + so.label + '</span>' + (s.open ? '<span class="muted small">' + esc(s.open.staff) + '</span>' : '') + '</div>';
+        h += '<div class="today-row"><span class="pill ' + sc.cls + '">마감 ' + sc.label + '</span>' + (s.close ? '<span class="muted small">' + esc(s.close.staff) + '</span>' : '') + '</div>';
+        var notes = []; if (s.open && s.open.note) notes.push('오픈: ' + s.open.note); if (s.close && s.close.note) notes.push('마감: ' + s.close.note);
+        if (notes.length) h += '<div class="hq-note">📝 ' + notes.map(esc).join('<br>📝 ') + '</div>';
+        h += '<div class="muted small">👥 직원 ' + (s.staff_n || 0) + '명 · 🎓 교육 완료 ' + done + '/' + tr.length + (late ? ' · <span class="warn">7일 지남 ' + late + '명</span>' : '') + '</div></a>';
+      });
+      body.className = ''; body.innerHTML = h;
+    });
+  }
+  // 지점 상세: 그날 기록(점주 화면과 같은 카드) · 최근 7일 특이사항 · 직원·교육 · 추가사항 · 링크/QR/안내문 · PIN 초기화 · 중지/재개 · 삭제
+  function hqStore(body, id, date) {
+    return hqRpc('hq_store', { p_store_id: id, p_date: date }).then(function (d) {
+      var st = d.store, link = storeLink(st.code);
+      return rpc('staff_bundle', { p_code: st.code }).catch(function () { return null; }).then(function (b) {
+        var s = shapeBundle(b); if (!s.store) { s = emptyBundle(); s.stores = [st.name]; s.store_items = {}; s.store_items[st.name] = (d.settings && d.settings.extra_items) || { open: [], close: [] }; }
+        if (s.manual && s.manual.length) setBook(s); else if (!book.chapters.length) setBook(null);
+        var h = '<div class="crumb"><a href="#/hq?d=' + date + '">지점 현황</a> › ' + esc(st.name) + '</div>';
+        h += '<div class="card"><div class="title">' + esc(st.name) + (st.status === 'paused' ? ' <span class="pill none">사용 중지</span>' : ' <span class="pill done">사용 중</span>') + '</div><div class="muted small">점주 ' + esc(st.owner_name || '-') + ' · ' + esc(st.owner_phone || '연락처 없음') + ' · 코드 ' + esc(st.code) + ' · 등록 ' + koDate(String(st.created_at).slice(0, 10)) + (st.locked_until && new Date(st.locked_until) > new Date() ? ' · <span class="warn">PIN 잠김(10분)</span>' : '') + '</div>';
+        h += '<div class="chapter-tools"><button type="button" class="btn" id="hs-link">🔗 링크·QR·안내문</button><button type="button" class="btn" id="hs-pin">🔐 PIN 초기화</button><button type="button" class="btn" id="hs-status">' + (st.status === 'paused' ? '▶ 다시 사용' : '⏸ 사용 중지') + '</button><button type="button" class="btn danger" id="hs-del">지점 삭제</button></div><p id="hs-note" class="small"></p><div id="hs-extra"></div></div>';
+        h += '<div class="date-nav"><a class="btn" href="#/hq/store/' + id + '?d=' + shiftDate(date, -1) + '">‹ 전날</a><strong>' + koDate(date) + (date === today() ? ' 오늘' : '') + '</strong>' + (date < today() ? '<a class="btn" href="#/hq/store/' + id + '?d=' + shiftDate(date, 1) + '">다음날 ›</a>' : '<a class="btn" href="#/hq/store/' + id + '">오늘</a>') + '</div>';
+        var any = false;
+        ['open', 'close'].forEach(function (k) { var run = (d.runs || []).filter(function (x) { return x.kind === k; })[0]; if (run) { any = true; h += ownerDetail(run, k, st.name, s, date); } });
+        if (!any) h += '<div class="empty"><strong>' + koDate(date) + ' 기록이 없어요.</strong></div>';
+        h += '<p class="section-title">📝 최근 7일 특이사항·폐기</p>';
+        if (!(d.recent || []).length) h += '<div class="card"><div class="muted small">없음</div></div>';
+        (d.recent || []).forEach(function (r) {
+          var wk = Object.keys(r.waste || {}).filter(function (x) { return x !== '_none' && r.waste[x] > 0; });
+          h += '<div class="card"><div class="muted small">' + koDate(r.run_date) + ' ' + KIND_LABEL[r.kind] + ' · ' + esc(r.staff) + '</div>' + (r.note ? '<div>' + esc(r.note).replace(/\n/g, '<br>') + '</div>' : '') + (wk.length ? '<div class="muted small">🗑️ ' + wk.map(function (p) { return esc(p) + ' ' + r.waste[p] + '개'; }).join(', ') + '</div>' : '') + '</div>';
+        });
+        h += '<p class="section-title">👥 직원 ' + d.staff.filter(function (x) { return x.active; }).length + '명 · 🎓 교육</p>';
+        if (!d.staff.length) h += '<div class="card"><div class="muted small">아직 직원이 없어요. 점주가 점주 화면 → 직원관리에서 등록합니다.</div></div>';
+        d.staff.forEach(function (f) {
+          var days = daysSince(f.hire_on), conf = STEPS.map(function (stp) { var p = (f.steps || []).filter(function (x) { return x.step === stp.day; })[0]; return '<span class="pill ' + (p && p.confirmed_at ? 'done' : p && p.read_at ? 'partial' : 'none') + '">' + esc(stp.day) + '</span>'; }).join(' ');
+          h += '<div class="card' + (f.active ? '' : ' staff-card off') + '"><div class="title">' + esc(f.name) + (f.active ? '' : ' <span class="pill none">퇴사</span>') + ' <span class="muted small">' + (days ? '입사 ' + days + '일째' : '입사일 미등록') + '</span></div><div class="choice">' + conf + '</div></div>';
+        });
+        h += '<p class="section-title">📍 이 지점 추가사항 ' + (d.notes || []).length + '건</p>';
+        if (!(d.notes || []).length) h += '<div class="card"><div class="muted small">없음</div></div>';
+        (d.notes || []).forEach(function (n) {
+          var ch = book.chapters.filter(function (c) { return c.num === n.chapter_no; })[0];
+          h += '<div class="card note-card' + (n.active ? '' : ' off') + '"><div class="where">' + n.chapter_no + '장 ' + esc(ch ? ch.name : '') + ' › ' + esc(n.section_key || '장 맨 끝') + (n.active ? '' : ' <span class="pill none">꺼짐</span>') + '</div><div class="store-note"><div class="store-note-title">📍 우리 지점 추가사항</div>' + renderBlocks(String(n.body_md || '').split('\n'), { num: 'h' + n.id }) + '</div></div>';
+        });
+        body.className = ''; body.innerHTML = h;
+        var note = document.getElementById('hs-note'), extra = document.getElementById('hs-extra');
+        function say(msg, ok) { note.textContent = msg; note.className = 'small ' + (ok ? 'ok-text' : 'warn'); }
+        document.getElementById('hs-link').addEventListener('click', function () {
+          if (extra.innerHTML) { extra.innerHTML = ''; return; }
+          extra.innerHTML = linkSectionHtml(st.name, link, 'hl') + '<div class="card"><div class="title">📨 점주님께 보낼 안내문 (PIN 없이)</div><p class="muted small">PIN은 "PIN 초기화"를 누르면 새로 만들어져 그때 안내문에 함께 들어가요.</p><textarea id="hl-og" rows="10" class="guide-ta">' + esc(ownerGuideText(st.name, link, '')) + '</textarea><button type="button" class="btn wide" id="hl-og-copy">점주 안내문 복사</button></div>';
+          bindLinkSection(st.name, link, 'hl');
+          document.getElementById('hl-og-copy').addEventListener('click', function () { copyText(document.getElementById('hl-og').value, this); });
+        });
+        document.getElementById('hs-pin').addEventListener('click', function () {
+          if (!confirm(st.name + ' 점주 번호(PIN)를 새로 만들까요?\n지금 번호는 더 이상 안 되고, 새 번호는 이 화면에 한 번만 보여요. 점주님께 꼭 전달해 주세요.')) return;
+          hqRpc('hq_reset_pin', { p_store_id: id }).then(function (r) {
+            extra.innerHTML = '<div class="card soft-card"><div class="title">🔐 새 점주 번호: <span class="pin-big">' + esc(r.pin) + '</span></div><div class="muted small">이 번호는 지금만 보여요. 아래 안내문에 들어 있으니 복사해서 점주님께 보내 주세요.</div></div><div class="card"><textarea id="hp-og" rows="10" class="guide-ta">' + esc(ownerGuideText(st.name, link, r.pin)) + '</textarea><button type="button" class="btn primary wide" id="hp-og-copy">점주 안내문 복사 (PIN 포함)</button></div>';
+            document.getElementById('hp-og-copy').addEventListener('click', function () { copyText(document.getElementById('hp-og').value, this); });
+            say('✓ 번호를 새로 만들었어요.', true);
+          }).catch(function (e) { say(hqMsg(e), false); });
+        });
+        document.getElementById('hs-status').addEventListener('click', function () {
+          var to = st.status === 'paused' ? 'active' : 'paused';
+          if (!confirm(to === 'paused' ? st.name + ' 사용을 중지할까요?\n직원 링크와 점주 화면이 모두 닫혀요. 기록은 남고, 언제든 다시 켤 수 있어요.' : st.name + ' 사용을 다시 시작할까요?')) return;
+          hqRpc('hq_update_store', { p_store_id: id, p_name: null, p_owner_name: null, p_owner_phone: null, p_status: to }).then(function () { viewHq('store', id, { d: date }); }).catch(function (e) { say(hqMsg(e), false); });
+        });
+        document.getElementById('hs-del').addEventListener('click', function () {
+          var typed = prompt('정말 지우려면 지점 이름을 똑같이 적어 주세요.\n(직원·기록·추가사항이 모두 지워져요. 7일보다 오래된 기록이 있는 지점은 지워지지 않고, 대신 "사용 중지"를 쓰세요)');
+          if (typed === null) return;
+          hqRpc('hq_delete_store', { p_store_id: id, p_confirm_name: typed.trim() }).then(function (r) { alert(r.deleted + ' 지점을 지웠어요. (기록 ' + r.runs + ' · 직원 ' + r.staff + ' · 추가사항 ' + r.notes + ')'); location.hash = '#/hq'; }).catch(function (e) { say(hqMsg(e), false); });
+        });
+      });
+    });
+  }
+  // 지점 등록: 이름·점주·연락처 → 코드 + 첫 PIN + 링크 + QR + 안내문이 한 번에
+  function hqNewStore(body) {
+    body.className = '';
+    body.innerHTML = '<div class="card"><div class="title">➕ 새 지점 등록</div><p class="muted small">등록하면 지점 코드·직원용 링크·QR·첫 점주 번호(PIN)·점주 안내문이 한 번에 만들어져요. 점주가 직접 가입하는 방식은 없어요.</p>' +
+      '<label class="field">지점 이름<input type="text" id="ns-name" class="text-input" placeholder="예: 떡기리 수원역점" maxlength="30"></label>' +
+      '<label class="field">점주 이름 (선택)<input type="text" id="ns-owner" class="text-input" maxlength="20"></label>' +
+      '<label class="field">점주 연락처 (선택)<input type="tel" id="ns-phone" class="text-input" maxlength="20"></label>' +
+      '<button type="button" class="btn primary wide" id="ns-go">지점 등록</button><p id="ns-note" class="small"></p></div><div id="ns-result"></div>';
+    document.getElementById('ns-go').addEventListener('click', function () {
+      var nm = document.getElementById('ns-name').value.trim(), n = document.getElementById('ns-note'), btn = this;
+      if (!nm) { n.textContent = '지점 이름을 적어 주세요.'; n.className = 'small warn'; return; }
+      if (!confirm('"' + nm + '" 지점을 등록할까요?')) return;
+      btn.disabled = true; n.textContent = '만드는 중…'; n.className = 'small muted';
+      hqRpc('hq_create_store', { p_name: nm, p_owner_name: document.getElementById('ns-owner').value, p_owner_phone: document.getElementById('ns-phone').value }).then(function (r) {
+        var link = storeLink(r.code);
+        n.textContent = '✓ 등록됐어요.'; n.className = 'small ok-text';
+        var h = '<div class="card soft-card"><div class="title">✅ ' + esc(r.name) + ' 등록 완료</div><table class="kv"><tr><th>지점 코드</th><td>' + esc(r.code) + '</td></tr><tr><th>첫 점주 번호</th><td><span class="pin-big">' + esc(r.pin) + '</span> <span class="muted small">— 지금만 보여요</span></td></tr><tr><th>직원용 링크</th><td style="word-break:break-all">' + esc(link) + '</td></tr></table></div>';
+        h += '<div class="card"><div class="title">📨 점주님께 보낼 안내문 (링크 + PIN + 순서)</div><textarea id="ns-og" rows="12" class="guide-ta">' + esc(ownerGuideText(r.name, link, r.pin)) + '</textarea><button type="button" class="btn primary wide" id="ns-og-copy">점주 안내문 복사</button></div>';
+        h += linkSectionHtml(r.name, link, 'nl');
+        h += '<a class="btn wide" href="#/hq/store/' + r.id + '">이 지점 상세로</a>';
+        document.getElementById('ns-result').innerHTML = h;
+        bindLinkSection(r.name, link, 'nl');
+        document.getElementById('ns-og-copy').addEventListener('click', function () { copyText(document.getElementById('ns-og').value, this); });
+        document.getElementById('ns-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }).catch(function (e) { btn.disabled = false; n.textContent = hqMsg(e); n.className = 'small warn'; });
+    });
+  }
+  // 공통 매뉴얼: 목록 → 조각 편집(미리보기·저장) → 수정 이력(보기·되돌리기)
+  function hqManualList(body) {
+    return hqRpc('hq_manual_list').then(function (pages) {
+      var h = '<div class="card soft-card"><strong>여기서 고치면 모든 지점에 바로 반영돼요.</strong><div class="muted small">저장할 때마다 이전 내용이 자동으로 남아, 각 조각의 "수정 이력"에서 언제든 되돌릴 수 있어요.</div></div>';
+      function row(p) { return '<a class="card link" href="#/hq/manual/' + p.id + '"><div class="title">' + (p.section_kind === 'chapter' ? '' : '') + esc(p.title) + '</div><div class="sub">' + (p.group_name ? esc(p.group_name) + ' · ' : '') + p.len + '자 · 수정 ' + koDT(p.updated_at) + (p.updated_by ? ' (' + esc(p.updated_by) + ')' : '') + ' · 이력 ' + p.history_n + '</div></a>'; }
+      var intro = pages.filter(function (p) { return p.section_kind === 'intro'; }), ch = pages.filter(function (p) { return p.section_kind === 'chapter'; }), ap = pages.filter(function (p) { return p.section_kind === 'appendix'; });
+      if (intro.length) { h += '<p class="section-title">머리말</p>'; intro.forEach(function (p) { h += row(p); }); }
+      h += '<p class="section-title">장 (' + ch.length + ')</p>'; ch.forEach(function (p) { h += row(p); });
+      if (ap.length) { h += '<p class="section-title">별도 출력물 (체크리스트 원본 등)</p>'; ap.forEach(function (p) { h += row(p); }); }
+      body.className = ''; body.innerHTML = h;
+    });
+  }
+  function hqManualPage(body, id) {
+    return hqRpc('hq_manual_page', { p_id: id }).then(function (p) {
+      if (!p) throw new Error('page not found');
+      var h = '<div class="crumb"><a href="#/hq/manual">공통 매뉴얼</a> › 편집</div>';
+      h += '<label class="field">제목 <span class="muted small">' + (p.section_kind === 'chapter' ? '— "N장. 이름" 형식을 유지해 주세요' : p.section_kind === 'appendix' ? '— 맨 앞 기호(①②③…)는 체크리스트 연결에 쓰이니 유지' : '') + '</span><input type="text" id="mp-title" class="text-input" value="' + esc(p.title) + '"></label>';
+      h += '<label class="field">본문 <span class="muted small">— 지금 매뉴얼과 같은 쓰기 방식: **굵은 소제목**, "- " 목록, "- [ ] " 체크 칸, "| 표 |"</span><textarea id="mp-body" rows="18" class="guide-ta mono">' + esc(p.body_md) + '</textarea></label>';
+      h += '<label class="field">바꾼 이유 (선택, 이력에 남아요)<input type="text" id="mp-reason" class="text-input" placeholder="예: 포장 규격 변경" maxlength="60"></label>';
+      h += '<div class="chapter-tools"><button type="button" class="btn" id="mp-preview">미리보기</button><button type="button" class="btn primary" id="mp-save">저장 (전 지점 반영)</button></div><p id="mp-note" class="small"></p><div id="mp-prev"></div>';
+      h += '<p class="section-title">🕘 수정 이력 ' + p.history.length + '건 <span class="muted small">— 마지막 수정 ' + koDT(p.updated_at) + (p.updated_by ? ' (' + esc(p.updated_by) + ')' : '') + '</span></p>';
+      if (!p.history.length) h += '<div class="card"><div class="muted small">아직 수정한 적이 없어요. 저장하면 지금 내용이 여기에 남습니다.</div></div>';
+      p.history.forEach(function (x) {
+        h += '<div class="card hist" data-id="' + x.id + '"><div class="title">' + koDT(x.saved_at) + ' <span class="muted small">' + esc(x.reason || '') + (x.saved_by ? ' · ' + esc(x.saved_by) : '') + ' · ' + x.len + '자</span></div><div class="chapter-tools"><button type="button" class="btn small-btn h-view">내용 보기</button><button type="button" class="btn small-btn h-restore">이 버전으로 되돌리기</button></div><div class="h-body"></div></div>';
+      });
+      body.className = ''; body.innerHTML = h;
+      var note = document.getElementById('mp-note');
+      function say(m, ok) { note.textContent = m; note.className = 'small ' + (ok ? 'ok-text' : 'warn'); }
+      function prevHtml(title, md) { return '<div class="card"><div class="title">' + esc(title) + '</div><div class="content">' + renderBlocks(String(md || '').replace(/\r\n?/g, '\n').split('\n'), { num: 'hq' }) + '</div></div>'; }
+      document.getElementById('mp-preview').addEventListener('click', function () { document.getElementById('mp-prev').innerHTML = prevHtml(document.getElementById('mp-title').value, document.getElementById('mp-body').value); });
+      document.getElementById('mp-save').addEventListener('click', function () {
+        var btn = this;
+        if (!confirm('저장하면 모든 지점 직원 화면에 바로 반영돼요. 저장할까요?')) return;
+        btn.disabled = true; say('저장 중…', true);
+        hqRpc('hq_manual_save', { p_id: id, p_title: document.getElementById('mp-title').value, p_body_md: document.getElementById('mp-body').value, p_reason: document.getElementById('mp-reason').value })
+          .then(function (r) { say(r.changed ? '✓ 저장했어요. 이전 내용은 수정 이력에 남았어요.' : '바뀐 내용이 없어요.', true); btn.disabled = false; if (r.changed) setTimeout(function () { viewHq('manual', id); }, 800); })
+          .catch(function (e) { btn.disabled = false; say(hqMsg(e), false); });
+      });
+      body.querySelectorAll('.hist').forEach(function (card) {
+        var hid = parseInt(card.dataset.id, 10);
+        card.querySelector('.h-view').addEventListener('click', function () {
+          var hb = card.querySelector('.h-body'); if (hb.innerHTML) { hb.innerHTML = ''; return; }
+          hb.innerHTML = '<p class="muted small">불러오는 중…</p>';
+          hqRpc('hq_manual_history_body', { p_history_id: hid }).then(function (x) { hb.innerHTML = prevHtml(x.title, x.body_md); }).catch(function (e) { hb.innerHTML = '<p class="warn small">' + esc(hqMsg(e)) + '</p>'; });
+        });
+        card.querySelector('.h-restore').addEventListener('click', function () {
+          if (!confirm('이 버전으로 되돌릴까요? 지금 내용도 이력에 남으니 다시 되돌릴 수 있어요. 모든 지점에 바로 반영됩니다.')) return;
+          hqRpc('hq_manual_restore', { p_history_id: hid }).then(function () { viewHq('manual', id); }).catch(function (e) { say(hqMsg(e), false); });
+        });
+      });
+    });
+  }
+
   // ---------- 라우터 ----------
   function route() {
     var hash = location.hash || '#/', path = hash.slice(1), query = '', qi = path.indexOf('?');
@@ -607,7 +1175,8 @@
     if (parts[0] === 'ch') return viewChapter(parseInt(parts[1], 10), params.hl !== undefined ? parseInt(params.hl, 10) : undefined);
     if (parts[0] === 'check') return viewChecklist(parts[1] === 'close' ? 'close' : 'open');
     if (parts[0] === 'who') return viewWho(params.next);
-    if (parts[0] === 'owner') return viewOwner();
+    if (parts[0] === 'owner') return viewOwner(parts[1] || '', params);
+    if (parts[0] === 'hq') return viewHq(parts[1] || '', parts[2], params);
     if (parts[0] === 'train') return viewTraining();
     if (parts[0] === 'todo') return viewTodo();
     if (parts[0] === 'search') { if (input) input.value = params.q || ''; return viewSearch(params.q); }
@@ -615,9 +1184,12 @@
   }
   document.getElementById('search-form').addEventListener('submit', function (e) { e.preventDefault(); location.hash = '#/search?q=' + encodeURIComponent(document.getElementById('search-input').value.trim()); });
   function viewNoCode(msg) {
-    app.innerHTML = '<h1>매장 링크로 들어와 주세요</h1><div class="card"><div class="sub">' + esc(msg || '이 온라인북은 매장마다 전용 링크(QR)가 있어요. 점주님이 보내 준 링크나 매장에 붙은 QR로 열면 바로 이름을 고를 수 있습니다.') + '</div></div>';
+    app.innerHTML = '<h1>매장 링크로 들어와 주세요</h1><div class="card"><div class="sub">' + esc(msg || '이 온라인북은 매장마다 전용 링크(QR)가 있어요. 점주님이 보내 준 링크나 매장에 붙은 QR로 열면 바로 이름을 고를 수 있습니다.') + '</div></div><p class="muted small" style="margin-top:30px"><a href="#/hq">본사 관리자</a></p>';
   }
+  function isHqHash() { return /^#\/hq(\/|\?|$)/.test(location.hash || ''); }
   function init() {
+    if (hqAuthFromHash()) history.replaceState(null, '', location.pathname + location.search + '#/hq');
+    if (isHqHash()) { route(); return; }   // 본사 화면은 지점 코드 없이 연다
     var c = codeFromHash();
     if (c) {
       if (c !== CODE) { CODE = c; store.set('store_code', c); store.del('me'); }
@@ -633,7 +1205,7 @@
       route();
     });
   }
-  window.addEventListener('hashchange', function () { if (codeFromHash()) init(); else route(); });
+  window.addEventListener('hashchange', function () { if (codeFromHash() || /^#access_token=|^#error/.test(location.hash)) init(); else route(); });
   (function inAppBanner() {
     var ua = navigator.userAgent || '', isKakao = /KAKAOTALK/i.test(ua), isOther = /Instagram|FBAN|FBAV|NAVER\(inapp|Line\//i.test(ua);
     if (!isKakao && !isOther) return;

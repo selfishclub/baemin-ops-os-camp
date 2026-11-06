@@ -1,0 +1,209 @@
+-- v3 4단계 (1/1): 본사 관리자용 서버 함수. 이메일 매직링크로 로그인한 사용자(JWT) 의 이메일이 hq_admins 에 있을 때만 동작.
+-- 익명(anon)은 호출 불가(authenticated 에만 실행 권한). 지점 등록·PIN 초기화·공통 매뉴얼 편집/이력/되돌리기·전 지점 현황.
+-- 되돌리기: rollback_step4.sql
+begin;
+
+-- 본사 관리자 이메일 (처음 1명). 바꾸려면 이 표의 이메일을 고치면 된다.
+insert into public.hq_admins (email, name) values ('boraej22@gmail.com', '김은정') on conflict (email) do nothing;
+
+create or replace function public.hq_email() returns text
+language sql stable as $$ select nullif(lower(trim(coalesce(auth.jwt() ->> 'email', ''))), '') $$;
+
+create or replace function public.assert_hq() returns text
+language plpgsql stable security definer set search_path = public as $$
+declare em text;
+begin
+  em := public.hq_email();
+  if em is null or not exists (select 1 from public.hq_admins where lower(email) = em) then raise exception 'not hq'; end if;
+  return em;
+end $$;
+revoke all on function public.hq_email() from public, anon;
+revoke all on function public.assert_hq() from public, anon;
+
+-- 전 지점 현황: 지점마다 그날 오픈·마감 기록(담당자·완료시간·체크·특이사항), 직원 수, 직원별 사수 확인 수
+create or replace function public.hq_overview(p_date date) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public.assert_hq();
+  return jsonb_build_object(
+    'admin', public.hq_email(),
+    'ch12', (select body_md from public.manual_pages where section_kind = 'chapter' and chapter_no = 12 limit 1),
+    'stores', coalesce((select jsonb_agg(jsonb_build_object(
+        'id', s.id, 'name', s.name, 'code', s.code, 'status', s.status, 'owner_name', s.owner_name, 'owner_phone', s.owner_phone, 'created_at', s.created_at,
+        'staff_n', (select count(*) from public.staff f where f.store_id = s.id and f.active),
+        'open', (select to_jsonb(r) - 'items' from public.checklist_runs r where r.store_id = s.id and r.run_date = p_date and r.kind = 'open' limit 1),
+        'close', (select to_jsonb(r) - 'items' from public.checklist_runs r where r.store_id = s.id and r.run_date = p_date and r.kind = 'close' limit 1),
+        'training', coalesce((select jsonb_agg(jsonb_build_object('name', f.name, 'hire_on', f.hire_on,
+             'confirmed', (select count(*) from public.training_progress t where t.staff_id = f.id and t.confirmed_at is not null),
+             'read', (select count(*) from public.training_progress t where t.staff_id = f.id and t.read_at is not null)) order by f.created_at)
+           from public.staff f where f.store_id = s.id and f.active), '[]'::jsonb)
+      ) order by s.created_at) from public.stores s), '[]'::jsonb)
+  );
+end $$;
+
+-- 지점 상세: 그날 기록 전체(항목 포함) · 최근 7일 특이사항·폐기 · 직원과 교육 진도 · 지점 추가사항
+create or replace function public.hq_store(p_store_id uuid, p_date date) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare st public.stores;
+begin
+  perform public.assert_hq();
+  select * into st from public.stores where id = p_store_id;
+  if st.id is null then raise exception 'store not found'; end if;
+  return jsonb_build_object(
+    'store', jsonb_build_object('id', st.id, 'name', st.name, 'code', st.code, 'status', st.status, 'owner_name', st.owner_name, 'owner_phone', st.owner_phone, 'created_at', st.created_at, 'locked_until', st.locked_until),
+    'runs', coalesce((select jsonb_agg(to_jsonb(r)) from public.checklist_runs r where r.store_id = st.id and r.run_date = p_date), '[]'::jsonb),
+    'recent', coalesce((select jsonb_agg(jsonb_build_object('run_date', r.run_date, 'kind', r.kind, 'staff', r.staff, 'note', r.note, 'waste', r.waste, 'completed_at', r.completed_at) order by r.run_date desc, r.kind)
+                        from public.checklist_runs r where r.store_id = st.id and r.run_date between p_date - 6 and p_date
+                          and (coalesce(r.note, '') <> '' or (r.waste is not null and r.waste <> '{}'::jsonb and r.waste <> '{"_none":true}'::jsonb))), '[]'::jsonb),
+    'settings', (select jsonb_build_object('extra_items', ss.extra_items, 'products', ss.products) from public.store_settings ss where ss.store_id = st.id),
+    'staff', coalesce((select jsonb_agg(jsonb_build_object('id', f.id, 'name', f.name, 'hire_on', f.hire_on, 'active', f.active,
+                'steps', coalesce((select jsonb_agg(jsonb_build_object('step', t.step, 'read_at', t.read_at, 'confirmed_at', t.confirmed_at)) from public.training_progress t where t.staff_id = f.id), '[]'::jsonb)) order by f.active desc, f.created_at)
+              from public.staff f where f.store_id = st.id), '[]'::jsonb),
+    'notes', coalesce((select jsonb_agg(jsonb_build_object('id', n.id, 'chapter_no', n.chapter_no, 'section_key', n.section_key, 'body_md', n.body_md, 'active', n.active, 'updated_at', n.updated_at) order by n.chapter_no, n.sort)
+              from public.store_manual_notes n where n.store_id = st.id), '[]'::jsonb)
+  );
+end $$;
+
+-- 신규 지점 등록 = 코드 6자리 + 첫 PIN 6자리 생성 (PIN 은 이때 한 번만 보여 준다). 떡 종류는 본점 설정을 복사.
+create or replace function public.hq_create_store(p_name text, p_owner_name text, p_owner_phone text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare st public.stores; pin text; nm text;
+begin
+  perform public.assert_hq();
+  nm := regexp_replace(trim(coalesce(p_name, '')), '\s+', ' ', 'g');
+  if nm = '' then raise exception 'name required'; end if;
+  if exists (select 1 from public.stores where name = nm) then raise exception 'duplicate store'; end if;
+  pin := lpad((floor(random() * 1000000))::int::text, 6, '0');
+  insert into public.stores (name, code, owner_name, owner_phone, owner_pin_hash)
+  values (nm, public.gen_store_code(), nullif(trim(coalesce(p_owner_name, '')), ''), nullif(trim(coalesce(p_owner_phone, '')), ''), public.pin_hash(pin))
+  returning * into st;
+  insert into public.store_settings (store_id, products)
+  values (st.id, coalesce((select ss.products from public.store_settings ss join public.stores s on s.id = ss.store_id order by s.created_at limit 1), '[]'::jsonb));
+  return jsonb_build_object('id', st.id, 'name', st.name, 'code', st.code, 'owner_name', st.owner_name, 'owner_phone', st.owner_phone, 'pin', pin);
+end $$;
+
+-- 점주 PIN 초기화: 새 6자리를 만들어 한 번 보여 주고, 그 지점의 점주 세션은 모두 끊는다
+create or replace function public.hq_reset_pin(p_store_id uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare st public.stores; pin text;
+begin
+  perform public.assert_hq();
+  select * into st from public.stores where id = p_store_id;
+  if st.id is null then raise exception 'store not found'; end if;
+  pin := lpad((floor(random() * 1000000))::int::text, 6, '0');
+  update public.stores set owner_pin_hash = public.pin_hash(pin), pin_fail_count = 0, locked_until = null, updated_at = now() where id = st.id;
+  delete from public.owner_sessions where store_id = st.id;
+  return jsonb_build_object('id', st.id, 'name', st.name, 'code', st.code, 'pin', pin);
+end $$;
+
+-- 지점 정보 수정 · 사용 중지/재개 (중지하면 직원·점주 링크가 모두 닫힌다)
+create or replace function public.hq_update_store(p_store_id uuid, p_name text, p_owner_name text, p_owner_phone text, p_status text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare st public.stores; nm text;
+begin
+  perform public.assert_hq();
+  select * into st from public.stores where id = p_store_id;
+  if st.id is null then raise exception 'store not found'; end if;
+  nm := regexp_replace(trim(coalesce(p_name, st.name)), '\s+', ' ', 'g');
+  if nm = '' then raise exception 'name required'; end if;
+  if nm <> st.name and exists (select 1 from public.stores where name = nm) then raise exception 'duplicate store'; end if;
+  if p_status is not null and p_status not in ('active', 'paused') then raise exception 'bad status'; end if;
+  update public.stores set name = nm, owner_name = coalesce(nullif(trim(p_owner_name), ''), owner_name), owner_phone = coalesce(nullif(trim(p_owner_phone), ''), owner_phone),
+         status = coalesce(p_status, status), updated_at = now() where id = st.id returning * into st;
+  -- 이름을 바꾸면 v2 호환 칸(store 글자)도 같이 바꿔 둔다
+  update public.checklist_runs set store = st.name where store_id = st.id and store <> st.name;
+  update public.training_progress set store = st.name where store_id = st.id and store is distinct from st.name;
+  if st.status = 'paused' then delete from public.owner_sessions where store_id = st.id; end if;
+  return jsonb_build_object('id', st.id, 'name', st.name, 'code', st.code, 'status', st.status, 'owner_name', st.owner_name, 'owner_phone', st.owner_phone);
+end $$;
+
+-- 지점 삭제(테스트 지점 정리용). 지점 이름을 똑같이 적어야 하고, 7일보다 오래된 기록이 있는 지점은 지울 수 없다(→ 대신 사용 중지).
+create or replace function public.hq_delete_store(p_store_id uuid, p_confirm_name text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare st public.stores; n_runs int; n_train int; n_staff int; n_notes int;
+begin
+  perform public.assert_hq();
+  select * into st from public.stores where id = p_store_id;
+  if st.id is null then raise exception 'store not found'; end if;
+  if trim(coalesce(p_confirm_name, '')) <> st.name then raise exception 'confirm name mismatch'; end if;
+  if exists (select 1 from public.checklist_runs r where r.store_id = st.id and r.run_date < current_date - 7) then raise exception 'has old records'; end if;
+  delete from public.training_progress where store_id = st.id or staff_id in (select id from public.staff where store_id = st.id); get diagnostics n_train = row_count;
+  delete from public.checklist_runs where store_id = st.id; get diagnostics n_runs = row_count;
+  delete from public.store_manual_notes where store_id = st.id; get diagnostics n_notes = row_count;
+  delete from public.owner_sessions where store_id = st.id;
+  delete from public.store_settings where store_id = st.id;
+  delete from public.staff where store_id = st.id; get diagnostics n_staff = row_count;
+  delete from public.stores where id = st.id;
+  return jsonb_build_object('deleted', st.name, 'runs', n_runs, 'training', n_train, 'staff', n_staff, 'notes', n_notes);
+end $$;
+
+-- 공통 매뉴얼: 목록 → 한 조각(본문 + 수정 이력 목록) → 저장(이력 자동) → 이력 본문 보기 → 되돌리기
+create or replace function public.hq_manual_list() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public.assert_hq();
+  return coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'section_kind', p.section_kind, 'chapter_no', p.chapter_no, 'group_name', p.group_name, 'title', p.title,
+            'updated_at', p.updated_at, 'updated_by', p.updated_by, 'len', length(p.body_md),
+            'history_n', (select count(*) from public.manual_history h where h.page_id = p.id)) order by p.sort) from public.manual_pages p), '[]'::jsonb);
+end $$;
+
+create or replace function public.hq_manual_page(p_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public.assert_hq();
+  return (select jsonb_build_object('id', p.id, 'section_kind', p.section_kind, 'chapter_no', p.chapter_no, 'group_name', p.group_name, 'title', p.title, 'body_md', p.body_md,
+            'updated_at', p.updated_at, 'updated_by', p.updated_by,
+            'history', coalesce((select jsonb_agg(jsonb_build_object('id', h.id, 'saved_at', h.saved_at, 'saved_by', h.saved_by, 'reason', h.reason, 'title', h.title, 'len', length(h.body_md)) order by h.saved_at desc, h.id desc)
+                                 from public.manual_history h where h.page_id = p.id), '[]'::jsonb))
+          from public.manual_pages p where p.id = p_id);
+end $$;
+
+create or replace function public.hq_manual_history_body(p_history_id bigint) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public.assert_hq();
+  return (select jsonb_build_object('id', h.id, 'page_id', h.page_id, 'saved_at', h.saved_at, 'saved_by', h.saved_by, 'reason', h.reason, 'title', h.title, 'body_md', h.body_md)
+          from public.manual_history h where h.id = p_history_id);
+end $$;
+
+create or replace function public.hq_manual_save(p_id uuid, p_title text, p_body_md text, p_reason text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare em text; before_n bigint; p public.manual_pages;
+begin
+  em := public.assert_hq();
+  if trim(coalesce(p_title, '')) = '' then raise exception 'title required'; end if;
+  select coalesce(max(id), 0) into before_n from public.manual_history where page_id = p_id;
+  update public.manual_pages set title = trim(p_title), body_md = coalesce(p_body_md, ''), updated_by = em where id = p_id returning * into p;
+  if p.id is null then raise exception 'page not found'; end if;
+  -- 트리거가 방금 남긴 이력 줄에 사유를 적어 둔다
+  update public.manual_history set reason = coalesce(nullif(trim(p_reason), ''), '수정'), saved_by = coalesce(saved_by, em) where page_id = p_id and id > before_n;
+  return jsonb_build_object('id', p.id, 'title', p.title, 'updated_at', p.updated_at, 'changed', exists (select 1 from public.manual_history where page_id = p_id and id > before_n));
+end $$;
+
+create or replace function public.hq_manual_restore(p_history_id bigint) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare em text; h public.manual_history; before_n bigint; p public.manual_pages;
+begin
+  em := public.assert_hq();
+  select * into h from public.manual_history where id = p_history_id;
+  if h.id is null then raise exception 'history not found'; end if;
+  select coalesce(max(id), 0) into before_n from public.manual_history where page_id = h.page_id;
+  update public.manual_pages set title = h.title, body_md = h.body_md, updated_by = em where id = h.page_id returning * into p;
+  update public.manual_history set reason = '되돌리기 전 (' || to_char(h.saved_at at time zone 'Asia/Seoul', 'MM/DD HH24:MI') || ' 버전으로)', saved_by = coalesce(saved_by, em) where page_id = h.page_id and id > before_n;
+  return jsonb_build_object('id', p.id, 'title', p.title, 'updated_at', p.updated_at, 'restored_from', h.id);
+end $$;
+
+-- 로그인한 사용자만. 익명은 전부 차단.
+revoke all on function public.hq_overview(date) from public, anon;                      grant execute on function public.hq_overview(date) to authenticated;
+revoke all on function public.hq_store(uuid, date) from public, anon;                   grant execute on function public.hq_store(uuid, date) to authenticated;
+revoke all on function public.hq_create_store(text, text, text) from public, anon;      grant execute on function public.hq_create_store(text, text, text) to authenticated;
+revoke all on function public.hq_reset_pin(uuid) from public, anon;                     grant execute on function public.hq_reset_pin(uuid) to authenticated;
+revoke all on function public.hq_update_store(uuid, text, text, text, text) from public, anon; grant execute on function public.hq_update_store(uuid, text, text, text, text) to authenticated;
+revoke all on function public.hq_delete_store(uuid, text) from public, anon;            grant execute on function public.hq_delete_store(uuid, text) to authenticated;
+revoke all on function public.hq_manual_list() from public, anon;                       grant execute on function public.hq_manual_list() to authenticated;
+revoke all on function public.hq_manual_page(uuid) from public, anon;                   grant execute on function public.hq_manual_page(uuid) to authenticated;
+revoke all on function public.hq_manual_history_body(bigint) from public, anon;         grant execute on function public.hq_manual_history_body(bigint) to authenticated;
+revoke all on function public.hq_manual_save(uuid, text, text, text) from public, anon; grant execute on function public.hq_manual_save(uuid, text, text, text) to authenticated;
+revoke all on function public.hq_manual_restore(bigint) from public, anon;              grant execute on function public.hq_manual_restore(bigint) to authenticated;
+
+commit;
