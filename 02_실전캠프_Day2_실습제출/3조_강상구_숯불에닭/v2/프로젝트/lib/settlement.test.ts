@@ -408,3 +408,53 @@ describe("다른 채널 매출 몫이 섞인 입금 (2026-11-04 BC카드 · 배�
     expect(r.fee).toBe(83_000 - 82_423 - 32_112);
   });
 });
+
+describe("계좌이체로 받고 현금영수증을 끊은 매출 (2026-11-02 실제 숫자)", () => {
+  // 손님이 통장으로 보내고 현금영수증을 끊어 달라고 하면, 돈은 계좌이체로 들어오는데 포스는 현금영수증으로 찍는다.
+  // 11/2 이체 255,000원(두 건) — 매출은 현금영수증 칸에 255,000원으로 들어가 있었다.
+  const rule: SettlementRule = { channel: "hall_transfer", mode: "days", days: 0, weekday: 0 };
+  const daily: DailySale[] = [
+    { date: "2026-10-24", channel: "hall_transfer", amount: 43_000 }, // 지난달 이체 — 있어야 11/2이 "지난달 주문분"으로 안 빠진다
+    { date: "2026-11-02", channel: "hall_cash_receipt", amount: 255_000 },
+    { date: "2026-11-03", channel: "hall_transfer", amount: 125_000 },
+    { date: "2026-11-03", channel: "hall_cash_receipt", amount: 68_000 }, // 이건 현금으로 받은 몫 — 통장에 없다
+  ];
+  const bank = [
+    tx("2026-11-02", "hall_transfer", 91_000),
+    { ...tx("2026-11-02", "hall_transfer", 164_000), id: "b2b" },
+    tx("2026-11-03", "hall_transfer", 125_000),
+  ];
+
+  it("그날 현금영수증 매출에 들어 있으면 짝이 안 맞는 입금으로 띄우지 않는다", () => {
+    const r = settleChannel("hall_transfer", "2026-11", rule, daily, bank, "2026-11-06");
+    expect(r.unmatchedDeposits).toEqual([]);
+    expect(r.cashReceiptDeposits).toEqual([{ date: "2026-11-02", amount: 255_000 }]);
+  });
+
+  it("계좌이체 채널 매출·입금은 그대로 짝이 맞는다", () => {
+    const r = settleChannel("hall_transfer", "2026-11", rule, daily, bank, "2026-11-06");
+    expect(r.sales).toBe(125_000);
+    expect(r.settlements).toHaveLength(1);
+    expect(r.settlements[0]).toMatchObject({ payout: "2026-11-03", sales: 125_000, deposit: 125_000, fee: 0, status: "일치" });
+  });
+
+  it("현금영수증 매출이 없는 날 들어온 이체는 그대로 짝이 안 맞는 입금으로 남는다", () => {
+    const only = [{ ...tx("2026-11-04", "hall_transfer", 70_000), id: "b4" }];
+    const r = settleChannel("hall_transfer", "2026-11", rule, daily, only, "2026-11-06");
+    expect(r.unmatchedDeposits).toEqual([{ date: "2026-11-04", amount: 70_000 }]);
+    expect(r.cashReceiptDeposits).toEqual([]);
+  });
+
+  it("그날 현금영수증 매출보다 이체가 많으면 넘기지 않는다 — 설명이 안 되는 돈이다", () => {
+    const big = [{ ...tx("2026-11-02", "hall_transfer", 300_000), id: "b2big" }];
+    const r = settleChannel("hall_transfer", "2026-11", rule, daily, big, "2026-11-06");
+    expect(r.unmatchedDeposits).toEqual([{ date: "2026-11-02", amount: 300_000 }]);
+  });
+
+  it("카드 채널에는 이 규칙을 쓰지 않는다 — 카드 입금은 카드 매출과만 맞춘다", () => {
+    const kb: SettlementRule = { channel: "card_kb", mode: "days", days: 2, weekday: 0 };
+    const sales: DailySale[] = [{ date: "2026-11-02", channel: "hall_cash_receipt", amount: 255_000 }];
+    const r = settleChannel("card_kb", "2026-11", kb, sales, [tx("2026-11-02", "card_kb", 100_000)], "2026-11-06");
+    expect(r.unmatchedDeposits).toEqual([{ date: "2026-11-02", amount: 100_000 }]);
+  });
+});

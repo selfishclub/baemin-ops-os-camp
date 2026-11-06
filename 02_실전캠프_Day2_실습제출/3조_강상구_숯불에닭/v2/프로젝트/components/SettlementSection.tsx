@@ -72,6 +72,8 @@ export default function SettlementSection({
   const totalPending = results.reduce((a, r) => a + r.pending, 0);
   const totalMissing = results.reduce((a, r) => a + r.missing, 0);
   const unmatched = results.flatMap((r) => r.unmatchedDeposits.map((d) => ({ ...d, channel: r.channel })));
+  // 손님이 이체로 보내고 현금영수증을 끊어 달라고 한 몫 — 매출은 현금영수증 칸에 있으니 경고가 아니라 안내로 보여 준다
+  const cashReceipt = results.flatMap((r) => (r.cashReceiptDeposits ?? []).map((d) => ({ ...d, channel: r.channel })));
   // 통장엔 입금이 있는데 오늘 탭에 그 채널 매출이 하나도 없는 채널 — 짝을 맞출 수가 없어 0으로 보인다
   const strayOf = (r: (typeof results)[number]) => r.unmatchedDeposits.reduce((a, d) => a + d.amount, 0);
   // 짝이 안 맞는 입금이 며칠 주문분인지 정산 규칙을 거꾸로 풀어 둔다.
@@ -472,6 +474,11 @@ export default function SettlementSection({
                     </span>
                   ))}{" "}
                   — 지난달 말 주문분이거나 정산 규칙이 실제와 다를 수 있어요. <b>간편결제·배민 만나서 카드결제</b>처럼 다른 채널 매출이 그 카드사로 들어온 것이면 눌러서 표시해 두세요.
+                </Notice>
+              )}
+              {cashReceipt.length > 0 && (
+                <Notice tone="ok">
+                  {cashReceipt.map((d) => `${d.date.slice(5)} ${num(d.amount)}원`).join(" · ")} 은 손님이 <b>계좌로 보내고 현금영수증을 끊은 몫</b>으로 봤어요 — 그날 현금영수증 매출에 들어 있어서 짝이 안 맞는 입금으로 띄우지 않아요.
                 </Notice>
               )}
               <p className="text-xs text-stone-500">

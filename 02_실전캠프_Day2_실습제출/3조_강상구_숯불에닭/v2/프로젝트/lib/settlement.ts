@@ -144,6 +144,7 @@ export interface ChannelSettlementSummary {
   missing: number; // 입금일이 지났는데 안 들어온 매출
   settlements: Settlement[];
   unmatchedDeposits: { date: string; amount: number }[]; // 매출 묶음과 짝이 안 맞는 입금
+  cashReceiptDeposits?: { date: string; amount: number }[]; // 손님 이체로 들어왔는데 매출은 현금영수증으로 적힌 몫
 }
 
 // 채널·날짜별 통장 입금 합계
@@ -325,10 +326,16 @@ export function settleChannel(
   // 이 달 입금 중 어느 묶음에도 안 붙은 것. 지난달 말·다음 달 주문분 입금은 빼고 (outsideMonthWindow)
   const monthStart = month + "-01";
   const groupPayouts = [...groups.keys()];
-  const unmatchedDeposits = [...deposits.entries()]
+  const stray = [...deposits.entries()]
     .filter(([date, amount]) => date >= monthStart && date <= lastBankDate && !used.has(date) && !fullyOutside(adj.get(date), amount) && !outsideMonthWindow(date, month, groupPayouts, holidays, rule))
     .map(([date, amount]) => ({ date, amount }))
     .sort((a, b) => a.date.localeCompare(b.date));
+  // 손님이 계좌이체로 보내고 현금영수증을 끊어 달라고 하면, 돈은 통장(계좌이체)으로 들어오는데
+  // 매출은 포스가 찍은 대로 현금영수증 칸에 적힌다. 그래서 계좌이체 쪽은 입금만 남아 짝이 안 맞아 보인다.
+  // 같은 날 현금영수증 매출이 그 입금만큼 있으면 그 몫으로 보고 경고에서 뺀다 — 매출이 빠진 게 아니라 다른 칸에 있다.
+  // (2026-11-07 사장님: 11/2 이체 255,000원 — "계좌이체인데 현금영수증 발행이라 거기에 들어갔을거야")
+  const unmatchedDeposits = stray.filter((d) => !isCashReceiptShare(channel, d, dailySales));
+  const cashReceiptDeposits = stray.filter((d) => isCashReceiptShare(channel, d, dailySales));
 
   return {
     channel,
@@ -340,7 +347,19 @@ export function settleChannel(
     missing: settlements.filter((s) => s.status === "미입금").reduce((a, s) => a + s.monthSales, 0),
     settlements: settlements.filter((s) => s.monthSales > 0), // 다른 달 주문분만 든 묶음은 이 달 표에서 뺀다
     unmatchedDeposits,
+    cashReceiptDeposits,
   };
+}
+
+/**
+ * 손님 이체로 들어왔는데 매출은 현금영수증 칸에 적힌 몫인가.
+ * 현금영수증 칸에는 현금으로 받은 것과 이체로 받은 것이 섞여 있어서(끊어 준 사실만 같다) 장부가 혼자 가릴 수 없다.
+ * 그래서 날짜가 같고 그날 현금영수증 매출이 이 입금만큼 되는, 설명이 되는 경우만 넘긴다.
+ */
+function isCashReceiptShare(channel: ChannelId, d: { date: string; amount: number }, dailySales: DailySale[]): boolean {
+  if (channel !== "hall_transfer") return false;
+  const receipt = dailySales.filter((s) => s.channel === "hall_cash_receipt" && s.date === d.date).reduce((a, s) => a + s.amount, 0);
+  return receipt > 0 && d.amount <= receipt;
 }
 
 // 같은 날 들어온 입금이 여러 건이면 한 묶음이 다 가져가지 않는다.
