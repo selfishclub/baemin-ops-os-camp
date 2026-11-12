@@ -214,7 +214,7 @@ const App = (() => {
     'seAdd', 'seClearDay', 'seCopyPrev', 'seFlag', 'seMonth', 'seNote', 'sePattern', 'seRemove', 'seRules', 'seShift', 'patFill', 'patFillNext', 'cmApply', 'cmAuto', 'cmClear', 'cmPreview', 'hdAdd', 'hdDel', 'crew',
     'healthAdd', 'healthDel', 'trainAdd', 'trainDel', 'trainEdit', 'trainSeed', 'trainReward', 'rankReward', 'msAdd', 'msEdit', 'msDel', 'msGoal',
     'recipeAdd', 'recipeEdit', 'recipeDel', 'staffAdd', 'staffDel', 'staffOff', 'staffRole', 'staffSeg', 'staffType',
-    'tankCount', 'tankCareDel', 'tankLogDel', 'deadDel', 'purchaseDel', 'purchaseCsv', 'salesDel', 'salesCsv',
+    'tankCount', 'tankCareDel', 'tankLogDel', 'deadDel', 'purchaseDel', 'purchaseCsv', 'salesDel', 'salesCsv', 'salesExport', 'taxImport', 'taxDel', 'taxClearMonth',
     'reset', 'import', 'sampleLoad', 'sampleClear', 'fixedAdd', 'fixedEdit', 'fixedDel', 'weeklyPay', 'sper', 'toggleAskWho', 'toggleReport', 'toggleSound', 'toggleTgInstant', 'tgFind', 'tgTest', 'supaClear', 'laborConfirm', 'laborUnconfirm', 'sealUpload', 'sealDel', 'guideEdit', 'doneMemo', 'staffLockToggle',
     'cAdd', 'cDel', 'cVoid', 'cEdit', 'cSign', 'cStamp', 'cDeliver', 'cAttach', 'cFileDel', 'cSaveBack', 'sendReportNow', 'testAlarm',
     'msApprove', 'issueDel', 'healthMonths', 'staffMerge',   // 10/15 점검: 직원이 자기 미션 승인 · 남의 글 삭제 · 보건증 유효기간 변경이 되던 구멍
@@ -878,7 +878,7 @@ const App = (() => {
     { id: 'people', g: '인사관리', gs: '인사', ic: '👥', lock: true, items: [['staff', '직원 명단', '🧑‍🍳'], ['contracts', '근로계약서', '📄'], ['payslip', '급여명세서', '💳'], ['hygiene', '위생교육 일정관리', '🧼']] },
     { id: 'ops', g: '운영', gs: '운영', ic: '🏪', lock: true, items: [['costAll', '총원가 (갑각류 + 식자재)', '💰'], ['buyInsight', '갑각류 매입 인사이트', '🦀']] },
     { id: 'kitchen', g: '서비스 교육', gs: '교육', ic: '🎓', lock: true, items: [['recipes', '레시피 관리', '📖']] },
-    { id: 'acct', g: '회계', gs: '회계', ic: '💵', lock: true, items: [['salesStat', '매출 분석', '📈'], ['pnl', '월 손익', '📘'], ['labor', '인건비', '👷']] },
+    { id: 'acct', g: '회계', gs: '회계', ic: '💵', lock: true, items: [['salesStat', '매출 분석', '📈'], ['pnl', '월 손익', '📘'], ['labor', '인건비', '👷'], ['taxBuy', '국세청 매입자료', '🏛️']] },
     { id: 'sys', g: '설정', gs: '설정', ic: '⚙️', lock: true, items: [['settings', '설정', '⚙️'], ['routines', '루틴', '🔁']] },
   ];
   const groupOf = (k) => MENU.find((m) => m.items.some(([x]) => x === k));
@@ -977,7 +977,8 @@ const App = (() => {
       return `<div class="hd"><div><h2>🔐 기기 등록</h2><div class="sub">이 기기는 매장 기록을 볼 수 있습니다.</div></div></div>
         <div class="lockBox regBox"><div class="lockIc">✅</div>
           <p><b>${sp.device ? '이 기기는 등록되어 있습니다.' : '이 기기는 매장 인터넷으로 열려 있습니다.'}</b><br><span class="mut">${sp.device ? '등록이 풀리는 기기라면 아래 전용 주소를 홈 화면에 두세요.' : '매장 밖에서도 쓰려면 사장님이 아래에서 이 기기를 등록할 수 있습니다.'}</span></p>
-          <div class="rowbtns"><button class="btn primary" data-act="view" data-v="dash">대시보드로</button>${sp.device ? '<button class="btn" data-act="deviceLink">📌 이 기기 전용 주소</button>' : ''}</div>
+          <div class="rowbtns"><button class="btn primary" data-act="view" data-v="dash">대시보드로</button>${sp.device ? '<button class="btn" data-act="deviceLink">📌 이 기기 전용 주소</button>' : ''}${sp.device && Store.credOk ? '<button class="btn" data-act="deviceCredSave">🔑 브라우저에 열쇠 보관</button>' : ''}</div>
+          ${sp.device && Store.credOk ? '<p class="hint keep">포스가 껐다 켤 때마다 등록이 풀린다면 <b>브라우저에 열쇠 보관</b>을 누르고, 브라우저가 "비밀번호를 저장할까요?"라고 물으면 <b>저장</b>을 누르세요. 다음부터는 저장소가 지워져도 자동으로 열립니다.</p>' : ''}
           ${sp.device ? '' : `<details style="margin-top:14px"><summary class="hint">이 기기를 따로 등록하기 (사장님)</summary><div class="regForm" style="margin-top:8px">
             <label>기기 이름<input id="rgName" placeholder="예: 사장님 폰" autocomplete="off"></label>
             <label>매장<select id="rgStore">${(Store.meta ? Store.meta.stores : []).map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}<option value="" selected>공용 (사장님 기기)</option></select></label>
@@ -995,6 +996,8 @@ const App = (() => {
           <label>매장<select id="rgStore">${(Store.meta ? Store.meta.stores : []).map((x) => `<option value="${x.id}"${x.id === (Store.meta || {}).current ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}<option value="">공용 (사장님 기기)</option></select></label>
           <label>사장님 비밀번호<input id="rgPw" type="password" autocomplete="current-password"></label>
           <button class="btn primary" data-act="deviceRegister">이 기기 등록</button>
+          ${Store.credOk ? '<button class="btn" data-act="deviceCred" style="margin-top:8px">🔑 이 브라우저에 저장된 열쇠로 열기</button>' : ''}
+          <p class="hint keep">등록할 때 브라우저가 <b>"비밀번호를 저장할까요?"</b>라고 물으면 <b>저장</b>을 눌러 주세요. 그러면 포스가 껐다 켜져 저장소가 지워지거나 매장 인터넷 주소가 바뀌어도 이 화면이 다시 뜨지 않습니다.</p>
           <p class="hint">첫 등록이면 지금 넣는 비밀번호가 사장님 비밀번호가 됩니다 (안산점·안양점 공통). 등록은 사장님만 합니다.</p>
           <p class="hint"><b>매장에서 한 번 등록하면 그 매장 인터넷에서는 어떤 기기든 원래 주소로 그냥 열립니다.</b> 이 화면이 매장에서 떴다면 이 매장 인터넷이 아직 기억되지 않은 것이니, 사장님이 여기서 한 번만 등록해 주세요.</p>
         </div>
@@ -1119,7 +1122,7 @@ const App = (() => {
     const sb = $('#storebar'); if (sb) sb.innerHTML = `<div class="sstore top">${storeBtns}</div>`;
 
     const y = window.scrollY;
-    $('#main').innerHTML = demoBar() + (viewLocked(view) ? vLocked() : ({ dash: vDash, guide: vGuide, register: vRegister, costAll: vCostAll, rules: vRules, tanks: vTanks, today: vToday, staff: vStaff, contracts: vContracts, month: vMonth, costs: vCosts, notices: vNotices, issues: vIssues, recipes: vRecipes, routines: vRoutines, report: vReport, salesIn: vSalesIn, salesStat: vSalesStat, pnl: vPnl, labor: vLabor, payslip: vPayslip, health: vHealth, hygiene: vHygiene, buyInsight: vBuyInsight, training: vTraining, settings: vSettings })[view]());
+    $('#main').innerHTML = demoBar() + (viewLocked(view) ? vLocked() : ({ dash: vDash, guide: vGuide, register: vRegister, costAll: vCostAll, taxBuy: vTaxBuy, rules: vRules, tanks: vTanks, today: vToday, staff: vStaff, contracts: vContracts, month: vMonth, costs: vCosts, notices: vNotices, issues: vIssues, recipes: vRecipes, routines: vRoutines, report: vReport, salesIn: vSalesIn, salesStat: vSalesStat, pnl: vPnl, labor: vLabor, payslip: vPayslip, health: vHealth, hygiene: vHygiene, buyInsight: vBuyInsight, training: vTraining, settings: vSettings })[view]());
     /* 지금 어느 매장 데이터를 보고 있는지 화면마다 박아둔다.
        직원·기록이 매장별로 따로인데 표시가 없으면 공유되는 것처럼 오해한다. */
     const h2 = $('#main .hd h2');
@@ -2560,7 +2563,7 @@ const App = (() => {
     list.forEach((x) => { byCat[x.cat] = (byCat[x.cat] || 0) + (Number(x.amount) || 0); });
     let h = `<div class="hd">
       <div><h2>원가 관리 — 식자재·소모품</h2><div class="sub">매장에서 실제로 사 오는 것(수산물 · 식자재 · 주류·음료 · 소모품)을 그때그때 적습니다. 갑각류 매입은 여기서 다루지 않습니다.</div></div>
-      ${monthNavCosts(m, `<button class="btn" data-act="purchaseCsv">CSV 가져오기</button><button class="btn primary" data-act="purchaseAdd" data-mode="staff">+ 매입 입력</button>`)}
+      ${monthNavCosts(m, `<button class="btn" data-act="view" data-v="taxBuy" title="홈택스 매입 전자(세금)계산서 목록과 비교">국세청 매입자료</button><button class="btn" data-act="purchaseCsv">CSV 가져오기</button><button class="btn primary" data-act="purchaseAdd" data-mode="staff">+ 매입 입력</button>`)}
     </div>`;
     h += `<div class="cards m4">
       <div class="card"><div class="cl">이번 달 식자재 매입</div><div class="cv sm2">${fmtWon(total)}</div><div class="cs">${list.length}건</div></div>
@@ -2576,6 +2579,111 @@ const App = (() => {
     h += purchaseList(list);
     return h;
   }
+
+  /* ── 국세청(홈택스) 매입 전자(세금)계산서 (2026-11-05 사장님 요청) ─────────
+     홈택스는 사업자가 쓸 수 있는 조회 API를 열어 두지 않아 자동 연동은 못 한다(유료 스크래핑 서비스만 가능).
+     대신 홈택스에서 내려받은 "매입 목록 엑셀(xls/xlsx)" 또는 CSV 를 올리면 월별·거래처별로 정리하고 원가 입력과 비교한다.
+     S.taxBuy[{ id, no(승인번호), date(작성일자), issued(발급일자), vendor, bizNo, rep, item, supply, vat, total, cls(세금계산서/계산서), kind(과세/면세…), memo, src, importedAt }] */
+  const taxMonth = () => S.ui.tmonth || dateKey().slice(0, 7);
+  const taxOf = (m) => (S.taxBuy || []).filter((x) => (x.date || '').slice(0, 7) === m).sort((a, b) => b.date.localeCompare(a.date));
+  const sumF = (arr, f) => arr.reduce((a, x) => a + (Number(x[f]) || 0), 0);
+  const normHead = (h) => String(h == null ? '' : h).replace(/[\s()\[\]\-_/·.]/g, '');
+  const taxDate = (v) => { if (v == null || v === '') return ''; if (typeof v === 'number') { const d = new Date(Math.round((v - 25569) * 86400000)); return isNaN(d) ? '' : d.toISOString().slice(0, 10); } const s2 = String(v).trim(); let m2 = s2.match(/^(\d{4})[.\-\/]?(\d{2})[.\-\/]?(\d{2})/); if (m2) return `${m2[1]}-${m2[2]}-${m2[3]}`; m2 = s2.match(/^(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); if (m2) return `${m2[1]}-${m2[2].padStart(2, '0')}-${m2[3].padStart(2, '0')}`; return ''; };
+  const taxNum = (v) => { if (v == null || v === '') return 0; const n = Number(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; };
+  function taxLoadXlsx() {
+    if (window.XLSX) return Promise.resolve();
+    return new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'vendor/xlsx.full.min.js'; sc.onload = ok; sc.onerror = () => no(new Error('엑셀 읽기 모듈을 불러오지 못했습니다. 인터넷 연결을 확인하세요.')); document.head.appendChild(sc); });
+  }
+  /* 표(2차원 배열)에서 홈택스 머리글 줄을 찾아 기록으로 바꾼다. 머리글이 1행이 아니어도(제목·안내 줄 뒤) 찾는다 */
+  function taxParseRows(rows) {
+    const hi = rows.findIndex((r) => { const hs = (r || []).map(normHead); return hs.some((h) => h.includes('승인번호')) && hs.some((h) => h.includes('공급가액')); });
+    if (hi < 0) return { error: '홈택스 매입 목록 파일이 아닌 것 같습니다. "승인번호"와 "공급가액" 열이 있어야 합니다.' };
+    const head = rows[hi].map(normHead);
+    const col = (...tests) => head.findIndex((h) => tests.every((t) => (t instanceof RegExp ? t.test(h) : h.includes(t))));
+    const pick = (keys) => { for (const k of keys) { const i = typeof k === 'function' ? k() : col(k); if (i >= 0) return i; } return -1; };
+    const ix = {
+      date: pick(['작성일자', '작성일']), issued: pick(['발급일자', '발급일']), no: pick(['승인번호']),
+      bizNo: pick([() => col('공급자', '사업자'), () => col('공급자', '등록번호'), '사업자등록번호']),
+      vendor: pick([() => col('공급자', '상호'), '상호']), rep: pick([() => col('공급자', '대표자'), '대표자']),
+      supply: pick(['공급가액']), vat: pick([() => head.findIndex((h) => h === '세액' || h === '부가세' || h === '세액합계')]), total: pick(['합계금액', '합계']),
+      cls: pick(['계산서분류', '분류']), kind: pick(['계산서종류', '종류']), item: pick(['품목명', '품목']), memo: pick(['비고']),
+    };
+    if (ix.vat < 0) ix.vat = head.findIndex((h) => h.includes('세액') && !h.includes('공급'));
+    const recs = []; let skipped = 0;
+    rows.slice(hi + 1).forEach((r) => {
+      if (!r || !r.length) return;
+      const date = taxDate(r[ix.date]), total = taxNum(r[ix.total]), supply = taxNum(r[ix.supply]);
+      if (!date || !(total || supply)) { skipped++; return; }
+      const no = ix.no >= 0 ? String(r[ix.no] || '').replace(/\s/g, '') : '';
+      recs.push({ no, date, issued: ix.issued >= 0 ? taxDate(r[ix.issued]) : '', vendor: ix.vendor >= 0 ? String(r[ix.vendor] || '').trim() : '', bizNo: ix.bizNo >= 0 ? String(r[ix.bizNo] || '').replace(/[^0-9]/g, '') : '', rep: ix.rep >= 0 ? String(r[ix.rep] || '').trim() : '',
+        item: ix.item >= 0 ? String(r[ix.item] || '').trim() : '', supply, vat: ix.vat >= 0 ? taxNum(r[ix.vat]) : Math.max(0, total - supply), total: total || supply,
+        cls: ix.cls >= 0 ? String(r[ix.cls] || '').trim() : '', kind: ix.kind >= 0 ? String(r[ix.kind] || '').trim() : '', memo: ix.memo >= 0 ? String(r[ix.memo] || '').trim() : '' });
+    });
+    return { recs, skipped };
+  }
+  function taxImport() {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv';
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      let rows;
+      try {
+        if (/\.csv$/i.test(f.name)) { const t = await f.text(); const { head, rows: rs } = parseCSV(t); rows = [head].concat(rs); }
+        else { await taxLoadXlsx(); const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: false }); const ws = wb.Sheets[wb.SheetNames[0]]; rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }); }
+      } catch (e) { alert('파일을 읽지 못했습니다: ' + (e.message || e)); return; }
+      const out = taxParseRows(rows); if (out.error) { alert(out.error); return; }
+      const have = new Set((S.taxBuy || []).map((x) => x.no || `${x.date}|${x.bizNo}|${x.total}`));
+      const fresh = [], seen = new Set(); let dup = 0;
+      out.recs.forEach((r) => { const k = r.no || `${r.date}|${r.bizNo}|${r.total}`; if (have.has(k) || seen.has(k)) { dup++; return; } seen.add(k); fresh.push({ id: newId('t'), ...r, src: 'hometax', importedAt: Date.now() }); });
+      if (!fresh.length) { alert(`새로 들어갈 계산서가 없습니다. (이미 있는 ${dup}건 · 건너뜀 ${out.skipped}줄)`); return; }
+      const ds = fresh.map((x) => x.date).sort();
+      modal('홈택스 매입자료 가져오기', `<p><b>${fresh.length}건</b>의 매입 (세금)계산서를 <b>${esc(storeName())}</b>에 가져옵니다.</p>
+        <ul class="hintlist"><li>작성일 ${ds[0]} ~ ${ds[ds.length - 1]}</li><li>공급가액 ${fmtWon(sumF(fresh, 'supply'))} · 세액 ${fmtWon(sumF(fresh, 'vat'))} · 합계 ${fmtWon(sumF(fresh, 'total'))}</li>
+        ${dup ? `<li>이미 있는 ${dup}건(승인번호 같음)은 건너뜁니다</li>` : ''}${out.skipped ? `<li>날짜·금액이 없는 ${out.skipped}줄은 건너뜁니다</li>` : ''}</ul>
+        <p class="hint">원가 관리의 매입 입력에는 더해지지 않습니다. 계산서 발행 여부를 대조하는 자료로만 씁니다.</p>`, () => {
+        S.taxBuy = (S.taxBuy || []).concat(fresh); S.ui.tmonth = ds[ds.length - 1].slice(0, 7); save(); render();
+      }, '가져오기');
+    };
+    inp.click();
+  }
+  function vTaxBuy() {
+    const m = taxMonth(); const list = taxOf(m); const all = S.taxBuy || [];
+    const buys = monthBuys(m), buyTotal = sumAmt(buys);
+    const sup = sumF(list, 'supply'), vat = sumF(list, 'vat'), tot = sumF(list, 'total');
+    const [y, mo] = m.split('-').map(Number);
+    let h = `<div class="hd"><div><h2>국세청 매입자료 — 전자(세금)계산서</h2><div class="sub">홈택스에서 내려받은 매입 (세금)계산서 목록을 올리면 월별·거래처별로 정리하고, 직원이 적은 원가 입력과 맞춰 봅니다. 홈택스는 자동 연동 API를 열어 두지 않아 파일로 올립니다.</div></div>
+      <div class="mnav"><button class="dnav" data-act="tmonthNav" data-d="-1" aria-label="이전 달">‹</button><span class="mtitle">${y}년 ${mo}월</span><button class="dnav" data-act="tmonthNav" data-d="1" aria-label="다음 달">›</button>
+        <button class="btn primary" data-act="taxImport">홈택스 파일 올리기</button>${list.length ? `<button class="btn" data-act="taxClearMonth" data-m="${m}">이달 지우기</button>` : ''}</div></div>`;
+    h += `<div class="cards m4">
+      <div class="card"><div class="cl">이달 계산서</div><div class="cv">${list.length}<small>건</small></div><div class="cs">거래처 ${new Set(list.map((x) => x.bizNo || x.vendor)).size}곳</div></div>
+      <div class="card"><div class="cl">공급가액</div><div class="cv sm2">${fmtWon(sup)}</div></div>
+      <div class="card"><div class="cl">세액(부가세)</div><div class="cv sm2">${fmtWon(vat)}</div><div class="cs">매입세액 공제 참고</div></div>
+      <div class="card"><div class="cl">합계 금액</div><div class="cv sm2">${fmtWon(tot)}</div></div></div>`;
+    const diff = buyTotal - sup;
+    h += `<div class="card" style="margin-bottom:14px"><div class="cl">원가 입력과 비교 — ${y}년 ${mo}월</div>
+      <div class="row" style="display:flex;gap:18px;flex-wrap:wrap;margin-top:6px"><div><small class="dim">원가 관리 입력(갑각류+식자재)</small><br><b>${fmtWon(buyTotal)}</b> <small class="dim">${buys.length}건</small></div><div><small class="dim">계산서 공급가액</small><br><b>${fmtWon(sup)}</b> <small class="dim">${list.length}건</small></div><div><small class="dim">차이 (입력 − 계산서)</small><br><b style="color:${Math.abs(diff) > 0 ? 'var(--crit)' : 'inherit'}">${diff >= 0 ? '' : '−'}${fmtWon(Math.abs(diff))}</b></div></div>
+      <p class="hint" style="margin:8px 0 0">차이가 크면 ① 계산서 없이 현금·카드로 산 매입(입력 &gt; 계산서) 또는 ② 입력을 빠뜨린 매입(입력 &lt; 계산서)입니다. 세금계산서는 공급가액, 원가 입력은 보통 부가세 포함 금액이라 10% 정도는 자연스러운 차이입니다.</p></div>`;
+    if (!all.length) return h + `<div class="notice"><b>아직 올린 홈택스 자료가 없습니다.</b>
+      <ol class="hintlist" style="margin:8px 0 0 18px;line-height:1.8"><li>홈택스(hometax.go.kr) 로그인 → <b>전자(세금)계산서 · 현금영수증 · 신용카드</b> → <b>전자(세금)계산서 발급·조회</b> → <b>목록조회</b></li><li>구분 <b>매입</b>, 기간(예: 이번 달 1일~말일) 선택 → 조회 → <b>엑셀 내려받기</b> (세금계산서와 면세 계산서는 따로 조회해 둘 다 올립니다)</li><li>위 "홈택스 파일 올리기"로 그 파일을 올립니다. 같은 승인번호는 두 번 들어가지 않으니 겹치게 올려도 됩니다.</li></ol>
+      <p class="hint" style="margin-top:8px">공동인증서로 자동 수집하려면 팝빌·바로빌 같은 유료 서비스(월 수만 원)가 필요합니다. 월 1회 파일 올리기로 충분하면 비용이 들지 않습니다.</p></div>`;
+    /* 월별 요약 (자료가 있는 달 전부) */
+    const months = [...new Set(all.map((x) => (x.date || '').slice(0, 7)))].sort().reverse();
+    h += `<div class="hd sub2"><h3>월별 발행 현황</h3><span class="hint" style="margin:0">달을 누르면 그 달로 이동</span></div>
+      <div class="tkLogWrap"><table class="tkLog"><thead><tr><th>월</th><th class="r">계산서</th><th class="r">거래처</th><th class="r">공급가액</th><th class="r">세액</th><th class="r">합계</th><th class="r">원가 입력</th><th class="r">차이</th></tr></thead><tbody>
+      ${months.map((mm) => { const l = taxOf(mm), b = sumAmt(monthBuys(mm)), s2 = sumF(l, 'supply'); return `<tr class="rowbtn${mm === m ? ' on' : ''}" data-act="tmonthGo" data-m="${mm}"><td><b>${mm.replace('-', '년 ')}월</b></td><td class="r">${l.length}건</td><td class="r">${new Set(l.map((x) => x.bizNo || x.vendor)).size}곳</td><td class="r">${fmtWon(s2)}</td><td class="r">${fmtWon(sumF(l, 'vat'))}</td><td class="r"><b>${fmtWon(sumF(l, 'total'))}</b></td><td class="r">${fmtWon(b)}</td><td class="r">${b - s2 >= 0 ? '' : '−'}${fmtWon(Math.abs(b - s2))}</td></tr>`; }).join('')}</tbody></table></div>`;
+    if (!list.length) return h + `<div class="notice"><b>${y}년 ${mo}월에는 올린 계산서가 없습니다.</b><div class="hint">위 월별 표에서 자료가 있는 달을 누르거나, 홈택스에서 이 달 목록을 내려받아 올리세요.</div></div>`;
+    /* 거래처별 */
+    const byV = {}; list.forEach((x) => { const k = x.bizNo || x.vendor; const o = byV[k] = byV[k] || { vendor: x.vendor, bizNo: x.bizNo, n: 0, supply: 0, vat: 0, total: 0 }; o.n++; o.supply += Number(x.supply) || 0; o.vat += Number(x.vat) || 0; o.total += Number(x.total) || 0; });
+    const buyByVendor = (name) => sumAmt(buys.filter((p) => name && p.vendor && (p.vendor.replace(/\s/g, '').includes(name.replace(/\s/g, '').slice(0, 2)) || name.replace(/\s/g, '').includes(p.vendor.replace(/\s/g, '').slice(0, 2)))));
+    h += `<div class="hd sub2"><h3>거래처별 — ${y}년 ${mo}월</h3><span class="hint" style="margin:0">"원가 입력"은 거래처 이름이 비슷한 매입 입력의 합(참고)</span></div>
+      <div class="tkLogWrap"><table class="tkLog"><thead><tr><th>거래처</th><th>사업자번호</th><th class="r">건수</th><th class="r">공급가액</th><th class="r">세액</th><th class="r">합계</th><th class="r">원가 입력</th></tr></thead><tbody>
+      ${Object.values(byV).sort((a, b) => b.total - a.total).map((o) => `<tr><td><b>${esc(o.vendor || '(상호 없음)')}</b></td><td class="dim">${o.bizNo ? `${o.bizNo.slice(0, 3)}-${o.bizNo.slice(3, 5)}-${o.bizNo.slice(5)}` : '–'}</td><td class="r">${o.n}건</td><td class="r">${fmtWon(o.supply)}</td><td class="r">${fmtWon(o.vat)}</td><td class="r"><b>${fmtWon(o.total)}</b></td><td class="r">${buyByVendor(o.vendor) ? fmtWon(buyByVendor(o.vendor)) : '<span class="dim">–</span>'}</td></tr>`).join('')}</tbody></table></div>`;
+    /* 계산서 목록 */
+    h += `<div class="hd sub2"><h3>계산서 목록 — ${list.length}건</h3></div>
+      <div class="tkLogWrap"><table class="tkLog"><thead><tr><th>작성일</th><th>발급일</th><th>거래처</th><th>품목</th><th class="r">공급가액</th><th class="r">세액</th><th class="r">합계</th><th>구분</th><th>승인번호</th><th></th></tr></thead><tbody>
+      ${list.map((x) => `<tr><td>${x.date.slice(5)}</td><td class="dim">${x.issued ? x.issued.slice(5) : '–'}</td><td><b>${esc(x.vendor || '–')}</b>${x.rep ? `<br><small class="dim">${esc(x.rep)}</small>` : ''}</td><td>${esc(x.item || '–')}</td><td class="r">${fmtWon(x.supply)}</td><td class="r">${fmtWon(x.vat)}</td><td class="r"><b>${fmtWon(x.total)}</b></td><td class="dim">${esc([x.cls, x.kind].filter(Boolean).join(' · ') || '–')}</td><td class="dim" title="${esc(x.no)}">${x.no ? x.no.slice(0, 8) + '…' : '–'}</td><td><button class="btn sm" data-act="taxDel" data-id="${x.id}" title="이 앱에서만 지웁니다">지움</button></td></tr>`).join('')}</tbody></table></div>`;
+    return h;
+  }
+
   /* 사장님용 — 갑각류 + 식자재 전체 */
   function vCostAll() {
     const m = S.ui.cmonth || dateKey().slice(0, 7);
@@ -4161,13 +4269,24 @@ const App = (() => {
     const filled = dates.filter((k) => salesOf(k));
     let h = `<div class="hd"><div><h2>매출 입력</h2><div class="sub">마감 때 "포스 마감·매출 정산" 루틴을 완료하면 여기에 자동으로 쌓입니다. 빠진 날은 줄을 눌러 채우세요.</div></div>
       <div class="mnav"><button class="dnav" data-act="smonthNav" data-d="-1" aria-label="이전 달">‹</button><span class="mtitle">${monthLabel(m)}</span><button class="dnav" data-act="smonthNav" data-d="1" aria-label="다음 달">›</button>
-        <button class="btn" data-act="salesCsv">CSV 가져오기</button><button class="btn primary" data-act="salesAdd">+ 매출 입력</button></div></div>`;
+        <button class="btn" data-act="salesCsv">CSV 가져오기</button><button class="btn" data-act="salesExport" data-m="${m}" title="이 달 매출을 엑셀에서 열 수 있는 CSV 파일로 저장">CSV 내려받기</button><button class="btn" data-act="salesExport" data-m="all" title="입력된 모든 날짜">전체 CSV</button><button class="btn primary" data-act="salesAdd">+ 매출 입력</button></div></div>`;
     h += `<div class="cards m4">
       <div class="card"><div class="cl">이달 매출</div><div class="cv sm2">${fmtWon(monthSales(m))}</div></div>
       <div class="card"><div class="cl">입력한 날</div><div class="cv">${filled.length}<small>일</small></div></div>
       <div class="card${dates.length - filled.length ? ' warn' : ''}"><div class="cl">미입력</div><div class="cv">${dates.length - filled.length}<small>일</small></div><div class="cs">오늘까지 기준</div></div>
       <div class="card"><div class="cl">총 kg</div><div class="cv sm2">${fmtKg(filled.reduce((a, k) => a + salesKg(S.sales[k]), 0)) || '–'}</div>
         ${filled.some((k) => hasKgSplit(S.sales[k])) ? `<div class="cs">매장 ${fmtKg(filled.reduce((a, k) => a + kgCh(S.sales[k], 'S'), 0)) || '0kg'} · 배달 ${fmtKg(filled.reduce((a, k) => a + kgCh(S.sales[k], 'D'), 0)) || '0kg'} · 포장 ${fmtKg(filled.reduce((a, k) => a + kgCh(S.sales[k], 'P'), 0)) || '0kg'}</div>` : ''}</div></div>`;
+    /* 2026-11-05 사장님 요청: 홀 팀수·배달 건수와 팀당(건당) 객단가 — 매장·배달 주문을 나눠 넣은 날만 집계 */
+    const sp = filled.map((k) => S.sales[k]).filter((r) => r.ordersS != null || r.ordersD != null);
+    const teams = sp.reduce((a, r) => a + (Number(r.ordersS) || 0), 0), delivN = sp.reduce((a, r) => a + (Number(r.ordersD) || 0), 0);
+    const hallSales = sp.filter((r) => r.ordersS != null && r.store != null).reduce((a, r) => a + (Number(r.store) || 0), 0), hallTeams = sp.filter((r) => r.ordersS != null && r.store != null).reduce((a, r) => a + (Number(r.ordersS) || 0), 0);
+    const dvSales = sp.filter((r) => r.ordersD != null && r.deliv != null).reduce((a, r) => a + (Number(r.deliv) || 0), 0), dvN = sp.filter((r) => r.ordersD != null && r.deliv != null).reduce((a, r) => a + (Number(r.ordersD) || 0), 0);
+    const noSplit = filled.length - sp.length;
+    h += `<div class="cards m4">
+      <div class="card"><div class="cl">홀 총 팀수</div><div class="cv">${teams.toLocaleString('ko-KR')}<small>팀</small></div><div class="cs">${sp.length}일 입력${noSplit ? ` · ${noSplit}일은 매장·배달 구분 없음` : ''}</div></div>
+      <div class="card"><div class="cl">배달 총 건수</div><div class="cv">${delivN.toLocaleString('ko-KR')}<small>건</small></div><div class="cs">${sp.length ? `하루 평균 ${(delivN / sp.length).toFixed(1)}건` : '매장·배달 주문을 나눠 넣으면 집계'}</div></div>
+      <div class="card"><div class="cl">홀 팀당 객단가</div><div class="cv sm2">${hallTeams ? fmtWon(Math.round(hallSales / hallTeams)) : '–'}</div><div class="cs">${hallTeams ? `매장 매출 ${fmtWon(hallSales)} ÷ ${hallTeams}팀` : '홀 팀수·매장 매출 미입력'}</div></div>
+      <div class="card"><div class="cl">배달 건당 객단가</div><div class="cv sm2">${dvN ? fmtWon(Math.round(dvSales / dvN)) : '–'}</div><div class="cs">${dvN ? `배달 매출 ${fmtWon(dvSales)} ÷ ${dvN}건` : '배달 건수·배달 매출 미입력'}</div></div></div>`;
     if (!dates.length) return h + `<div class="notice"><b>아직 오지 않은 달입니다.</b></div>`;
     const kv = S.ui.skg || 'all';   // kg 열 보기: all 합계 · S 매장 · D 배달
     h += `<div class="filters" style="margin:4px 0 10px"><span class="hint" style="margin:0 6px 0 0">kg 보기</span>${[['all', '합계'], ['S', '매장'], ['D', '배달'], ['P', '포장']].map(([k, n]) => `<button class="fl${kv === k ? ' on' : ''}" data-act="skgView" data-k="${k}">${n}</button>`).join('')}</div>`;
@@ -4177,7 +4296,7 @@ const App = (() => {
     h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>날짜</th><th class="r">총주문</th><th class="r">매장</th><th class="r">배달</th><th class="r">포장</th><th class="r">총매출</th><th class="r">대게${kgHead}</th><th class="r">킹크랩${kgHead}</th><th class="r">랍스터${kgHead}</th><th class="r">주류</th><th>입력자</th></tr></thead><tbody>`;
     dates.slice().reverse().forEach((k) => {
       const r = salesOf(k), d = new Date(k + 'T00:00:00'), lb = `${k.slice(5)} ${WD[d.getDay()]}`;
-      h += r ? `<tr class="rowbtn" data-act="salesEdit" data-k="${k}"><td>${lb}</td><td class="r">${cell(r.orders)}${(r.ordersS != null || r.ordersD != null) ? `<br><small class="dim">매장 ${r.ordersS ?? 0} · 배달 ${r.ordersD ?? 0}</small>` : ''}</td><td class="r">${cell(r.store)}</td><td class="r">${cell(r.deliv)}</td><td class="r">${cell(r.take)}</td><td class="r"><b>${fmtWon(salesTotal(r))}</b>${payLine(r) ? `<br><small class="dim">${payLine(r)}</small>` : ''}${r.note ? `<br><small class="dim" title="${esc(r.note)}">📝 ${esc(r.note.length > 18 ? r.note.slice(0, 18) + '…' : r.note)}</small>` : ''}</td><td class="r">${kgCell(r, 'crab')}</td><td class="r">${kgCell(r, 'king')}</td><td class="r">${kgCell(r, 'lob')}</td><td class="r">${cell(r.liquor)}</td><td>${esc(r.by || '')}${r.src === 'csv' ? ' <span class="chip missed">CSV</span>' : ''}</td></tr>`
+      h += r ? `<tr class="rowbtn" data-act="salesEdit" data-k="${k}"><td>${lb}</td><td class="r">${cell(r.orders)}${(r.ordersS != null || r.ordersD != null) ? `<br><small class="dim">매장 ${r.ordersS ?? 0} · 배달 ${r.ordersD ?? 0}</small>` : ''}</td><td class="r">${cell(r.store)}${(r.ordersS > 0 && r.store != null) ? `<br><small class="dim">팀당 ${fmtWon(Math.round(Number(r.store) / Number(r.ordersS)))}</small>` : ''}</td><td class="r">${cell(r.deliv)}${(r.ordersD > 0 && r.deliv != null) ? `<br><small class="dim">건당 ${fmtWon(Math.round(Number(r.deliv) / Number(r.ordersD)))}</small>` : ''}</td><td class="r">${cell(r.take)}</td><td class="r"><b>${fmtWon(salesTotal(r))}</b>${payLine(r) ? `<br><small class="dim">${payLine(r)}</small>` : ''}${r.note ? `<br><small class="dim" title="${esc(r.note)}">📝 ${esc(r.note.length > 18 ? r.note.slice(0, 18) + '…' : r.note)}</small>` : ''}</td><td class="r">${kgCell(r, 'crab')}</td><td class="r">${kgCell(r, 'king')}</td><td class="r">${kgCell(r, 'lob')}</td><td class="r">${cell(r.liquor)}</td><td>${esc(r.by || '')}${r.src === 'csv' ? ' <span class="chip missed">CSV</span>' : ''}</td></tr>`
         : `<tr class="rowbtn empty" data-act="salesEdit" data-k="${k}"><td>${lb}</td><td colspan="10" style="text-align:left"><span class="chip missed">미입력</span> <small>눌러서 입력</small></td></tr>`;
     });
     h += `</tbody></table></div>`;
@@ -4195,6 +4314,27 @@ const App = (() => {
   const CSV_MAP = { '날짜': 'date', '매장': 'storeName', '총주문': 'orders', '매장주문': 'ordersS', '배달주문': 'ordersD', '매장매출': 'store', '배달매출': 'deliv', '포장매출': 'take', '총매출': 'total', '대게kg': 'crab', '킹크랩kg': 'king', '랍스타kg': 'lob', '랍스터kg': 'lob', '주류매출': 'liquor',
     '대게매장kg': 'crabS', '대게배달kg': 'crabD', '킹크랩매장kg': 'kingS', '킹크랩배달kg': 'kingD', '랍스터매장kg': 'lobS', '랍스타매장kg': 'lobS', '랍스터배달kg': 'lobD', '랍스타배달kg': 'lobD', '대게포장kg': 'crabP', '킹크랩포장kg': 'kingP', '랍스터포장kg': 'lobP', '랍스타포장kg': 'lobP',
     '현금': 'cash', '계좌이체': 'transfer', '이체': 'transfer', '상품권': 'voucher', '기프티콘': 'gifticon', '시제': 'petty', '시재': 'petty', '대게단가': 'priceCrab', '킹크랩단가': 'priceKing', '랍스터단가': 'priceLob', '랍스타단가': 'priceLob' };
+  /* CSV 내려받기 (2026-11-05 사장님 요청) — 열 이름은 CSV 가져오기와 같아서 그대로 다시 불러올 수 있다. 엑셀용 BOM 포함 */
+  const CSV_OUT = [['날짜', 'date'], ['매장', 'storeName'], ['총주문', 'orders'], ['매장주문', 'ordersS'], ['배달주문', 'ordersD'], ['매장매출', 'store'], ['배달매출', 'deliv'], ['포장매출', 'take'], ['총매출', 'total'],
+    ['홀팀당객단가', 'perTeam'], ['배달건당객단가', 'perDeliv'], ['대게kg', 'crab'], ['킹크랩kg', 'king'], ['랍스터kg', 'lob'], ['주류매출', 'liquor'],
+    ['대게매장kg', 'crabS'], ['대게배달kg', 'crabD'], ['대게포장kg', 'crabP'], ['킹크랩매장kg', 'kingS'], ['킹크랩배달kg', 'kingD'], ['킹크랩포장kg', 'kingP'], ['랍스터매장kg', 'lobS'], ['랍스터배달kg', 'lobD'], ['랍스터포장kg', 'lobP'],
+    ['현금', 'cash'], ['계좌이체', 'transfer'], ['상품권', 'voucher'], ['기프티콘', 'gifticon'], ['시제', 'petty'], ['대게단가', 'priceCrab'], ['킹크랩단가', 'priceKing'], ['랍스터단가', 'priceLob'], ['입력자', 'by'], ['메모', 'note']];
+  function salesCsvExport(m) {
+    const all = m === 'all';
+    const keys = salesDates().filter((k) => all || k.slice(0, 7) === m);
+    if (!keys.length) { alert(all ? '입력된 매출이 없습니다.' : `${monthLabel(m)}에 입력된 매출이 없습니다.`); return; }
+    const meta = Store.meta || {}; const stName = ((meta.stores || []).find((x) => x.id === meta.current) || {}).name || '';
+    const q = (v) => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; };
+    const rows = keys.map((k) => { const r = S.sales[k] || {};
+      const v = { ...r, date: k, storeName: stName, total: salesTotal(r),
+        perTeam: (r.ordersS > 0 && r.store != null) ? Math.round(Number(r.store) / Number(r.ordersS)) : '',
+        perDeliv: (r.ordersD > 0 && r.deliv != null) ? Math.round(Number(r.deliv) / Number(r.ordersD)) : '' };
+      return CSV_OUT.map(([, f]) => q(v[f])).join(','); });
+    const text = '\ufeff' + CSV_OUT.map(([n]) => n).join(',') + '\n' + rows.join('\n');
+    const name = `해모닉_매출_${stName || '매장'}_${all ? `전체_${keys[0]}_${keys[keys.length - 1]}` : m}.csv`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' })); a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
   function salesCsvImport() {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = '.csv,text/csv';
@@ -6099,6 +6239,11 @@ const App = (() => {
         case 'monthToday': S.ui.month = dateKey().slice(0, 7); S.ui.mdate = dateKey(); save(); render(); break;
         case 'mpick': S.ui.mdate = b.dataset.k; save(); render(); break;
         case 'storeSwitch': switchStore(b.dataset.id); break;
+        case 'tmonthNav': S.ui.tmonth = monthShiftKey(S.ui.tmonth || dateKey().slice(0, 7), Number(b.dataset.d)); save(); render(); break;
+        case 'tmonthGo': S.ui.tmonth = b.dataset.m; save(); render(); break;
+        case 'taxImport': taxImport(); break;
+        case 'taxDel': S.taxBuy = (S.taxBuy || []).filter((x) => x.id !== b.dataset.id); save(); render(); break;
+        case 'taxClearMonth': { const m = b.dataset.m; const n = (S.taxBuy || []).filter((x) => (x.date || '').slice(0, 7) === m).length; if (!n) break; if (!confirm(`${monthLabel(m)} 계산서 ${n}건을 이 앱에서 지울까요? (홈택스 자료는 그대로입니다)`)) break; S.taxBuy = S.taxBuy.filter((x) => (x.date || '').slice(0, 7) !== m); save(); render(); break; }
         case 'cmonthNav': S.ui.cmonth = monthShiftKey(S.ui.cmonth || dateKey().slice(0, 7), Number(b.dataset.d)); save(); render(); break;
         case 'nmonthNav': S.ui.nmonth = monthShiftKey(S.ui.nmonth || dateKey().slice(0, 7), Number(b.dataset.d)); save(); render(); break;
         case 'purchaseAdd': purchaseForm(null, b.dataset.mode || 'staff'); break;
@@ -6127,6 +6272,7 @@ const App = (() => {
           save(); closeModal(); render(); break;
         }
         case 'salesCsv': salesCsvImport(); break;
+        case 'salesExport': salesCsvExport(b.dataset.m); break;
         case 'sper': S.ui.sper = b.dataset.p; save(); render(); break;
         case 'fixedAdd': fixedForm(null); break;
         case 'fixedEdit': fixedForm(fixedList().find((f) => f.id === id)); break;
@@ -6579,6 +6725,8 @@ const App = (() => {
         case 'supaRetry': Store.flush().then(() => location.reload()); break;
         case 'ownerLogin': ownerLoginModal(); break;
         case 'deviceRegister': deviceRegisterGo(); break;
+        case 'deviceCred': Store.credLoad('optional').then((ok) => { if (ok) location.reload(); else banner('이 브라우저에 저장된 열쇠가 없습니다', '사장님이 아래에서 한 번 등록하고, 브라우저가 물으면 "저장"을 눌러 주세요.'); }); break;
+        case 'deviceCredSave': Store.credSave('해모닉 기기 열쇠').then((ok) => banner(ok ? '브라우저에 열쇠를 맡겼습니다' : '이 브라우저는 열쇠 보관을 지원하지 않습니다', ok ? '"비밀번호를 저장할까요?" 창이 떴다면 저장을 눌러 주세요. 저장소가 지워져도 자동으로 되찾습니다.' : '크롬이나 엣지에서 열어 주세요.')); break;
         case 'deviceLink': deviceLinkModal(false); break;
         case 'netRevoke': { if (!confirm(`${b.dataset.name} 인터넷(${id})을 끊을까요?\n이 인터넷에서는 다시 등록된 기기만 열립니다.`)) break; Store.netRevoke(id).then(() => { devList = null; render(); banner('매장 인터넷을 끊었습니다', id); }).catch((e) => alert('끊지 못했습니다: ' + (e.message || e))); break; }
         case 'deviceLinkCopy': { const l = Store.deviceLink(); const done = () => banner('주소를 복사했습니다', '이 기기의 홈 화면·즐겨찾기에 추가하세요.');
@@ -6889,6 +7037,7 @@ const App = (() => {
     }
     if (!S.recipes) S.recipes = [];
     if (!S.purchases) S.purchases = [];
+    if (!S.taxBuy) S.taxBuy = [];   // 국세청(홈택스) 매입 전자(세금)계산서 목록 (2026-11-05)
     if (!S.sales) S.sales = {};
     if (!S.payroll) S.payroll = {};
     S.ui.smonth = null; S.ui.pmonth = null; S.ui.lmonth = null;   // 회계 화면은 열 때마다 이번 달부터

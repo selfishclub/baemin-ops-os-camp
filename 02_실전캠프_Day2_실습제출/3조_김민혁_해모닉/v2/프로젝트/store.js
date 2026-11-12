@@ -370,7 +370,7 @@ const Store = (() => {
        다른 기기에서 바꾼 상태(해결 완료 · 미션 승인 · 매입 수정 등)가 되돌아간다 (10/15 점검). 손댄 시각이 없으면 예전처럼 최신 문서 쪽 */
     const tsOf = (x) => Number(x && (x.u || x.updatedAt || Math.max(x.doneAt || 0, x.claimedAt || 0)))
       || 0;
-    [['purchases', 'id'], ['contracts', 'id'], ['recipes', 'id'], ['training', 'id'], ['deaths', 'id'],
+    [['purchases', 'id'], ['taxBuy', 'id'], ['contracts', 'id'], ['recipes', 'id'], ['training', 'id'], ['deaths', 'id'],
       ['health', 'id'], ['staff', 'name'], ['trainSeen', null], ['notices', 'id'], ['issues', 'id'], ['missions', 'id'], ['syncLog', 'id']].forEach(([f, by]) => {
       const v = by ? unionNewest(newer[f], older[f], by, tsOf) : unionBy(newer[f], older[f], by); if (v !== undefined) out[f] = v;
     });
@@ -531,6 +531,26 @@ const Store = (() => {
     if (!k) k = devCookie();
     if (!k && db) { try { const v = await idbGet('__devkey'); if (v && DEV_RE.test(v)) k = v; } catch (_) { /* 무시 */ } }
     if (k) devSave(k);   // 빠진 곳을 다시 채운다
+    else await Promise.race([credLoad('silent'), new Promise((r) => setTimeout(r, 2500))]);   // 전부 지워졌으면 브라우저 비밀번호 관리자에서 조용히 꺼내 온다
+  }
+  /* 브라우저 비밀번호 관리자에 열쇠 보관 (2026-11-12, 안산점 포스에 "등록되지 않은 기기"가 자꾸 뜬다는 신고).
+     그 포스는 브라우저를 닫을 때 사이트 저장소(localStorage · 쿠키 · IndexedDB)가 전부 지워져 열쇠가 매일 사라지고,
+     매장 인터넷 주소(공인 IP)까지 바뀐 날에는 등록 화면이 뜬다. 저장된 비밀번호는 그 삭제에 포함되지 않으므로(크롬 · 엣지)
+     등록할 때 열쇠를 '아이디 haemonic-device / 비밀번호 = 열쇠'로 넣어 두고, 열쇠가 없으면 여기서 되찾는다.
+     아이디를 하나로 고정해 저장된 것이 늘 하나 → 묻지 않고(silent) 꺼낼 수 있다 */
+  const CRED_ID = 'haemonic-device';
+  const credOk = () => { try { return !!(window.PasswordCredential && navigator.credentials && navigator.credentials.store && navigator.credentials.get); } catch (_) { return false; } };
+  async function credSave(name) {
+    const k = devKey(); if (!k || !credOk()) return false;
+    try { await navigator.credentials.store(new window.PasswordCredential({ id: CRED_ID, name: name || '해모닉 기기 열쇠', password: k })); return true; } catch (_) { return false; }
+  }
+  async function credLoad(mediation) {
+    if (!credOk()) return false;
+    try {
+      const c = await navigator.credentials.get({ password: true, mediation: mediation || 'silent' });
+      if (c && c.type === 'password' && DEV_RE.test(c.password || '')) { devSave(c.password); return true; }
+    } catch (_) { /* 무시 */ }
+    return false;
   }
   const deviceLink = () => { const k = devKey(); return k ? location.origin + location.pathname + '?dk=' + k : ''; };
   function mkClient(cfg) {
@@ -611,6 +631,7 @@ const Store = (() => {
     if (!data) throw new Error('서버가 열쇠를 돌려주지 않았습니다');
     devSave(data);
     if (!devKey()) throw new Error('이 브라우저에 저장할 수 없습니다 (시크릿 모드?)');
+    credSave(name).then(() => {}, () => {});   // 브라우저가 "비밀번호를 저장할까요?"라고 묻는다 — 저장해 두면 저장소가 지워져도 되찾는다
     return true;
   }
   async function deviceList() {
@@ -823,7 +844,7 @@ const Store = (() => {
   return {
     init, load, save, flush, setMeta, applyRenames, switchTo, dumpAll, restoreAll, loadStore, saveStore, loadShared, saveShared, watchShared,
     supaSetConfig, supaSignIn, supaSignOut, supaEvent, supaEvents, supaTgUpdates, watchDoc,
-    deviceRegister, deviceList, deviceRevoke, deviceHash, deviceForget, deviceLink, netList, netRevoke, myIp, deviceTouch, trainingDoc, trainingSave,
+    deviceRegister, deviceList, deviceRevoke, deviceHash, deviceForget, deviceLink, netList, netRevoke, myIp, deviceTouch, trainingDoc, trainingSave, credSave, credLoad, get credOk() { return credOk(); },
     get supa() { const cfg = supaCfg || supaConfig(); return { configured: !!(cfg && cfg.url && cfg.key), url: cfg ? cfg.url : '', signedIn: !!supa, anon: !!(supa && supa.anon), deviceOk: supa ? supa.deviceOk !== false : true, device: !!devKey(), viaNet: !!(supa && supa.viaNet), email: supa ? supa.email : '', libLoaded: !!(window.supabase && window.supabase.createClient) }; },
     get mode() { return mode; },
     get ok() { return writable; },
