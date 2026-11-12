@@ -12,7 +12,7 @@ import { monthLabel } from "@/lib/month";
 import { getStore } from "@/lib/storage";
 import type { ChannelSale, Month, Transaction } from "@/lib/types";
 
-const STATE_TONE: Record<DepositState, string> = { "출금 확인 필요": "bg-amber-100 text-amber-900", "입금 확인": "bg-emerald-100 text-emerald-800", "입금 대기": "bg-red-100 text-red-800", 예정: "bg-stone-100 text-stone-600", "입금 안 맞음": "bg-amber-100 text-amber-900" };
+const STATE_TONE: Record<DepositState, string> = { "출금 확인 필요": "bg-amber-100 text-amber-900", "입금 확인": "bg-emerald-100 text-emerald-800", "입금 대기": "bg-red-100 text-red-800", 예정: "bg-stone-100 text-stone-600", "입금 안 맞음": "bg-amber-100 text-amber-900", "입금 없음": "bg-stone-100 text-stone-600" };
 
 // 정산 탭 — 배민 정산 명세(자동 수집): 정산 건별 입금 확인 · 주문 1건당 쪼개기 · 광고 효율.
 // 유승균 사장님 배달이익노트 방식. 자료는 리뷰 수집기의 npm run collect:baemin-settle → export:ledger 로 온다.

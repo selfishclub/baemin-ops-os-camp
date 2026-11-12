@@ -6,7 +6,7 @@
 import type { BaeminExport, BaeminOrderDay, BaeminSettlement } from "../export/types";
 import type { Transaction } from "../types";
 
-export type DepositState = "입금 확인" | "입금 대기" | "예정" | "입금 안 맞음" | "출금 확인 필요";
+export type DepositState = "입금 확인" | "입금 대기" | "예정" | "입금 안 맞음" | "출금 확인 필요" | "입금 없음";
 
 export interface SettlementRow extends BaeminSettlement {
   state: DepositState;
@@ -65,6 +65,9 @@ export function matchSettlements(settlements: BaeminSettlement[], txs: Transacti
 
   // 2) 남은 건
   return sorted.map((s, i) => {
+    if (s.depositAmount === 0) {
+      return { ...s, state: "입금 없음" as const, bankDate: null, bankAmount: null, bankGap: null, daysLate: null };
+    }
     const done = exact[i];
     if (done) return done;
     if (channelId === "coupang") {
