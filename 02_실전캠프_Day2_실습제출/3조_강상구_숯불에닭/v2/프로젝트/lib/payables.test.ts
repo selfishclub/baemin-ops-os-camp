@@ -56,6 +56,16 @@ describe("미지급금", () => {
       ["(주)그루온", 100_000],
     ]);
   });
+  it("본사 로열티 명세표는 그 뒤에 나간 가맹수수료 이체로 갚는다 (그 전 달 로열티 이체는 안 깎는다)", () => {
+    const fee = (date: string, payee: string, out: number) => ({ ...tx(date, payee, out), major: "가맹수수료" as const, minor: "가맹수수료" });
+    const royalty = pu("r", "2026-10-31", "(주)그루온", 471_000, { vat: 47_100, vatExcluded: true });
+    royalty.lines = royalty.lines.map((l) => ({ ...l, category: "기타" as const }));
+    const ps = [pu("g", "2026-10-08", "(주)그루온", 100_000), royalty];
+    const before = computePayables(ps, [fee("2026-10-12", "NH콕송금 주식회사그루온", 1_001_880)], setting());
+    expect(before.rows.map((x) => [x.vendor, x.paid, x.due])).toEqual([["(주)그루온", 0, 618_100]]);
+    const after = computePayables(ps, [fee("2026-10-12", "NH콕송금 주식회사그루온", 1_001_880), fee("2026-11-10", "NH콕송금 주식회사 그루온", 518_100)], setting());
+    expect(after.rows.map((x) => [x.vendor, x.paid, x.due])).toEqual([["(주)그루온", 518_100, 100_000]]);
+  });
   it("부가세 모르는 영수증 수와 거래처 잔액을 같이 준다", () => {
     const k = vendorKey("코카콜라음료");
     const r = computePayables([pu("c", "2026-10-07", "코카콜라음료", 44_400)], [], setting({ statements: { [k]: { amount: 44_400, date: "2026-10-25" } } }));
