@@ -69,7 +69,9 @@ export function computePayables(purchases: Purchase[], txs: Transaction[], setti
     if (t.source !== "bank" || isCardTx(t) || t.out <= 0) continue;
     if (t.major && t.major !== "매출원가") continue; // 본사 가맹수수료·배달대행비 등은 재료 대금이 아니다
     const payee = squashPayee(t.payee);
-    const key = keys.find((k) => payee.includes(k) || (payee.length >= 3 && k.includes(payee)));
+    // 10/28 명세서 잔액 189,400원과 대조한 11/10 이체. 이전 이체는 별도 증빙이 필요하다.
+    const verifiedCocaPayment = t.date === "2026-11-10" && t.out === 189_400 && payee.endsWith("_코카");
+    const key = keys.find((k) => verifiedCocaPayment ? k === "코카콜라음료" : payee.includes(k) || (payee.length >= 3 && k.includes(payee)));
     if (!key || !inWindow(t.date, key)) continue;
     rows.get(key)!.paid += t.out;
   }
