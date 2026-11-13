@@ -27,6 +27,7 @@ export interface PayableRow {
   due: number; // 남은 돈 (음수 = 미리 낸 돈)
   receipts: number;
   lastDate: string;
+  lastPaymentDate: string;
   vatUnknown: number; // 부가세를 모르는 영수증 수
   statement: { amount: number; date: string } | null;
 }
@@ -46,7 +47,7 @@ export function computePayables(purchases: Purchase[], txs: Transaction[], setti
   const rows = new Map<string, PayableRow>();
   // 재료가 아닌 명세표 (본사 로열티·프로그램 사용료·택배비) — 가맹수수료 이체로 갚는다
   const feeBills = new Map<string, { date: string; left: number }[]>();
-  const blank = (key: string, vendor: string): PayableRow => ({ key, vendor, opening: 0, billed: 0, paid: 0, due: 0, receipts: 0, lastDate: "", vatUnknown: 0, statement: setting.statements[key] ?? null });
+  const blank = (key: string, vendor: string): PayableRow => ({ key, vendor, opening: 0, billed: 0, paid: 0, due: 0, receipts: 0, lastDate: "", lastPaymentDate: "", vatUnknown: 0, statement: setting.statements[key] ?? null });
   for (const p of windowPurchases) {
     const key = vendorKey(p.vendor);
     if (!key || cardPaid.has(p.id) || !inWindow(p.date, key)) continue;
@@ -81,7 +82,9 @@ export function computePayables(purchases: Purchase[], txs: Transaction[], setti
     const key = keys.find((k) => verifiedCocaPayment ? k === "코카콜라음료" : payee.includes(k) || (payee.length >= 3 && k.includes(payee)));
     if (!key || !inWindow(t.date, key)) continue;
     if (!isFee) {
-      rows.get(key)!.paid += t.out;
+      const row = rows.get(key)!;
+      row.paid += t.out;
+      row.lastPaymentDate = t.date;
       continue;
     }
     // 가맹수수료 이체: 이체일까지 받은 로열티 명세표 금액만큼만 갚은 것으로 본다 (명세표 없는 지난달 로열티 이체는 재료 외상을 깎지 않는다)
@@ -91,7 +94,9 @@ export function computePayables(purchases: Purchase[], txs: Transaction[], setti
       const use = Math.min(bill.left, left);
       bill.left -= use;
       left -= use;
-      rows.get(key)!.paid += use;
+      const row = rows.get(key)!;
+      row.paid += use;
+      row.lastPaymentDate = t.date;
     }
   }
   const list = [...rows.values()].map((r) => ({ ...r, due: r.opening + r.billed - r.paid }));

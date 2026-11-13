@@ -137,6 +137,7 @@ export function PayablesCard() {
 
 function Row({ r, open, onToggle, children }: { r: PayableRow; open: boolean; onToggle: () => void; children: React.ReactNode }) {
   const st = r.statement;
+  const showStatement = st && st.date >= r.lastDate && st.date >= r.lastPaymentDate;
   const diff = st ? r.due - st.amount : null;
   return (
     <li className="py-2">
