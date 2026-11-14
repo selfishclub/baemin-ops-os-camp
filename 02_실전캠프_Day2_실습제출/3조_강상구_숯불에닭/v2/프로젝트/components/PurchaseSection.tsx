@@ -28,7 +28,8 @@ import { txFromPurchase } from "@/lib/costing/purchaseToTx";
 import { RECEIPT_PROMPT, matchItem, parseReceiptText, toPurchaseLine } from "@/lib/costing/receiptText";
 import { todayStr } from "@/lib/daily";
 import { num, won } from "@/lib/format";
-import { monthLabel, nextMonth } from "@/lib/month";
+import { monthLabel, nextMonth, prevMonth } from "@/lib/month";
+import { checkPurchases } from "@/lib/costing/purchaseChecks";
 import { countPhotosByOwner, deletePhotosOf, getPhotoBlob, listPhotos, photosAvailable, type PhotoMeta } from "@/lib/photos";
 import PhotoStrip from "@/components/PhotoStrip";
 import { getStore, type BatchOp } from "@/lib/storage";
@@ -44,6 +45,7 @@ const emptyLine = (): PurchaseLine => ({ name: "", unitPrice: 0, qty: 1, amount:
 
 export default function PurchaseSection({ month, items, onItemsChange }: { month: string; items: Item[]; onItemsChange: () => Promise<void> }) {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [pastPurchases, setPastPurchases] = useState<Purchase[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState<Purchase | null>(null);
   const [editingIsNew, setEditingIsNew] = useState(false);
@@ -73,6 +75,8 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
   async function load() {
     const list = (await getStore().getSetting<Purchase[]>(key)) ?? [];
     setPurchases(list.sort((a, b) => (a.date < b.date ? 1 : -1)));
+    // 단가를 "평소"와 견주려면 지난 두 달치가 더 있어야 한다
+    setPastPurchases(((await getStore().getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + prevMonth(month))) ?? []).concat((await getStore().getSetting<Purchase[]>(PURCHASES_KEY_PREFIX + prevMonth(prevMonth(month)))) ?? []));
     setPhotoCounts(await countPhotosByOwner());
     setBankTxs(await getStore().listTransactions(month));
     setExempt({ ...emptyExempt(), ...((await getStore().getSetting<ReceiptExempt>(RECEIPT_EXEMPT_KEY)) ?? {}) });
@@ -260,6 +264,9 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
     });
   }
 
+  // 훅은 조기 반환보다 위에 있어야 한다 (아래 `if (!loaded) return null` 다음에 두면 렌더마다 훅 수가 달라져 터진다)
+  const issues = useMemo(() => checkPurchases(purchases, items, pastPurchases), [purchases, items, pastPurchases]);
+
   if (!loaded) return null;
   const summary = summarizePurchases(purchases);
   const itemName = (id: string) => items.find((i) => i.id === id)?.name ?? id;
@@ -302,6 +309,26 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
           </p>
         </details>
         {note && <Notice tone={note.tone}>{note.text}</Notice>}
+
+        {/* 넣을 때 자주 나는 실수를 장부가 먼저 잡는다 (2026-11-14 — 입력은 GPT가 하기도 해서 사람 눈을 못 믿는다) */}
+        {issues.length > 0 && (
+          <Notice tone="warn">
+            <b>넣은 값 중 {issues.length}가지를 봐 주세요.</b>
+            <ul className="mt-1.5 space-y-1">
+              {issues.slice(0, 8).map((x, i) => (
+                <li key={x.purchaseId + x.kind + (x.lineName ?? "") + i}>
+                  <button className="text-left underline decoration-dotted" onClick={() => setEditing(purchases.find((p) => p.id === x.purchaseId) ?? null)}>
+                    <b>
+                      {x.date.slice(5)} {x.vendor}
+                    </b>{" "}
+                    — {x.message}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {issues.length > 8 && <p className="mt-1 text-xs">… 그리고 {issues.length - 8}가지 더</p>}
+          </Notice>
+        )}
 
         {purchases.length > 0 && (
           <div className="num flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-xl bg-stone-50 px-3 py-2 text-xs">

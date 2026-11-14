@@ -96,3 +96,23 @@ describe("영수증 텍스트 — 부가세·면세", () => {
     expect([r.lines[0].taxFree, r.vat]).toEqual([true, null]);
   });
 });
+
+describe("부가세를 못 읽었을 때 (2026-11-14)", () => {
+  const head = "거래처: 코카콜라음료\n날짜: 2026-11-11\n코카콜라 510PET ×24 | 22200 | 1 | 22200\n";
+
+  it('"모름"은 0이 아니라 모름으로 둔다 — 0으로 두면 단가가 10% 부풀려진다', () => {
+    expect(parseReceiptText(head + "부가세: 모름").vat).toBeNull();
+    expect(parseReceiptText(head + "부가세: 안 보임").vat).toBeNull();
+    expect(parseReceiptText(head + "부가세: 없음").vat).toBeNull();
+    expect(parseReceiptText(head + "부가세: -").vat).toBeNull();
+  });
+
+  it("숫자로 적혀 있으면 그대로 읽는다", () => {
+    expect(parseReceiptText(head + "부가세: 2,018").vat).toBe(2018);
+    expect(parseReceiptText(head + "부가세: 0").vat).toBe(0);
+  });
+
+  it("부가세 줄이 아예 없으면 모름", () => {
+    expect(parseReceiptText(head).vat).toBeNull();
+  });
+});
