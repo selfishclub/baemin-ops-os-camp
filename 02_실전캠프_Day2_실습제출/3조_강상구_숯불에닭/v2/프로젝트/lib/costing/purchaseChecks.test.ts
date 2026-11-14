@@ -55,6 +55,16 @@ describe("박스 수와 낱개 수를 바꿔 넣은 줄", () => {
     const i = checkPurchase(bad, [COLA]).find((x) => x.kind === "qty-swapped")!;
     expect(i.message).toContain("바꿔 넣지 않았나요");
   });
+
+  it("kg 품목은 한 봉이 1kg 미만일 수 있어 묻지 않는다 (날치알 1봉 0.8kg · 애호박 2개 0.66kg)", () => {
+    const ROE = item("it_roe", "날치알", "kg");
+    const SQUASH = item("it_squash", "애호박", "kg");
+    const p = buy("p3", "2026-11-08", "홈마트(청주점)", [
+      line({ name: "날치알(레드)", amount: 16_000, qty: 1, itemQty: 0.8, itemId: ROE.id, taxFree: true }),
+      line({ name: "인큐애호박", amount: 1_960, qty: 2, itemQty: 0.66, itemId: SQUASH.id, taxFree: true }),
+    ]);
+    expect(checkPurchase(p, [ROE, SQUASH]).filter((x) => x.kind === "qty-swapped")).toEqual([]);
+  });
 });
 
 describe("품목 연결을 빠뜨린 줄 (2026-11-11 코크제로 실제 건)", () => {

@@ -78,9 +78,11 @@ export function checkPurchase(p: Purchase, items: Item[], others: Purchase[] = [
       out.push({ ...at, kind: "item-qty-zero", lineName: l.name, message: `“${l.name}”에 품목 단위 수량이 비었어요. 몇 ${items.find((i) => i.id === l.itemId)?.baseUnit ?? "개"}인지 넣어야 단가가 나와요.` });
       continue;
     }
-    // ② 박스 수(qty)가 품목 수량(itemQty)보다 크다 — 두 칸을 바꿔 넣은 모양
-    if (l.qty > l.itemQty)
-      out.push({ ...at, kind: "qty-swapped", lineName: l.name, message: `“${l.name}”은 ${l.qty}묶음인데 품목 수량이 ${l.itemQty}밖에 안 돼요. 두 칸을 바꿔 넣지 않았나요?`, suggest: l.qty });
+    // ② 박스 수(qty)가 품목 수량(itemQty)보다 크다 — 두 칸을 바꿔 넣은 모양.
+    //    낱개로 세는 품목(ea)에만 묻는다. kg·L 품목은 한 봉이 0.8kg일 수 있어 묶음 수가 더 큰 게 정상이다
+    //    (날치알 1봉 0.8kg, 애호박 2개 0.66kg을 "바꿔 넣었냐"고 묻는 헛경고가 났다 — 2026-11-14)
+    if (items.find((i) => i.id === l.itemId)?.baseUnit === "ea" && l.qty > l.itemQty)
+      out.push({ ...at, kind: "qty-swapped", lineName: l.name, message: `“${l.name}”은 ${l.qty}묶음인데 품목 수량이 ${l.itemQty}개밖에 안 돼요. 두 칸을 바꿔 넣지 않았나요?`, suggest: l.qty });
 
     // ⑤ 단가가 평소와 크게 다르다
     const u = perUnit(l);
