@@ -48,6 +48,9 @@ export function usualUnitCost(itemId: string, purchases: Purchase[], exceptId?: 
 
 const OUTLIER = 2; // 평소의 2배 위 또는 절반 아래면 묻는다
 
+/** 일부러 품목에 안 거는 줄 — 개인지출·직원간식과 소모품은 레시피 재료가 아니다 */
+const skipLinking = (l: PurchaseLine) => /개인|직원\s*간식/.test(l.name) || l.category === "기타" || l.category === "소모품비";
+
 /**
  * 영수증 한 장을 검사한다. `others`는 견줄 대상이 되는 지난 매입(이 영수증은 빼고 넘겨도 된다).
  */
@@ -68,8 +71,9 @@ export function checkPurchase(p: Purchase, items: Item[], others: Purchase[] = [
 
   for (const l of p.lines) {
     if (!l.itemId) {
-      // ③ 금액이 큰데 품목에 연결을 안 했다 (작은 잡화까지 묻지는 않는다)
-      if (l.amount >= 10_000 && items.some((i) => i.active !== false && l.name.includes(i.name)))
+      // ③ 금액이 큰데 품목에 연결을 안 했다 (작은 잡화까지 묻지는 않는다).
+      //    개인용·직원간식처럼 일부러 안 거는 줄은 묻지 않는다 (2026-11-15)
+      if (l.amount >= 10_000 && !skipLinking(l) && items.some((i) => i.active !== false && l.name.includes(i.name)))
         out.push({ ...at, kind: "item-unlinked", lineName: l.name, message: `“${l.name}”이 품목에 연결 안 됐어요. 연결해야 그 품목 단가가 이 영수증으로 갱신돼요.` });
       continue;
     }

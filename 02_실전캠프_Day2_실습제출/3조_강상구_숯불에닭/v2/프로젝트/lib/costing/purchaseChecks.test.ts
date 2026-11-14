@@ -140,3 +140,28 @@ describe("한 달치 한꺼번에", () => {
     expect(found.map((i) => i.kind).sort()).toEqual(["cost-outlier", "vat-empty"]);
   });
 });
+
+describe("일부러 품목에 안 거는 줄 (2026-11-15)", () => {
+  const COKE = item("it_coke", "코카콜라제로");
+  const at = { id: "p1", date: "2026-10-25", vendor: "쿠팡" };
+
+  it("개인지출은 연결하라고 묻지 않는다", () => {
+    const p = buy(at.id, at.date, at.vendor, [line({ name: "개인용 코카콜라제로 레몬라임 24개", amount: 16_170, category: "기타" })], { vat: 1_470 });
+    expect(checkPurchase(p, [COKE]).filter((i) => i.kind === "item-unlinked")).toEqual([]);
+  });
+
+  it("직원간식도 묻지 않는다", () => {
+    const p = buy("p2", "2026-10-12", "화랑마트", [line({ name: "직원간식 참앤참) 김치손만두 2.8kg", amount: 15_980, category: "기타" })], { vat: 1_453 });
+    expect(checkPurchase(p, []).filter((i) => i.kind === "item-unlinked")).toEqual([]);
+  });
+
+  it("소모품도 묻지 않는다", () => {
+    const p = buy("p3", "2026-10-11", "세모플러스", [line({ name: "면장갑 300켤레", amount: 59_000, category: "소모품비" })], { vat: 5_364 });
+    expect(checkPurchase(p, []).filter((i) => i.kind === "item-unlinked")).toEqual([]);
+  });
+
+  it("가게 재료는 그대로 묻는다", () => {
+    const p = buy("p4", "2026-11-11", "코카콜라음료", [line({ name: "코카콜라제로 510PET ×24", amount: 22_200, category: "원재료비" })], { vat: 2_018 });
+    expect(checkPurchase(p, [COKE]).map((i) => i.kind)).toContain("item-unlinked");
+  });
+});
