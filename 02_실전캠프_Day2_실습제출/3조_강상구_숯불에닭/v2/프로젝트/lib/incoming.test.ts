@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CardsalesData, CardPayout } from "./cardsales";
-import { feeRateOf, incomingDays, incomingOn, lastKnownSale, lastSettledSale, netRateOf, type DeliverySource } from "./incoming";
+import { feeRateOf, incomingDays, incomingOn, lastKnownSale, lastSettledSale, netRateOf, unpostedSales, type DeliverySource } from "./incoming";
 import type { SettlementRule } from "./settlement";
 import type { DailySale } from "./types";
 
@@ -69,6 +69,29 @@ describe("들어올 돈 — 확정(여신협회) + 짐작(포스)", () => {
     const d = incomingOn("2026-11-17", { sales, cardsales: data(HYUNDAI), rules: RULES, channels: ["card_hyundai"] });
     expect(d.estimated).toBe(0);
     expect(d.amount).toBe(402_930);
+  });
+
+  it("하루가 반만 올라왔으면 나머지만 더한다 (2026-11-14 하나카드 실제 건)", () => {
+    // 포스 336,000원인데 여신협회엔 132,000원만 올라와 있었다. 나머지 204,000원이 같은 11/17 입금에 들어왔다.
+    // (자정 넘겨 받은 결제를 포스는 전날로, 카드사는 다음 날로 적어서 이렇게 갈린다)
+    const hana = [
+      pay({ channel: "card_hana", issuer: "하나카드", saleDate: "2026-11-13", payDate: "2026-11-17", amount: 236_000, fee: 1_770, pay: 234_230 }),
+      pay({ channel: "card_hana", issuer: "하나카드", saleDate: "2026-11-14", payDate: "2026-11-17", amount: 132_000, fee: 990, pay: 131_010 }),
+    ];
+    const sales = [sale("2026-11-13", "card_hana", 236_000), sale("2026-11-14", "card_hana", 336_000)];
+    expect(unpostedSales(data(hana), "card_hana", sales)).toEqual([{ date: "2026-11-14", amount: 204_000 }]);
+    const d = incomingOn("2026-11-17", { sales, cardsales: data(hana), rules: RULES, channels: ["card_hana"] });
+    expect(d.confirmed).toBe(365_240);
+    expect(d.estimated).toBe(202_470); // 204,000 × (1 − 0.75%) — 캐시노트와 같은 금액
+  });
+
+  it("오래된 자료 구멍은 들어올 돈으로 세지 않는다 (10/23~24 하나카드처럼 매입을 못 받은 날)", () => {
+    const hana = [
+      pay({ channel: "card_hana", issuer: "하나카드", saleDate: "2026-10-25", payDate: "2026-10-27", amount: 211_000, fee: 1_583, pay: 209_417 }),
+      pay({ channel: "card_hana", issuer: "하나카드", saleDate: "2026-11-13", payDate: "2026-11-17", amount: 236_000, fee: 1_770, pay: 234_230 }),
+    ];
+    const sales = [sale("2026-10-23", "card_hana", 146_000), sale("2026-10-24", "card_hana", 464_000), sale("2026-11-13", "card_hana", 236_000)];
+    expect(unpostedSales(data(hana), "card_hana", sales)).toEqual([]);
   });
 
   it("KB국민카드처럼 매입이 통째로 안 올라온 카드사는 전부 짐작으로 센다 (11/13~15 → 11/17)", () => {

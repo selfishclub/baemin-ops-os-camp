@@ -68,11 +68,45 @@ export function feeRateOf(data: CardsalesData | null, channel: ChannelId): numbe
   return amount > 0 ? fee / amount : null;
 }
 
-/** 여신협회에 매입이 올라와 있는 마지막 거래일. 이 날까지는 "확정"으로 본다 */
+/** 여신협회에 매입이 올라와 있는 마지막 거래일 */
 export function lastKnownSale(data: CardsalesData | null, channel: ChannelId): string | null {
   let last: string | null = null;
   for (const p of data?.payouts ?? []) if (p.channel === channel && (!last || p.saleDate > last)) last = p.saleDate;
   return last;
+}
+
+const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
+/** 몇백 원 차이는 채널 분류가 흔들린 것으로 보고 넘긴다 */
+const MIN_SHORT = 1_000;
+
+/**
+ * 그 카드사의 "아직 매입이 안 올라온 매출" — 거래일별로 (포스 매출 − 여신협회 매입).
+ *
+ * 하루가 통째로 안 올라오기도 하지만 **반만 올라오기도 한다**: 2026-11-14 하나카드는 포스 336,000원
+ * 중 132,000원만 올라와 있었고, 나머지 204,000원이 11/17 입금에 같이 들어왔다 (캐시노트와 202,470원
+ * 차이가 났던 원인). 자정 넘겨 받은 결제는 포스가 전날로 적고 카드사는 다음 날로 적어서 이렇게 갈린다.
+ *
+ * 올라온 마지막 거래일에서 이틀 앞까지만 본다. 더 오래된 구멍(10/23~24 하나카드처럼 매입 자료를
+ * 못 받아 비어 있는 날)은 들어올 돈이 아니라 자료 구멍이라 "카드사 입금 대조"에서 볼 일이다.
+ */
+export function unpostedSales(data: CardsalesData | null, channel: ChannelId, sales: DailySale[]): { date: string; amount: number }[] {
+  const buy = new Map<string, number>();
+  let last = "";
+  for (const p of data?.payouts ?? []) {
+    if (p.channel !== channel) continue;
+    buy.set(p.saleDate, (buy.get(p.saleDate) ?? 0) + p.amount);
+    if (p.saleDate > last) last = p.saleDate;
+  }
+  const from = last ? addDays(last, -2) : null;
+  const out: { date: string; amount: number }[] = [];
+  for (const s of sales) {
+    if (s.channel !== channel || s.amount <= 0) continue;
+    if (from && s.date < from) continue;
+    const short = s.amount - (buy.get(s.date) ?? 0);
+    if (short >= MIN_SHORT) out.push({ date: s.date, amount: short });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /**
@@ -109,7 +143,6 @@ export function incomingOn(date: string, input: IncomingInput): IncomingDay {
 
   for (const channel of wanted) {
     const rate = feeRateOf(cardsales, channel);
-    const last = lastKnownSale(cardsales, channel);
     const rule = rules.find((r) => r.channel === channel) ?? cardRule(channel);
 
     let confirmed = 0;
@@ -120,13 +153,11 @@ export function incomingOn(date: string, input: IncomingInput): IncomingDay {
       from.add(p.saleDate);
     }
 
-    // 여신협회가 아직 모르는 거래일만 포스 매출로 센다. 실측 수수료율이 없으면 짐작하지 않는다
+    // 매입이 아직 안 올라온 몫만 포스 매출로 센다. 실측 수수료율이 없으면 짐작하지 않는다
     let estimated = 0;
     const estFrom: string[] = [];
     if (rate !== null) {
-      for (const s of sales) {
-        if (s.channel !== channel || s.amount <= 0) continue;
-        if (last && s.date <= last) continue;
+      for (const s of unpostedSales(cardsales, channel, sales)) {
         if (payoutDate(s.date, rule, holidays) !== date) continue;
         estimated += Math.round(s.amount * (1 - rate));
         estFrom.push(s.date);
