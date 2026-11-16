@@ -1,5 +1,5 @@
 import type { Item } from "./types";
-import type { PurchaseLine } from "./purchases";
+import type { Purchase, PurchaseLine } from "./purchases";
 
 // 영수증 텍스트 읽기 — 클로드·챗GPT 앱에 영수증 사진을 올려 받은 텍스트를 매입 영수증 줄로 바꾼다.
 //  - 사진을 이 앱(또는 코딩 창)이 직접 읽으면 비용이 크다. 사진은 사장님 구독으로 읽고, 앱은 글자만 받는다.
@@ -213,10 +213,32 @@ function drinkNameMatches(name: string, itemNorm: string): boolean {
   return joined === itemNorm || (joined.startsWith(itemNorm) && DRINK_TAIL.test(joined.slice(itemNorm.length)));
 }
 
-/** 상품명으로 원가율 품목을 찾아 자동 연결 (가장 길게 겹치는 품목) */
-export function matchItem(name: string, items: Item[]): Item | null {
+/** 예전에 손으로 연결해 둔 상품명 → 품목 (띄어쓰기·괄호 뗀 이름 그대로 같을 때만 쓴다)
+ *  거래처 상품명이 품목 이름과 안 겹치는 일이 많다 — 으뜸 "닭갈비(드럼) 국내산" ↔ 품목 "닭갈비 원육".
+ *  이름으로는 못 잇지만 한 번 손으로 이어 두면 다음부터는 그 기억으로 잇는다 (2026-11-16, 11/14 312,000원이 안 이어져 있었다) */
+export type LearnedLinks = Map<string, string>;
+export function learnLinks(purchases: Purchase[]): LearnedLinks {
+  const out: LearnedLinks = new Map();
+  const seenOn = new Map<string, string>();
+  for (const p of purchases) {
+    for (const l of p.lines) {
+      const k = norm(l.name);
+      if (!k || !l.itemId) continue;
+      if ((seenOn.get(k) ?? "") > p.date) continue; // 같은 이름을 다른 품목에 이었으면 가장 최근 것
+      seenOn.set(k, p.date);
+      out.set(k, l.itemId);
+    }
+  }
+  return out;
+}
+
+/** 상품명으로 원가율 품목을 찾아 자동 연결 (예전에 이어 둔 이름이 먼저, 없으면 가장 길게 겹치는 품목) */
+export function matchItem(name: string, items: Item[], learned?: LearnedLinks): Item | null {
   const n = norm(name);
   if (!n) return null;
+  const known = learned?.get(n);
+  const remembered = known ? items.find((it) => it.id === known && it.active) : undefined;
+  if (remembered) return remembered;
   let best: Item | null = null;
   for (const it of items) {
     if (!it.active) continue;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { matchItem, parseDate, parseReceiptText } from "./receiptText";
+import { learnLinks, matchItem, parseDate, parseReceiptText } from "./receiptText";
+import type { Purchase } from "./purchases";
 import type { Item } from "./types";
 
 const item = (id: string, name: string, baseUnit: Item["baseUnit"] = "ea"): Item => ({ id, name, baseUnit, standardCost: 0, category: "etc", active: true });
@@ -81,6 +82,19 @@ describe("품목 자동 연결", () => {
   it("안 쓰는 품목·없는 품목은 연결하지 않는다", () => {
     expect(matchItem("쉬는 품목", items)).toBeNull();
     expect(matchItem("휴지", items)).toBeNull();
+  });
+
+  it("이름이 안 겹쳐도 예전에 손으로 이어 둔 상품명이면 같은 품목에 잇는다 (으뜸 닭갈비(드럼))", () => {
+    const buy = (date: string, name: string, itemId: string | null): Purchase => ({ id: date, date, vendor: "으뜸식품", discount: 0, lines: [{ name, unitPrice: 7800, qty: 10, amount: 78000, category: "원재료비", itemId, itemQty: 10 }] });
+    expect(matchItem("닭갈비(드럼) 국내산", items)).toBeNull();
+    const learned = learnLinks([buy("2026-11-13", "닭갈비(드럼) 국내산", "i2"), buy("2026-11-14", "닭갈비 (드럼)국내산", null)]);
+    expect(matchItem("닭갈비(드럼) 국내산", items, learned)?.id).toBe("i2");
+    expect(matchItem("닭갈비 (드럼) 국내산", items, learned)?.id).toBe("i2");
+    // 기억한 품목을 안 쓰게 됐으면 기억은 버리고 이름으로만 찾는다
+    expect(matchItem("쉬는 품목", items, learnLinks([buy("2026-11-01", "쉬는 품목", "i4")]))).toBeNull();
+    // 같은 이름을 나중에 다른 품목으로 고쳐 이었으면 최근 것을 따른다
+    const relinked = learnLinks([buy("2026-11-02", "대파 한단", "i3"), buy("2026-10-01", "대파 한단", "i1")]);
+    expect(matchItem("대파 한단", items, relinked)?.id).toBe("i3");
   });
 });
 

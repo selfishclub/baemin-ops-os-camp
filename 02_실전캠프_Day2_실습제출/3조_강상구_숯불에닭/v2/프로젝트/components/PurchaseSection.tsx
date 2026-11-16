@@ -25,7 +25,7 @@ import { LiquorParseError, liquorBrands, liquorDayToPurchase, newLiquorItems, pa
 import { ReceiptSheetError, linkableCategory, parseReceiptSheets, receiptDiscount, receiptTotal, sheetReceiptToPurchase, toPurchaseCategory, type SheetReceipt } from "@/lib/costing/receiptSheet";
 import { LIQUOR_PROMPT, parseLiquorText } from "@/lib/costing/liquorText";
 import { txFromPurchase } from "@/lib/costing/purchaseToTx";
-import { RECEIPT_PROMPT, matchItem, parseReceiptText, toPurchaseLine } from "@/lib/costing/receiptText";
+import { RECEIPT_PROMPT, learnLinks, matchItem, parseReceiptText, toPurchaseLine, type LearnedLinks } from "@/lib/costing/receiptText";
 import { todayStr } from "@/lib/daily";
 import { num, won } from "@/lib/format";
 import { monthLabel, nextMonth, prevMonth } from "@/lib/month";
@@ -234,7 +234,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
     let nextItems = items;
     const byMonth = new Map<string, Purchase[]>();
     for (const rc of picked) {
-      const p = sheetReceiptToPurchase(rc, nextItems, link);
+      const p = sheetReceiptToPurchase(rc, nextItems, link, learned);
       byMonth.set(rc.date.slice(0, 7), [...(byMonth.get(rc.date.slice(0, 7)) ?? []), p]);
     }
     const updated = new Map<string, { name: string; from: number; to: number }>();
@@ -266,6 +266,8 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
 
   // 훅은 조기 반환보다 위에 있어야 한다 (아래 `if (!loaded) return null` 다음에 두면 렌더마다 훅 수가 달라져 터진다)
   const issues = useMemo(() => checkPurchases(purchases, items, pastPurchases), [purchases, items, pastPurchases]);
+  // 예전에 손으로 이어 둔 상품명 (석 달치) — 붙여넣기·엑셀로 들어오는 줄을 같은 품목에 잇는다
+  const learned = useMemo(() => learnLinks([...pastPurchases, ...purchases]), [purchases, pastPurchases]);
 
   if (!loaded) return null;
   const summary = summarizePurchases(purchases);
@@ -450,6 +452,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
         <PasteDialog
           month={month}
           items={items}
+          learned={learned}
           onCancel={() => setPasting(false)}
           onUse={(p, balance) => {
             setPasting(false);
@@ -458,7 +461,7 @@ export default function PurchaseSection({ month, items, onItemsChange }: { month
           }}
         />
       )}
-      {sheet && <SheetDialog {...sheet} items={items} onCancel={() => setSheet(null)} onSave={(picked, link) => void saveSheet(picked, link)} />}
+      {sheet && <SheetDialog {...sheet} items={items} learned={learned} onCancel={() => setSheet(null)} onSave={(picked, link) => void saveSheet(picked, link)} />}
       {liquor && <LiquorDialog {...liquor} items={items} onCancel={() => setLiquor(null)} onSave={(vendor, createItems) => void saveLiquor(liquor.ledger, vendor, createItems)} />}
       {viewing && <PurchaseViewer purchase={viewing} items={items} onClose={() => setViewing(null)} />}
       {editing && <PurchaseEditor purchase={editing} items={items} onChange={setEditing} onSave={() => save(editing)} onCancel={() => void cancelEdit()} />}
@@ -633,7 +636,7 @@ function itemUnitOf(items: Item[], id: string) {
 }
 
 // 텍스트로 붙여넣기 — 폰 클로드·챗GPT 앱에 영수증 사진을 올려 받은 글자를 그대로 붙이면 줄로 바꿔 준다.
-function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: Item[]; onUse: (p: Partial<Purchase>, balance?: LiquorBalance | null) => void; onCancel: () => void }) {
+function PasteDialog({ month, items, learned, onUse, onCancel }: { month: string; items: Item[]; learned: LearnedLinks; onUse: (p: Partial<Purchase>, balance?: LiquorBalance | null) => void; onCancel: () => void }) {
   const [text, setText] = useState("");
   const [copied, setCopied] = useState(false);
   // 주류 판매계산서는 보증금·채권잔액이 섞여 있어 읽는 법이 다르다. 글자를 보고 알아서 고른다.
@@ -659,7 +662,7 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
     if (!parsed) return;
     const lines: PurchaseLine[] = parsed.lines.map((l) => {
       const line = toPurchaseLine(l);
-      const it = matchItem(l.name, items);
+      const it = matchItem(l.name, items, learned);
       if (it) {
         line.itemId = it.id;
         line.itemQty = guessItemQty(l.name, l.qty, it.baseUnit) ?? 0;
@@ -669,7 +672,7 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
     onUse({ date: parsed.date || undefined, vendor: parsed.vendor || "", lines, discount: parsed.discount, ...(parsed.vat !== null ? { vat: parsed.vat } : {}) });
   };
 
-  const linked = parsed ? parsed.lines.filter((l) => matchItem(l.name, items)).length : 0;
+  const linked = parsed ? parsed.lines.filter((l) => matchItem(l.name, items, learned)).length : 0;
   const sum = parsed ? parsed.lines.reduce((a, l) => a + l.amount, 0) - parsed.discount : 0;
 
   return (
@@ -741,7 +744,7 @@ function PasteDialog({ month, items, onUse, onCancel }: { month: string; items: 
               <>
                 <ul className="divide-y divide-stone-100 text-xs">
                   {parsed.lines.map((l, i) => {
-                    const it = matchItem(l.name, items);
+                    const it = matchItem(l.name, items, learned);
                     return (
                       <li key={i} className="flex items-center justify-between gap-2 py-1">
                         <span className="min-w-0 flex-1 truncate">
@@ -1070,7 +1073,7 @@ function LiquorDialog({ ledger, fileName, vendor: initialVendor, items, onSave, 
 }
 
 // 영수증 정리 엑셀 미리보기 — 영수증마다 넣을지 고르고, 식비·개인 물품뿐인 영수증은 기본으로 빼 둔다
-function SheetDialog({ receipts, notes, fileName, items, onSave, onCancel }: { receipts: SheetReceipt[]; notes: string[]; fileName: string; items: Item[]; onSave: (picked: SheetReceipt[], link: boolean) => void; onCancel: () => void }) {
+function SheetDialog({ receipts, notes, fileName, items, learned, onSave, onCancel }: { receipts: SheetReceipt[]; notes: string[]; fileName: string; items: Item[]; learned: LearnedLinks; onSave: (picked: SheetReceipt[], link: boolean) => void; onCancel: () => void }) {
   const [on, setOn] = useState<Record<string, boolean>>(() => Object.fromEntries(receipts.map((r) => [r.key, !r.personal])));
   const [link, setLink] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
@@ -1128,7 +1131,7 @@ function SheetDialog({ receipts, notes, fileName, items, onSave, onCancel }: { r
                 {open === r.key && (
                   <ul className="mt-1 space-y-0.5 rounded-lg bg-stone-50 p-2 text-xs">
                     {r.lines.map((l, i) => {
-                      const it = link && linkableCategory(toPurchaseCategory(l.rawCategory)) ? matchItem(l.name, items) : null;
+                      const it = link && linkableCategory(toPurchaseCategory(l.rawCategory)) ? matchItem(l.name, items, learned) : null;
                       return (
                         <li key={i} className="flex justify-between gap-2">
                           <span className="min-w-0 flex-1">

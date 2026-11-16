@@ -1,6 +1,6 @@
 import type { Item } from "./types";
 import { guessItemQty, type Purchase, type PurchaseCategory, type PurchaseLine } from "./purchases";
-import { matchItem, parseDate, toNumber } from "./receiptText";
+import { matchItem, parseDate, toNumber, type LearnedLinks } from "./receiptText";
 
 // 영수증 정리 엑셀 읽기 — 폰 AI로 영수증 사진을 표로 정리한 파일(예: 영수증_손익관리_입력용_2026-09.xlsx)
 //  - "품목별내역" 시트: 구매일시 | 거래처 | 비용분류 | 품목 | 단가 | 수량 | 품목금액 | 결제수단 | 검토상태
@@ -164,10 +164,10 @@ export const receiptDiscount = (rc: SheetReceipt) => (rc.paid !== null ? Math.ma
 export const receiptTotal = (rc: SheetReceipt) => rc.itemSum - receiptDiscount(rc);
 
 /** 영수증 한 건 → 매입 영수증. id를 구매일시·거래처로 고정해 다시 올려도 겹치지 않는다 */
-export function sheetReceiptToPurchase(rc: SheetReceipt, items: Item[], link: boolean): Purchase {
+export function sheetReceiptToPurchase(rc: SheetReceipt, items: Item[], link: boolean, learned?: LearnedLinks): Purchase {
   const lines: PurchaseLine[] = rc.lines.map((l) => {
     const category = toPurchaseCategory(l.rawCategory);
-    const it = link && linkableCategory(category) ? matchItem(l.name, items) : null;
+    const it = link && linkableCategory(category) ? matchItem(l.name, items, learned) : null;
     const itemQty = it ? guessItemQty(l.name, l.qty, it.baseUnit) ?? 0 : 0;
     return { name: l.name, unitPrice: l.unitPrice, qty: l.qty, amount: l.amount, category, itemId: it ? it.id : null, itemQty: it ? itemQty : 0 };
   });
