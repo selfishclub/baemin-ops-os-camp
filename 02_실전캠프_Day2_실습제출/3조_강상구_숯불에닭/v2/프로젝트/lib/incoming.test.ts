@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CardsalesData, CardPayout } from "./cardsales";
-import { feeRateOf, incomingDays, incomingOn, lastKnownSale } from "./incoming";
+import { feeRateOf, incomingDays, incomingOn, lastKnownSale, lastSettledSale, netRateOf, type DeliverySource } from "./incoming";
 import type { SettlementRule } from "./settlement";
 import type { DailySale } from "./types";
 
@@ -18,6 +18,7 @@ const RULES: SettlementRule[] = [
   { channel: "card_hyundai", mode: "days", days: 2, weekday: 0 },
   { channel: "card_kb", mode: "days", days: 2, weekday: 0 },
   { channel: "card_samsung", mode: "calendar", days: 2, weekday: 0 },
+  { channel: "baemin", mode: "days", days: 3, weekday: 0 },
 ];
 
 // 현대카드: 11/13·11/14 매입이 올라와 있고 수수료율 1%
@@ -27,6 +28,22 @@ const HYUNDAI: CardPayout[] = [
 ];
 
 const data = (payouts: CardPayout[]): CardsalesData => ({ fetchedAt: "2026-11-16T16:00:00Z", ranges: [{ from: "2026-09-22", to: "2026-11-14" }], payouts });
+
+// 배민 — 주문일 + 3영업일. 정산 건은 11/15 주문분까지 만들어져 있다 (2026-11-17 실제 자료)
+const BAEMIN: DeliverySource = {
+  channel: "baemin",
+  name: "배달의민족",
+  settlements: [
+    { depositDueDate: "2026-11-12", periodStart: "2026-11-09", periodEnd: "2026-11-09", depositAmount: 89_022 },
+    { depositDueDate: "2026-11-13", periodStart: "2026-11-10", periodEnd: "2026-11-10", depositAmount: 29_512 },
+    { depositDueDate: "2026-11-16", periodStart: "2026-11-11", periodEnd: "2026-11-11", depositAmount: 22_012 },
+    { depositDueDate: "2026-11-17", periodStart: "2026-11-12", periodEnd: "2026-11-12", depositAmount: 107_076 },
+    { depositDueDate: "2026-11-18", periodStart: "2026-11-13", periodEnd: "2026-11-15", depositAmount: 232_523 },
+  ],
+};
+
+// 위 정산 건과 짝이 되는 포스 배민 매출 — 입금률이 0.8 근처로 나온다
+const BAEMIN_SALES = [sale("2026-11-09", "baemin", 111_000), sale("2026-11-10", "baemin", 37_000), sale("2026-11-11", "baemin", 28_000), sale("2026-11-12", "baemin", 134_000), sale("2026-11-13", "baemin", 120_000), sale("2026-11-14", "baemin", 90_000), sale("2026-11-15", "baemin", 80_000)];
 
 describe("들어올 돈 — 확정(여신협회) + 짐작(포스)", () => {
   it("매입이 다 올라온 카드사는 여신협회 숫자 그대로", () => {
@@ -84,6 +101,43 @@ describe("들어올 돈 — 확정(여신협회) + 짐작(포스)", () => {
     expect(days[0].amount).toBe(484_110);
     expect(days[1].amount).toBe(49_500); // 11/16(월) 매출 → 11/18(수)
     expect(days[2].amount).toBe(0); // 11/17 장사분은 아직 포스에 없다
+  });
+
+  it("같은 날 카드와 배달을 같이 센다 — 배달 줄은 뒤에 온다", () => {
+    const d = incomingOn("2026-11-17", { sales: [], cardsales: data(HYUNDAI), rules: RULES, channels: ["card_hyundai"], delivery: [BAEMIN] });
+    expect(d.lines.map((l) => [l.kind, l.name, l.amount])).toEqual([
+      ["card", "현대카드", 402_930],
+      ["delivery", "배달의민족", 107_076],
+    ]);
+    expect(d.amount).toBe(510_006);
+  });
+
+  it("배달앱은 정산 건이 확정, 정산 건이 아직 없는 매출일만 실측 입금률로 짐작한다", () => {
+    // 11/16(월) 배민 매출 100,000원 → +3영업일 = 11/19(목)
+    const sales = [...BAEMIN_SALES, sale("2026-11-16", "baemin", 100_000)];
+    const d = incomingOn("2026-11-19", { sales, cardsales: null, rules: RULES, channels: [], delivery: [BAEMIN] });
+    expect(lastSettledSale(BAEMIN)).toBe("2026-11-15");
+    const rate = netRateOf(BAEMIN, BAEMIN_SALES)!;
+    expect(Math.round(rate * 1000) / 10).toBe(79.9); // 매출의 79.9%가 들어온다
+    expect(d.confirmed).toBe(0);
+    expect(d.estimated).toBe(Math.round(100_000 * rate));
+    expect(d.lines[0].feeRate).toBe(20.09); // 수수료·배달비로 20.09%
+  });
+
+  it("정산 건이 이미 있는 매출일은 두 번 세지 않는다", () => {
+    const d = incomingOn("2026-11-18", { sales: BAEMIN_SALES, cardsales: null, rules: RULES, channels: [], delivery: [BAEMIN] });
+    expect(d.confirmed).toBe(232_523);
+    expect(d.estimated).toBe(0);
+  });
+
+  it("견줄 정산 건이 3건이 안 되면 짐작하지 않는다", () => {
+    const thin: DeliverySource = { ...BAEMIN, settlements: BAEMIN.settlements.slice(0, 2) };
+    expect(netRateOf(thin, BAEMIN_SALES)).toBeNull();
+  });
+
+  it("기간에 포스 매출이 없는 정산 건(환급만 들어온 날 등)은 입금률 계산에서 뺀다", () => {
+    const withRefund: DeliverySource = { ...BAEMIN, settlements: [...BAEMIN.settlements, { depositDueDate: "2026-11-06", periodStart: "2026-11-06", periodEnd: "2026-11-06", depositAmount: 28_128 }] };
+    expect(netRateOf(withRefund, BAEMIN_SALES)).toBe(netRateOf(BAEMIN, BAEMIN_SALES));
   });
 
   it("매입이 올라와 있는 마지막 거래일을 카드사별로 본다", () => {

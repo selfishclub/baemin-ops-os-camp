@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Notice } from "@/components/ui";
+import { useExport } from "@/components/useExport";
 import { CARDSALES_KEY, type CardsalesData } from "@/lib/cardsales";
 import { num, won } from "@/lib/format";
-import { incomingDays, type IncomingDay } from "@/lib/incoming";
+import { incomingDays, type DeliverySource, type IncomingDay } from "@/lib/incoming";
 import { prevMonth } from "@/lib/month";
 import type { SettlementRule } from "@/lib/settlement";
 import { getStore } from "@/lib/storage";
@@ -33,6 +34,15 @@ export function IncomingSection({ rules, holidays, txs }: { rules: SettlementRul
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const today = localDay();
+  const { baemin, coupang } = useExport();
+
+  // 배달앱은 정산 건을 앱이 알려 주므로 그게 확정. 아직 정산 건이 없는 매출일만 실측 입금률로 짐작한다
+  const delivery = useMemo<DeliverySource[]>(() => {
+    const out: DeliverySource[] = [];
+    if (baemin?.settlements.length) out.push({ channel: "baemin", name: "배달의민족", settlements: baemin.settlements });
+    if (coupang?.settlements.length) out.push({ channel: "coupang", name: "쿠팡이츠", settlements: coupang.settlements });
+    return out;
+  }, [baemin, coupang]);
 
   useEffect(() => {
     const store = getStore();
@@ -45,10 +55,13 @@ export function IncomingSection({ rules, holidays, txs }: { rules: SettlementRul
       .finally(() => setLoaded(true));
   }, [today]);
 
-  const days = useMemo(() => incomingDays(today, 3, { sales, cardsales, rules, holidays }), [today, sales, cardsales, rules, holidays]);
+  const days = useMemo(() => incomingDays(today, 3, { sales, cardsales, rules, holidays, delivery }), [today, sales, cardsales, rules, holidays, delivery]);
 
-  // 오늘 몫이 이미 통장에 들어왔나 (카드 입금은 아침에 들어온다)
-  const gotToday = useMemo(() => txs.filter((t) => t.date === today && t.in > 0 && String(t.channel ?? "").startsWith("card_")).reduce((a, t) => a + t.in, 0), [txs, today]);
+  // 오늘 몫이 이미 통장에 들어왔나 (카드·배달 입금은 아침에 들어온다)
+  const gotToday = useMemo(() => {
+    const ch = new Set<string>([...(days[0]?.lines ?? []).map((l) => String(l.channel))]);
+    return txs.filter((t) => t.date === today && t.in > 0 && t.channel && ch.has(t.channel)).reduce((a, t) => a + t.in, 0);
+  }, [txs, today, days]);
 
   if (!loaded) return null;
   if (!days.some((d) => d.amount > 0))
@@ -62,8 +75,8 @@ export function IncomingSection({ rules, holidays, txs }: { rules: SettlementRul
   return (
     <section className="card space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="text-base font-bold">들어올 돈 · 카드</h2>
-        <p className="text-xs text-stone-500">여신협회 확정 + 아직 안 올라온 날은 포스 매출로 미리 셈</p>
+        <h2 className="text-base font-bold">들어올 돈 · 카드 + 배달</h2>
+        <p className="text-xs text-stone-500">확정(여신협회·배달앱) + 아직 안 올라온 날은 포스 매출로 미리 셈</p>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
@@ -94,7 +107,9 @@ export function IncomingSection({ rules, holidays, txs }: { rules: SettlementRul
       )}
 
       <p className="text-xs text-stone-500">
-        <b>예상</b>은 여신협회에 매입이 아직 안 올라온 거래일을, 포스 카드 매출에서 그 카드사 실측 수수료율을 뺀 금액이에요. 카드사는 보통 거래 다음 날 매입을 올리고, <b>KB국민카드는 이틀 뒤</b>에 올려요. 모레 칸은 오늘 장사분이 들어가므로 마감 뒤에 채워져요. 간편결제·제로페이는 여신협회에 안 나와서 여기서 뺐어요.
+        <b>확정</b>은 카드사가 여신협회에 올린 지급예정액과 배달앱이 알려 준 정산 금액이에요. <b>예상</b>은 아직 그게 안 올라온 매출일을, 포스 매출에서 그 카드사·앱의 <b>실측</b> 수수료율을 뺀 금액이에요. 카드사는 보통 거래 다음 날 매입을 올리고 <b>KB국민카드는 이틀 뒤</b>, 배달앱은 정산일이 가까워져야 금액이 나와요. 모레 칸은 오늘 장사분이 들어가므로 마감 뒤에 채워져요. 간편결제·제로페이는 여신협회에 안 나와서 뺐고, 쿠팡이츠는 <b>출금 신청을 해야</b> 통장에 들어와요.
+        <br />
+        예상은 <b>카드사당 100~200원쯤</b> 빗나갈 수 있어요 — 같은 카드사라도 체크카드(0.75%)와 신용카드(1.0%) 수수료가 달라서, 그날 어느 쪽이 섞였는지는 매입이 올라와야 알 수 있거든요. 지난 두 달로 맞춰 보니 카드사별 오차 중앙값이 0~190원이었어요.
       </p>
     </section>
   );
@@ -117,9 +132,12 @@ function Detail({ day, today }: { day: IncomingDay; today: string }) {
           </tr>
         </thead>
         <tbody className="num divide-y divide-stone-100">
-          {day.lines.map((l) => (
-            <tr key={l.channel} className="whitespace-nowrap">
-              <td className="py-1.5">{l.name}</td>
+          {day.lines.map((l, i) => (
+            <tr key={l.channel} className={`whitespace-nowrap ${l.kind === "delivery" && day.lines[i - 1]?.kind === "card" ? "border-t-2 border-stone-200" : ""}`}>
+              <td className="py-1.5">
+                {l.name}
+                {l.kind === "delivery" && <span className="ml-1 rounded bg-sky-100 px-1 text-[10px] font-bold text-sky-900">배달</span>}
+              </td>
               <td className="text-xs text-stone-500">
                 {range(l.from)}{" "}
                 {l.estFrom.length > 0 && <span className="ml-0.5 rounded bg-amber-100 px-1 text-[10px] font-bold text-amber-900" title={`${l.estFrom.map(md).join(", ")}는 아직 여신협회에 안 올라와 포스 매출로 셌어요 (수수료 ${l.feeRate}%)`}>{l.estFrom.map(md).join(",")} 예상</span>}

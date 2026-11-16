@@ -18,14 +18,22 @@ import type { DailySale } from "./types";
 // 어림한 숫자를 "들어올 돈"에 섞으면 통장과 맞춰 볼 수가 없다.
 
 export interface IncomingLine {
+  kind: "card" | "delivery";
   channel: ChannelId;
   name: string;
-  confirmed: number; // 여신협회가 알려 준 지급금액
+  confirmed: number; // 카드: 여신협회 지급금액 / 배달: 앱이 알려 준 정산 입금액
   estimated: number; // 포스 매출로 미리 센 몫
   amount: number;
   from: string[]; // 이 입금에 들어가는 거래일
   estFrom: string[]; // 그중 아직 짐작인 거래일
   feeRate: number | null; // 짐작에 쓴 수수료율 (%)
+}
+
+/** 배달앱 정산 — 앱이 정산 건을 알려 주므로 그 금액이 "확정"이다 */
+export interface DeliverySource {
+  channel: ChannelId;
+  name: string;
+  settlements: { depositDueDate: string; periodStart: string; periodEnd: string; depositAmount: number }[];
 }
 
 export interface IncomingDay {
@@ -43,6 +51,7 @@ export interface IncomingInput {
   rules: SettlementRule[];
   holidays?: string[];
   channels?: ChannelId[]; // 비우면 카드사 전부
+  delivery?: DeliverySource[];
 }
 
 const cardRule = (channel: ChannelId): SettlementRule => ({ channel, mode: "days", days: 2, weekday: 0 });
@@ -63,6 +72,32 @@ export function feeRateOf(data: CardsalesData | null, channel: ChannelId): numbe
 export function lastKnownSale(data: CardsalesData | null, channel: ChannelId): string | null {
   let last: string | null = null;
   for (const p of data?.payouts ?? []) if (p.channel === channel && (!last || p.saleDate > last)) last = p.saleDate;
+  return last;
+}
+
+/**
+ * 배달앱이 매출의 몇 %를 통장에 넣어 주나 — 정산 건의 입금액 ÷ 그 기간 포스 매출의 가운뎃값.
+ * 수수료율을 따로 알 필요 없이 실제로 들어온 비율을 쓴다. 터무니없는 짝(기간에 매출이 없거나
+ * 환급이 섞여 비율이 튄 건)은 버린다.
+ */
+export function netRateOf(src: DeliverySource, sales: DailySale[]): number | null {
+  const rates: number[] = [];
+  for (const s of src.settlements) {
+    if (!(s.depositAmount > 0) || !s.periodStart || !s.periodEnd) continue;
+    const sold = sales.filter((x) => x.channel === src.channel && x.date >= s.periodStart && x.date <= s.periodEnd).reduce((a, x) => a + x.amount, 0);
+    if (sold <= 0) continue;
+    const r = s.depositAmount / sold;
+    if (r >= 0.4 && r <= 1.1) rates.push(r); // 배달앱이 절반 아래로 주거나 매출보다 많이 줄 수는 없다
+  }
+  if (rates.length < 3) return null; // 견줄 자료가 적으면 짐작하지 않는다
+  rates.sort((a, b) => a - b);
+  return rates[Math.floor(rates.length / 2)];
+}
+
+/** 그 앱의 정산 건이 만들어져 있는 마지막 매출일. 이 날까지는 "확정"으로 본다 */
+export function lastSettledSale(src: DeliverySource): string | null {
+  let last: string | null = null;
+  for (const s of src.settlements) if (s.periodEnd && (!last || s.periodEnd > last)) last = s.periodEnd;
   return last;
 }
 
@@ -101,6 +136,7 @@ export function incomingOn(date: string, input: IncomingInput): IncomingDay {
 
     if (confirmed + estimated <= 0) continue;
     lines.push({
+      kind: "card",
       channel,
       name: CARD_PRESETS.find((c) => c.id === channel)?.name ?? channel,
       confirmed,
@@ -112,7 +148,49 @@ export function incomingOn(date: string, input: IncomingInput): IncomingDay {
     });
   }
 
-  lines.sort((a, b) => b.amount - a.amount);
+  // 배달앱 — 앱이 알려 준 정산 건이 확정, 아직 정산 건이 없는 매출일은 실측 입금률로 짐작
+  for (const src of input.delivery ?? []) {
+    const rule = rules.find((r) => r.channel === src.channel) ?? cardRule(src.channel);
+    const rate = netRateOf(src, sales);
+    const last = lastSettledSale(src);
+
+    let confirmed = 0;
+    const from = new Set<string>();
+    for (const s of src.settlements) {
+      if (s.depositDueDate !== date || !(s.depositAmount > 0)) continue;
+      confirmed += s.depositAmount;
+      if (s.periodStart) from.add(s.periodStart);
+      if (s.periodEnd) from.add(s.periodEnd);
+    }
+
+    let estimated = 0;
+    const estFrom: string[] = [];
+    if (rate !== null) {
+      for (const s of sales) {
+        if (s.channel !== src.channel || s.amount <= 0) continue;
+        if (last && s.date <= last) continue;
+        if (payoutDate(s.date, rule, holidays) !== date) continue;
+        estimated += Math.round(s.amount * rate);
+        estFrom.push(s.date);
+        from.add(s.date);
+      }
+    }
+
+    if (confirmed + estimated <= 0) continue;
+    lines.push({
+      kind: "delivery",
+      channel: src.channel,
+      name: src.name,
+      confirmed,
+      estimated,
+      amount: confirmed + estimated,
+      from: [...from].sort(),
+      estFrom: estFrom.sort(),
+      feeRate: rate === null ? null : Math.round((1 - rate) * 10000) / 100,
+    });
+  }
+
+  lines.sort((a, b) => (a.kind === b.kind ? b.amount - a.amount : a.kind === "card" ? -1 : 1));
   const confirmed = lines.reduce((a, l) => a + l.confirmed, 0);
   const estimated = lines.reduce((a, l) => a + l.estimated, 0);
   return { date, lines, confirmed, estimated, amount: confirmed + estimated, partial: estimated > 0 };
