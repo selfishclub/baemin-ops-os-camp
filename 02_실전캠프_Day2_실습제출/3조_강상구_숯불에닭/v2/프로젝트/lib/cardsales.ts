@@ -1,7 +1,7 @@
 import { CARD_PRESETS, type ChannelId } from "./categories";
 import { issuerToChannel } from "./cardApproval";
 import { nextMonth } from "./month";
-import type { Month, Transaction } from "./types";
+import type { DailySale, Month, Transaction } from "./types";
 
 // 여신금융협회 카드매출조회(cardsales.or.kr) "기간별 매입내역 - 세부내역" 엑셀 → 카드사별 입금 예정과 통장 대조.
 //  - 결제 한 건마다 거래일·카드사·매입금액·수수료·지급금액·지급예정일이 있다.
@@ -265,4 +265,40 @@ export function rangesToFetch(month: Month, today: string): { from: string; to: 
 /** 받아 둔 구간이 이 구간을 다 덮나 */
 export function covered(data: CardsalesData | null, r: { from: string; to: string }): boolean {
   return !!data?.ranges.some((x) => x.from <= r.from && x.to >= r.to);
+}
+
+// ── 자료 구멍 ──────────────────────────────────────────────────
+// 받아 둔 구간인데도 그날 매입이 통째로(또는 거의) 빠져 있는 날이 생긴다. 그러면 지급예정액이
+// 실제보다 작게 잡혀서, 통장에 제대로 들어온 돈이 "차이"로 빨갛게 뜬다.
+// 2026-11-17에 뜬 "확인할 입금 12건"이 전부 이것이었다 — 10/08·09·23·24 매입이 빠져 있었고,
+// 그 나흘을 다시 받으니 12건이 한 번에 사라졌다. 돈 문제가 아니라 자료 문제다.
+const GAP_MIN = 100_000; // 이보다 적게 빠진 건 자정 넘긴 결제가 옆날로 간 것 (늘 조금씩 있다)
+const GAP_RATIO = 0.3; // 그날 포스 카드 매출의 30% 넘게 빠졌을 때만
+
+/** 포스엔 카드 매출이 있는데 여신협회 매입이 크게 빠진 날 → 다시 받을 구간 (거래일 기준) */
+export function purchaseGaps(data: CardsalesData | null, sales: DailySale[], today: string): { from: string; to: string }[] {
+  if (!data?.ranges.length) return [];
+  const buy = new Map<string, number>();
+  for (const p of data.payouts) buy.set(p.saleDate, (buy.get(p.saleDate) ?? 0) + p.amount);
+  const pos = new Map<string, number>();
+  for (const s of sales) {
+    if (!s.channel.startsWith("card_") || s.channel === "card_easy" || s.channel === "card_zeropay") continue;
+    pos.set(s.date, (pos.get(s.date) ?? 0) + s.amount);
+  }
+  // 카드사는 거래 다음 날(KB는 이틀 뒤) 매입을 올린다. 최근 사흘은 아직 올라오는 중이라 구멍이 아니다
+  const until = addDays(today, -3);
+  const days: string[] = [];
+  for (const [d, p] of [...pos.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    if (d > until || !data.ranges.some((r) => r.from <= d && r.to >= d)) continue;
+    const short = p - (buy.get(d) ?? 0);
+    if (short >= GAP_MIN && short >= p * GAP_RATIO) days.push(d);
+  }
+  // 이어진 날은 한 구간으로 묶고, 앞뒤로 하루씩 넓힌다 (자정 넘긴 결제가 옆날에 가 있다)
+  const out: { from: string; to: string }[] = [];
+  for (const d of days) {
+    const last = out[out.length - 1];
+    if (last && d <= addDays(last.to, 2)) last.to = d;
+    else out.push({ from: d, to: d });
+  }
+  return out.map((r) => ({ from: addDays(r.from, -1), to: addDays(r.to, 1) }));
 }

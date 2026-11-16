@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { cardsalesMonth, CardsalesParseError, covered, isCardDeposit, mergeCardsales, mergeRanges, parseCardsalesPurchase, rangesToFetch, type CardsalesData } from "./cardsales";
-import type { Transaction } from "./types";
+import { cardsalesMonth, CardsalesParseError, covered, isCardDeposit, mergeCardsales, mergeRanges, parseCardsalesPurchase, purchaseGaps, rangesToFetch, type CardPayout, type CardsalesData } from "./cardsales";
+import type { DailySale, Transaction } from "./types";
 
 // 여신협회 "기간별 매입내역 - 세부내역" 엑셀 모양 (카드번호는 가짜)
 const HEAD = ["No.", "거래일자", "매입일자", "승인번호", "카드사", "제휴카드사", "카드번호", "카드종류", "매입금액", "가맹점수수료", "수수료포인트", "수수료포인트률", "기타수수료", "수수료합계(B)", "부가세대리납부금액(C)", "지급금액(A-B-C)", "지급예정일", "MPM QR결제여부"];
@@ -108,5 +108,39 @@ describe("저장 모양", () => {
   it("CardsalesData 는 JSON 으로 그대로 저장된다", () => {
     const d: CardsalesData = mergeCardsales(null, parseCardsalesPurchase(SHEET), "t");
     expect(JSON.parse(JSON.stringify(d))).toEqual(d);
+  });
+});
+
+// 2026-11-17: 받아 둔 구간인데도 10/08·09·23·24 매입이 통째로 빠져 있어 "확인할 입금 12건"이 떴다.
+// 그 나흘을 다시 받으니 12건이 한 번에 사라졌다 — 돈 문제가 아니라 자료 구멍이었다.
+describe("자료 구멍 (매입이 빠진 거래일)", () => {
+  const buy = (saleDate: string, amount: number): CardPayout => ({ channel: "card_kb", issuer: "KB카드", saleDate, payDate: saleDate, count: 1, amount, fee: 0, pay: amount });
+  const sold = (date: string, amount: number): DailySale => ({ date, channel: "card_kb", amount });
+  const data = (payouts: CardPayout[]): CardsalesData => ({ fetchedAt: "t", ranges: [{ from: "2026-10-01", to: "2026-10-31" }], payouts });
+
+  it("매입이 통째로 빠진 날을 찾아 앞뒤 하루씩 넓힌 구간으로 준다", () => {
+    const d = data([buy("2026-10-07", 500_000), buy("2026-10-10", 400_000)]);
+    const sales = [sold("2026-10-07", 500_000), sold("2026-10-08", 600_000), sold("2026-10-09", 700_000), sold("2026-10-10", 400_000)];
+    expect(purchaseGaps(d, sales, "2026-11-17")).toEqual([{ from: "2026-10-07", to: "2026-10-10" }]);
+  });
+
+  it("자정 넘긴 결제가 옆날로 간 정도(조금 모자람)는 구멍이 아니다", () => {
+    const d = data([buy("2026-10-07", 480_000)]);
+    expect(purchaseGaps(d, [sold("2026-10-07", 500_000)], "2026-11-17")).toEqual([]);
+  });
+
+  it("최근 사흘은 아직 매입이 올라오는 중이라 구멍으로 보지 않는다", () => {
+    const d = data([]);
+    expect(purchaseGaps(d, [sold("2026-10-30", 500_000)], "2026-11-01")).toEqual([]);
+    expect(purchaseGaps(d, [sold("2026-10-30", 500_000)], "2026-11-05")).toEqual([{ from: "2026-10-29", to: "2026-10-31" }]);
+  });
+
+  it("아직 받아 본 적 없는 구간은 구멍이 아니다", () => {
+    const d = data([]);
+    expect(purchaseGaps(d, [sold("2026-09-15", 500_000)], "2026-11-17")).toEqual([]);
+  });
+
+  it("자료가 아예 없으면 묻지 않는다", () => {
+    expect(purchaseGaps(null, [sold("2026-10-08", 500_000)], "2026-11-17")).toEqual([]);
   });
 });

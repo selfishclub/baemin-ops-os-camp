@@ -89,13 +89,13 @@ export default function ChannelsPage() {
   return (
     <>
       {/* 오늘·내일·모레 통장에 들어올 카드 돈 — 캐시노트 당일 입금예정액과 같은 것을 우리 자료로 센다 (11/17) */}
-      {!isBasic() && <IncomingSection rules={settlement.rules} holidays={settlement.holidays} txs={[...ledger.txs, ...ledger.nextTxs]} />}
+      {!isBasic() && <IncomingSection month={month} rules={settlement.rules} holidays={settlement.holidays} txs={[...ledger.txs, ...ledger.nextTxs]} results={settlement.results} />}
 
       {/* 정산 규칙 카드는 규칙 탭 맨 아래로 옮김 (사장님 요청 10/15). 여기는 짝 맞추기 결과만 */}
       <SettlementSection month={month} ledger={ledger} daily={daily} settlement={settlement} show="results" />
 
       {/* 여신협회 지급예정일로 카드 입금 대조 — 도우미(같은 PC)가 받아 오는 기능이라 전체판에만 (사장님 결정 10/17) */}
-      {!isBasic() && <CardSalesSection month={month} txs={[...ledger.txs, ...ledger.nextTxs]} lastBankDate={ledger.lastBankDate} />}
+      {!isBasic() && <CardSalesSection month={month} txs={[...ledger.txs, ...ledger.nextTxs]} lastBankDate={ledger.lastBankDate} sales={daily.sales} />}
 
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">

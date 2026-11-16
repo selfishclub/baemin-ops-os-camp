@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Notice } from "@/components/ui";
 import { useExport } from "@/components/useExport";
+import { CARD_PRESETS } from "@/lib/categories";
 import { CARDSALES_KEY, type CardsalesData } from "@/lib/cardsales";
 import { num, won } from "@/lib/format";
 import { incomingDays, type DeliverySource, type IncomingDay } from "@/lib/incoming";
 import { prevMonth } from "@/lib/month";
-import type { SettlementRule } from "@/lib/settlement";
+import type { ChannelSettlementSummary, SettlementRule } from "@/lib/settlement";
 import { getStore } from "@/lib/storage";
 import type { DailySale, Transaction } from "@/lib/types";
 
@@ -28,7 +29,7 @@ function range(days: string[]): string {
   return days.length === 1 ? md(days[0]) : `${md(days[0])}~${md(days[days.length - 1])}`;
 }
 
-export function IncomingSection({ rules, holidays, txs }: { rules: SettlementRule[]; holidays: string[]; txs: Transaction[] }) {
+export function IncomingSection({ month, rules, holidays, txs, results }: { month: string; rules: SettlementRule[]; holidays: string[]; txs: Transaction[]; results: ChannelSettlementSummary[] }) {
   const [cardsales, setCardsales] = useState<CardsalesData | null>(null);
   const [sales, setSales] = useState<DailySale[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -36,13 +37,23 @@ export function IncomingSection({ rules, holidays, txs }: { rules: SettlementRul
   const today = localDay();
   const { baemin, coupang } = useExport();
 
-  // 배달앱은 정산 건을 앱이 알려 주므로 그게 확정. 아직 정산 건이 없는 매출일만 실측 입금률로 짐작한다
+  // 배달앱은 정산 건을 앱이 알려 주므로 그게 확정. 아직 정산 건이 없는 매출일만 실측 입금률로 짐작한다.
+  // 간편결제(카카오페이·네이버페이·토스 등)는 알려 주는 데가 없어, 통장에 실제로 들어와 짝이 맞은
+  // 묶음을 정산 건 대신 쓴다 — 거기서 실측 입금률이 나온다.
   const delivery = useMemo<DeliverySource[]>(() => {
     const out: DeliverySource[] = [];
     if (baemin?.settlements.length) out.push({ channel: "baemin", name: "배달의민족", settlements: baemin.settlements });
     if (coupang?.settlements.length) out.push({ channel: "coupang", name: "쿠팡이츠", settlements: coupang.settlements });
+    if (month === today.slice(0, 7)) {
+      for (const ch of ["card_easy", "card_zeropay"] as const) {
+        const matched = (results.find((r) => r.channel === ch)?.settlements ?? [])
+          .filter((s) => s.status === "일치" && s.deposit > 0)
+          .map((s) => ({ depositDueDate: s.payout, periodStart: s.from, periodEnd: s.to, depositAmount: s.deposit }));
+        if (matched.length) out.push({ channel: ch, name: CARD_PRESETS.find((c) => c.id === ch)?.name ?? ch, kind: "easy", settlements: matched });
+      }
+    }
     return out;
-  }, [baemin, coupang]);
+  }, [baemin, coupang, results, month, today]);
 
   useEffect(() => {
     const store = getStore();
@@ -107,7 +118,7 @@ export function IncomingSection({ rules, holidays, txs }: { rules: SettlementRul
       )}
 
       <p className="text-xs text-stone-500">
-        <b>확정</b>은 카드사가 여신협회에 올린 지급예정액과 배달앱이 알려 준 정산 금액이에요. <b>예상</b>은 아직 그게 안 올라온 매출일을, 포스 매출에서 그 카드사·앱의 <b>실측</b> 수수료율을 뺀 금액이에요. 카드사는 보통 거래 다음 날 매입을 올리고 <b>KB국민카드는 이틀 뒤</b>, 배달앱은 정산일이 가까워져야 금액이 나와요. 모레 칸은 오늘 장사분이 들어가므로 마감 뒤에 채워져요. 간편결제·제로페이는 여신협회에 안 나와서 뺐고, 쿠팡이츠는 <b>출금 신청을 해야</b> 통장에 들어와요.
+        <b>확정</b>은 카드사가 여신협회에 올린 지급예정액과 배달앱이 알려 준 정산 금액이에요. <b>예상</b>은 아직 그게 안 올라온 매출일을, 포스 매출에서 그 카드사·앱의 <b>실측</b> 수수료율을 뺀 금액이에요. 카드사는 보통 거래 다음 날 매입을 올리고 <b>KB국민카드는 이틀 뒤</b>, 배달앱은 정산일이 가까워져야 금액이 나와요. 모레 칸은 오늘 장사분이 들어가므로 마감 뒤에 채워져요. <b>간편결제</b>는 여신협회에도 앱에도 안 나와서, 지금까지 통장에 들어온 비율로만 셈해요(그래서 늘 예상이에요). 쿠팡이츠는 <b>출금 신청을 해야</b> 통장에 들어와요.
         <br />
         예상은 <b>카드사당 100~200원쯤</b> 빗나갈 수 있어요 — 같은 카드사라도 체크카드(0.75%)와 신용카드(1.0%) 수수료가 달라서, 그날 어느 쪽이 섞였는지는 매입이 올라와야 알 수 있거든요. 지난 두 달로 맞춰 보니 카드사별 오차 중앙값이 0~190원이었어요.
       </p>
@@ -133,10 +144,11 @@ function Detail({ day, today }: { day: IncomingDay; today: string }) {
         </thead>
         <tbody className="num divide-y divide-stone-100">
           {day.lines.map((l, i) => (
-            <tr key={l.channel} className={`whitespace-nowrap ${l.kind === "delivery" && day.lines[i - 1]?.kind === "card" ? "border-t-2 border-stone-200" : ""}`}>
+            <tr key={l.channel} className={`whitespace-nowrap ${day.lines[i - 1] && day.lines[i - 1].kind !== l.kind ? "border-t-2 border-stone-200" : ""}`}>
               <td className="py-1.5">
                 {l.name}
                 {l.kind === "delivery" && <span className="ml-1 rounded bg-sky-100 px-1 text-[10px] font-bold text-sky-900">배달</span>}
+                {l.kind === "easy" && <span className="ml-1 rounded bg-violet-100 px-1 text-[10px] font-bold text-violet-900">간편</span>}
               </td>
               <td className="text-xs text-stone-500">
                 {range(l.from)}{" "}

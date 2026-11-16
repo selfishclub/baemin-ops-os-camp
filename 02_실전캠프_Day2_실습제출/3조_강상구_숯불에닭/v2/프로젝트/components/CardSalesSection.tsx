@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { Notice } from "@/components/ui";
-import { CARDSALES_KEY, CardsalesParseError, cardsalesMonth, covered, mergeCardsales, parseCardsalesPurchase, rangesToFetch, type CardsalesData, type PayoutStatus } from "@/lib/cardsales";
+import { CARDSALES_KEY, CardsalesParseError, cardsalesMonth, covered, mergeCardsales, parseCardsalesPurchase, purchaseGaps, rangesToFetch, type CardsalesData, type PayoutStatus } from "@/lib/cardsales";
 import { num, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
 import { getStore } from "@/lib/storage";
-import type { Transaction } from "@/lib/types";
+import type { DailySale, Transaction } from "@/lib/types";
 
 // 정산 탭 — 여신금융협회 카드매출조회의 "지급예정일"로 카드사 입금을 통장과 맞춘다 (사장님 PC 전용, 10/17).
 //  규칙(+2영업일)으로 짐작하는 위쪽 짝 맞추기와 달리, 카드사가 알려 준 실제 예정일·금액으로 본다.
@@ -35,7 +35,7 @@ function rowsOf(bytes: ArrayBuffer): unknown[][] {
   throw new CardsalesParseError("여신협회 '기간별 매입내역 세부내역' 엑셀이 아닌 것 같아요.");
 }
 
-export function CardSalesSection({ month, txs, lastBankDate }: { month: string; txs: Transaction[]; lastBankDate: string }) {
+export function CardSalesSection({ month, txs, lastBankDate, sales }: { month: string; txs: Transaction[]; lastBankDate: string; sales: DailySale[] }) {
   const [data, setData] = useState<CardsalesData | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -53,6 +53,7 @@ export function CardSalesSection({ month, txs, lastBankDate }: { month: string; 
   }, []);
 
   const view = useMemo(() => cardsalesMonth(data, month, txs, lastBankDate), [data, month, txs, lastBankDate]);
+  const gaps = useMemo(() => purchaseGaps(data, sales, localDay()), [data, sales]);
   const hasMonth = view.checks.length > 0 || view.issuers.length > 0;
 
   async function save(next: CardsalesData) {
@@ -66,8 +67,10 @@ export function CardSalesSection({ month, txs, lastBankDate }: { month: string; 
     const today = localDay();
     const all = rangesToFetch(month, today);
     if (!all.length) return setMsg({ tone: "info", text: `${monthLabel(month)}은 아직 받을 자료가 없어요.` });
-    // 이미 다 받아 둔 앞 구간은 건너뛴다. 마지막 구간(요즘 것)은 늘 새로 받는다
-    const todo = all.filter((r, i) => i === all.length - 1 || !covered(data, r));
+    // 이미 다 받아 둔 앞 구간은 건너뛴다. 마지막 구간(요즘 것)은 늘 새로 받는다.
+    // 받아 뒀지만 매입이 크게 빠진 날(자료 구멍)은 같이 다시 받는다 — 안 그러면 제대로 들어온 돈이
+    // 계속 "차이"로 빨갛게 뜬다 (2026-11-17: 10/08·09·23·24를 다시 받으니 경고 12건이 사라졌다)
+    const todo = [...all.filter((r, i) => i === all.length - 1 || !covered(data, r)), ...gaps];
     let cur = data;
     let rows = 0;
     try {
@@ -151,7 +154,14 @@ export function CardSalesSection({ month, txs, lastBankDate }: { month: string; 
 
       {hasMonth && (
         <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {gaps.length > 0 && (
+            <Notice tone="warn">
+              여신협회에 <b>매입이 빠진 날이 {gaps.length}군데</b> 있어요. 그러면 지급예정액이 실제보다 작게 잡혀서, 제대로 들어온 돈이 “차이”로 뜹니다. 위 <b>「여신협회에서 바로 가져오기」</b>를 누르면 그 날짜까지 같이 다시 받아 메워요.{" "}
+              <span className="text-xs text-stone-500">({gaps.map((r) => `${md(r.from)}~${md(r.to)}`).join(", ")})</span>
+            </Notice>
+          )}
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div className="rounded-xl bg-stone-50 p-2.5">
               <div className="text-[11px] text-stone-500">{monthLabel(month)} 카드 매입</div>
               <div className="num text-base font-bold">{won(view.totals.amount)}</div>
@@ -165,10 +175,6 @@ export function CardSalesSection({ month, txs, lastBankDate }: { month: string; 
             <div className="rounded-xl bg-stone-50 p-2.5">
               <div className="text-[11px] text-stone-500">통장 확인된 입금</div>
               <div className="num text-base font-bold">{won(view.totals.deposited)}</div>
-            </div>
-            <div className="rounded-xl bg-emerald-50 p-2.5">
-              <div className="text-[11px] text-emerald-800">들어올 돈 (입금 예정)</div>
-              <div className="num text-base font-bold text-emerald-900">{won(view.totals.pending)}</div>
             </div>
             <div className={`rounded-xl p-2.5 ${view.totals.missing ? "bg-red-50" : "bg-stone-50"}`}>
               <div className="text-[11px] text-stone-500">미입금 (입금이상)</div>
@@ -212,22 +218,8 @@ export function CardSalesSection({ month, txs, lastBankDate }: { month: string; 
             </table>
           </div>
 
-          {pendingByDate.length > 0 && (
-            <div className="space-y-1 rounded-xl bg-emerald-50/60 p-2.5">
-              <h3 className="text-sm font-bold text-emerald-900">앞으로 들어올 돈 · 날짜별</h3>
-              <ul className="divide-y divide-emerald-100 text-sm">
-                {pendingByDate.map(([date, cs]) => (
-                  <li key={date} className="flex flex-wrap items-baseline justify-between gap-x-3 py-1">
-                    <span>
-                      <span className="num font-semibold">{md(date)}</span> <span className="text-xs text-stone-500">{cs.map((c) => c.issuer.replace(/카드$/, "")).join("·")}</span>
-                    </span>
-                    <span className="num font-bold text-emerald-900">{num(cs.reduce((a, c) => a + c.expected, 0))}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-[11px] text-stone-500">여신협회에서 받은 거래일까지의 카드 매출만 들어 있어요. 그 뒤 매출은 "바로 가져오기"를 다시 누르면 더해져요.</p>
-            </div>
-          )}
+          {/* "앞으로 들어올 돈 · 날짜별"은 맨 위 「들어올 돈」 카드와 겹쳐서 뺐다 (2026-11-17).
+              거기는 아직 매입이 안 올라온 날까지 포스 매출로 채워 주므로 늘 더 맞다. */}
 
           <div className="space-y-1">
             <div className="flex items-baseline justify-between">

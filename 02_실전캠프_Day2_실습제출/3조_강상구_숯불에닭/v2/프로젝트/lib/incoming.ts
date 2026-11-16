@@ -18,7 +18,7 @@ import type { DailySale } from "./types";
 // 어림한 숫자를 "들어올 돈"에 섞으면 통장과 맞춰 볼 수가 없다.
 
 export interface IncomingLine {
-  kind: "card" | "delivery";
+  kind: "card" | "easy" | "delivery";
   channel: ChannelId;
   name: string;
   confirmed: number; // 카드: 여신협회 지급금액 / 배달: 앱이 알려 준 정산 입금액
@@ -29,10 +29,16 @@ export interface IncomingLine {
   feeRate: number | null; // 짐작에 쓴 수수료율 (%)
 }
 
-/** 배달앱 정산 — 앱이 정산 건을 알려 주므로 그 금액이 "확정"이다 */
+/**
+ * 여신협회에 안 나오는 채널 — 배달앱과 간편결제.
+ *  - 배달앱: 앱이 정산 건을 알려 주므로 그 금액이 "확정"이다.
+ *  - 간편결제(카카오페이·네이버페이·토스 등): 알려 주는 곳이 없어 통장에 실제로 들어온 묶음을 쓴다.
+ *    그래서 "확정"은 이미 들어온 날뿐이고, 앞날은 실측 입금률로만 짐작한다.
+ */
 export interface DeliverySource {
   channel: ChannelId;
   name: string;
+  kind?: "delivery" | "easy";
   settlements: { depositDueDate: string; periodStart: string; periodEnd: string; depositAmount: number }[];
 }
 
@@ -209,7 +215,7 @@ export function incomingOn(date: string, input: IncomingInput): IncomingDay {
 
     if (confirmed + estimated <= 0) continue;
     lines.push({
-      kind: "delivery",
+      kind: src.kind ?? "delivery",
       channel: src.channel,
       name: src.name,
       confirmed,
@@ -221,7 +227,8 @@ export function incomingOn(date: string, input: IncomingInput): IncomingDay {
     });
   }
 
-  lines.sort((a, b) => (a.kind === b.kind ? b.amount - a.amount : a.kind === "card" ? -1 : 1));
+  const order = { card: 0, easy: 1, delivery: 2 };
+  lines.sort((a, b) => order[a.kind] - order[b.kind] || b.amount - a.amount);
   const confirmed = lines.reduce((a, l) => a + l.confirmed, 0);
   const estimated = lines.reduce((a, l) => a + l.estimated, 0);
   return { date, lines, confirmed, estimated, amount: confirmed + estimated, partial: estimated > 0 };
