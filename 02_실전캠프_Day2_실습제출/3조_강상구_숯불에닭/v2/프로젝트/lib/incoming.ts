@@ -40,6 +40,8 @@ export interface DeliverySource {
   name: string;
   kind?: "delivery" | "easy";
   settlements: { depositDueDate: string; periodStart: string; periodEnd: string; depositAmount: number }[];
+  /** 짝이 맞은 묶음이 몇 건 안 될 때 쓸 입금률 (장부가 이미 센 수수료율). 0.987 = 1.3% 떼고 들어옴 */
+  netRate?: number;
 }
 
 export interface IncomingDay {
@@ -188,7 +190,7 @@ export function incomingOn(date: string, input: IncomingInput): IncomingDay {
   // 배달앱 — 앱이 알려 준 정산 건이 확정, 아직 정산 건이 없는 매출일은 실측 입금률로 짐작
   for (const src of input.delivery ?? []) {
     const rule = rules.find((r) => r.channel === src.channel) ?? cardRule(src.channel);
-    const rate = netRateOf(src, sales);
+    const rate = netRateOf(src, sales) ?? src.netRate ?? null;
     const last = lastSettledSale(src);
 
     let confirmed = 0;

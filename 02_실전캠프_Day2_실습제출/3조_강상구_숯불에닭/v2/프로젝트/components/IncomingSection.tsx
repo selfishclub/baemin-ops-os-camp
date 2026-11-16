@@ -46,10 +46,13 @@ export function IncomingSection({ month, rules, holidays, txs, results }: { mont
     if (coupang?.settlements.length) out.push({ channel: "coupang", name: "쿠팡이츠", settlements: coupang.settlements });
     if (month === today.slice(0, 7)) {
       for (const ch of ["card_easy", "card_zeropay"] as const) {
-        const matched = (results.find((r) => r.channel === ch)?.settlements ?? [])
+        const r = results.find((x) => x.channel === ch);
+        const matched = (r?.settlements ?? [])
           .filter((s) => s.status === "일치" && s.deposit > 0)
           .map((s) => ({ depositDueDate: s.payout, periodStart: s.from, periodEnd: s.to, depositAmount: s.deposit }));
-        if (matched.length) out.push({ channel: ch, name: CARD_PRESETS.find((c) => c.id === ch)?.name ?? ch, kind: "easy", settlements: matched });
+        if (!matched.length) continue;
+        // 짝이 맞은 묶음이 두어 건뿐이면 장부가 이미 센 이 달 수수료율을 쓴다
+        out.push({ channel: ch, name: CARD_PRESETS.find((c) => c.id === ch)?.name ?? ch, kind: "easy", settlements: matched, netRate: r?.feeRate != null ? 1 - r.feeRate / 100 : undefined });
       }
     }
     return out;

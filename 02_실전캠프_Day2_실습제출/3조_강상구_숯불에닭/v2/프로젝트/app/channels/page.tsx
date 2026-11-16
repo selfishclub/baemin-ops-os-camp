@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMonth } from "@/components/AppShell";
 import { ConfirmDialog, MoneyInput, Notice } from "@/components/ui";
 import { useLedger } from "@/components/useLedger";
@@ -21,6 +21,14 @@ import { isBasic } from "@/lib/edition";
 import type { ChannelSale } from "@/lib/types";
 import { checkChannelSale, type Issue } from "@/lib/validate";
 
+// 「지난 입금 확인」에서 눌러 펴는 것들. full = 사장님 PC(전체판)에만 있는 것
+const REVIEW_TABS = [
+  { id: "fee", label: "수수료 집계", full: false },
+  { id: "card", label: "카드사 대조", full: true },
+  { id: "baemin", label: "배민 정산", full: true },
+  { id: "coupang", label: "쿠팡이츠 정산", full: true },
+] as const;
+
 export default function ChannelsPage() {
   const { month } = useMonth();
   const ledger = useLedger(month);
@@ -30,6 +38,16 @@ export default function ChannelsPage() {
   const settlement = useSettlement(month, ledger, daily);
   const autoChannels = settlement.results.map((r) => r.channel);
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [openReview, setOpenReview] = useState<(typeof REVIEW_TABS)[number]["id"] | null>(null);
+  // 평소엔 "이상 없음"만 보이게 — 볼 게 있을 때만 숫자를 띄운다
+  const review = useMemo(() => {
+    const rs = settlement.results;
+    return {
+      missing: rs.reduce((a, r) => a + r.missing, 0),
+      stray: rs.reduce((a, r) => a + r.unmatchedDeposits.length, 0),
+      fee: rs.reduce((a, r) => a + r.fee, 0),
+    };
+  }, [settlement.results]);
   const [asking, setAsking] = useState(false);
   const [saved, setSaved] = useState(false);
   const monthNo = Number(month.slice(5));
@@ -91,11 +109,36 @@ export default function ChannelsPage() {
       {/* 오늘·내일·모레 통장에 들어올 카드 돈 — 캐시노트 당일 입금예정액과 같은 것을 우리 자료로 센다 (11/17) */}
       {!isBasic() && <IncomingSection month={month} rules={settlement.rules} holidays={settlement.holidays} txs={[...ledger.txs, ...ledger.nextTxs]} results={settlement.results} />}
 
-      {/* 정산 규칙 카드는 규칙 탭 맨 아래로 옮김 (사장님 요청 10/15). 여기는 짝 맞추기 결과만 */}
-      <SettlementSection month={month} ledger={ledger} daily={daily} settlement={settlement} show="results" />
+      {/* 지난 입금 확인 — 전에 따로따로 펼쳐 두던 네 덩어리(수수료 집계·카드사 대조·배민·쿠팡)를
+          한 줄로 모았다. 평소엔 "이상 없음"만 보면 되고, 볼 일이 있을 때만 눌러서 편다 (사장님 요청 11/17) */}
+      <section className="card space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-base font-bold">지난 입금 확인</h2>
+          <span className="text-xs text-stone-500">{monthLabel(month)} 주문분</span>
+        </div>
+        {review.missing > 0 || review.stray > 0 ? (
+          <Notice tone="warn">
+            {review.missing > 0 && <>입금일이 지났는데 안 들어온 돈 <b className="num">{won(review.missing)}</b>{review.stray > 0 && " · "}</>}
+            {review.stray > 0 && <>매출과 짝이 안 맞는 입금 <b className="num">{review.stray}건</b></>} — 아래에서 확인해 주세요.
+          </Notice>
+        ) : (
+          <Notice tone="ok">
+            통장과 다 맞아요. {monthLabel(month)} 확인된 수수료 <b className="num">{won(review.fee)}</b>.
+          </Notice>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {REVIEW_TABS.filter((t) => !t.full || !isBasic()).map((t) => (
+            <button key={t.id} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${openReview === t.id ? "bg-orange-600 text-white" : "bg-stone-100 text-stone-700 hover:bg-stone-200"}`} onClick={() => setOpenReview(openReview === t.id ? null : t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
-      {/* 여신협회 지급예정일로 카드 입금 대조 — 도우미(같은 PC)가 받아 오는 기능이라 전체판에만 (사장님 결정 10/17) */}
-      {!isBasic() && <CardSalesSection month={month} txs={[...ledger.txs, ...ledger.nextTxs]} lastBankDate={ledger.lastBankDate} sales={daily.sales} />}
+      {openReview === "fee" && <SettlementSection month={month} ledger={ledger} daily={daily} settlement={settlement} show="results" />}
+      {openReview === "card" && !isBasic() && <CardSalesSection month={month} txs={[...ledger.txs, ...ledger.nextTxs]} lastBankDate={ledger.lastBankDate} sales={daily.sales} />}
+      {openReview === "baemin" && !isBasic() && <BaeminSettleSection platform="baemin" month={month} txs={ledger.txs} nextTxs={ledger.nextTxs} sales={ledger.sales} onSaved={ledger.reload} />}
+      {openReview === "coupang" && !isBasic() && <BaeminSettleSection platform="coupang" month={month} txs={ledger.txs} nextTxs={ledger.nextTxs} sales={ledger.sales} onSaved={ledger.reload} />}
 
       <section className="card space-y-3">
         <div className="flex items-baseline justify-between">
@@ -270,13 +313,7 @@ export default function ChannelsPage() {
         </section>
       )}
 
-      {/* 배민·쿠팡 정산 명세는 리뷰 수집기 자료로 채우는 기능 — 전체판(사장님 PC)에만 */}
-      {!isBasic() && (
-        <>
-          <BaeminSettleSection platform="baemin" month={month} txs={ledger.txs} nextTxs={ledger.nextTxs} sales={ledger.sales} onSaved={ledger.reload} />
-          <BaeminSettleSection platform="coupang" month={month} txs={ledger.txs} nextTxs={ledger.nextTxs} sales={ledger.sales} onSaved={ledger.reload} />
-        </>
-      )}
+      {/* 배민·쿠팡 정산 명세는 위 「지난 입금 확인」에서 눌러 펴도록 옮겼다 (11/17) */}
 
       {asking && (
         <ConfirmDialog title="숫자를 한 번 더 확인해 주세요" confirmLabel="맞아요, 저장" onConfirm={save} onCancel={() => setAsking(false)}>
