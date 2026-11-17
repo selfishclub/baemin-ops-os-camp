@@ -652,6 +652,21 @@ const Store = (() => {
   }
   /* 낮에도 주기적으로 '살아 있음'을 알린다 — 등록된 포스가 켜져 있는 동안 매장 인터넷 주소가 서버에 기억되도록 (재시작 없이도) */
   function deviceTouch() { if (!supa || supa.deviceOk === false) return; supa.client.rpc(devKey() ? 'device_touch' : 'net_touch').then(() => {}, () => {}); }
+  /* 매입 사진 자동 입력(api/receipt) 을 부를 때 내는 것 — 서버 접속 표(로그인 토큰) · 1회용 확인 표 · 기기 열쇠.
+     확인 표(ai_ticket)는 서버에 그 기능이 아직 없으면 비워 두고, 그때는 기기 열쇠로 확인한다 */
+  async function aiAuth() {
+    if (!supa) return { err: '서버에 연결된 뒤에 쓸 수 있습니다. 인터넷을 확인해 주세요.' };
+    let token = '';
+    try { const { data } = await supa.client.auth.getSession(); token = (data && data.session && data.session.access_token) || ''; } catch (_) { /* 무시 */ }
+    if (!token) return { err: '서버 연결이 끊겼습니다. 새로고침한 뒤 다시 해 주세요.' };
+    let ticket = '';
+    try {
+      const r = await supa.client.rpc('ai_ticket');
+      if (!r.error && typeof r.data === 'string') ticket = r.data;
+      else if (r.error && r.error.code === 'P0001') return { err: r.error.message };   // 서버가 거절한 이유(한도 초과 · 미등록 기기)를 그대로 보여 준다
+    } catch (_) { /* 표 기능이 없는 서버 — 기기 열쇠로 */ }
+    return { token, ticket, devKey: devKey() };
+  }
   async function myIp() { if (!supa) return ''; const { data } = await supa.client.rpc('req_ip'); return data || ''; }
   async function deviceRevoke(id) {
     if (!supa) return false;
@@ -844,7 +859,7 @@ const Store = (() => {
   return {
     init, load, save, flush, setMeta, applyRenames, switchTo, dumpAll, restoreAll, loadStore, saveStore, loadShared, saveShared, watchShared,
     supaSetConfig, supaSignIn, supaSignOut, supaEvent, supaEvents, supaTgUpdates, watchDoc,
-    deviceRegister, deviceList, deviceRevoke, deviceHash, deviceForget, deviceLink, netList, netRevoke, myIp, deviceTouch, trainingDoc, trainingSave, credSave, credLoad, get credOk() { return credOk(); },
+    deviceRegister, deviceList, deviceRevoke, deviceHash, deviceForget, deviceLink, netList, netRevoke, myIp, deviceTouch, trainingDoc, trainingSave, credSave, credLoad, aiAuth, get credOk() { return credOk(); },
     get supa() { const cfg = supaCfg || supaConfig(); return { configured: !!(cfg && cfg.url && cfg.key), url: cfg ? cfg.url : '', signedIn: !!supa, anon: !!(supa && supa.anon), deviceOk: supa ? supa.deviceOk !== false : true, device: !!devKey(), viaNet: !!(supa && supa.viaNet), email: supa ? supa.email : '', libLoaded: !!(window.supabase && window.supabase.createClient) }; },
     get mode() { return mode; },
     get ok() { return writable; },

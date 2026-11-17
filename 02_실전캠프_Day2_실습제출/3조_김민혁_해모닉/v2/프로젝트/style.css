@@ -1534,3 +1534,29 @@ input.won{text-align:right;font-variant-numeric:tabular-nums}
 /* 카카오톡으로 보내기 버튼 — 카카오 노랑 */
 .btn.kakao{background:#FEE500;color:#191919;border-color:#FEE500}
 .btn.kakao:hover{filter:brightness(.96)}
+
+/* 국세청 매입자료 월별 표에서 선택된 달 */
+.tkLog tr.on td{background:rgba(255,255,255,.07)}
+
+/* 매입 사진 자동 입력 (2026-11-17) */
+.photoBtn{width:100%;justify-content:center;padding:14px 12px;font-size:15px;font-weight:600;border-style:dashed}
+.photoWait{text-align:center;padding:18px 0}
+.photoWait .spin{width:38px;height:38px;margin:0 auto 14px;border:4px solid var(--rule);border-top-color:var(--accent);border-radius:50%;animation:phSpin 1s linear infinite}
+@keyframes phSpin{to{transform:rotate(360deg)}}
+.phDoc{margin:4px 0 10px}
+.phRow{display:flex;gap:8px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--rule)}
+.phRow.off{opacity:.45}
+.phRow.unsure{background:rgba(232,140,60,.10);margin:0 -8px;padding:10px 8px;border-radius:8px}
+.phRow .phOn{margin:8px 0 0;flex:0 0 auto}
+.phRow .phOn input{width:22px;height:22px}
+.phMain{flex:1;min-width:0}
+.phMain .phName{width:100%;font-weight:600}
+.phSub{display:flex;gap:6px;margin-top:6px}
+.phSub .phQty{flex:0 0 68px;min-width:0}
+.phSub .phUnit{flex:0 0 64px;min-width:0}
+.phSub .phCat{flex:1 1 90px;min-width:0}
+.phSub .phAmt{flex:1 1 100px;min-width:0}
+.phWarn{font-size:12.5px;margin-top:5px;color:var(--crit)}
+.phTotal{margin:12px 0 0;padding-top:10px;border-top:2px solid var(--rule);font-size:15px}
+.warnTxt{color:var(--crit)}
+@media (max-width:420px){.phSub{flex-wrap:wrap}.phSub .phCat,.phSub .phAmt{flex:1 1 40%}}

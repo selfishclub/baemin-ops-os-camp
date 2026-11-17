@@ -2563,7 +2563,7 @@ const App = (() => {
     list.forEach((x) => { byCat[x.cat] = (byCat[x.cat] || 0) + (Number(x.amount) || 0); });
     let h = `<div class="hd">
       <div><h2>원가 관리 — 식자재·소모품</h2><div class="sub">매장에서 실제로 사 오는 것(수산물 · 식자재 · 주류·음료 · 소모품)을 그때그때 적습니다. 갑각류 매입은 여기서 다루지 않습니다.</div></div>
-      ${monthNavCosts(m, `<button class="btn" data-act="view" data-v="taxBuy" title="홈택스 매입 전자(세금)계산서 목록과 비교">국세청 매입자료</button><button class="btn" data-act="purchaseCsv">CSV 가져오기</button><button class="btn primary" data-act="purchaseAdd" data-mode="staff">+ 매입 입력</button>`)}
+      ${monthNavCosts(m, `<button class="btn" data-act="view" data-v="taxBuy" title="홈택스 매입 전자(세금)계산서 목록과 비교">국세청 매입자료</button><button class="btn" data-act="purchaseCsv">CSV 가져오기</button><button class="btn" data-act="purchasePhoto" data-mode="staff" title="거래명세서·영수증 사진을 올리면 품목·금액을 읽어 채워 줍니다">📷 사진으로 입력</button><button class="btn primary" data-act="purchaseAdd" data-mode="staff">+ 매입 입력</button>`)}
     </div>`;
     h += `<div class="cards m4">
       <div class="card"><div class="cl">이번 달 식자재 매입</div><div class="cv sm2">${fmtWon(total)}</div><div class="cs">${list.length}건</div></div>
@@ -2694,7 +2694,7 @@ const App = (() => {
     const byCat = {}; food.forEach((x) => { byCat[x.cat] = (byCat[x.cat] || 0) + (Number(x.amount) || 0); });
     let h = `<div class="hd">
       <div><h2>총원가 — 갑각류 + 식자재</h2><div class="sub">사장님만 보는 화면입니다. 직원이 업무 › 원가 관리에 적은 식자재와 갑각류 매입을 합쳐 전체 원가율을 봅니다.</div></div>
-      ${monthNavCosts(m, `<button class="btn" data-act="purchaseCsv">CSV 가져오기</button><button class="btn" data-act="purchaseAdd" data-mode="crab">+ 갑각류 매입</button><button class="btn primary" data-act="purchaseAdd" data-mode="all">+ 매입 입력</button>`)}
+      ${monthNavCosts(m, `<button class="btn" data-act="purchaseCsv">CSV 가져오기</button><button class="btn" data-act="purchasePhoto" data-mode="all" title="거래명세서·영수증 사진을 올리면 품목·금액을 읽어 채워 줍니다">📷 사진으로 입력</button><button class="btn" data-act="purchaseAdd" data-mode="crab">+ 갑각류 매입</button><button class="btn primary" data-act="purchaseAdd" data-mode="all">+ 매입 입력</button>`)}
     </div>`;
     h += `<div class="cards m4">
       <div class="card"><div class="cl">총매입</div><div class="cv sm2">${fmtWon(tAll)}</div><div class="cs">${all.length}건</div></div>
@@ -2713,12 +2713,124 @@ const App = (() => {
     h += purchaseList(all);
     return h;
   }
+  /* ── 매입 사진 자동 입력 (2026-11-17 사장님 요청) ──
+     거래명세서·영수증 사진 → 서버 함수(api/receipt, Claude 가 읽음) → 읽은 줄을 확인 창에 보여 주고 → 직원이 고친 뒤 저장.
+     사진은 올리기 전에 긴 변 1800px JPEG 로 줄인다(전송량·속도). 사진 자체는 저장하지 않는다 */
+  const PHOTO_MAX = 4;
+  function shrinkImage(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, 1800 / Math.max(img.naturalWidth, img.naturalHeight));
+        const cv = document.createElement('canvas'); cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k);
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url);
+        resolve(cv.toDataURL('image/jpeg', 0.85).split(',')[1]);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이 파일은 사진으로 열 수 없습니다 (JPG·PNG 사진만 됩니다)')); };
+      img.src = url;
+    });
+  }
+  async function receiptRead(b64) {
+    if (DEMO) {   // 데모판은 서버가 없다 — 예시 결과를 보여 준다
+      await new Promise((r) => setTimeout(r, 1200));
+      return { is_purchase_doc: true, doc_date: dateKey(), vendor: '○○농산 (예시)', total: 68200, tax: 6200, notes: ['데모에서는 사진을 실제로 읽지 않고 예시 결과를 보여 줍니다.', '셋째 줄 금액 글씨가 흐립니다 — 확인해 주세요.'],
+        items: [{ name: '깻잎 100g', qty: 10, unit: '봉', amount: 18000, cat: '식자재', unsure: false }, { name: '대파', qty: 5, unit: '단', amount: 14000, cat: '식자재', unsure: false }, { name: '위생장갑 100매', qty: 6, unit: '박스', amount: 30000, cat: '소모품', unsure: true }] };
+    }
+    const a = await Store.aiAuth(); if (a.err) throw new Error(a.err);
+    const r = await fetch('/api/receipt', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.token, ...(a.devKey && !a.ticket ? { 'x-device-key': a.devKey } : {}) },
+      body: JSON.stringify({ image: b64, media_type: 'image/jpeg', ticket: a.ticket || undefined, today: dateKey() }) });
+    let j = null; try { j = await r.json(); } catch (_) { /* 무시 */ }
+    if (!r.ok || !j || !j.result) throw new Error((j && j.error) || (r.status === 404 ? '사진 자동 입력은 실제 앱 주소(haemonic-ops.vercel.app)에서만 됩니다.' : `읽지 못했습니다 (${r.status})`));
+    return j.result;
+  }
+  function purchasePhoto(mode) {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;   // 휴대폰에서는 "사진 찍기 / 사진 보관함"을 고르게 된다
+    inp.onchange = async () => {
+      const files = [...inp.files].slice(0, PHOTO_MAX); if (!files.length) return;
+      if (inp.files.length > PHOTO_MAX) banner(`사진은 한 번에 ${PHOTO_MAX}장까지입니다`, `앞의 ${PHOTO_MAX}장만 읽습니다.`);
+      const docs = [], fails = [];
+      for (let i = 0; i < files.length; i++) {
+        modal('사진 읽는 중…', `<div class="photoWait"><div class="spin"></div><p><b>${files.length > 1 ? `${i + 1} / ${files.length}장 ` : ''}사진에서 품목·금액을 읽고 있습니다.</b></p><p class="hint keep">보통 10~30초 걸립니다. 창을 닫지 말고 기다려 주세요.</p></div>`, null);
+        $('#modal .mfoot').hidden = true;
+        try { const res = await receiptRead(await shrinkImage(files[i])); if (res.is_purchase_doc && res.items.length) docs.push(res); else fails.push((res.notes || [])[0] || '매입 내용이 보이지 않는 사진입니다.'); }
+        catch (e) { fails.push(e.message || String(e)); }
+      }
+      closeModal();
+      if (!docs.length) { modal('사진을 읽지 못했습니다', `<p>${fails.map(esc).join('<br>')}</p><p class="hint keep">글씨가 화면에 꽉 차게, 밝은 곳에서 그림자 없이 다시 찍어 보세요. 급하면 "+ 매입 입력"으로 직접 적을 수 있습니다.</p>`, null, '확인'); return; }
+      purchasePhotoReview(mode, docs, fails);
+    };
+    inp.click();
+  }
+  /* 읽은 결과 확인 창 — 줄마다 넣을지 고르고, 이름·수량·금액·분류를 고친 뒤 한 번에 저장 */
+  function purchasePhotoReview(mode, docs, fails) {
+    const rows = []; docs.forEach((d, di) => d.items.forEach((it) => rows.push({ ...it, di })));
+    const sum = (d, di) => rows.filter((r) => r.di === di).reduce((a, r) => a + (Number(r.amount) || 0), 0);
+    const docHead = (d, di) => {
+      const s = sum(d, di), diff = d.total != null ? d.total - s : 0;
+      return `<div class="phDoc" data-di="${di}">
+        <div class="frow"><label>날짜<input type="date" class="phDate" value="${esc(/^\d{4}-\d{2}-\d{2}$/.test(d.doc_date || '') && d.doc_date <= dateKey() ? d.doc_date : dateKey())}" max="${dateKey()}"></label>
+          <label>거래처<input class="phVendor" value="${esc(d.vendor || '')}" placeholder="거래처 이름"></label></div>
+        ${d.total != null ? `<p class="hint keep" style="margin:4px 0 0">문서 합계 <b>${fmtWon(d.total)}</b> · 읽은 품목 합계 <b>${fmtWon(s)}</b>${diff ? ` · <b class="warnTxt">차이 ${fmtWon(Math.abs(diff))}</b>${d.tax && Math.abs(diff - d.tax) < 10 ? ' (부가세만큼 차이 — 아래 "부가세 줄 추가"를 켜면 맞습니다)' : ' — 빠진 줄이나 잘못 읽은 금액이 없는지 확인하세요'}` : ' · 일치 ✓'}</p>` : ''}
+        ${d.tax ? `<label class="chk" style="margin-top:6px"><input type="checkbox" class="phTax" data-tax="${d.tax}"${d.total != null && Math.abs(diff - d.tax) < 10 ? ' checked' : ''}> 부가세 ${fmtWon(d.tax)} 을 한 줄로 추가 (품목 금액이 부가세 별도일 때)</label>` : ''}
+        ${(d.notes || []).length ? `<div class="notice warn" style="margin:8px 0 0">${d.notes.map((n) => '⚠️ ' + esc(n)).join('<br>')}</div>` : ''}
+      </div>`;
+    };
+    const row = (r, i) => `<div class="phRow${r.unsure ? ' unsure' : ''}" data-i="${i}" data-di="${r.di}">
+      <label class="chk phOn"><input type="checkbox" class="phUse" checked aria-label="이 줄 넣기"></label>
+      <div class="phMain">
+        <input class="phName" value="${esc(r.name)}" aria-label="품목">
+        <div class="phSub">
+          <input type="number" class="phQty" min="0" step="0.1" value="${r.qty ?? ''}" inputmode="decimal" placeholder="수량" aria-label="수량">
+          <select class="phUnit" aria-label="단위">${PURCHASE_UNITS.map((u) => `<option${u === (r.unit || '개') ? ' selected' : ''}>${u}</option>`).join('')}</select>
+          <select class="phCat" aria-label="분류">${PURCHASE_CATS.map((c) => `<option${c === r.cat ? ' selected' : ''}>${c}</option>`).join('')}</select>
+          <input type="text" class="won phAmt" data-won value="${wonStr(r.amount)}" inputmode="numeric" aria-label="금액">
+        </div>
+        ${r.unsure ? '<div class="phWarn">⚠️ 글씨가 흐려 확신이 없는 줄입니다 — 원본과 비교해 주세요</div>' : ''}
+      </div></div>`;
+    modal(`사진에서 읽은 매입 ${rows.length}줄 — 확인 후 저장`, `
+      <p class="hint keep" style="margin-top:0"><b>AI 가 읽은 것이라 틀릴 수 있습니다.</b> 원본과 비교해 금액을 확인하고, 필요 없는 줄은 체크를 끄세요. 금액·이름은 바로 고칠 수 있습니다.</p>
+      ${fails.length ? `<div class="notice warn">읽지 못한 사진 ${fails.length}장: ${fails.map(esc).join(' / ')}</div>` : ''}
+      ${docs.map((d, di) => `${docs.length > 1 ? `<div class="mlabel">사진 ${di + 1}</div>` : ''}${docHead(d, di)}${rows.map((r, i) => (r.di === di ? row(r, i) : '')).join('')}`).join('')}
+      <p class="phTotal">넣을 줄 <b id="phCnt">${rows.length}</b>개 · 합계 <b id="phSum"></b></p>`, () => {
+      const out = [], by = (S.ui.whoDate === dateKey() ? S.ui.who : '') || '';
+      document.querySelectorAll('#modal .phDoc').forEach((dEl) => {
+        const di = dEl.dataset.di, date = dEl.querySelector('.phDate').value || dateKey(), vendor = dEl.querySelector('.phVendor').value.trim();
+        document.querySelectorAll(`#modal .phRow[data-di="${di}"]`).forEach((el) => {
+          if (!el.querySelector('.phUse').checked) return;
+          const name = el.querySelector('.phName').value.trim(), amount = wonNum(el.querySelector('.phAmt').value);
+          if (!name || !amount) return;
+          const q = el.querySelector('.phQty').value;
+          out.push({ id: newId('p'), date, cat: el.querySelector('.phCat').value, name, qty: q ? Number(q) : null, unit: el.querySelector('.phUnit').value, amount, vendor, memo: '', by, createdAt: Date.now(), u: Date.now(), src: 'photo' });
+        });
+        const tx = dEl.querySelector('.phTax');
+        if (tx && tx.checked) out.push({ id: newId('p'), date, cat: '기타', name: '부가세', qty: null, unit: '개', amount: Number(tx.dataset.tax) || 0, vendor, memo: '사진 자동 입력 — 품목 금액과 별도 표기된 부가세', by, createdAt: Date.now(), u: Date.now(), src: 'photo' });
+      });
+      if (!out.length) { alert('넣을 줄이 없습니다. 품목 이름과 금액이 있는 줄을 하나 이상 체크해 주세요.'); return false; }
+      S.purchases = (S.purchases || []).concat(out);
+      S.ui.cmonth = out[0].date.slice(0, 7);
+      save(); render();
+      banner(`매입 ${out.length}건을 넣었습니다`, `합계 ${fmtWon(out.reduce((a, x) => a + x.amount, 0))} · 목록에서 줄을 누르면 고칠 수 있습니다.`);
+    }, '저장');
+    const box = $('#modal');
+    const recalc = () => {
+      let n = 0, t = 0;
+      box.querySelectorAll('.phRow').forEach((el) => { const on = el.querySelector('.phUse').checked; el.classList.toggle('off', !on); if (on) { n++; t += wonNum(el.querySelector('.phAmt').value) || 0; } });
+      box.querySelectorAll('.phTax').forEach((x) => { if (x.checked) { n++; t += Number(x.dataset.tax) || 0; } });
+      $('#phCnt').textContent = n; $('#phSum').textContent = fmtWon(t);
+    };
+    box.addEventListener('input', recalc); box.addEventListener('change', recalc); recalc();
+  }
   function purchaseForm(x, mode) {
     const isNew = !x;
     if (!mode) mode = x ? (isCrabBuy(x) ? 'crab' : 'staff') : 'staff';
     const cats = mode === 'crab' ? CRAB_CATS : mode === 'all' ? PURCHASE_CATS : PURCHASE_CATS.filter((c) => !CRAB_CATS.includes(c));
     x = x || { date: dateKey(), cat: cats[0], unit: mode === 'crab' ? 'kg' : '개' };
     modal(isNew ? (mode === 'crab' ? '갑각류 매입 입력' : '매입 입력') : '매입 수정', `
+      ${isNew ? `<button type="button" class="btn photoBtn" data-act="purchasePhoto" data-mode="${mode}">📷 사진·이미지 올려서 자동으로 채우기</button>
+      <p class="hint keep" style="margin:6px 0 12px">거래명세서·영수증을 찍거나 사진을 고르면 품목·수량·금액을 읽어 줍니다. 저장 전에 한 번 확인하세요. 직접 적으려면 아래에 그대로 입력하면 됩니다.</p>` : ''}
       <div class="frow">
         <label>날짜<input type="date" id="puD" value="${esc(x.date)}"></label>
         <label>분류<select id="puC">${cats.map((c) => `<option${c === x.cat ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
@@ -6258,6 +6370,7 @@ const App = (() => {
         case 'cmonthNav': S.ui.cmonth = monthShiftKey(S.ui.cmonth || dateKey().slice(0, 7), Number(b.dataset.d)); save(); render(); break;
         case 'nmonthNav': S.ui.nmonth = monthShiftKey(S.ui.nmonth || dateKey().slice(0, 7), Number(b.dataset.d)); save(); render(); break;
         case 'purchaseAdd': purchaseForm(null, b.dataset.mode || 'staff'); break;
+        case 'purchasePhoto': purchasePhoto(b.dataset.mode || 'staff'); break;
         case 'purchaseCsv': purchaseCsvImport(); break;
         case 'biSp': S.ui.biSp = b.dataset.sp; save(); render(); break;
         case 'buyEvAdd': buyEvForm(); break;
