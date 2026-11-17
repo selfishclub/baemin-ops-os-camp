@@ -4179,8 +4179,8 @@ const App = (() => {
       <div class="frow3">${inp(SALES_F.find(([k]) => k === 'gifticon'))}${inp(SALES_F.find(([k]) => k === 'petty'))}<label class="autoF">카드·배달앱 등 나머지 <small class="opt">원 · 자동</small><input type="text" class="won" id="payRest" readonly placeholder="자동"></label></div>
       <div class="mlabel">오늘의 단가 <span class="opt">원/kg · 선택</span></div>
       <div class="frow3">${inp(SALES_F.find(([k]) => k === 'priceCrab'))}${inp(SALES_F.find(([k]) => k === 'priceKing'))}${inp(SALES_F.find(([k]) => k === 'priceLob'))}</div>
-      <div class="mlabel">리뷰 쿠폰 — 오늘 손님에게 나눠 준 수량</div>
-      <div class="frow">${inp(SALES_F.find(([k]) => k === 'coupon'))}${inp(SALES_F.find(([k]) => k === 'reviews')).replace('<small class="opt">건</small>', '<small class="opt">건 · 선택 (사장님이 나중에 적어도 됩니다)</small>')}</div>
+      <div class="mlabel">리뷰 쿠폰 — 오늘 손님에게 나눠 준 수량 <span class="opt">달린 리뷰는 사장님이 나중에 적어도 됩니다</span></div>
+      <div class="frow">${inp(SALES_F.find(([k]) => k === 'coupon'))}${inp(SALES_F.find(([k]) => k === 'reviews')).replace('<small class="opt">건</small>', '<small class="opt">건 · 선택</small>')}</div>
       <label>비고 <span class="opt">선택</span><textarea id="sfNote" rows="2" placeholder="예: 잔돈이 없어 직원에게 1만원 빌림 · 상품권 손님 2팀">${esc(r.note || '')}</textarea></label>
       <p class="hint">빈칸은 0이 아니라 "미입력"으로 남습니다. 총주문·총매출은 나눠 넣은 값의 합으로 자동 계산되고, 나눠 넣지 않았을 때만 직접 적습니다. 결제 수단은 총매출에서 현금·이체·상품권·기프티콘을 뺀 나머지가 카드·배달앱으로 자동 표시됩니다(시제는 매출이 아니라 거스름돈용 시재금이라 빼지 않습니다). 주류 매출은 매장 매출 안에 포함된 금액을 따로 적는 칸입니다(총매출에 더해지지 않음). 합계 kg 만 알면 합계 칸에만 넣어도 됩니다.</p>`;
   }
