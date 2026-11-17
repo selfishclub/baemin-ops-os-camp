@@ -98,13 +98,31 @@ export function mergeRanges(ranges: { from: string; to: string }[]): { from: str
   return out;
 }
 
-/** 새로 받은 구간의 거래일 것은 새 것으로 바꾸고, 나머지는 둔다 */
+/**
+ * 새로 받은 구간의 거래일 것은 새 것으로 바꾸고, 나머지는 둔다.
+ *
+ * 다만 여신협회는 **매입일**로 조회하는데 우리는 **거래일**로 바꿔 넣는다. 그래서 구간 양 끝의
+ * 거래일은 일부만 들어온다 — 매입일 11/15~11/17로 받으면 거래일 11/13 중 11/14에 매입된 줄이
+ * 빠진 채로 온다. 그걸 그대로 덮으면 이미 받아 둔 줄이 사라진다.
+ * (2026-11-18: 구멍 메우기가 좁게 받아 와 거래일 11/13이 1,617,000원에서 34,000원으로 줄었다.)
+ *
+ * 그래서 **전보다 적게 온 거래일은 덜 받은 것으로 보고 전 것을 둔다.** 취소·환불로 진짜 줄어든
+ * 날이면 옛 숫자가 남지만, 그건 통장 대조에서 "차이"로 보인다 — 말없이 사라지는 것보다 낫다.
+ */
 export function mergeCardsales(prev: CardsalesData | null, next: { payouts: CardPayout[]; from: string; to: string }, now = new Date().toISOString()): CardsalesData {
-  const kept = (prev?.payouts ?? []).filter((p) => p.saleDate < next.from || p.saleDate > next.to);
+  const prevRows = prev?.payouts ?? [];
+  const sum = (rows: CardPayout[], day: string) => rows.reduce((a, p) => a + (p.saleDate === day ? p.amount : 0), 0);
+  const short = new Set<string>();
+  for (const p of prevRows) {
+    if (p.saleDate < next.from || p.saleDate > next.to || short.has(p.saleDate)) continue;
+    if (sum(next.payouts, p.saleDate) < sum(prevRows, p.saleDate)) short.add(p.saleDate);
+  }
+  const kept = prevRows.filter((p) => p.saleDate < next.from || p.saleDate > next.to || short.has(p.saleDate));
+  const incoming = next.payouts.filter((p) => !short.has(p.saleDate));
   return {
     fetchedAt: now,
     ranges: mergeRanges([...(prev?.ranges ?? []), { from: next.from, to: next.to }]),
-    payouts: [...kept, ...next.payouts].sort((a, b) => a.saleDate.localeCompare(b.saleDate) || a.issuer.localeCompare(b.issuer)),
+    payouts: [...kept, ...incoming].sort((a, b) => a.saleDate.localeCompare(b.saleDate) || a.issuer.localeCompare(b.issuer)),
   };
 }
 

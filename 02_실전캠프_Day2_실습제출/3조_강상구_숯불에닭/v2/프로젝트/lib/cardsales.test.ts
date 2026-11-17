@@ -43,7 +43,8 @@ describe("받아 둔 자료 합치기", () => {
   });
   it("새로 받은 거래일 것은 바꾸고 나머지는 둔다", () => {
     const first = mergeCardsales(null, parseCardsalesPurchase(SHEET), "t1");
-    const again = mergeCardsales(first, { from: "2026-10-01", to: "2026-10-01", payouts: [{ channel: "card_nh", issuer: "농협NH카드", saleDate: "2026-10-01", payDate: "2026-10-05", count: 1, amount: 1, fee: 0, pay: 1 }] }, "t2");
+    // 10/01 은 전에 150,000원(NH 100,000 + 씨티 50,000)이었는데 새로 200,000원이 왔다 → 새 것으로
+    const again = mergeCardsales(first, { from: "2026-10-01", to: "2026-10-01", payouts: [{ channel: "card_nh", issuer: "농협NH카드", saleDate: "2026-10-01", payDate: "2026-10-05", count: 1, amount: 200000, fee: 0, pay: 200000 }] }, "t2");
     expect(again.payouts).toHaveLength(2); // KB 9/30 + 새 NH 10/1 (씨티 10/1 은 새 자료에 없으니 사라짐)
     expect(again.ranges).toEqual([{ from: "2026-09-30", to: "2026-10-01" }]);
     expect(covered(again, { from: "2026-09-30", to: "2026-10-01" })).toBe(true);
@@ -142,5 +143,37 @@ describe("자료 구멍 (매입이 빠진 거래일)", () => {
 
   it("자료가 아예 없으면 묻지 않는다", () => {
     expect(purchaseGaps(null, [sold("2026-10-08", 500_000)], "2026-11-17")).toEqual([]);
+  });
+});
+
+// 2026-11-18: 구멍 메우기가 매입일 11/15~11/17로 좁게 받아 와, 거래일 11/13이
+// 1,617,000원에서 34,000원으로 줄어든 일이 있었다. 여신협회는 매입일로 조회하는데
+// 우리는 거래일로 바꿔 넣어서, 구간 맨 앞 거래일은 늘 일부만 들어온다.
+describe("매입 자료 합치기 — 덜 받아 온 날은 덮지 않는다", () => {
+  const row = (saleDate: string, amount: number, issuer = "현대카드"): CardPayout => ({ channel: "card_hyundai", issuer, saleDate, payDate: "2026-11-17", count: 1, amount, fee: 0, pay: amount });
+  const prev = { fetchedAt: "", ranges: [{ from: "2026-11-01", to: "2026-11-15" }], payouts: [row("2026-11-13", 1_617_000), row("2026-11-14", 1_051_000)] };
+
+  it("전보다 적게 온 거래일은 전 것을 둔다", () => {
+    const out = mergeCardsales(prev, { payouts: [row("2026-11-13", 34_000), row("2026-11-14", 1_051_000)], from: "2026-11-13", to: "2026-11-14" });
+    const on = (d: string) => out.payouts.filter((p) => p.saleDate === d).reduce((a, p) => a + p.amount, 0);
+    expect(on("2026-11-13")).toBe(1_617_000);
+    expect(on("2026-11-14")).toBe(1_051_000);
+  });
+
+  it("아예 안 온 거래일도 전 것을 둔다", () => {
+    const out = mergeCardsales(prev, { payouts: [row("2026-11-14", 1_051_000)], from: "2026-11-13", to: "2026-11-14" });
+    expect(out.payouts.filter((p) => p.saleDate === "2026-11-13").reduce((a, p) => a + p.amount, 0)).toBe(1_617_000);
+  });
+
+  it("더 받아 온 날은 새 것으로 바꾼다 (늦게 올라온 매입)", () => {
+    const out = mergeCardsales(prev, { payouts: [row("2026-11-13", 1_700_000)], from: "2026-11-13", to: "2026-11-13" });
+    expect(out.payouts.filter((p) => p.saleDate === "2026-11-13").reduce((a, p) => a + p.amount, 0)).toBe(1_700_000);
+    expect(out.payouts.filter((p) => p.saleDate === "2026-11-14").length).toBe(1);
+  });
+
+  it("전에 없던 거래일은 그냥 넣는다", () => {
+    const out = mergeCardsales(prev, { payouts: [row("2026-11-16", 900_000)], from: "2026-11-16", to: "2026-11-16" });
+    expect(out.payouts.filter((p) => p.saleDate === "2026-11-16").reduce((a, p) => a + p.amount, 0)).toBe(900_000);
+    expect(out.payouts.length).toBe(3);
   });
 });

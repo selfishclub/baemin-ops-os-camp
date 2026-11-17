@@ -77,8 +77,10 @@ export function CardSalesSection({ month, txs, lastBankDate, sales }: { month: s
       for (let i = 0; i < todo.length; i++) {
         const r = todo[i];
         setBusy(`여신협회에서 받는 중… ${todo.length > 1 ? `(${i + 1}/${todo.length}) ` : ""}30초쯤`);
-        // 여신협회는 "매입일"로 조회한다. 보통 거래 다음 날 매입되므로 하루 밀어서 묻는다
-        const q = { report: "purchase", from: addDays(r.from, 1), to: addDays(r.to, 1) > today ? today : addDays(r.to, 1) };
+        // 여신협회는 "매입일"로 조회한다. 보통 거래 다음 날 매입되지만 주말·연휴를 끼면 사나흘 뒤에
+        // 올라온다. 끝을 +1일로만 물으면 구간 마지막 거래일이 반만 들어와서, 전에 받아 둔 날을
+        // 덜 받은 값으로 덮을 뻔했다 (2026-11-18 거래일 11/13). 끝은 넉넉히 +4일까지 묻는다.
+        const q = { report: "purchase", from: addDays(r.from, 1), to: addDays(r.to, 4) > today ? today : addDays(r.to, 4) };
         const res = await fetch(`${HELPER}/cardsales/fetch`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(q) });
         const j = (await res.json()) as { ok: boolean; message?: string; needLogin?: boolean; guard?: boolean; base64?: string | null };
         if (!j.ok) {
