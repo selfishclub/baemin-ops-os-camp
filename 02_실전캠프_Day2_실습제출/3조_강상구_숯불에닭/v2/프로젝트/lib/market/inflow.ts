@@ -19,6 +19,39 @@ export function inflowMonths(now = new Date()): string[] {
   return months;
 }
 
+const nextDay = (day: string) => new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * 수집기가 하루씩 받아 둔 자료를 더해 그 기간을 만든다.
+ *
+ * 수집기(auto-collect)는 밤마다 **하루치**만 받아 둔다. 월별 자료는 월간 수집을 따로 돌려야
+ * 갱신돼서, 진행 중인 달은 months 에 옛날 끝날짜로 남아 있다 (2026-11-17 기준 2026-11 은
+ * 11/01~11/04 에서 멈춰 있었다). 그래서 달력에서 이번 달을 고르면 저장된 기간이 없어
+ * Aside 창으로 직접 조회하다가 네이버 로그인이 풀리면 실패했다.
+ *
+ * 유입 수(pv)는 더해지는 값이라 하루치를 더하면 월별 자료와 같다 — 2026-10 하루치 31일분을
+ * 더하니 월별 자료와 1,215회·212개 말까지 똑같았다 (차이 0).
+ *
+ * 하루라도 빠지면 그 기간은 만들지 않는다. 적게 나온 숫자를 맞는 것처럼 보여 주지 않기 위해서다.
+ */
+export function inflowFromDays(inflow: MarketInflow | null | undefined, start: string, end: string): { start: string; end: string; items: { keyword: string; pv: number }[]; days: number; missing: string[] } | null {
+  if (!inflow?.periods || start > end) return null;
+  const sum = new Map<string, number>();
+  const missing: string[] = [];
+  let days = 0;
+  for (let day = start; day <= end; day = nextDay(day)) {
+    const p = inflow.periods[`${day}/${day}`];
+    if (!p) {
+      missing.push(day);
+      continue;
+    }
+    days++;
+    for (const it of p.items) sum.set(it.keyword, (sum.get(it.keyword) ?? 0) + it.pv);
+  }
+  if (days === 0) return null;
+  return { start, end, items: [...sum].map(([keyword, pv]) => ({ keyword, pv })).sort((a, b) => b.pv - a.pv), days, missing };
+}
+
 export interface InflowRow {
   keyword: string;
   pv: number;

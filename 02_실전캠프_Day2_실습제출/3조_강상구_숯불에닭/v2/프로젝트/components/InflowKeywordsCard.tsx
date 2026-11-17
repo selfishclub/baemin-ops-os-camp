@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { InflowDateCalendar } from "@/components/InflowDateCalendar";
 import { num } from "@/lib/format";
 import type { MarketInflow } from "@/lib/export/types";
-import { inflowSummary, type InflowRange } from "@/lib/market/inflow";
+import { inflowFromDays, inflowSummary, type InflowRange } from "@/lib/market/inflow";
 
 import { INFLOW_FIRST_DAY, inflowPeriod, inflowPeriodLabel, inflowYesterday, moveInflowPeriod, type InflowMode } from "@/lib/market/inflowPeriod";
 
@@ -23,7 +23,18 @@ export function InflowKeywordsCard({ inflow }: { inflow: MarketInflow | null | u
   const period = inflowPeriod(mode, anchor);
   const range = (mode === "monthly" && inflow?.months?.[period.start.slice(0, 7)]?.end === period.end
     ? period.start.slice(0, 7) : period.key) as InflowRange;
-  const s = useMemo(() => inflowSummary({ ...inflow, collectedAt: inflow?.collectedAt ?? "", periods: { ...inflow?.periods, ...queried } }, range, new Map()), [inflow, queried, range]);
+  // 수집기가 밤마다 받아 둔 하루치를 더해 이 기간을 먼저 만들어 본다. 그래야 진행 중인 달·주도
+  // Aside 창(네이버 로그인)을 거치지 않고 보인다. 하루라도 빠지면 만들지 않고 아래에서 직접 조회한다.
+  const fromDays = useMemo(
+    () => inflowFromDays({ ...inflow, collectedAt: inflow?.collectedAt ?? "", periods: { ...inflow?.periods, ...queried } }, period.start, period.end),
+    [inflow, queried, period.start, period.end],
+  );
+  const built = fromDays && fromDays.missing.length === 0 ? fromDays : null;
+  const missingDays = fromDays?.missing ?? [];
+  const s = useMemo(
+    () => inflowSummary({ ...inflow, collectedAt: inflow?.collectedAt ?? "", periods: { ...inflow?.periods, ...queried, ...(built ? { [period.key]: built } : {}) } }, range, new Map()),
+    [inflow, queried, built, period.key, range],
+  );
   const changePeriod = (next: string) => { setAnchor(next); setAll(false); setError(null); setCalendarOpen(false); };
   const hasPeriod = s !== null;
   const ready = !!inflow;
@@ -70,7 +81,12 @@ export function InflowKeywordsCard({ inflow }: { inflow: MarketInflow | null | u
       </div>
       {calendarOpen && <InflowDateCalendar anchor={anchor} latest={period.latest} mode={mode} onApply={changePeriod} onCancel={() => setCalendarOpen(false)} />}
       {loading && <p role="status" className="py-2 text-sm text-stone-500">선택한 기간의 자료를 불러오는 중이에요…</p>}
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-red-700">
+          {error}
+          {missingDays.length > 0 && <> 수집기가 이 기간 중 <b className="num">{num(missingDays.length)}일</b>치를 아직 안 받아 왔어요({missingDays.slice(0, 3).map((d) => d.slice(5).replace("-", "/")).join(", ")}{missingDays.length > 3 && " 등"}). 밤에 수집기가 돌면 채워져서 이 화면이 저절로 나와요.</>}
+        </p>
+      )}
 
       {!s ? null : !s.total ? (
         <p className="text-sm text-stone-500">이 기간에 네이버가 제공한 검색 키워드 자료가 없어요.</p>
