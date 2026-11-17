@@ -100,8 +100,6 @@ export default function ChannelsPage() {
 
   const fees = channelFees(settlement.effectiveSales, ledger.txs, ledger.prevSales);
   const manualFees = fees.filter((f) => !autoChannels.includes(f.channel) && channelKind(f.channel, daily.channels) !== "cash");
-  const delivery = fees.filter((f) => f.channel !== "hall" && f.feeRate !== null);
-  const worst = delivery.length ? delivery.reduce((a, b) => ((b.feeRate ?? 0) > (a.feeRate ?? 0) ? b : a)) : null;
   const hasBank = ledger.txs.some((t) => t.channel && t.in > 0);
 
   return (
@@ -221,49 +219,10 @@ export default function ChannelsPage() {
         </div>
       </section>
 
-      <section className="card space-y-3">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-base font-bold">앱별 수수료 비교</h2>
-          <span className="text-xs text-stone-500">{monthNo}월 주문분 기준</span>
-        </div>
-        {fees.length === 0 ? (
-          <Notice tone="info">실매출을 저장하면 앱별 수수료율이 나와요.</Notice>
-        ) : (
-          <>
-            {worst && (
-              <Notice tone="warn">
-                수수료율이 가장 높은 곳은 <b>{worst.name}</b> — 주문금액의 <b>{pctText(worst.feeRate)}</b> ({won(worst.fee)})가 빠져요.
-              </Notice>
-            )}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[26rem] text-sm">
-                <thead className="text-left text-xs text-stone-500">
-                  <tr>
-                    <th className="py-1">채널</th>
-                    <th className="text-right">주문금액</th>
-                    <th className="text-right">수수료</th>
-                    <th className="text-right">수수료율</th>
-                    <th className="text-right">건당</th>
-                  </tr>
-                </thead>
-                <tbody className="num divide-y divide-stone-100">
-                  {fees.map((f) => (
-                    <tr key={f.channel} className={worst?.channel === f.channel ? "bg-amber-50" : ""}>
-                      <td className="py-2 font-semibold">{f.name}</td>
-                      <td className="text-right">{num(f.orders)}</td>
-                      <td className="text-right">{f.feeRate === null ? "–" : num(f.fee)}</td>
-                      <td className="text-right font-bold">{pctText(f.feeRate)}</td>
-                      <td className="text-right">{f.perOrder === null ? "–" : num(f.perOrder)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-xs text-stone-500">홀의 카드수수료는 통장 출금(영업비 › 카드수수료)으로 잡혀서 여기서는 계산하지 않아요.</p>
-          </>
-        )}
-      </section>
-
+      {/* 「앱별 수수료 비교」는 뺐다 (11/17) — 배달앱만 숫자가 나와 16줄 중 2줄뿐이었고,
+          그 2줄(수수료율·건당)은 「배민 정산」·「쿠팡이츠 정산」이 중개·결제·배달비·부가세·광고로
+          쪼개서 더 자세히 보여 준다. 위 「수수료 집계」와 수수료율이 달라 보이던 것도
+          기준이 서로 달라서다 — 아래 주석 참고. */}
       {manualFees.length > 0 && (
         <section className="card space-y-3">
           <div className="flex items-baseline justify-between">
