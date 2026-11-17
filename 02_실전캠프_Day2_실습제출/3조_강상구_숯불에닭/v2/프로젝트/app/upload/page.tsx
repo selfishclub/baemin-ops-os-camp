@@ -8,7 +8,7 @@ import { ExportUploadSection } from "@/components/ExportUploadCard";
 import { isBasic } from "@/lib/edition";
 import ExpenseSection from "@/components/ExpenseSection";
 import { BankParseError, parseBankSheet } from "@/lib/bank/parse";
-import { DEFAULT_CHANNELS, type ChannelId, type Major } from "@/lib/categories";
+import { CARD_PRESETS, DEFAULT_CHANNELS, type ChannelId, type Major } from "@/lib/categories";
 import { classifyRows, findRule, newId, ruleFromChoice, usualAmounts } from "@/lib/classify";
 import { num, won } from "@/lib/format";
 import { findOverlap, monthLabel, monthsBetween, newBankRowsOnly, prevMonth } from "@/lib/month";
@@ -479,7 +479,7 @@ function ReviewCard({ tx, ledger, payDays, editing = false, onDone }: { tx: Tran
       {isIncome && major === "수입" && (
         <select aria-label={`${tx.payee} 채널`} className="field" value={channel} onChange={(e) => setChannel(e.target.value as ChannelId | "")}>
           <option value="">어느 채널의 입금인가요? (없으면 그대로)</option>
-          {DEFAULT_CHANNELS.map((c) => (
+          {[...DEFAULT_CHANNELS, ...CARD_PRESETS].map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
             </option>
