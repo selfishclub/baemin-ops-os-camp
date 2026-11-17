@@ -11,6 +11,8 @@ import { newId } from "@/lib/classify";
 import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor";
 import { CardApprovalError, parseCardApproval, type ParsedCardApproval, mergeApprovalDay } from "@/lib/cardApproval";
 import { DeliveryStatementError, parseBaeminStatement, type ParsedDeliveryStatement } from "@/lib/deliveryStatement";
+import { dailyOrdersFromExport, type DailyOrderFillSet } from "@/lib/baemin/settle";
+import { useExport } from "@/components/useExport";
 import { checkDay, dayTotals, daysInMonth, hoursBetween, monthHoursByStaff, monthSummary, normalizeTime, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
 import { monthLabel } from "@/lib/month";
@@ -88,6 +90,8 @@ export default function TodayPage() {
   const [deliveryFile, setDeliveryFile] = useState<{ parsed: ParsedDeliveryStatement; name: string } | null>(null);
   const [deliveryMsg, setDeliveryMsg] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const deliveryFileRef = useRef<HTMLInputElement>(null);
+  const [askFill, setAskFill] = useState(false);
+  const exp = useExport();
   const weather = useWeather();
   const todayWeather = weather.weather.find((w) => w.date === date) ?? weather.forecast.find((w) => w.date === date);
 
@@ -228,6 +232,47 @@ export default function TodayPage() {
     }
   }
 
+  // 수집기가 받아 둔 주문 → 이 달 배달앱 매출. 정산을 기다리지 않는다 (주문 품목 합계).
+  const fills = useMemo(() => {
+    const out: { channel: string; name: string; set: DailyOrderFillSet }[] = [];
+    for (const [channel, name, b] of [["baemin", "배달의민족", exp.baemin], ["coupang", "쿠팡이츠", exp.coupang]] as const) {
+      const set = b ? dailyOrdersFromExport(b.orders, month) : null;
+      if (set) out.push({ channel, name, set });
+    }
+    return out;
+  }, [exp.baemin, exp.coupang, month]);
+  const fillDays = useMemo(() => new Set(fills.flatMap((f) => f.set.days.map((d) => d.date))).size, [fills]);
+  // 넣기 전과 달라지는 줄 — 이미 같은 값이면 누를 일이 없고, 다르면 넣기 전에 보여 준다
+  const fillChanges = useMemo(
+    () =>
+      fills.flatMap((f) =>
+        f.set.days
+          .map((d) => ({ date: d.date, name: f.name, before: daily.sales.find((x) => x.date === d.date && x.channel === f.channel)?.amount ?? 0, after: d.amount }))
+          .filter((c) => c.before !== c.after),
+      ).sort((a, b) => a.date.localeCompare(b.date)),
+    [fills, daily.sales],
+  );
+
+  // 수집기 자료로 그 날짜들의 배달앱 줄만 바꾼다 (카드·현금·근무는 그대로)
+  async function applyFills() {
+    const store = getStore();
+    const byDate = new Map<string, { channel: string; amount: number }[]>();
+    for (const f of fills) for (const d of f.set.days) byDate.set(d.date, [...(byDate.get(d.date) ?? []), { channel: f.channel, amount: d.amount }]);
+    for (const [day, rows] of [...byDate].sort((a, b) => a[0].localeCompare(b[0]))) {
+      const keep = daily.sales.filter((x) => x.date === day && !rows.some((r) => r.channel === x.channel));
+      const mine: DailySale[] = rows.filter((r) => r.amount > 0).map((r) => ({ date: day, channel: r.channel, amount: r.amount }));
+      await store.saveDailySales(day, [...keep, ...mine]);
+    }
+    setAskFill(false);
+    await daily.reload();
+    const meet = fills.reduce((a, f) => a + f.set.meetPay, 0);
+    setDeliveryMsg({
+      tone: "ok",
+      text: `${fills.map((f) => f.name).join("·")} ${byDate.size}일치 주문금액을 넣었어요.${meet > 0 ? ` 만나서결제 ${won(meet)}은 안 넣었어요 — 「배민 후불카드」 칸에 따로 넣어 주세요.` : ""}`,
+    });
+    weather.fillMissing().catch(() => {});
+  }
+
   // 배달앱 정산명세서 → 매출일별 주문금액. 지금은 배민 파일만.
   async function readDeliveryFile(file: File) {
     setDeliveryMsg(null);
@@ -357,7 +402,7 @@ export default function TodayPage() {
                 <b>카드사별로 나눴으면</b> — 마감정산서 맨 아래 “카드사별 매출내역”의 숫자를 카드사 칸에 그대로. 합계가 “카드매출”과 맞으면 돼요
               </li>
               <li>
-                <b>배달앱</b> — 각 앱 사장님 앱의 오늘 주문금액(손님 결제 금액, 수수료 빼기 전)
+                <b>배달앱</b> — 각 앱 사장님 앱의 오늘 주문금액(손님 결제 금액, 수수료 빼기 전). 밤 수집기를 돌리고 올리기 탭에 내보내기 파일을 넣었으면 <b>「배달앱 매출 넣기」</b>로 한 달치를 한 번에 넣을 수 있어요 — 정산이 올라오기 전의 날도 들어와요
               </li>
               <li>
                 <b>알바</b> — 별칭을 고르고 <b>출근·퇴근 시각</b>을 24시간제로 넣으면 근무시간이 계산돼요(예: 18:00~22:30 → 4.5h, 저녁 6시는 18, 자정을 넘기면 다음날로). 숫자만 쳐도 돼요(1830 → 18:30). 시급은 아래 “직원·채널 설정”에서 한 번만 등록
@@ -443,6 +488,17 @@ export default function TodayPage() {
                 )}
                 {g.title === "배달앱" && (
                   <>
+                    {fills.length > 0 && (
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border-t border-stone-200 pt-2">
+                        <p className="text-xs text-stone-500">
+                          밤 수집기가 받아 둔 주문에서 <b className="num">{fillDays}일</b>치
+                          {fillChanges.length === 0 ? <span className="text-stone-400"> · 이미 다 넣었어요</span> : <span className="num"> · 바뀔 줄 {fillChanges.length}개</span>}
+                        </p>
+                        <button className="btn-ghost px-3 py-1.5 text-xs" disabled={fillChanges.length === 0} onClick={() => setAskFill(true)}>
+                          {monthLabel(month)} 배달앱 매출 넣기
+                        </button>
+                      </div>
+                    )}
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border-t border-stone-200 pt-2">
                       <p className="text-xs text-stone-500">여러 날을 한 번에: 배민 사장님 사이트 → 정산 → 정산명세서(암호 푼 것)</p>
                       <input ref={deliveryFileRef} type="file" accept=".xlsx,.xls" aria-label="배달앱 정산명세서 엑셀" className="hidden" onChange={(e) => e.target.files?.[0] && readDeliveryFile(e.target.files[0])} />
@@ -706,6 +762,37 @@ export default function TodayPage() {
         </div>
       )}
 
+      {askFill && (
+        <ConfirmDialog title="수집기 자료로 배달앱 매출 넣기 — 이대로 할까요?" confirmLabel={`${fillDays}일치 넣기`} onConfirm={applyFills} onCancel={() => setAskFill(false)}>
+          {fills.map((f) => (
+            <div key={f.channel} className="num mb-2 text-sm">
+              <b>{f.name}</b> {f.set.from.slice(5).replace("-", "/")}~{f.set.to.slice(5).replace("-", "/")} · {f.set.days.length}일 · 주문 {num(f.set.count)}건 · <b>{won(f.set.total)}</b>
+              {f.set.unsettled > 0 && <span className="text-stone-500"> (그중 정산 전 {num(f.set.unsettled)}건 — 매출은 이미 셌어요)</span>}
+              {f.set.meetPay > 0 && <p className="text-xs text-stone-500">만나서결제 {won(f.set.meetPay)}는 문 앞에서 카드·현금으로 받은 돈이라 안 넣어요. 「배민 후불카드」 칸에 따로 넣어 주세요.</p>}
+              {f.set.skipped.length > 0 && <p className="text-xs text-stone-500">{f.set.skipped.length}일은 건너뛰어요 — 수집기 파일이 오래돼서 정산 전 주문금액이 없어요. 수집기를 다시 돌리면 들어와요.</p>}
+            </div>
+          ))}
+          {fillChanges.length > 0 && (
+            <div className="rounded-xl bg-stone-50 p-2">
+              <p className="mb-1 text-xs font-semibold text-stone-500">지금 들어 있는 값과 다른 날 {fillChanges.length}개 — 이 줄만 바뀌어요</p>
+              <table className="num w-full text-xs">
+                <tbody className="divide-y divide-stone-200">
+                  {fillChanges.map((c) => (
+                    <tr key={`${c.date}-${c.name}`}>
+                      <td className="py-0.5">{c.date.slice(5).replace("-", "/")} {c.name}</td>
+                      <td className="py-0.5 text-right text-stone-500 line-through">{won(c.before)}</td>
+                      <td className="w-4 py-0.5 text-center text-stone-400">→</td>
+                      <td className="py-0.5 text-right font-bold">{won(c.after)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="text-xs text-stone-500">이 날짜들의 배달앱 주문금액만 바뀌어요. 카드·현금·근무는 그대로예요. 손으로 넣어 둔 값이 있으면 수집기 값으로 바뀌어요.</p>
+          <p className="text-xs text-stone-500">주문 품목 합계로 센 금액이에요 — 정산이 올라오기 전에도 그날 매출을 알 수 있어요. 정산이 끝난 날과 대조해 보니 차이가 없었어요.</p>
+        </ConfirmDialog>
+      )}
       {deliveryFile && (
         <ConfirmDialog title={`${deliveryFile.parsed.channelName} 정산명세서 — 이대로 넣을까요?`} confirmLabel={`${deliveryFile.parsed.days.length}일치 넣기`} onConfirm={applyDeliveryFile} onCancel={() => setDeliveryFile(null)}>
           <p>

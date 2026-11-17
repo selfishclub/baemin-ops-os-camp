@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adEfficiency, applyConfirms, channelSaleFromOrders, matchSettlements, perOrderBreakdown } from "./settle";
+import { adEfficiency, applyConfirms, channelSaleFromOrders, dailyOrdersFromExport, matchSettlements, perOrderBreakdown } from "./settle";
 import type { BaeminExport, BaeminOrderDay, BaeminSettlement } from "../export/types";
 import type { Transaction } from "../types";
 
@@ -119,5 +119,49 @@ describe("쿠팡이츠 직접 출금 확인", () => {
     const paid = matchSettlements(source, [tx("2026-10-30", 123000, "coupang")], "2026-10-30", "coupang");
     expect(paid[0]).toMatchObject({state: "입금 확인", bankAmount: 123000});
     expect(matchSettlements(source, [], "2026-10-30", "baemin")[0].state).toBe("입금 대기");
+  });
+});
+
+describe("수집기 주문으로 하루 배달앱 매출 만들기", () => {
+  const base = { discount: 0, otherRevenue: 0, deductions: { brokerage: 0, payment: 0, delivery: 0, vat: 0, unclassified: 0 } };
+  const days: BaeminOrderDay[] = [
+    // 정산이 끝난 날 — orderAmount 가 gross 와 같다
+    { date: "2026-11-16", orders: 3, settledOrders: 3, unsettledOrders: 0, gross: 89_500, orderAmount: 89_500, meetPay: 0, ...base },
+    // 아직 정산 전 — gross 는 0인데 주문 품목 합계는 있다
+    { date: "2026-11-17", orders: 7, settledOrders: 0, unsettledOrders: 7, gross: 0, orderAmount: 206_500, meetPay: 0, ...base },
+    // 만나서결제가 섞인 날 — 그 몫은 매출에 안 넣고 따로 알려 준다
+    { date: "2026-11-18", orders: 2, settledOrders: 2, unsettledOrders: 0, gross: 60_000, orderAmount: 30_000, meetPay: 30_000, ...base },
+    { date: "2026-10-31", orders: 1, settledOrders: 1, unsettledOrders: 0, gross: 54_000, orderAmount: 54_000, meetPay: 0, ...base },
+  ];
+
+  it("정산 전 날도 주문 품목 합계로 매출이 나온다", () => {
+    const f = dailyOrdersFromExport(days, "2026-11")!;
+    expect(f.days.map((d) => [d.date, d.amount])).toEqual([
+      ["2026-11-16", 89_500],
+      ["2026-11-17", 206_500],
+      ["2026-11-18", 30_000],
+    ]);
+    expect(f.from).toBe("2026-11-16");
+    expect(f.to).toBe("2026-11-18");
+    expect(f.total).toBe(89_500 + 206_500 + 30_000);
+    expect(f.count).toBe(12);
+    expect(f.unsettled).toBe(7);
+    expect(f.meetPay).toBe(30_000); // 「배민 후불카드」로 손수 넣을 몫
+    expect(f.skipped).toEqual([]);
+  });
+
+  it("옛 내보내기 파일(주문금액 없음)은 정산 전 날을 건너뛴다 — 덜 받아 온 값으로 덮지 않는다", () => {
+    const old: BaeminOrderDay[] = [
+      { date: "2026-11-16", orders: 3, settledOrders: 3, unsettledOrders: 0, gross: 89_500, ...base },
+      { date: "2026-11-17", orders: 7, settledOrders: 0, unsettledOrders: 7, gross: 0, ...base },
+    ];
+    const f = dailyOrdersFromExport(old, "2026-11")!;
+    expect(f.days.map((d) => d.date)).toEqual(["2026-11-16"]);
+    expect(f.days[0].amount).toBe(89_500);
+    expect(f.skipped).toEqual(["2026-11-17"]);
+  });
+
+  it("그 달 주문이 없으면 null", () => {
+    expect(dailyOrdersFromExport(days, "2026-09")).toBeNull();
   });
 });

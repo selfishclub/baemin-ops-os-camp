@@ -83,7 +83,11 @@ export interface BaeminOrderDay {
   orders: number;
   settledOrders: number; // 정산이 채워진 주문 (비용을 아는 주문)
   unsettledOrders: number;
-  gross: number; // 주문금액
+  gross: number; // 주문금액 (정산이 올라온 주문만)
+  // 아래 둘은 정산 전 주문까지 센다 — 주문 품목 합계라 정산을 기다리지 않아도 그날 매출을 알 수 있다.
+  // (수집기 2026-11-18 이전 파일에는 없다. 없으면 gross 로 대신한다.)
+  orderAmount?: number; // 앱으로 결제한 주문금액 (만나서결제 제외)
+  meetPay?: number; // 만나서결제 주문금액 — 문 앞에서 카드·현금으로 받은 돈이라 배민 매출이 아니다
   discount: number; // 점주 부담 할인
   otherRevenue: number; // 가게배달팁 등
   deductions: { brokerage: number; payment: number; delivery: number; vat: number; unclassified: number; ad?: number }; // ad = 주문당 광고비 (쿠팡이츠)

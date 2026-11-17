@@ -188,3 +188,59 @@ export function channelSaleFromOrders(days: BaeminOrderDay[], month: string): { 
   if (p.orders <= 0) return null;
   return { orders: p.gross, deposit: p.net, count: p.orders };
 }
+
+export interface DailyOrderFill {
+  date: string;
+  amount: number; // 그날 앱 결제 주문금액 (만나서결제 제외)
+  meetPay: number; // 만나서결제 주문금액 — 매출로는 넣지 않고 알려만 준다
+  count: number;
+  unsettled: number; // 그중 아직 정산 전인 주문
+}
+
+export interface DailyOrderFillSet {
+  from: string;
+  to: string;
+  days: DailyOrderFill[];
+  total: number;
+  meetPay: number;
+  count: number;
+  unsettled: number; // 아직 정산 전인 주문 수 (매출은 이미 셌다)
+  skipped: string[]; // 옛 내보내기 파일이라 정산 전 주문금액을 알 수 없어 건너뛴 날
+}
+
+/**
+ * 수집기가 받아 둔 주문에서 그날의 배달앱 매출을 만든다 — 정산을 기다리지 않는다.
+ *
+ * 배민 정산은 주문 며칠 뒤에 올라와서(NOT_READY), 그때까지 gross 가 0이다. 그런데 주문 품목은
+ * 처음부터 들어 있어서 품목 합계로 그날 매출을 낼 수 있다. 수집기가 그 합계를 orderAmount 로
+ * 내보낸다 — 정산이 끝난 80일을 대조해 보니 모두 차이 0이었다 (2026-11-18 확인).
+ *
+ * 만나서결제는 문 앞에서 카드·현금으로 받은 돈이라 배민 매출이 아니다. 따로 알려만 주고
+ * 넣지 않는다 (「배민 후불카드」 채널에 손으로 넣는다).
+ *
+ * orderAmount 가 없는 옛 파일에서는 정산 전 주문이 있는 날을 건너뛴다 — 덜 받아 온 값을
+ * 맞는 매출처럼 넣지 않기 위해서다.
+ */
+export function dailyOrdersFromExport(days: BaeminOrderDay[], month: string): DailyOrderFillSet | null {
+  const rows: DailyOrderFill[] = [];
+  const skipped: string[] = [];
+  for (const d of days.filter((x) => x.date.startsWith(month)).sort((a, b) => a.date.localeCompare(b.date))) {
+    if (d.orderAmount === undefined && d.unsettledOrders > 0) {
+      skipped.push(d.date);
+      continue;
+    }
+    rows.push({ date: d.date, amount: d.orderAmount ?? d.gross, meetPay: d.meetPay ?? 0, count: d.orders, unsettled: d.unsettledOrders });
+  }
+  if (!rows.length) return null;
+  const sum = (f: (r: DailyOrderFill) => number) => rows.reduce((a, r) => a + f(r), 0);
+  return {
+    from: rows[0].date,
+    to: rows[rows.length - 1].date,
+    days: rows,
+    total: sum((r) => r.amount),
+    meetPay: sum((r) => r.meetPay),
+    count: sum((r) => r.count),
+    unsettled: sum((r) => r.unsettled),
+    skipped,
+  };
+}
