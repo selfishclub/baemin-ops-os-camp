@@ -4127,6 +4127,7 @@ const App = (() => {
     ['crabP', '대게 포장', 'kg', 0.1], ['kingP', '킹크랩 포장', 'kg', 0.1], ['lobP', '랍스터 포장', 'kg', 0.1],   // 2026-10-10 안산점 건의: 포장 매출 칸은 있는데 포장 kg 칸이 없음
     ['cash', '현금', '원', 100], ['transfer', '계좌이체', '원', 100], ['voucher', '상품권', '원', 100], ['gifticon', '기프티콘', '원', 100], ['petty', '시제(시재금)', '원', 100],   // 2026-10-12 사장님 요청: 포스 정산 메시지의 결제 수단·시재
     ['priceCrab', '대게 단가', '원/kg', 1000], ['priceKing', '킹크랩 단가', '원/kg', 1000], ['priceLob', '랍스터 단가', '원/kg', 1000],   // 오늘의 단가
+    ['coupon', '리뷰 쿠폰 배포', '장', 1], ['reviews', '달린 리뷰', '건', 1],   // 2026-11-17 사장님 요청: 나눠 준 리뷰 쿠폰 대비 실제 리뷰가 몇 건 달렸는지
   ];
   const PAY_F = [['cash', '현금'], ['transfer', '계좌이체'], ['voucher', '상품권'], ['gifticon', '기프티콘'], ['petty', '시제']];
   const payLine = (r) => PAY_F.filter(([k]) => r && r[k] != null).map(([k, n]) => `${n} ${Number(r[k]).toLocaleString('ko-KR')}`).join(' · ');
@@ -4178,6 +4179,8 @@ const App = (() => {
       <div class="frow3">${inp(SALES_F.find(([k]) => k === 'gifticon'))}${inp(SALES_F.find(([k]) => k === 'petty'))}<label class="autoF">카드·배달앱 등 나머지 <small class="opt">원 · 자동</small><input type="text" class="won" id="payRest" readonly placeholder="자동"></label></div>
       <div class="mlabel">오늘의 단가 <span class="opt">원/kg · 선택</span></div>
       <div class="frow3">${inp(SALES_F.find(([k]) => k === 'priceCrab'))}${inp(SALES_F.find(([k]) => k === 'priceKing'))}${inp(SALES_F.find(([k]) => k === 'priceLob'))}</div>
+      <div class="mlabel">리뷰 쿠폰 — 오늘 손님에게 나눠 준 수량</div>
+      <div class="frow">${inp(SALES_F.find(([k]) => k === 'coupon'))}${inp(SALES_F.find(([k]) => k === 'reviews')).replace('<small class="opt">건</small>', '<small class="opt">건 · 선택 (사장님이 나중에 적어도 됩니다)</small>')}</div>
       <label>비고 <span class="opt">선택</span><textarea id="sfNote" rows="2" placeholder="예: 잔돈이 없어 직원에게 1만원 빌림 · 상품권 손님 2팀">${esc(r.note || '')}</textarea></label>
       <p class="hint">빈칸은 0이 아니라 "미입력"으로 남습니다. 총주문·총매출은 나눠 넣은 값의 합으로 자동 계산되고, 나눠 넣지 않았을 때만 직접 적습니다. 결제 수단은 총매출에서 현금·이체·상품권·기프티콘을 뺀 나머지가 카드·배달앱으로 자동 표시됩니다(시제는 매출이 아니라 거스름돈용 시재금이라 빼지 않습니다). 주류 매출은 매장 매출 안에 포함된 금액을 따로 적는 칸입니다(총매출에 더해지지 않음). 합계 kg 만 알면 합계 칸에만 넣어도 됩니다.</p>`;
   }
@@ -4287,6 +4290,13 @@ const App = (() => {
       <div class="card"><div class="cl">배달 총 건수</div><div class="cv">${delivN.toLocaleString('ko-KR')}<small>건</small></div><div class="cs">${sp.length ? `하루 평균 ${(delivN / sp.length).toFixed(1)}건` : '매장·배달 주문을 나눠 넣으면 집계'}</div></div>
       <div class="card"><div class="cl">홀 팀당 객단가</div><div class="cv sm2">${hallTeams ? fmtWon(Math.round(hallSales / hallTeams)) : '–'}</div><div class="cs">${hallTeams ? `매장 매출 ${fmtWon(hallSales)} ÷ ${hallTeams}팀` : '홀 팀수·매장 매출 미입력'}</div></div>
       <div class="card"><div class="cl">배달 건당 객단가</div><div class="cv sm2">${dvN ? fmtWon(Math.round(dvSales / dvN)) : '–'}</div><div class="cs">${dvN ? `배달 매출 ${fmtWon(dvSales)} ÷ ${dvN}건` : '배달 건수·배달 매출 미입력'}</div></div></div>`;
+    /* 2026-11-17 사장님 요청: 리뷰 쿠폰 배포 수량 대비 달린 리뷰 */
+    const cpDays = filled.map((k) => S.sales[k]).filter((r) => r.coupon != null), cpSum = cpDays.reduce((a, r) => a + (Number(r.coupon) || 0), 0);
+    const rvDays = filled.map((k) => S.sales[k]).filter((r) => r.reviews != null), rvSum = rvDays.reduce((a, r) => a + (Number(r.reviews) || 0), 0);
+    h += `<div class="cards m4">
+      <div class="card"><div class="cl">🎟️ 리뷰 쿠폰 배포</div><div class="cv">${cpSum.toLocaleString('ko-KR')}<small>장</small></div><div class="cs">${cpDays.length ? `${cpDays.length}일 입력 · 하루 평균 ${(cpSum / cpDays.length).toFixed(1)}장` : '마감 때 나눠 준 수량을 적으면 집계'}${filled.length - cpDays.length ? ` · ${filled.length - cpDays.length}일 미입력` : ''}</div></div>
+      <div class="card"><div class="cl">달린 리뷰</div><div class="cv">${rvDays.length ? rvSum.toLocaleString('ko-KR') : '–'}<small>${rvDays.length ? '건' : ''}</small></div><div class="cs">${rvDays.length ? `${rvDays.length}일 입력` : '날짜 줄을 눌러 "달린 리뷰"에 적으세요'}</div></div>
+      <div class="card"><div class="cl">쿠폰 대비 리뷰</div><div class="cv">${cpSum && rvDays.length ? Math.round(rvSum / cpSum * 100) : '–'}<small>${cpSum && rvDays.length ? '%' : ''}</small></div><div class="cs">${cpSum && rvDays.length ? `쿠폰 ${cpSum}장 → 리뷰 ${rvSum}건` : '쿠폰과 리뷰를 둘 다 적으면 계산'}</div></div></div>`;
     if (!dates.length) return h + `<div class="notice"><b>아직 오지 않은 달입니다.</b></div>`;
     const kv = S.ui.skg || 'all';   // kg 열 보기: all 합계 · S 매장 · D 배달
     h += `<div class="filters" style="margin:4px 0 10px"><span class="hint" style="margin:0 6px 0 0">kg 보기</span>${[['all', '합계'], ['S', '매장'], ['D', '배달'], ['P', '포장']].map(([k, n]) => `<button class="fl${kv === k ? ' on' : ''}" data-act="skgView" data-k="${k}">${n}</button>`).join('')}</div>`;
@@ -4296,7 +4306,7 @@ const App = (() => {
     h += `<div class="tkLogWrap"><table class="tkLog"><thead><tr><th>날짜</th><th class="r">총주문</th><th class="r">매장</th><th class="r">배달</th><th class="r">포장</th><th class="r">총매출</th><th class="r">대게${kgHead}</th><th class="r">킹크랩${kgHead}</th><th class="r">랍스터${kgHead}</th><th class="r">주류</th><th>입력자</th></tr></thead><tbody>`;
     dates.slice().reverse().forEach((k) => {
       const r = salesOf(k), d = new Date(k + 'T00:00:00'), lb = `${k.slice(5)} ${WD[d.getDay()]}`;
-      h += r ? `<tr class="rowbtn" data-act="salesEdit" data-k="${k}"><td>${lb}</td><td class="r">${cell(r.orders)}${(r.ordersS != null || r.ordersD != null) ? `<br><small class="dim">매장 ${r.ordersS ?? 0} · 배달 ${r.ordersD ?? 0}</small>` : ''}</td><td class="r">${cell(r.store)}${(r.ordersS > 0 && r.store != null) ? `<br><small class="dim">팀당 ${fmtWon(Math.round(Number(r.store) / Number(r.ordersS)))}</small>` : ''}</td><td class="r">${cell(r.deliv)}${(r.ordersD > 0 && r.deliv != null) ? `<br><small class="dim">건당 ${fmtWon(Math.round(Number(r.deliv) / Number(r.ordersD)))}</small>` : ''}</td><td class="r">${cell(r.take)}</td><td class="r"><b>${fmtWon(salesTotal(r))}</b>${payLine(r) ? `<br><small class="dim">${payLine(r)}</small>` : ''}${r.note ? `<br><small class="dim" title="${esc(r.note)}">📝 ${esc(r.note.length > 18 ? r.note.slice(0, 18) + '…' : r.note)}</small>` : ''}</td><td class="r">${kgCell(r, 'crab')}</td><td class="r">${kgCell(r, 'king')}</td><td class="r">${kgCell(r, 'lob')}</td><td class="r">${cell(r.liquor)}</td><td>${esc(r.by || '')}${r.src === 'csv' ? ' <span class="chip missed">CSV</span>' : ''}</td></tr>`
+      h += r ? `<tr class="rowbtn" data-act="salesEdit" data-k="${k}"><td>${lb}</td><td class="r">${cell(r.orders)}${(r.ordersS != null || r.ordersD != null) ? `<br><small class="dim">매장 ${r.ordersS ?? 0} · 배달 ${r.ordersD ?? 0}</small>` : ''}</td><td class="r">${cell(r.store)}${(r.ordersS > 0 && r.store != null) ? `<br><small class="dim">팀당 ${fmtWon(Math.round(Number(r.store) / Number(r.ordersS)))}</small>` : ''}</td><td class="r">${cell(r.deliv)}${(r.ordersD > 0 && r.deliv != null) ? `<br><small class="dim">건당 ${fmtWon(Math.round(Number(r.deliv) / Number(r.ordersD)))}</small>` : ''}</td><td class="r">${cell(r.take)}</td><td class="r"><b>${fmtWon(salesTotal(r))}</b>${payLine(r) ? `<br><small class="dim">${payLine(r)}</small>` : ''}${(r.coupon != null || r.reviews != null) ? `<br><small class="dim">🎟️ 쿠폰 ${r.coupon ?? '–'}장${r.reviews != null ? ` · 리뷰 ${r.reviews}건` : ''}</small>` : ''}${r.note ? `<br><small class="dim" title="${esc(r.note)}">📝 ${esc(r.note.length > 18 ? r.note.slice(0, 18) + '…' : r.note)}</small>` : ''}</td><td class="r">${kgCell(r, 'crab')}</td><td class="r">${kgCell(r, 'king')}</td><td class="r">${kgCell(r, 'lob')}</td><td class="r">${cell(r.liquor)}</td><td>${esc(r.by || '')}${r.src === 'csv' ? ' <span class="chip missed">CSV</span>' : ''}</td></tr>`
         : `<tr class="rowbtn empty" data-act="salesEdit" data-k="${k}"><td>${lb}</td><td colspan="10" style="text-align:left"><span class="chip missed">미입력</span> <small>눌러서 입력</small></td></tr>`;
     });
     h += `</tbody></table></div>`;
@@ -4313,12 +4323,13 @@ const App = (() => {
   }
   const CSV_MAP = { '날짜': 'date', '매장': 'storeName', '총주문': 'orders', '매장주문': 'ordersS', '배달주문': 'ordersD', '매장매출': 'store', '배달매출': 'deliv', '포장매출': 'take', '총매출': 'total', '대게kg': 'crab', '킹크랩kg': 'king', '랍스타kg': 'lob', '랍스터kg': 'lob', '주류매출': 'liquor',
     '대게매장kg': 'crabS', '대게배달kg': 'crabD', '킹크랩매장kg': 'kingS', '킹크랩배달kg': 'kingD', '랍스터매장kg': 'lobS', '랍스타매장kg': 'lobS', '랍스터배달kg': 'lobD', '랍스타배달kg': 'lobD', '대게포장kg': 'crabP', '킹크랩포장kg': 'kingP', '랍스터포장kg': 'lobP', '랍스타포장kg': 'lobP',
-    '현금': 'cash', '계좌이체': 'transfer', '이체': 'transfer', '상품권': 'voucher', '기프티콘': 'gifticon', '시제': 'petty', '시재': 'petty', '대게단가': 'priceCrab', '킹크랩단가': 'priceKing', '랍스터단가': 'priceLob', '랍스타단가': 'priceLob' };
+    '현금': 'cash', '계좌이체': 'transfer', '이체': 'transfer', '상품권': 'voucher', '기프티콘': 'gifticon', '시제': 'petty', '시재': 'petty', '대게단가': 'priceCrab', '킹크랩단가': 'priceKing', '랍스터단가': 'priceLob', '랍스타단가': 'priceLob',
+    '쿠폰배포': 'coupon', '리뷰쿠폰': 'coupon', '리뷰수': 'reviews', '리뷰': 'reviews' };
   /* CSV 내려받기 (2026-11-05 사장님 요청) — 열 이름은 CSV 가져오기와 같아서 그대로 다시 불러올 수 있다. 엑셀용 BOM 포함 */
   const CSV_OUT = [['날짜', 'date'], ['매장', 'storeName'], ['총주문', 'orders'], ['매장주문', 'ordersS'], ['배달주문', 'ordersD'], ['매장매출', 'store'], ['배달매출', 'deliv'], ['포장매출', 'take'], ['총매출', 'total'],
     ['홀팀당객단가', 'perTeam'], ['배달건당객단가', 'perDeliv'], ['대게kg', 'crab'], ['킹크랩kg', 'king'], ['랍스터kg', 'lob'], ['주류매출', 'liquor'],
     ['대게매장kg', 'crabS'], ['대게배달kg', 'crabD'], ['대게포장kg', 'crabP'], ['킹크랩매장kg', 'kingS'], ['킹크랩배달kg', 'kingD'], ['킹크랩포장kg', 'kingP'], ['랍스터매장kg', 'lobS'], ['랍스터배달kg', 'lobD'], ['랍스터포장kg', 'lobP'],
-    ['현금', 'cash'], ['계좌이체', 'transfer'], ['상품권', 'voucher'], ['기프티콘', 'gifticon'], ['시제', 'petty'], ['대게단가', 'priceCrab'], ['킹크랩단가', 'priceKing'], ['랍스터단가', 'priceLob'], ['입력자', 'by'], ['메모', 'note']];
+    ['현금', 'cash'], ['계좌이체', 'transfer'], ['상품권', 'voucher'], ['기프티콘', 'gifticon'], ['시제', 'petty'], ['대게단가', 'priceCrab'], ['킹크랩단가', 'priceKing'], ['랍스터단가', 'priceLob'], ['쿠폰배포', 'coupon'], ['리뷰수', 'reviews'], ['입력자', 'by'], ['메모', 'note']];
   function salesCsvExport(m) {
     const all = m === 'all';
     const keys = salesDates().filter((k) => all || k.slice(0, 7) === m);
@@ -7080,7 +7091,7 @@ const App = (() => {
   /* ── 데모판 (10/14 공유회용, 2026-10-09) ─────────────────────────
      demo.js 가 window.HM_DEMO 를 켜면: 서버 없음 · 저장소 따로 · 매일 처음 열 때 가짜 두 매장 자료를 오늘 날짜 기준으로 새로 만든다.
      실제 직원·매출과 무관한 숫자만 쓴다. 사장님 비밀번호 1234. */
-  const DEMO = !!window.HM_DEMO, DEMO_VER = 5, DEMO_PW = (window.HM_DEMO_CFG || {}).pw || '1234';   // DEMO_VER 4 (10/11): 자료 생성은 데모/demo.js 로 이동 · 6주 기록 · 일부러 넣은 일 · 시연 장면
+  const DEMO = !!window.HM_DEMO, DEMO_VER = 6, DEMO_PW = (window.HM_DEMO_CFG || {}).pw || '1234';   // DEMO_VER 4 (10/11): 자료 생성은 데모/demo.js 로 이동 · 6주 기록 · 일부러 넣은 일 · 시연 장면
   /* 데모 자료는 데모/demo.js(HM_DEMO_SEED) 가 만든다 — 숫자·이름·장면은 그 파일의 HM_DEMO_CFG 에 모아 둠 */
   async function demoSeed() {
     const api = { setS: (v) => { S = v; }, dateKey, nowMin, shift, minutesOf, pad, newId, monthNow, freshState, applyShiftDay, ensureDay, tpl, TANK_DEFAULT, deadEntries, seedTraining, quizOf, hashPw, schedOf, TRAIN_TRACKS, trackSteps, laborCalc, putBlob, newContract, ROUTINE_VER, ROLE_MGR, DEMO_VER };
