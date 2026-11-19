@@ -12,7 +12,8 @@ import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor
 import { CardApprovalError, parseCardApproval, type ParsedCardApproval, mergeApprovalDay } from "@/lib/cardApproval";
 import { DeliveryStatementError, parseBaeminStatement, type ParsedDeliveryStatement } from "@/lib/deliveryStatement";
 import { dailyOrdersFromExport, type DailyOrderFillSet } from "@/lib/baemin/settle";
-import { parsePosDaily, posCardGaps, PosDailyError, type ParsedPosDaily } from "@/lib/posDaily";
+import { assignPayCard, parsePosDaily, posCardGaps, PosDailyError, type ParsedPosDaily, type PayCardAssign } from "@/lib/posDaily";
+import { CARDSALES_KEY, type CardsalesData } from "@/lib/cardsales";
 import { useExport } from "@/components/useExport";
 import { checkDay, dayTotals, daysInMonth, hoursBetween, monthHoursByStaff, monthSummary, normalizeTime, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
@@ -91,6 +92,10 @@ export default function TodayPage() {
   // 포스 일별종합 — 카드승인현황에 없는 간편결제를 채우고, 카드 합계를 포스 실매출과 대조한다.
   // 「바로 가져오기」로 받았을 때만 채워진다 (손으로 올린 엑셀에는 딸려 오지 않는다).
   const [posDaily, setPosDaily] = useState<ParsedPosDaily | null>(null);
+  const [cardsales, setCardsales] = useState<CardsalesData | null>(null);
+  useEffect(() => {
+    void getStore().getSetting<CardsalesData>(CARDSALES_KEY).then((v) => setCardsales(v ?? null));
+  }, []);
   const [deliveryFile, setDeliveryFile] = useState<{ parsed: ParsedDeliveryStatement; name: string } | null>(null);
   const [deliveryMsg, setDeliveryMsg] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const deliveryFileRef = useRef<HTMLInputElement>(null);
@@ -252,6 +257,20 @@ export default function TodayPage() {
     }
   }
 
+  // 토스페이카드가 어느 카드사 몫인지 여신협회 매입으로 알아낸다 (간편결제승인현황 없이).
+  const payCard = useMemo(() => {
+    if (!posDaily || !cardFile || cardFile.parsed.kind !== "card") return { assigned: [] as PayCardAssign[], unresolved: [] as string[] };
+    const card = new Map(cardFile.parsed.days.map((d) => [d.date, d.byCard]));
+    const purchase = new Map<string, Record<string, number>>();
+    for (const p of cardsales?.payouts ?? []) {
+      if (!p.channel) continue;
+      const row = purchase.get(p.saleDate) ?? {};
+      row[p.channel] = (row[p.channel] ?? 0) + p.amount;
+      purchase.set(p.saleDate, row);
+    }
+    return assignPayCard(posDaily.days, card, purchase);
+  }, [posDaily, cardFile, cardsales]);
+
   // 수집기가 받아 둔 주문 → 이 달 배달앱 매출. 정산을 기다리지 않는다 (주문 품목 합계).
   const fills = useMemo(() => {
     const out: { channel: string; name: string; set: DailyOrderFillSet }[] = [];
@@ -342,11 +361,19 @@ export default function TodayPage() {
       let merged = mergeApprovalDay(daily.sales, d, parsed.kind);
       // 토스페이카드가 있는 날은 건드리지 않는다 — 어느 카드사인지 일별종합에 없어서, 간편결제만
       // 포스 값으로 덮으면 그 금액이 그냥 사라진다 (2026-11-13·11-16 에서 182,000원이 지워질 뻔했다).
-      const pd = parsed.kind === "card" ? posDaily?.days.find((x) => x.date === d.date && x.payCard === 0) : undefined;
+      const hit = parsed.kind === "card" ? payCard.assigned.find((a) => a.date === d.date) : undefined;
+      const pd = parsed.kind === "card" ? posDaily?.days.find((x) => x.date === d.date && (x.payCard === 0 || hit)) : undefined;
       if (pd) {
         merged = merged.filter((x) => !posOnly(x.channel));
         for (const [channel, amount] of Object.entries(pd.byChannel)) {
           if (amount > 0) { merged.push({ date: d.date, channel, amount }); used.add(channel); }
+        }
+        // 토스페이카드는 그 카드사 몫으로. source "pos_easy" 로 둬야 다음에 카드승인현황을 다시
+        // 넣어도 안 지워진다 (그 파일엔 이 금액이 없다).
+        if (hit) {
+          merged = merged.filter((x) => !(x.channel === hit.channel && x.source === "pos_easy"));
+          merged.push({ date: d.date, channel: hit.channel, amount: hit.amount, source: "pos_easy" });
+          used.add(hit.channel);
         }
       }
       for (const c of merged) if (d.byCard[c.channel]) used.add(c.channel);
@@ -865,7 +892,7 @@ export default function TodayPage() {
           </ul>
           {cardFile.parsed.unknownIssuers.length > 0 && <Notice tone="warn">카드사 목록에 없는 매입사 “{cardFile.parsed.unknownIssuers.join(", ")}”는 ‘카드 전체 / 기타’로 넣어요.</Notice>}
           {cardFile.parsed.kind === "card" && posDaily && (() => {
-            const fillable = posDaily.days.filter((d) => d.payCard === 0);
+            const fillable = posDaily.days.filter((d) => d.payCard === 0 || payCard.assigned.some((a) => a.date === d.date));
             const easy = Object.entries(
               fillable.reduce<Record<string, number>>((acc, d) => {
                 for (const [ch, amt] of Object.entries(d.byChannel)) acc[ch] = (acc[ch] ?? 0) + amt;
@@ -895,9 +922,20 @@ export default function TodayPage() {
                     </ul>
                   </>
                 )}
-                {posDaily.payCard > 0 && (
+                {payCard.assigned.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-stone-500">토스페이카드 — 여신협회 매입으로 카드사를 찾았어요</p>
+                    {payCard.assigned.map((a) => (
+                      <p key={a.date} className="num text-sm">
+                        {a.date.slice(5).replace("-", "/")} <b>{cardLabel(a.channel)}</b> {won(a.amount)}{" "}
+                        <span className="text-xs text-stone-500">— 손님은 토스로 냈지만 돈은 이 카드사 입금에 섞여 들어와요</span>
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {payCard.unresolved.length > 0 && (
                   <Notice tone="warn">
-                    토스페이<b>카드</b> {won(posDaily.payCard)}이 있어요 ({posDaily.payCardDays.map((d) => d.slice(5).replace("-", "/")).join(", ")}). 손님이 토스로 냈지만 실제로는 카드라, 돈은 <b>그 카드사 입금에 섞여</b> 들어와요. 어느 카드사인지는 일별종합에 없어서 <b>그 날은 간편결제를 손대지 않아요</b>. 포스 ASP에서 「간편결제승인현황」을 받아 위 “카드·간편결제 승인현황 올리기”로 올리면 카드사까지 맞춰 넣어요.
+                    토스페이<b>카드</b>가 있는데 어느 카드사인지 못 찾은 날이 있어요 ({payCard.unresolved.map((d) => d.slice(5).replace("-", "/")).join(", ")}). 여신협회 매입이 아직 안 올라왔거나 들어맞는 카드사가 여럿이에요. <b>그 날은 손대지 않아요</b> — 정산 탭에서 여신협회 매입을 받은 뒤 다시 눌러 보세요.
                   </Notice>
                 )}
                 {gaps.length === 0 ? (

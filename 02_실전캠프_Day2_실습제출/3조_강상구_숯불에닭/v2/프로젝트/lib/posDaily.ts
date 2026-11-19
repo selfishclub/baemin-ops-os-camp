@@ -151,3 +151,54 @@ export function posCardGaps(daily: ParsedPosDaily, cardByDate: Map<string, numbe
   }
   return gaps;
 }
+
+export interface PayCardAssign {
+  date: string;
+  channel: ChannelId; // 토스페이카드 값을 넣을 카드사
+  amount: number;
+}
+
+/**
+ * 토스페이카드가 어느 카드사 몫인지 **여신협회 매입으로** 알아낸다 — 간편결제승인현황 없이.
+ *
+ * 토스페이카드는 카드승인현황엔 없는데 여신협회 매입엔 들어 있다(그 카드사가 매입했으니까).
+ * 그래서 같은 거래일에 `여신협회 매입 − 카드승인현황` 이 그 카드사만 토스페이카드만큼 남는다.
+ *
+ * 다만 **하루씩 밀려 올라오는 매입**이 섞인다 (2026-11-12 현대 −119,000 → 11-13 +231,000).
+ * 하루만 보면 231,000 이라 안 맞으므로 **구간 누계**로 본다. 밀린 건 다음 날 되돌아와 지워지고,
+ * 남는 누계가 토스페이카드다 — 11/13 현대 누계 +112,000, 11/16 하나 누계 +70,000 으로
+ * 포스가 말한 금액과 원 단위까지 같았다 (2026-11-19 확인).
+ *
+ * 딱 한 카드사만 들어맞을 때에만 정한다. 둘 이상이거나 하나도 없으면 손대지 않고 알린다 —
+ * 틀린 카드사에 넣으면 그 카드사 입금 대조가 둘 다 깨진다.
+ */
+export function assignPayCard(
+  days: { date: string; payCard: number }[],
+  cardByDay: Map<string, Record<ChannelId, number>>,
+  purchaseByDay: Map<string, Record<ChannelId, number>>,
+): { assigned: PayCardAssign[]; unresolved: string[] } {
+  const assigned: PayCardAssign[] = [];
+  const unresolved: string[] = [];
+  const cum: Record<ChannelId, number> = {};
+  const taken: Record<ChannelId, number> = {};
+  let blind = false; // 여신협회 매입이 없는 날부터는 누계를 믿을 수 없다
+  for (const d of [...days].sort((a, b) => a.date.localeCompare(b.date))) {
+    const purchase = purchaseByDay.get(d.date);
+    if (!purchase) {
+      blind = true;
+      if (d.payCard > 0) unresolved.push(d.date);
+      continue;
+    }
+    const file = cardByDay.get(d.date) ?? {};
+    for (const ch of new Set([...Object.keys(purchase), ...Object.keys(file)])) {
+      cum[ch] = (cum[ch] ?? 0) + (purchase[ch] ?? 0) - (file[ch] ?? 0);
+    }
+    if (d.payCard <= 0) continue;
+    if (blind) { unresolved.push(d.date); continue; }
+    const hits = Object.keys(cum).filter((ch) => cum[ch] - (taken[ch] ?? 0) === d.payCard);
+    if (hits.length !== 1) { unresolved.push(d.date); continue; }
+    taken[hits[0]] = (taken[hits[0]] ?? 0) + d.payCard;
+    assigned.push({ date: d.date, channel: hits[0], amount: d.payCard });
+  }
+  return { assigned, unresolved };
+}

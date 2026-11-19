@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PosDailyError, isPayCardColumn, parsePosDaily, payMethodToChannel, posCardGaps } from "./posDaily";
+import { PosDailyError, assignPayCard, isPayCardColumn, parsePosDaily, payMethodToChannel, posCardGaps } from "./posDaily";
 
 // 2026-11-18 실제 파일 모양 (칸 이름·차례 그대로, 쓰지 않는 칸은 줄였다)
 const HEADER_GROUP = ["일자", "요일", "매출현황", "매출현황", "매출현황", "매출현황", "결제수단", "결제수단", "결제수단", "결제수단", "결제수단"];
@@ -81,5 +81,58 @@ describe("카드 합계를 포스 신용카드와 대조", () => {
 
   it("카드 파일에 없는 날은 비교하지 않는다 (받아 온 기간이 다를 수 있다)", () => {
     expect(posCardGaps(p, new Map([["2026-11-18", 571_000]]))).toEqual([]);
+  });
+});
+
+describe("토스페이카드가 어느 카드사인지 여신협회 매입으로 찾기", () => {
+  // 2026-11-11 ~ 11-16 실제 숫자 (카드사별). 매입이 하루 밀린 것도 그대로.
+  const days = [
+    { date: "2026-11-11", payCard: 0 },
+    { date: "2026-11-12", payCard: 0 },
+    { date: "2026-11-13", payCard: 112_000 },
+    { date: "2026-11-14", payCard: 0 },
+    { date: "2026-11-15", payCard: 0 },
+    { date: "2026-11-16", payCard: 70_000 },
+  ];
+  const card = new Map<string, Record<string, number>>([
+    ["2026-11-11", { card_hyundai: 300_000, card_hana: 379_000 }],
+    ["2026-11-12", { card_hyundai: 119_000, card_hana: 451_000 }],
+    ["2026-11-13", { card_hyundai: 63_000, card_hana: 236_000 }],
+    ["2026-11-14", { card_hyundai: 0, card_hana: 204_000 }],
+    ["2026-11-15", { card_hyundai: 0, card_hana: 0 }],
+    ["2026-11-16", { card_hyundai: 116_000, card_hana: 209_000 }],
+  ]);
+  const purchase = new Map<string, Record<string, number>>([
+    ["2026-11-11", { card_hyundai: 300_000, card_hana: 379_000 }],
+    ["2026-11-12", { card_hyundai: 0, card_hana: 451_000 }], // 현대 119,000 이 하루 밀렸다
+    ["2026-11-13", { card_hyundai: 294_000, card_hana: 236_000 }], // 119,000 + 63,000 + 토스페이카드 112,000
+    ["2026-11-14", { card_hyundai: 0, card_hana: 0 }], // 하나 204,000 이 밀렸다
+    ["2026-11-15", { card_hyundai: 0, card_hana: 204_000 }],
+    ["2026-11-16", { card_hyundai: 116_000, card_hana: 279_000 }], // 209,000 + 토스페이카드 70,000
+  ]);
+
+  it("하루 밀린 매입에 속지 않고 카드사를 집어낸다 (누계로 본다)", () => {
+    const r = assignPayCard(days, card, purchase);
+    expect(r.assigned).toEqual([
+      { date: "2026-11-13", channel: "card_hyundai", amount: 112_000 },
+      { date: "2026-11-16", channel: "card_hana", amount: 70_000 },
+    ]);
+    expect(r.unresolved).toEqual([]);
+  });
+
+  it("여신협회 매입이 아직 없는 날은 손대지 않는다", () => {
+    const r = assignPayCard([{ date: "2026-11-18", payCard: 133_000 }], new Map(), new Map());
+    expect(r.assigned).toEqual([]);
+    expect(r.unresolved).toEqual(["2026-11-18"]);
+  });
+
+  it("들어맞는 카드사가 둘이면 고르지 않는다 — 틀리면 양쪽 대조가 깨진다", () => {
+    const r = assignPayCard(
+      [{ date: "2026-11-13", payCard: 50_000 }],
+      new Map([["2026-11-13", { card_hana: 0, card_kb: 0 }]]),
+      new Map([["2026-11-13", { card_hana: 50_000, card_kb: 50_000 }]]),
+    );
+    expect(r.assigned).toEqual([]);
+    expect(r.unresolved).toEqual(["2026-11-13"]);
   });
 });
