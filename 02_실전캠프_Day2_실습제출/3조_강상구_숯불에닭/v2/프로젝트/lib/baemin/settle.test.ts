@@ -130,7 +130,8 @@ describe("수집기 주문으로 하루 배달앱 매출 만들기", () => {
     // 아직 정산 전 — gross 는 0인데 주문 품목 합계는 있다
     { date: "2026-11-17", orders: 7, settledOrders: 0, unsettledOrders: 7, gross: 0, orderAmount: 206_500, meetPay: 0, ...base },
     // 만나서결제가 섞인 날 — 그 몫은 매출에 안 넣고 따로 알려 준다
-    { date: "2026-11-18", orders: 2, settledOrders: 2, unsettledOrders: 0, gross: 60_000, orderAmount: 30_000, meetPay: 30_000, ...base },
+    // 만나서결제가 섞인 날 — 주문 30,000 인데 가게배달팁까지 32,400 을 문 앞에서 받았다 (2026-11-02 실측)
+    { date: "2026-11-18", orders: 2, settledOrders: 2, unsettledOrders: 0, gross: 60_000, orderAmount: 30_000, meetPay: 30_000, meetCollected: 32_400, ...base },
     { date: "2026-10-31", orders: 1, settledOrders: 1, unsettledOrders: 0, gross: 54_000, orderAmount: 54_000, meetPay: 0, ...base },
   ];
 
@@ -146,8 +147,13 @@ describe("수집기 주문으로 하루 배달앱 매출 만들기", () => {
     expect(f.total).toBe(89_500 + 206_500 + 30_000);
     expect(f.count).toBe(12);
     expect(f.unsettled).toBe(7);
-    expect(f.meetPay).toBe(30_000); // 「배민 후불카드」로 손수 넣을 몫
+    expect(f.meetPay).toBe(32_400); // 「배민 후불카드」로 손수 넣을 몫 — 주문금액이 아니라 실제로 받은 돈
     expect(f.skipped).toEqual([]);
+  });
+
+  it("meetCollected 가 없는 옛 파일은 주문금액으로 대신한다", () => {
+    const old: BaeminOrderDay[] = [{ date: "2026-11-02", orders: 1, settledOrders: 1, unsettledOrders: 0, gross: 30_000, orderAmount: 0, meetPay: 30_000, ...base }];
+    expect(dailyOrdersFromExport(old, "2026-11")!.meetPay).toBe(30_000);
   });
 
   it("옛 내보내기 파일(주문금액 없음)은 정산 전 날을 건너뛴다 — 덜 받아 온 값으로 덮지 않는다", () => {

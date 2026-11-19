@@ -832,7 +832,7 @@ export default function TodayPage() {
             <div key={f.channel} className="num mb-2 text-sm">
               <b>{f.name}</b> {f.set.from.slice(5).replace("-", "/")}~{f.set.to.slice(5).replace("-", "/")} · {f.set.days.length}일 · 주문 {num(f.set.count)}건 · <b>{won(f.set.total)}</b>
               {f.set.unsettled > 0 && <span className="text-stone-500"> (그중 정산 전 {num(f.set.unsettled)}건 — 매출은 이미 셌어요)</span>}
-              {f.set.meetPay > 0 && <p className="text-xs text-stone-500">만나서결제 {won(f.set.meetPay)}는 문 앞에서 카드·현금으로 받은 돈이라 안 넣어요. 「배민 후불카드」 칸에 따로 넣어 주세요.</p>}
+              {f.set.meetPay > 0 && <p className="text-xs text-stone-500">만나서결제로 손님이 낸 {won(f.set.meetPay)}(주문금액 + 가게배달팁)은 문 앞에서 받은 돈이라 여기 안 넣어요. 카드로 받았으면 「배민 후불카드」, 현금으로 받았으면 「배민 후불현금」 칸에 따로 넣어 주세요.</p>}
               {f.set.skipped.length > 0 && <p className="text-xs text-stone-500">{f.set.skipped.length}일은 건너뛰어요 — 수집기 파일이 오래돼서 정산 전 주문금액이 없어요. 수집기를 다시 돌리면 들어와요.</p>}
             </div>
           ))}

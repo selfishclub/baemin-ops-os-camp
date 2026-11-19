@@ -88,6 +88,7 @@ export interface BaeminOrderDay {
   // (수집기 2026-11-18 이전 파일에는 없다. 없으면 gross 로 대신한다.)
   orderAmount?: number; // 앱으로 결제한 주문금액 (만나서결제 제외)
   meetPay?: number; // 만나서결제 주문금액 — 문 앞에서 카드·현금으로 받은 돈이라 배민 매출이 아니다
+  meetCollected?: number; // 그때 손님이 실제로 낸 돈 (주문금액 + 가게배달팁). 「배민 후불카드·후불현금」에 넣을 금액
   discount: number; // 점주 부담 할인
   otherRevenue: number; // 가게배달팁 등
   deductions: { brokerage: number; payment: number; delivery: number; vat: number; unclassified: number; ad?: number }; // ad = 주문당 광고비 (쿠팡이츠)

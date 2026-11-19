@@ -192,7 +192,7 @@ export function channelSaleFromOrders(days: BaeminOrderDay[], month: string): { 
 export interface DailyOrderFill {
   date: string;
   amount: number; // 그날 앱 결제 주문금액 (만나서결제 제외)
-  meetPay: number; // 만나서결제 주문금액 — 매출로는 넣지 않고 알려만 준다
+  meetPay: number; // 만나서결제로 손님이 낸 돈 — 매출로는 넣지 않고 알려만 준다
   count: number;
   unsettled: number; // 그중 아직 정산 전인 주문
 }
@@ -229,7 +229,9 @@ export function dailyOrdersFromExport(days: BaeminOrderDay[], month: string): Da
       skipped.push(d.date);
       continue;
     }
-    rows.push({ date: d.date, amount: d.orderAmount ?? d.gross, meetPay: d.meetPay ?? 0, count: d.orders, unsettled: d.unsettledOrders });
+    // 만나서결제는 손님이 문 앞에서 낸 돈(주문금액 + 가게배달팁)을 알려 준다. 주문금액만 알려 주면
+    // 배달팁만큼 모자라게 넣게 된다 (2026-11-02 주문 30,000 · 실제 32,400 — 통장에 32,400 이 찍혔다).
+    rows.push({ date: d.date, amount: d.orderAmount ?? d.gross, meetPay: d.meetCollected ?? d.meetPay ?? 0, count: d.orders, unsettled: d.unsettledOrders });
   }
   if (!rows.length) return null;
   const sum = (f: (r: DailyOrderFill) => number) => rows.reduce((a, r) => a + f(r), 0);
