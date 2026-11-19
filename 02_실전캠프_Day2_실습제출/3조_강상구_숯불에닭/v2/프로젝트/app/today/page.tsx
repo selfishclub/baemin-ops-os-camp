@@ -12,6 +12,7 @@ import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor
 import { CardApprovalError, parseCardApproval, type ParsedCardApproval, mergeApprovalDay } from "@/lib/cardApproval";
 import { DeliveryStatementError, parseBaeminStatement, type ParsedDeliveryStatement } from "@/lib/deliveryStatement";
 import { dailyOrdersFromExport, type DailyOrderFillSet } from "@/lib/baemin/settle";
+import { parsePosDaily, posCardGaps, PosDailyError, type ParsedPosDaily } from "@/lib/posDaily";
 import { useExport } from "@/components/useExport";
 import { checkDay, dayTotals, daysInMonth, hoursBetween, monthHoursByStaff, monthSummary, normalizeTime, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
 import { num, pctText, won } from "@/lib/format";
@@ -87,6 +88,9 @@ export default function TodayPage() {
   const [cardFile, setCardFile] = useState<{ parsed: ParsedCardApproval; name: string } | null>(null);
   const [cardFileMsg, setCardFileMsg] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const cardFileRef = useRef<HTMLInputElement>(null);
+  // 포스 일별종합 — 카드승인현황에 없는 간편결제를 채우고, 카드 합계를 포스 실매출과 대조한다.
+  // 「바로 가져오기」로 받았을 때만 채워진다 (손으로 올린 엑셀에는 딸려 오지 않는다).
+  const [posDaily, setPosDaily] = useState<ParsedPosDaily | null>(null);
   const [deliveryFile, setDeliveryFile] = useState<{ parsed: ParsedDeliveryStatement; name: string } | null>(null);
   const [deliveryMsg, setDeliveryMsg] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const deliveryFileRef = useRef<HTMLInputElement>(null);
@@ -194,6 +198,7 @@ export default function TodayPage() {
   }
   async function readCardFile(file: File) {
     setCardFileMsg(null);
+    setPosDaily(null); // 손으로 올린 엑셀에는 일별종합이 딸려 오지 않는다
     try {
       await readCardBytes(await file.arrayBuffer(), file.name);
     } catch (e) {
@@ -216,15 +221,30 @@ export default function TodayPage() {
       const to = local(new Date(Date.now() - 86_400_000));
       const weekAgo = local(new Date(Date.now() - 7 * 86_400_000));
       const res = await fetch(`${helper}/okpos/fetch`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ from: weekAgo, to }) });
-      const j = (await res.json()) as { ok: boolean; message?: string; needLogin?: boolean; fileName?: string; base64?: string; from?: string; to?: string };
+      const j = (await res.json()) as { ok: boolean; message?: string; needLogin?: boolean; fileName?: string; base64?: string; from?: string; to?: string; daily?: { fileName: string; base64: string } | null; dailyError?: string | null };
       if (!j.ok || !j.base64) {
         setCardFileMsg({ tone: "error", text: j.needLogin ? "오케이포스 로그인이 필요해요. 리뷰 수집기 폴더에서 npm run login:source -- okpos 를 돌리고 Aside 창에서 로그인한 뒤 다시 눌러 주세요." : (j.message ?? "받지 못했어요.") });
         return;
       }
-      const bin = atob(j.base64);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      await readCardBytes(bytes.buffer, j.fileName ?? "카드승인현황.xls");
+      const toBytes = (b64: string) => {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return bytes.buffer;
+      };
+      // 일별종합을 먼저 읽는다 — 카드 미리보기 창이 뜰 때 간편결제·대조 결과가 같이 보이도록.
+      setPosDaily(null);
+      if (j.daily?.base64) {
+        try {
+          const XLSX = await import("xlsx");
+          const wb = XLSX.read(toBytes(j.daily.base64), { type: "array" });
+          setPosDaily(parsePosDaily(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: null }) as never[][]));
+        } catch (e) {
+          // 일별종합은 덤이라 실패해도 카드 자료는 그대로 넣는다
+          console.warn("포스 일별종합을 읽지 못했어요", e instanceof PosDailyError ? e.message : e);
+        }
+      }
+      await readCardBytes(toBytes(j.base64), j.fileName ?? "카드승인현황.xls");
     } catch (e) {
       setCardFileMsg({ tone: "error", text: e instanceof CardApprovalError ? e.message : "도우미에 연결하지 못했어요. 리뷰 수집기 폴더에서 npm run helper 를 켜 주세요." });
     } finally {
@@ -315,8 +335,20 @@ export default function TodayPage() {
     const { parsed } = cardFile;
     const store = getStore();
     const used = new Set<string>();
+    // 카드승인현황에 없는 결제수단(간편결제·제로페이)은 포스 일별종합 값으로 그 날짜만 바꾼다.
+    // 일별종합이 그날을 다뤘는데 금액이 없으면 0이라는 뜻이라 줄을 지운다 — 포스가 기준이다.
+    const posOnly = (id: string) => id === "card_easy" || id === "card_zeropay";
     for (const d of parsed.days) {
-      const merged = mergeApprovalDay(daily.sales, d, parsed.kind);
+      let merged = mergeApprovalDay(daily.sales, d, parsed.kind);
+      // 토스페이카드가 있는 날은 건드리지 않는다 — 어느 카드사인지 일별종합에 없어서, 간편결제만
+      // 포스 값으로 덮으면 그 금액이 그냥 사라진다 (2026-11-13·11-16 에서 182,000원이 지워질 뻔했다).
+      const pd = parsed.kind === "card" ? posDaily?.days.find((x) => x.date === d.date && x.payCard === 0) : undefined;
+      if (pd) {
+        merged = merged.filter((x) => !posOnly(x.channel));
+        for (const [channel, amount] of Object.entries(pd.byChannel)) {
+          if (amount > 0) { merged.push({ date: d.date, channel, amount }); used.add(channel); }
+        }
+      }
       for (const c of merged) if (d.byCard[c.channel]) used.add(c.channel);
       await store.saveDailySales(d.date, merged);
     }
@@ -324,7 +356,12 @@ export default function TodayPage() {
       const preset = CARD_PRESETS.find((p) => p.id === id);
       if (preset) await ensureCardChannel(preset);
     }
+    const easyTotal =
+      parsed.kind === "card"
+        ? (posDaily?.days ?? []).filter((d) => d.payCard === 0).reduce((a, d) => a + Object.values(d.byChannel).reduce((b, x) => b + x, 0), 0)
+        : 0;
     setCardFile(null);
+    setPosDaily(null);
     await daily.reload();
     if (!date.startsWith(parsed.from.slice(0, 7))) setDate(parsed.to);
     setCardFileMsg({
@@ -332,7 +369,7 @@ export default function TodayPage() {
       text:
         parsed.kind === "easy"
           ? `${parsed.from.slice(5).replace("-", "/")}~${parsed.to.slice(5).replace("-", "/")} ${parsed.days.length}일치 간편결제 매출을 넣었어요. 토스페이카드는 카드사 매출에 더했고, 토스페이머니·계좌는 간편결제로 넣었어요.`
-          : `${parsed.from.slice(5).replace("-", "/")}~${parsed.to.slice(5).replace("-", "/")} ${parsed.days.length}일치 카드 매출을 넣었어요. 현금·배달앱은 날마다 따로 넣어 주세요.`,
+          : `${parsed.from.slice(5).replace("-", "/")}~${parsed.to.slice(5).replace("-", "/")} ${parsed.days.length}일치 카드 매출을 넣었어요.${easyTotal > 0 ? ` 포스 일별종합에 있던 간편결제 ${won(easyTotal)}도 같이 넣었어요.` : ""} 현금·배달앱은 날마다 따로 넣어 주세요.`,
     });
     weather.fillMissing().catch(() => {});
   }
@@ -807,7 +844,7 @@ export default function TodayPage() {
         </ConfirmDialog>
       )}
       {cardFile && (
-        <ConfirmDialog title={`${cardFile.parsed.kind === "easy" ? "간편결제승인현황" : "카드승인현황"} 파일 — 이대로 넣을까요?`} confirmLabel={`${cardFile.parsed.days.length}일치 넣기`} onConfirm={applyCardFile} onCancel={() => setCardFile(null)}>
+        <ConfirmDialog title={`${cardFile.parsed.kind === "easy" ? "간편결제승인현황" : "카드승인현황"} 파일 — 이대로 넣을까요?`} confirmLabel={`${cardFile.parsed.days.length}일치 넣기`} onConfirm={applyCardFile} onCancel={() => { setCardFile(null); setPosDaily(null); }}>
           {cardFile.parsed.kind === "easy" && <Notice tone="info">토스페이카드는 돈이 카드사에서 들어오니 그 카드사 매출에 더하고, 토스페이머니·토스페이계좌만 간편결제로 넣어요. 카드승인현황을 먼저 올리고 이 파일을 올려도, 반대로 해도 돼요.</Notice>}
           <p>
             <b>{cardFile.parsed.from}</b> ~ <b>{cardFile.parsed.to}</b> · {cardFile.parsed.days.length}일 · 승인 {num(cardFile.parsed.days.reduce((a, d) => a + d.count, 0))}건
@@ -827,6 +864,53 @@ export default function TodayPage() {
               ))}
           </ul>
           {cardFile.parsed.unknownIssuers.length > 0 && <Notice tone="warn">카드사 목록에 없는 매입사 “{cardFile.parsed.unknownIssuers.join(", ")}”는 ‘카드 전체 / 기타’로 넣어요.</Notice>}
+          {cardFile.parsed.kind === "card" && posDaily && (() => {
+            const fillable = posDaily.days.filter((d) => d.payCard === 0);
+            const easy = Object.entries(
+              fillable.reduce<Record<string, number>>((acc, d) => {
+                for (const [ch, amt] of Object.entries(d.byChannel)) acc[ch] = (acc[ch] ?? 0) + amt;
+                return acc;
+              }, {}),
+            ).filter(([, amt]) => amt > 0);
+            const gaps = posCardGaps(posDaily, new Map(cardFile.parsed.days.map((d) => [d.date, Object.values(d.byCard).reduce((a, x) => a + x, 0)])));
+            return (
+              <div className="space-y-2 rounded-xl bg-stone-50 p-2">
+                <p className="text-xs font-semibold text-stone-500">포스 일별종합도 같이 받았어요 — 카드승인현황에 없는 것</p>
+                {easy.length === 0 ? (
+                  <p className="num text-xs text-stone-500">이 기간엔 간편결제가 없었어요.</p>
+                ) : (
+                  <>
+                    {easy.map(([id, amt]) => (
+                      <p key={id} className="num text-sm">
+                        <b>{cardLabel(id)}</b> {won(amt)} <span className="text-xs text-stone-500">— 이것도 같이 넣어요</span>
+                      </p>
+                    ))}
+                    <ul className="num grid grid-cols-2 gap-x-3 text-xs text-stone-600">
+                      {fillable.filter((d) => Object.values(d.byChannel).some((x) => x > 0)).map((d) => (
+                        <li key={d.date} className="flex justify-between">
+                          <span>{d.date.slice(5).replace("-", "/")}</span>
+                          <span>{won(Object.values(d.byChannel).reduce((a, x) => a + x, 0))}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {posDaily.payCard > 0 && (
+                  <Notice tone="warn">
+                    토스페이<b>카드</b> {won(posDaily.payCard)}이 있어요 ({posDaily.payCardDays.map((d) => d.slice(5).replace("-", "/")).join(", ")}). 손님이 토스로 냈지만 실제로는 카드라, 돈은 <b>그 카드사 입금에 섞여</b> 들어와요. 어느 카드사인지는 일별종합에 없어서 <b>그 날은 간편결제를 손대지 않아요</b>. 포스 ASP에서 「간편결제승인현황」을 받아 위 “카드·간편결제 승인현황 올리기”로 올리면 카드사까지 맞춰 넣어요.
+                  </Notice>
+                )}
+                {gaps.length === 0 ? (
+                  <p className="num text-xs text-emerald-700">날마다 카드 합계가 포스 신용카드와 똑같아요 — 빠진 승인은 없어요.</p>
+                ) : (
+                  <Notice tone="warn">
+                    카드 합계가 포스 신용카드와 다른 날이 있어요 —{" "}
+                    {gaps.map((g) => `${g.date.slice(5).replace("-", "/")} 포스 ${won(g.pos)} / 파일 ${won(g.file)}`).join(", ")}. 넣기 전에 포스에서 한 번 더 보세요.
+                  </Notice>
+                )}
+              </div>
+            );
+          })()}
           <p className="text-xs text-stone-500">이 날짜들의 카드 매출은 파일 값으로 바뀌어요. 현금·배달앱·근무는 그대로예요. 자정 넘어 결제한 것도 영업일자대로 전날에 붙어요.</p>
         </ConfirmDialog>
       )}
