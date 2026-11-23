@@ -7,7 +7,7 @@ import { todayStr } from "@/lib/daily";
 import { parseNum, won } from "@/lib/format";
 import { deletePhotosOf } from "@/lib/photos";
 import { getStore } from "@/lib/storage";
-import { TAX_KINDS, TAX_NOTICES_KEY, paymentMonths, sortNotices, taxStatus, type TaxKind, type TaxNotice, type TaxStatus } from "@/lib/taxNotices";
+import { TAX_KINDS, TAX_NOTICES_KEY, matchPayments, paymentMonths, sortNotices, taxStatus, type TaxKind, type TaxNotice, type TaxStatus } from "@/lib/taxNotices";
 import type { Transaction } from "@/lib/types";
 
 // 세금 고지서 — 고지서 PDF·사진을 금액·납부기한과 같이 두고, 통장에서 낸 줄과 짝을 맞춘다.
@@ -49,13 +49,15 @@ export function TaxNoticeCard() {
       });
   }, []);
 
+  // 분납이면 회차마다 금액이 같다. 통장 한 줄이 여러 장에 붙지 않게 먼저 짝을 지어 둔다.
+  const matched = useMemo(() => matchPayments(list, txs), [list, txs]);
   const statusOf = useMemo(() => {
     const cache = new Map<string, TaxStatus>();
     return (n: TaxNotice) => {
-      if (!cache.has(n.id)) cache.set(n.id, taxStatus(n, txs, today));
+      if (!cache.has(n.id)) cache.set(n.id, taxStatus(n, txs, today, matched.get(n.id) ?? null));
       return cache.get(n.id)!;
     };
-  }, [txs, today]);
+  }, [txs, today, matched]);
   const sorted = useMemo(() => sortNotices(list, statusOf), [list, statusOf]);
 
   async function save() {

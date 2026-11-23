@@ -26,21 +26,46 @@ export type TaxStatus =
 const DAY = 86_400_000;
 const days = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / DAY);
 
-/** 통장에서 고지서 금액과 똑같이 나간 줄 — 기한 60일 전 ~ 30일 뒤 사이, 세금과공과로 분류된 줄을 먼저 */
-export function findPayment(n: TaxNotice, txs: Transaction[]): Transaction | null {
-  const hits = txs
+/** 짝이 될 수 있는 통장 줄 — 기한 60일 전 ~ 30일 뒤 사이, 세금과공과로 분류된 줄과 기한에 가까운 줄을 먼저 */
+export function paymentCandidates(n: TaxNotice, txs: Transaction[]): Transaction[] {
+  return txs
     .filter((t) => t.out === n.amount && n.amount > 0)
     .filter((t) => {
       const d = days(n.due, t.date);
       return d >= -60 && d <= 30;
     })
     .sort((a, b) => Number(b.major === "세금과공과") - Number(a.major === "세금과공과") || Math.abs(days(n.due, a.date)) - Math.abs(days(n.due, b.date)));
-  return hits[0] ?? null;
 }
 
-export function taxStatus(n: TaxNotice, txs: Transaction[], today: string): TaxStatus {
-  const paid = findPayment(n, txs);
-  if (paid) return { state: "paid", date: paid.date, payee: paid.payee };
+/** 통장에서 고지서 금액과 똑같이 나간 줄 */
+export function findPayment(n: TaxNotice, txs: Transaction[]): Transaction | null {
+  return paymentCandidates(n, txs)[0] ?? null;
+}
+
+/**
+ * 고지서마다 통장 줄을 하나씩만 붙인다 — **한 줄이 두 장에 붙지 않게**.
+ *
+ * 분납이면 회차마다 금액이 같다. 그냥 각자 찾게 두면 1차에 낸 돈 한 줄이 2차·3차에도 붙어
+ * 아직 안 낸 회차가 "냈어요"로 보인다 (2026-11-23: 부가세 예정고지 1,450,660원 3회 분납).
+ * 기한이 이른 고지서부터 가져가고, 이미 다른 고지서가 쓴 줄은 건너뛴다.
+ */
+export function matchPayments(notices: TaxNotice[], txs: Transaction[]): Map<string, Transaction> {
+  const taken = new Set<string>();
+  const out = new Map<string, Transaction>();
+  for (const n of [...notices].sort((a, b) => a.due.localeCompare(b.due))) {
+    const hit = paymentCandidates(n, txs).find((t) => !taken.has(t.id));
+    if (hit) {
+      taken.add(hit.id);
+      out.set(n.id, hit);
+    }
+  }
+  return out;
+}
+
+/** `paid` 를 주면 그걸 쓴다(= matchPayments 결과). 안 주면 이 고지서 혼자 찾는다. */
+export function taxStatus(n: TaxNotice, txs: Transaction[], today: string, paid?: Transaction | null): TaxStatus {
+  const hit = paid === undefined ? findPayment(n, txs) : paid;
+  if (hit) return { state: "paid", date: hit.date, payee: hit.payee };
   const left = days(today, n.due);
   return left >= 0 ? { state: "open", daysLeft: left } : { state: "late", daysLate: -left };
 }
