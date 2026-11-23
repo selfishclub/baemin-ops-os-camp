@@ -221,10 +221,12 @@ export default function TodayPage() {
     setPosBusy(true);
     try {
       const helper = process.env.NEXT_PUBLIC_HELPER_URL || "http://127.0.0.1:4599";
-      // 기본: 어제까지 7일 (우리 시간 기준 — toISOString 은 세계시라 밤에는 하루가 밀린다)
+      // 기본: 오늘까지 7일 (우리 시간 기준 — toISOString 은 세계시라 밤에는 하루가 밀린다)
+      // 오늘까지 받는다 — 마감은 그날 밤에 하므로 어제까지만 받으면 오늘 장사분이 장부에 안 들어간다.
+      // 장사 중에 눌러도 그때까지의 금액이 미리보기에 그대로 보이고, 나중에 다시 받으면 그 날짜가 덮인다.
       const local = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      const to = local(new Date(Date.now() - 86_400_000));
-      const weekAgo = local(new Date(Date.now() - 7 * 86_400_000));
+      const to = local(new Date());
+      const weekAgo = local(new Date(Date.now() - 6 * 86_400_000));
       const res = await fetch(`${helper}/okpos/fetch`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ from: weekAgo, to }) });
       const j = (await res.json()) as { ok: boolean; message?: string; needLogin?: boolean; fileName?: string; base64?: string; from?: string; to?: string; daily?: { fileName: string; base64: string } | null; dailyError?: string | null };
       if (!j.ok || !j.base64) {
@@ -514,7 +516,7 @@ export default function TodayPage() {
               {/* 도우미(같은 PC)가 받아 오는 기능 — 전체판에만 */}
               {!isBasic() && (
                 <button className="btn-primary px-3 py-1.5 text-xs" disabled={posBusy} onClick={() => void fetchFromPos()}>
-                  {posBusy ? "오케이포스에서 받는 중… (20초쯤)" : "오케이포스에서 바로 가져오기 (어제까지 7일)"}
+                  {posBusy ? "오케이포스에서 받는 중… (20초쯤)" : "오케이포스에서 바로 가져오기 (오늘까지 7일)"}
                 </button>
               )}
               <button className="btn-ghost px-3 py-1.5 text-xs" onClick={() => cardFileRef.current?.click()}>
