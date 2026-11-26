@@ -262,7 +262,9 @@ export function cardsalesMonth(data: CardsalesData | null, month: Month, txs: Tr
   };
 }
 
-/** 이 달 지급예정을 다 보려면 받아야 할 거래일 구간: 지난달 말 일주일 ~ 이 달 말(오늘 전날까지). 31일씩 나눈다 */
+/** 이 달 지급예정을 다 보려면 받아야 할 거래일 구간: 지난달 말 일주일 ~ 이 달 말(오늘 전날까지). 28일씩 나눈다.
+ *  여신협회는 매입일로 31일까지만 묻는데, 가져오기는 거래일 구간을 매입일 +1일 ~ +4일로 늘려 묻는다(3일 더 길어짐).
+ *  31일로 나누면 34일이 돼 "31일까지만 조회돼요"로 막혔다 (2026-11-27, 10/25~11/24 → 매입일 10/26~11/27 33일) */
 export function rangesToFetch(month: Month, today: string): { from: string; to: string }[] {
   const start = `${month}-01`;
   const lastDay = addDays(`${nextMonth(month)}-01`, -1);
@@ -273,7 +275,7 @@ export function rangesToFetch(month: Month, today: string): { from: string; to: 
   const out: { from: string; to: string }[] = [];
   let a = from;
   while (a <= to) {
-    const b = addDays(a, 30) < to ? addDays(a, 30) : to;
+    const b = addDays(a, 27) < to ? addDays(a, 27) : to;
     out.push({ from: a, to: b });
     a = addDays(b, 1);
   }
