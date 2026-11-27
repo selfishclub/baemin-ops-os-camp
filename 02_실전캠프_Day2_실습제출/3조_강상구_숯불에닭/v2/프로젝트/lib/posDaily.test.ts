@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PosDailyError, assignPayCard, isPayCardColumn, parsePosDaily, payMethodToChannel, posCardGaps } from "./posDaily";
+import { PosDailyError, assignPayCard, isPayCardColumn, parsePosDaily, payMethodToChannel, posCardGaps, posOnlyFill } from "./posDaily";
 
 // 2026-11-18 실제 파일 모양 (칸 이름·차례 그대로, 쓰지 않는 칸은 줄였다)
 const HEADER_GROUP = ["일자", "요일", "매출현황", "매출현황", "매출현황", "매출현황", "결제수단", "결제수단", "결제수단", "결제수단", "결제수단"];
@@ -134,5 +134,17 @@ describe("토스페이카드가 어느 카드사인지 여신협회 매입으로
     );
     expect(r.assigned).toEqual([]);
     expect(r.unresolved).toEqual(["2026-11-13"]);
+  });
+});
+
+describe("카드승인현황에 없는 결제수단 채우기", () => {
+  it("토스페이카드 카드사를 못 찾은 날도 토스페이머니·계좌는 넣는다 (2026-11-27)", () => {
+    const d = { byChannel: { card_easy: 312_000 }, payCard: 55_000 };
+    expect(posOnlyFill(d, false)).toEqual({ card_easy: 367_000 }); // 매출 합계는 포스와 같게
+    expect(posOnlyFill(d, true)).toEqual({ card_easy: 312_000 }); // 카드사를 찾으면 간편결제는 포스 값 그대로
+  });
+  it("토스페이카드만 있는 날도 빠뜨리지 않는다", () => {
+    expect(posOnlyFill({ byChannel: {}, payCard: 70_000 }, false)).toEqual({ card_easy: 70_000 });
+    expect(posOnlyFill({ byChannel: {}, payCard: 70_000 }, true)).toEqual({});
   });
 });

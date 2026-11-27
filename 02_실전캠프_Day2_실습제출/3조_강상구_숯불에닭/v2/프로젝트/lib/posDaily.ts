@@ -202,3 +202,15 @@ export function assignPayCard(
   }
   return { assigned, unresolved };
 }
+
+/**
+ * 그날 카드승인현황에 없는 결제수단으로 채울 금액 (간편결제·제로페이).
+ * 토스페이카드의 카드사를 못 찾았으면(assigned=false) 그 금액을 잠시 간편결제에 얹는다 —
+ * 그날을 건너뛰면 토스페이머니·계좌까지 통째로 빠진다 (2026-11-27 머니 237,000 + 계좌 75,000).
+ * 나중에 카드사를 찾아 다시 넣으면 간편결제는 포스 값으로 바뀌고 토스페이카드는 카드사 몫이 된다.
+ */
+export function posOnlyFill(d: Pick<PosDailyDay, "byChannel" | "payCard">, assigned: boolean): Record<string, number> {
+  const out: Record<string, number> = { ...d.byChannel };
+  if (d.payCard > 0 && !assigned) out.card_easy = (out.card_easy ?? 0) + d.payCard;
+  return out;
+}

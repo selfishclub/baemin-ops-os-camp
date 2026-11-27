@@ -12,7 +12,7 @@ import { EMPTY_FIXED_LABOR, FIXED_LABOR_KEY, type FixedLabor } from "@/lib/labor
 import { CardApprovalError, parseCardApproval, type ParsedCardApproval, mergeApprovalDay } from "@/lib/cardApproval";
 import { DeliveryStatementError, parseBaeminStatement, type ParsedDeliveryStatement } from "@/lib/deliveryStatement";
 import { dailyOrdersFromExport, type DailyOrderFillSet } from "@/lib/baemin/settle";
-import { assignPayCard, parsePosDaily, posCardGaps, PosDailyError, type ParsedPosDaily, type PayCardAssign } from "@/lib/posDaily";
+import { assignPayCard, parsePosDaily, posCardGaps, posOnlyFill, PosDailyError, type ParsedPosDaily, type PayCardAssign } from "@/lib/posDaily";
 import { CARDSALES_KEY, type CardsalesData } from "@/lib/cardsales";
 import { useExport } from "@/components/useExport";
 import { checkDay, dayTotals, daysInMonth, hoursBetween, monthHoursByStaff, monthSummary, normalizeTime, shiftDate, todayStr, weekHoursByStaff, type DailyIssue } from "@/lib/daily";
@@ -361,13 +361,14 @@ export default function TodayPage() {
     const posOnly = (id: string) => id === "card_easy" || id === "card_zeropay";
     for (const d of parsed.days) {
       let merged = mergeApprovalDay(daily.sales, d, parsed.kind);
-      // 토스페이카드가 있는 날은 건드리지 않는다 — 어느 카드사인지 일별종합에 없어서, 간편결제만
-      // 포스 값으로 덮으면 그 금액이 그냥 사라진다 (2026-11-13·11-16 에서 182,000원이 지워질 뻔했다).
+      // 토스페이카드는 어느 카드사인지 일별종합에 없다. 카드사를 못 찾은 날엔 그 금액을 잠시 간편결제에
+      // 얹어 둔다 — 그날을 통째로 건너뛰면 토스페이머니·계좌까지 빠진다 (2026-11-27 312,000원이 빠졌다).
+      // 여신협회 매입이 올라와 다시 누르면 간편결제는 포스 값으로 바뀌고 토스페이카드는 카드사 몫으로 간다.
       const hit = parsed.kind === "card" ? payCard.assigned.find((a) => a.date === d.date) : undefined;
-      const pd = parsed.kind === "card" ? posDaily?.days.find((x) => x.date === d.date && (x.payCard === 0 || hit)) : undefined;
+      const pd = parsed.kind === "card" ? posDaily?.days.find((x) => x.date === d.date) : undefined;
       if (pd) {
         merged = merged.filter((x) => !posOnly(x.channel));
-        for (const [channel, amount] of Object.entries(pd.byChannel)) {
+        for (const [channel, amount] of Object.entries(posOnlyFill(pd, !!hit))) {
           if (amount > 0) { merged.push({ date: d.date, channel, amount }); used.add(channel); }
         }
         // 토스페이카드는 그 카드사 몫으로. source "pos_easy" 로 둬야 다음에 카드승인현황을 다시
@@ -387,7 +388,7 @@ export default function TodayPage() {
     }
     const easyTotal =
       parsed.kind === "card"
-        ? (posDaily?.days ?? []).filter((d) => d.payCard === 0).reduce((a, d) => a + Object.values(d.byChannel).reduce((b, x) => b + x, 0), 0)
+        ? (posDaily?.days ?? []).reduce((a, d) => a + Object.values(posOnlyFill(d, payCard.assigned.some((x) => x.date === d.date))).reduce((b, x) => b + x, 0), 0)
         : 0;
     setCardFile(null);
     setPosDaily(null);
@@ -894,7 +895,7 @@ export default function TodayPage() {
           </ul>
           {cardFile.parsed.unknownIssuers.length > 0 && <Notice tone="warn">카드사 목록에 없는 매입사 “{cardFile.parsed.unknownIssuers.join(", ")}”는 ‘카드 전체 / 기타’로 넣어요.</Notice>}
           {cardFile.parsed.kind === "card" && posDaily && (() => {
-            const fillable = posDaily.days.filter((d) => d.payCard === 0 || payCard.assigned.some((a) => a.date === d.date));
+            const fillable = posDaily.days.map((d) => ({ date: d.date, byChannel: posOnlyFill(d, payCard.assigned.some((a) => a.date === d.date)) }));
             const easy = Object.entries(
               fillable.reduce<Record<string, number>>((acc, d) => {
                 for (const [ch, amt] of Object.entries(d.byChannel)) acc[ch] = (acc[ch] ?? 0) + amt;
@@ -937,7 +938,7 @@ export default function TodayPage() {
                 )}
                 {payCard.unresolved.length > 0 && (
                   <Notice tone="warn">
-                    토스페이<b>카드</b>가 있는데 어느 카드사인지 못 찾은 날이 있어요 ({payCard.unresolved.map((d) => d.slice(5).replace("-", "/")).join(", ")}). 여신협회 매입이 아직 안 올라왔거나 들어맞는 카드사가 여럿이에요. <b>그 날은 손대지 않아요</b> — 정산 탭에서 여신협회 매입을 받은 뒤 다시 눌러 보세요.
+                    토스페이<b>카드</b>가 있는데 어느 카드사인지 못 찾은 날이 있어요 ({payCard.unresolved.map((d) => d.slice(5).replace("-", "/")).join(", ")}). 여신협회 매입이 아직 안 올라왔거나 들어맞는 카드사가 여럿이에요. <b>그 금액은 잠시 간편결제에 얹어 둬요</b>(매출 합계는 포스와 같아요) — 정산 탭에서 여신협회 매입을 받은 뒤 다시 누르면 카드사로 옮겨져요.
                   </Notice>
                 )}
                 {gaps.length === 0 ? (
