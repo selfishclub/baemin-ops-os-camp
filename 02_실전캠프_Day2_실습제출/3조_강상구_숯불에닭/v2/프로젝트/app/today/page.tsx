@@ -111,10 +111,20 @@ export default function TodayPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weather.loading, weather.sales.length]);
 
-  // 날짜가 다른 달로 넘어가면 달 선택도 따라간다
+  // 날짜와 달 선택을 서로 맞춘다. 어느 쪽이 바뀌었는지 보고 다른 쪽을 따라가게 한다 —
+  // 전엔 날짜만 기준이라 위의 ◀ ▶ 로 달을 바꾸면 날짜가 그 달을 다시 끌어와 달이 안 넘어갔다 (2026-11-28).
+  const prevSync = useRef({ date, month });
   useEffect(() => {
-    if (!date.startsWith(month)) setMonth(date.slice(0, 7));
-  }, [date, month, setMonth]);
+    const prev = prevSync.current;
+    prevSync.current = { date, month };
+    if (date.startsWith(month)) return;
+    if (month !== prev.month && date === prev.date) {
+      // 달을 바꿨다 → 그 달의 오늘(이번 달이면) 또는 1일로
+      setDate(today.startsWith(month) ? today : `${month}-01`);
+    } else {
+      setMonth(date.slice(0, 7)); // 전날·다음날로 달을 넘겼다
+    }
+  }, [date, month, setMonth, today]);
 
   const active = daily.channels.filter((c) => c.active);
   const activeStaff = daily.staff.filter((s) => s.active);
